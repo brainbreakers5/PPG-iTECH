@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 const api = axios.create({
-    baseURL: 'https://ppg-itech.onrender.com',
+    baseURL: 'https://ppg-itech.onrender.com/api',
 });
 
 // Add a request interceptor
