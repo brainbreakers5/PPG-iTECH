@@ -1,0 +1,57 @@
+const ZKLib = require('zkteco-js');
+const axios = require('axios');
+require('dotenv').config();
+
+/**
+ * BIOMETRIC REAL-TIME BRIDGE
+ * This script connects to your device (192.168.1.201) and pushes data 
+ * to the web application as soon as someone punches their finger.
+ */
+
+const DEVICE_IP = '192.168.1.201';
+const DEVICE_PORT = 4370;
+const SERVER_API_URL = 'http://localhost:5000/api/biometric/log'; // Adjust if server is remote
+
+async function startBridge() {
+    let zkInstance = new ZKLib(DEVICE_IP, DEVICE_PORT, 10000, 4000);
+
+    try {
+        console.log(`[${new Date().toLocaleTimeString()}] Connecting to biometric device at ${DEVICE_IP}...`);
+        await zkInstance.createSocket();
+        console.log(`[${new Date().toLocaleTimeString()}] ✅ Connected to device! Listening for real-time punches...`);
+
+        // Get live notifications
+        zkInstance.getRealTimeLogs(async (data) => {
+            console.log(`[${new Date().toLocaleTimeString()}] 🔔 Punch detected! User ID: ${data.userId}`);
+
+            try {
+                // Push to our web server API
+                const response = await axios.post(SERVER_API_URL, {
+                    emp_id: data.userId.toString(),
+                    device_id: 'MAIN_DEVICE_01',
+                    timestamp: new Date().toISOString(),
+                    type: new Date().getHours() < 12 ? 'IN' : 'OUT' // Automatic detection or use device type if available
+                });
+
+                if (response.status === 200) {
+                    console.log(`[${new Date().toLocaleTimeString()}] 🚀 Data pushed to server successfully.`);
+                }
+            } catch (postError) {
+                console.error(`[${new Date().toLocaleTimeString()}] ❌ Failed to push data to server:`, postError.message);
+            }
+        });
+
+    } catch (e) {
+        console.error(`[${new Date().toLocaleTimeString()}] ❌ Connection Error:`, e.message);
+        console.log("Retrying in 10 seconds...");
+        setTimeout(startBridge, 10000);
+    }
+}
+
+// Keep the process alive and handle errors
+process.on('uncaughtException', (err) => {
+    console.error('Fatal Error:', err);
+    setTimeout(startBridge, 5000);
+});
+
+startBridge();

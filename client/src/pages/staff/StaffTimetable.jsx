@@ -1,0 +1,451 @@
+import { useState, useEffect } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import Layout from '../../components/Layout';
+import api from '../../utils/api';
+import { useAuth } from '../../context/AuthContext';
+import { FaSearch, FaUserTie, FaClock, FaDoorOpen, FaCalendarAlt, FaBookOpen, FaPlus, FaEdit, FaTrash, FaArrowLeft } from 'react-icons/fa';
+import { motion, AnimatePresence } from 'framer-motion';
+import { useTimetableConfig } from '../../hooks/useTimetableConfig';
+import Swal from 'sweetalert2';
+
+const to12h = (timeStr) => {
+    if (!timeStr) return '';
+    const [h, m] = timeStr.split(':').map(Number);
+    const ampm = h >= 12 ? 'PM' : 'AM';
+    const h12 = h % 12 || 12;
+    return `${h12}:${String(m).padStart(2, '0')} ${ampm}`;
+};
+
+const StaffTimetable = () => {
+    const { user } = useAuth();
+    const { empId } = useParams();
+    const navigate = useNavigate();
+    // viewOnlyMode: opened via Schedule button for a specific staff — lock to that staff only
+    const viewOnlyMode = !!empId;
+    const [view, setView] = useState('my'); // 'my' or 'all'
+    const [timetable, setTimetable] = useState([]);
+    const [staffList, setStaffList] = useState([]);
+    const [selectedStaff, setSelectedStaff] = useState('');
+    const [searchQuery, setSearchQuery] = useState('');
+    const [loading, setLoading] = useState(false);
+    const { config: periodConfig, teachingPeriods, periodNumbers, allSlots, getPeriodConfig } = useTimetableConfig();
+
+    useEffect(() => {
+        fetchStaff();
+    }, []);
+
+    useEffect(() => {
+        // If opened for a specific staff via URL param, lock to that staff
+        if (empId) {
+            setView('all');
+            setSelectedStaff(empId);
+        }
+    }, [empId]);
+
+    useEffect(() => {
+        fetchTimetable();
+    }, [view, selectedStaff]);
+
+    const fetchStaff = async () => {
+        try {
+            const { data } = await api.get('/employees');
+            setStaffList(data);
+        } catch { console.error('Failed to fetch staff'); }
+    };
+
+    const fetchTimetable = async () => {
+        setLoading(true);
+        try {
+            let query = '/timetable';
+            if (view === 'all') {
+                if (!selectedStaff) {
+                    setTimetable([]);
+                    setLoading(false);
+                    return;
+                }
+                query += `?emp_id=${selectedStaff}`;
+            }
+            const { data } = await api.get(query);
+            setTimetable(data);
+        } catch { console.error('Failed to fetch timetable'); }
+        finally { setLoading(false); }
+    };
+
+    const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const periods = periodNumbers.length > 0 ? periodNumbers : [1, 2, 3, 4, 5, 6, 7, 8];
+    const displaySlots = allSlots.length > 0 ? allSlots : periodConfig;
+
+    const handleDelete = async (id) => {
+        const result = await Swal.fire({
+            title: 'Delete Entry?',
+            text: "This will permanently remove this period from the timetable.",
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#ef4444',
+            confirmButtonText: 'Yes, Delete',
+            background: '#fff',
+            color: '#1e3a8a'
+        });
+
+        if (result.isConfirmed) {
+            try {
+                await api.delete(`/timetable/${id}`);
+                fetchTimetable();
+                Swal.fire({ title: 'Deleted!', text: 'Entry has been removed.', icon: 'success', confirmButtonColor: '#2563eb' });
+            } catch { Swal.fire('Error', 'Failed to delete', 'error'); }
+        }
+    };
+
+    const handleAction = async (entry = null) => {
+        const pCfg = entry?.period_number ? getPeriodConfig(entry.period_number) : null;
+        const initStart = (entry?.start_time || pCfg?.start_time || '').slice(0, 5);
+        const initEnd = (entry?.end_time || pCfg?.end_time || '').slice(0, 5);
+        const { value: formValues } = await Swal.fire({
+            title: entry?.id ? 'Edit Period' : 'Add New Period',
+            html: `
+                <div class="swal-custom-form">
+                    <div class="swal-field-group">
+                         <label>Day of Week</label>
+                         <select id="day_of_week" class="swal2-input custom-select">
+                             ${days.map(d => `<option value="${d}" ${entry?.day_of_week === d ? 'selected' : ''}>${d}</option>`)}
+                         </select>
+                     </div>
+                     <div class="swal-field-group">
+                         <label>Period Number</label>
+                         <select id="period_number" class="swal2-input custom-select" onchange="
+                             var cfg = ${JSON.stringify(periodConfig)};
+                             var sel = this.value;
+                             var p = cfg.find(function(c){ return c.period_number == sel; });
+                             if(p){ 
+                                document.getElementById('start_time').value = p.start_time ? p.start_time.slice(0,5) : ''; 
+                                document.getElementById('end_time').value = p.end_time ? p.end_time.slice(0,5) : ''; 
+                             }
+                         ">
+                             ${teachingPeriods.map(p => `<option value="${p.period_number}" ${entry?.period_number === p.period_number ? 'selected' : ''}>${p.label || 'Period ' + p.period_number}${p.start_time ? ' (' + to12h(p.start_time) + ' – ' + to12h(p.end_time) + ')' : ''}</option>`).join('')}
+                         </select>
+                     </div>
+                     <div class="swal-field-group">
+                        <label>Subject Name</label>
+                        <input id="subject" class="swal2-input" placeholder="Enter Subject..." value="${entry?.subject || ''}">
+                    </div>
+                    <div class="swal-field-group half">
+                        <label>Subject Code</label>
+                        <input id="subject_code" class="swal2-input" placeholder="E.g. CS601" value="${entry?.subject_code || ''}">
+                    </div>
+                    <div class="swal-field-group half">
+                        <label>Room Number</label>
+                        <input id="room_number" class="swal2-input" placeholder="Room #" value="${entry?.room_number || ''}">
+                    </div>
+                    <div class="swal-field-group half">
+                       <label>Start Time</label>
+                       <input id="start_time" type="time" class="swal2-input" value="${initStart}">
+                    </div>
+                    <div class="swal-field-group half">
+                       <label>End Time</label>
+                       <input id="end_time" type="time" class="swal2-input" value="${initEnd}">
+                    </div>
+                </div>
+            `,
+            focusConfirm: false,
+            confirmButtonColor: '#2563eb',
+            confirmButtonText: entry?.id ? 'Update Schedule' : 'Add Period',
+            background: '#fff',
+            color: '#1e3a8a',
+            customClass: { popup: 'swal-modern-popup' },
+            preConfirm: () => {
+                return {
+                    day_of_week: document.getElementById('day_of_week').value,
+                    period_number: document.getElementById('period_number').value,
+                    subject: document.getElementById('subject').value,
+                    subject_code: document.getElementById('subject_code').value,
+                    room_number: document.getElementById('room_number').value,
+                    start_time: document.getElementById('start_time').value,
+                    end_time: document.getElementById('end_time').value,
+                };
+            }
+        });
+
+        if (formValues) {
+            try {
+                if (entry?.id) {
+                    await api.put(`/timetable/${entry.id}`, formValues);
+                } else {
+                    await api.post('/timetable', { ...formValues, emp_id: user.emp_id });
+                }
+                fetchTimetable();
+                Swal.fire({ title: 'Success!', text: 'Timetable updated.', icon: 'success', timer: 1500, showConfirmButton: false });
+            } catch (error) {
+                Swal.fire('Error', error.response?.data?.message || 'Failed to save entry', 'error');
+            }
+        }
+    };
+
+    const filteredStaffList = staffList.filter(s =>
+        s.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (s.designation || '').toLowerCase().includes(searchQuery.toLowerCase())
+    );
+
+    const getEntriesForCell = (day, period) => {
+        return timetable.filter(t => t.day_of_week === day && t.period_number === period);
+    };
+
+    return (
+        <Layout>
+            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
+                {/* Header */}
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-10 gap-6">
+                    <div className="flex items-center gap-4">
+                        {viewOnlyMode && (
+                            <button
+                                onClick={() => navigate(-1)}
+                                className="h-12 w-12 rounded-2xl bg-white border border-gray-100 flex items-center justify-center text-gray-400 hover:bg-sky-50 hover:text-sky-600 transition-all shadow-sm active:scale-90"
+                            >
+                                <FaArrowLeft size={16} />
+                            </button>
+                        )}
+                        <div>
+                            <h1 className="text-3xl font-black text-gray-800 tracking-tight">Timetable</h1>
+                            {viewOnlyMode ? (
+                                <p className="text-gray-500 font-medium mt-1">
+                                    Viewing schedule for: <span className="font-black text-sky-600">
+                                        {staffList.find(s => s.emp_id === empId)?.name || empId}
+                                    </span>
+                                </p>
+                            ) : (
+                                <p className="text-gray-500 font-medium mt-1">View your schedule and browse all staff timetables.</p>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* Only show toggle when NOT in view-only mode */}
+                    {!viewOnlyMode && (
+                        <div className="flex items-center gap-3 flex-wrap">
+                            {/* View Toggle */}
+                            <div className="flex items-center gap-3 bg-white p-2 rounded-2xl shadow-xl shadow-sky-50/50 border border-sky-50">
+                                <div className="flex p-1 bg-gray-50 rounded-xl border border-gray-100/50">
+                                    <button
+                                        onClick={() => { setView('my'); setSelectedStaff(''); }}
+                                        className={`px-6 py-2.5 rounded-lg text-xs font-black uppercase tracking-widest transition-all ${view === 'my' ? 'bg-sky-600 text-white shadow-lg shadow-sky-100' : 'text-gray-400 hover:text-sky-600'}`}
+                                    >
+                                        My Timetable
+                                    </button>
+                                    <button
+                                        onClick={() => setView('all')}
+                                        className={`px-6 py-2.5 rounded-lg text-xs font-black uppercase tracking-widest transition-all ${view === 'all' ? 'bg-sky-600 text-white shadow-lg shadow-sky-100' : 'text-gray-400 hover:text-sky-600'}`}
+                                    >
+                                        All Staff
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+
+                {/* Staff Selector Panel — only shown in 'all' view AND not in viewOnlyMode */}
+                <AnimatePresence>
+                    {view === 'all' && !viewOnlyMode && (
+                        <motion.div
+                            initial={{ opacity: 0, y: -10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: -10 }}
+                            className="mb-10 grid grid-cols-1 md:grid-cols-3 gap-6"
+                        >
+                            {/* Search Box */}
+                            <div className="md:col-span-1 bg-white rounded-3xl shadow-xl shadow-sky-50/50 border border-sky-50 p-6">
+                                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-4">Browse Staff</p>
+                                <div className="relative mb-4">
+                                    <FaSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-sky-300" />
+                                    <input
+                                        type="text"
+                                        placeholder="Search by name or role..."
+                                        value={searchQuery}
+                                        onChange={(e) => setSearchQuery(e.target.value)}
+                                        className="w-full pl-12 pr-4 py-3.5 bg-gray-50 border border-gray-100 rounded-2xl outline-none focus:ring-4 focus:ring-sky-100 focus:border-sky-500 transition-all font-bold text-gray-700 text-sm"
+                                    />
+                                </div>
+                                <div className="space-y-2 max-h-72 overflow-y-auto custom-scrollbar pr-1">
+
+                                    {filteredStaffList.map(s => (
+                                        <button
+                                            key={s.emp_id}
+                                            onClick={() => setSelectedStaff(s.emp_id)}
+                                            className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-left transition-all ${selectedStaff === s.emp_id ? 'bg-sky-600 text-white' : 'bg-gray-50 hover:bg-sky-50 text-gray-600'}`}
+                                        >
+                                            <div className="h-8 w-8 rounded-xl overflow-hidden shrink-0 border border-white shadow">
+                                                <img
+                                                    src={s.profile_pic || `https://ui-avatars.com/api/?name=${encodeURIComponent(s.name)}&background=3b82f6&color=fff&bold=true`}
+                                                    alt=""
+                                                    className="w-full h-full object-cover"
+                                                />
+                                            </div>
+                                            <div className="min-w-0">
+                                                <p className="text-xs font-black tracking-tight truncate">{s.name}</p>
+                                                <p className={`text-[9px] font-bold uppercase tracking-widest truncate ${selectedStaff === s.emp_id ? 'text-sky-100' : 'text-gray-400'}`}>
+                                                    {s.designation || s.role}
+                                                </p>
+                                            </div>
+                                            {s.emp_id === user.emp_id && (
+                                                <span className={`ml-auto text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md shrink-0 ${selectedStaff === s.emp_id ? 'bg-white/20 text-white' : 'bg-sky-100 text-sky-600'}`}>You</span>
+                                            )}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Right side: Timetable grid */}
+                            <div className="md:col-span-2">
+                                {timetable.length === 0 && !loading ? (
+                                    <div className="h-full bg-white rounded-3xl shadow-xl shadow-sky-50/50 border border-sky-50 flex flex-col items-center justify-center py-20">
+                                        <FaCalendarAlt size={40} className="text-sky-200 mb-4" />
+                                        <p className="font-black text-gray-400 text-sm tracking-tight">No timetable entries found.</p>
+                                        <p className="text-[10px] text-gray-300 font-bold uppercase tracking-widest mt-1">Select a staff member to view their schedule</p>
+                                    </div>
+                                ) : (
+                                    <TimetableGrid days={days} displaySlots={displaySlots} timetable={timetable} loading={loading} showStaffName={!selectedStaff} getPeriodConfig={getPeriodConfig} handleAction={handleAction} handleDelete={handleDelete} view={view} />
+                                )}
+                            </div>
+                        </motion.div>
+                    )}
+                </AnimatePresence>
+
+                {/* My Timetable View */}
+                {view === 'my' && (
+                    <TimetableGrid days={days} displaySlots={displaySlots} timetable={timetable} loading={loading} showStaffName={false} getPeriodConfig={getPeriodConfig} handleAction={handleAction} handleDelete={handleDelete} view={view} />
+                )}
+            </motion.div>
+        </Layout>
+    );
+};
+
+// ── Reusable Timetable Grid ───────────────────────────────────────────────────
+const TimetableGrid = ({ days, displaySlots, timetable, loading, showStaffName, getPeriodConfig, handleAction, handleDelete, view }) => (
+    <>
+        <div className="styled-table-container modern-card !p-0 overflow-hidden border-sky-100">
+            <div style={{ overflowX: 'visible' }}>
+                <table className="w-full border-collapse">
+                    <thead>
+                        <tr className="bg-sky-50/50">
+                            <th className="p-6 border-b border-r border-sky-100 font-black text-[10px] text-sky-500 uppercase tracking-[0.2em] text-center w-32">Timeline</th>
+                            {displaySlots.map((slot, idx) => {
+                                const isBreak = slot.is_break;
+                                return (
+                                    <th key={idx} className={`p-4 border-b border-r text-center ${isBreak ? 'bg-amber-50/50 border-amber-100' : 'border-sky-100'}`} style={{ width: `${100 / displaySlots.length}%` }}>
+                                        <div className="flex items-center justify-center gap-2">
+                                            {isBreak && <span className="text-lg">☕</span>}
+                                            <p className={`font-black text-[10px] uppercase tracking-[0.2em] ${isBreak ? 'text-amber-600' : 'text-gray-600'}`}>
+                                                {slot.label || (slot.period_number ? `Period ${slot.period_number}` : 'Break')}
+                                            </p>
+                                        </div>
+                                        {slot.start_time && (
+                                            <p className={`text-[9px] font-bold mt-0.5 ${isBreak ? 'text-amber-400' : 'text-gray-300'}`}>
+                                                {to12h(slot.start_time)} – {to12h(slot.end_time)}
+                                            </p>
+                                        )}
+                                    </th>
+                                );
+                            })}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {days.map(day => (
+                            <tr key={day} className="group">
+                                <td className="p-6 border-b border-r border-sky-50 bg-gray-50/30 text-center font-black text-gray-700 text-xs uppercase tracking-widest">{day}</td>
+                                {displaySlots.map((slot, idx) => {
+                                    const isBreak = slot.is_break;
+                                    if (isBreak) {
+                                        return (
+                                            <td key={idx} className="p-3 border-b border-r border-amber-50/30 bg-amber-50/20 align-middle min-h-[120px] h-36 text-center">
+                                                <div className="text-amber-300 opacity-50">
+                                                    <span className="text-3xl">☕</span>
+                                                </div>
+                                            </td>
+                                        );
+                                    }
+                                    const p = slot.period_number;
+                                    const entries = timetable.filter(t => t.day_of_week === day && t.period_number === p);
+                                    return (
+                                        <td key={idx} className="p-3 border-b border-r border-sky-50 align-top min-h-[120px] h-36 relative">
+                                            <AnimatePresence>
+                                                {entries.map(entry => (
+                                                    <motion.div
+                                                        key={entry.id}
+                                                        initial={{ opacity: 0, scale: 0.95 }}
+                                                        animate={{ opacity: 1, scale: 1 }}
+                                                        className="h-full bg-white border-2 border-sky-100 p-4 rounded-2xl shadow-lg shadow-sky-50/50 flex flex-col justify-between overflow-hidden relative group/entry hover:border-sky-400 transition-all"
+                                                    >
+                                                        <div className="space-y-1.5">
+                                                            <div className="flex items-start justify-between gap-2">
+                                                                <span className="px-2 py-0.5 bg-sky-100 text-sky-600 rounded-lg text-[8px] font-black uppercase tracking-widest shrink-0">{entry.subject_code || 'N/A'}</span>
+                                                                {view === 'my' && (
+                                                                    <div className="flex gap-2 opacity-0 group-hover/entry:opacity-100 transition-all transform translate-y-[-10px] group-hover/entry:translate-y-0">
+                                                                        <button onClick={() => handleAction(entry)} className="text-sky-400 hover:text-sky-600 transition-colors"><FaEdit size={10} /></button>
+                                                                        <button onClick={() => handleDelete(entry.id)} className="text-rose-400 hover:text-rose-600 transition-colors"><FaTrash size={10} /></button>
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                            <p className="text-sm font-black text-gray-800 tracking-tight line-clamp-2 leading-snug">{entry.subject}</p>
+                                                            {showStaffName && (
+                                                                <div className="flex items-center gap-1.5">
+                                                                    <FaUserTie size={9} className="text-sky-400 shrink-0" />
+                                                                    <span className="text-[9px] font-bold text-sky-500 uppercase tracking-widest truncate">{entry.staff_name}</span>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                        <div className="mt-3 pt-2 border-t border-gray-50 flex items-center justify-between">
+                                                            <div className="flex items-center gap-1.5 text-[9px] font-black text-gray-400 uppercase tracking-widest">
+                                                                <FaClock className="text-sky-300" />
+                                                                {to12h(getPeriodConfig(entry.period_number)?.start_time || entry.start_time)} – {to12h(getPeriodConfig(entry.period_number)?.end_time || entry.end_time)}
+                                                            </div>
+                                                            {entry.room_number && (
+                                                                <div className="flex items-center gap-1 text-[9px] font-black text-sky-500 uppercase tracking-widest">
+                                                                    <FaDoorOpen size={9} /> {entry.room_number}
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    </motion.div>
+                                                ))}
+                                            </AnimatePresence>
+
+                                            {entries.length === 0 && view === 'my' && (
+                                                <div className="h-full flex items-center justify-center opacity-0 hover:opacity-100 transition-all duration-300 transform scale-95 hover:scale-100">
+                                                    <button
+                                                        onClick={() => handleAction({ day_of_week: day, period_number: p })}
+                                                        className="w-full h-full flex flex-col items-center justify-center text-gray-200 border-2 border-dashed border-gray-100 rounded-2xl hover:border-sky-200 hover:text-sky-300 hover:bg-white transition-all gap-2"
+                                                    >
+                                                        <div className="h-8 w-8 rounded-full bg-gray-50 flex items-center justify-center">
+                                                            <FaPlus size={12} />
+                                                        </div>
+                                                        <span className="text-[8px] font-black uppercase tracking-widest">Add Period</span>
+                                                    </button>
+                                                </div>
+                                            )}
+
+                                            {entries.length === 0 && view !== 'my' && (
+                                                <div className="h-full flex items-center justify-center opacity-40">
+                                                    <div className="w-8 h-8 rounded-full bg-gray-50 flex items-center justify-center">
+                                                        <FaBookOpen size={10} className="text-gray-200" />
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </td>
+                                    );
+                                })}
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        {loading && (
+            <div className="mt-8 flex items-center justify-center gap-3">
+                <div className="h-2 w-2 bg-sky-600 rounded-full animate-bounce"></div>
+                <div className="h-2 w-2 bg-sky-600 rounded-full animate-bounce delay-100"></div>
+                <div className="h-2 w-2 bg-sky-600 rounded-full animate-bounce delay-200"></div>
+                <span className="text-[10px] font-black text-sky-600 uppercase tracking-widest ml-2">Loading Schedule...</span>
+            </div>
+        )}
+    </>
+);
+
+export default StaffTimetable;
