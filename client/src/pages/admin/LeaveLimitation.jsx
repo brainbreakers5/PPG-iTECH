@@ -8,13 +8,7 @@ import {
 } from 'react-icons/fa';
 import { motion, AnimatePresence } from 'framer-motion';
 
-const LEAVE_TYPES = [
-    { key: 'cl', label: 'CL', full: 'Casual Leave', color: 'blue' },
-    { key: 'ml', label: 'ML', full: 'Medical Leave', color: 'rose' },
-    { key: 'od', label: 'OD', full: 'On Duty', color: 'amber' },
-    { key: 'comp', label: 'Comp Leave', full: 'Compensatory Leave', color: 'purple' },
-    { key: 'lop', label: 'LOP', full: 'Loss of Pay', color: 'gray' },
-];
+
 
 const colorMap = {
     blue: { bg: 'bg-sky-50', text: 'text-sky-600', bar: 'bg-sky-500', border: 'border-sky-100' },
@@ -34,24 +28,29 @@ const LeaveLimitation = () => {
     const [editValues, setEditValues] = useState({});
     const [fromMonth, setFromMonth] = useState(new Date().toISOString().slice(0, 7)); // YYYY-MM format
     const [toMonth, setToMonth] = useState(new Date().toISOString().slice(0, 7));
-    const [customLeaveTypes, setCustomLeaveTypes] = useState([]);
+    const [leaveTypes, setLeaveTypes] = useState([]);
     const [showAddLeaveType, setShowAddLeaveType] = useState(false);
 
     useEffect(() => {
         fetchLimits();
-        loadCustomLeaveTypes();
+        fetchLeaveTypes();
     }, [fromMonth, toMonth]);
 
-    const loadCustomLeaveTypes = () => {
-        const saved = localStorage.getItem('customLeaveTypes');
-        if (saved) {
-            setCustomLeaveTypes(JSON.parse(saved));
+    const fetchLeaveTypes = async () => {
+        try {
+            const { data } = await api.get('/leave-types');
+            setLeaveTypes(data.filter(t => t.key !== 'lop').map(t => ({
+                id: t.id,
+                key: t.key,
+                label: t.label,
+                full: t.full_name,
+                color: t.color,
+                defaultDays: t.default_days,
+                isDefault: t.is_default
+            })));
+        } catch (error) {
+            console.error('Failed to fetch leave types', error);
         }
-    };
-
-    const saveCustomLeaveTypes = (types) => {
-        localStorage.setItem('customLeaveTypes', JSON.stringify(types));
-        setCustomLeaveTypes(types);
     };
 
     const fetchLimits = async () => {
@@ -71,14 +70,12 @@ const LeaveLimitation = () => {
         }
     };
 
+    const noLimitTypes = ['od', 'ml', 'comp'];
+
     const startEdit = (emp) => {
         setEditingId(emp.emp_id);
         setEditValues({
             cl_limit: emp.cl_limit ?? 12,
-            ml_limit: emp.ml_limit ?? 12,
-            od_limit: emp.od_limit ?? 10,
-            comp_limit: emp.comp_limit ?? 6,
-            lop_limit: emp.lop_limit ?? 30,
         });
     };
 
@@ -159,24 +156,19 @@ const LeaveLimitation = () => {
         });
 
         if (formValues) {
-            const newType = {
-                key: formValues.code.toLowerCase().replace(/\s+/g, '_'),
-                label: formValues.code.toUpperCase(),
-                full: formValues.name,
-                color: formValues.color,
-                defaultDays: formValues.days,
-                custom: true
-            };
-            
-            const updatedTypes = [...customLeaveTypes, newType];
-            saveCustomLeaveTypes(updatedTypes);
-            
-            Swal.fire({ 
-                title: 'Success!', 
-                text: 'Custom leave type added successfully.', 
-                icon: 'success',
-                confirmButtonColor: '#2563eb' 
-            });
+            try {
+                await api.post('/leave-types', {
+                    key: formValues.code.toLowerCase().replace(/\s+/g, '_'),
+                    label: formValues.code.toUpperCase(),
+                    full_name: formValues.name,
+                    color: formValues.color,
+                    default_days: formValues.days
+                });
+                fetchLeaveTypes();
+                Swal.fire({ title: 'Success!', text: 'Leave type added successfully.', icon: 'success', confirmButtonColor: '#2563eb' });
+            } catch (error) {
+                Swal.fire({ title: 'Error', text: error.response?.data?.message || 'Failed to add leave type.', icon: 'error' });
+            }
         }
     };
 
@@ -234,30 +226,27 @@ const LeaveLimitation = () => {
         });
 
         if (formValues) {
-            const updatedType = {
-                key: formValues.code.toLowerCase().replace(/\s+/g, '_'),
-                label: formValues.code.toUpperCase(),
-                full: formValues.name,
-                color: formValues.color,
-                defaultDays: formValues.days,
-                custom: true
-            };
-            
-            const updatedTypes = customLeaveTypes.map(t => 
-                t.key === leaveType.key ? updatedType : t
-            );
-            saveCustomLeaveTypes(updatedTypes);
-            
-            Swal.fire({ 
-                title: 'Success!', 
-                text: 'Leave type updated successfully.', 
-                icon: 'success',
-                confirmButtonColor: '#2563eb' 
-            });
+            try {
+                await api.put(`/leave-types/${leaveType.id}`, {
+                    key: formValues.code.toLowerCase().replace(/\s+/g, '_'),
+                    label: formValues.code.toUpperCase(),
+                    full_name: formValues.name,
+                    color: formValues.color,
+                    default_days: formValues.days
+                });
+                fetchLeaveTypes();
+                Swal.fire({ title: 'Success!', text: 'Leave type updated successfully.', icon: 'success', confirmButtonColor: '#2563eb' });
+            } catch (error) {
+                Swal.fire({ title: 'Error', text: error.response?.data?.message || 'Failed to update leave type.', icon: 'error' });
+            }
         }
     };
 
     const handleDeleteLeaveType = async (leaveType) => {
+        if (leaveType.isDefault) {
+            Swal.fire({ title: 'Cannot Delete', text: 'Default leave types cannot be deleted.', icon: 'warning', confirmButtonColor: '#2563eb' });
+            return;
+        }
         const result = await Swal.fire({
             title: 'Delete Leave Type?',
             text: `Are you sure you want to delete "${leaveType.full}"? This action cannot be undone.`,
@@ -270,20 +259,18 @@ const LeaveLimitation = () => {
         });
 
         if (result.isConfirmed) {
-            const updatedTypes = customLeaveTypes.filter(t => t.key !== leaveType.key);
-            saveCustomLeaveTypes(updatedTypes);
-            
-            Swal.fire({ 
-                title: 'Deleted!', 
-                text: 'Leave type has been removed.', 
-                icon: 'success',
-                confirmButtonColor: '#2563eb' 
-            });
+            try {
+                await api.delete(`/leave-types/${leaveType.id}`);
+                fetchLeaveTypes();
+                Swal.fire({ title: 'Deleted!', text: 'Leave type has been removed.', icon: 'success', confirmButtonColor: '#2563eb' });
+            } catch (error) {
+                Swal.fire({ title: 'Error', text: error.response?.data?.message || 'Failed to delete leave type.', icon: 'error' });
+            }
         }
     };
 
     const handleBulkSet = async () => {
-        const allTypes = [...LEAVE_TYPES, ...customLeaveTypes];
+        const editableTypes = leaveTypes.filter(t => !noLimitTypes.includes(t.key));
         const { value: formValues } = await Swal.fire({
             title: 'Set Default Limits for All Staff',
             html: `
@@ -301,13 +288,16 @@ const LeaveLimitation = () => {
                         </div>
                     </div>
                     <div style="border-top:2px solid #e5e7eb; padding-top:12px;">
-                        ${allTypes.map(t => `
+                        ${editableTypes.map(t => `
                             <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:10px;">
                                 <label style="font-size:12px; font-weight:900; color:#6b7280; text-transform:uppercase; letter-spacing:0.1em; flex:1;">${t.full} (${t.label})</label>
-                                <input id="bulk_${t.key}" type="number" min="0" max="365" value="${t.defaultDays || (t.key === 'lop' ? 30 : t.key === 'comp' ? 6 : t.key === 'od' ? 10 : 12)}"
+                                <input id="bulk_${t.key}" type="number" min="0" max="365" value="${t.defaultDays || 12}"
                                     style="width:80px; padding:8px 12px; border:2px solid #e5e7eb; border-radius:12px; font-weight:700; font-size:14px; text-align:center; outline:none;">
                             </div>
                         `).join('')}
+                        <div style="margin-top:8px; padding:8px 12px; background:#f0fdf4; border-radius:10px; font-size:11px; color:#16a34a; font-weight:700;">
+                            Comp Leave (auto-calculated), OD &amp; ML (no limit) are not editable.
+                        </div>
                     </div>
                 </div>
             `,
@@ -318,7 +308,7 @@ const LeaveLimitation = () => {
             width: '550px',
             preConfirm: () => {
                 const values = {};
-                allTypes.forEach(t => {
+                editableTypes.forEach(t => {
                     values[`${t.key}_limit`] = parseInt(document.getElementById(`bulk_${t.key}`)?.value) || 12;
                 });
                 values.fromMonth = document.getElementById('bulk_from_month')?.value;
@@ -379,13 +369,6 @@ const LeaveLimitation = () => {
                                     className="bg-transparent font-black text-sm text-gray-700 outline-none"
                                 />
                             </div>
-                            
-                            <button
-                                onClick={handleAddLeaveType}
-                                className="bg-purple-600 text-white px-5 py-3 rounded-2xl font-black text-xs uppercase tracking-widest shadow-lg shadow-purple-100 hover:bg-purple-700 transition-all flex items-center gap-2 active:scale-95"
-                            >
-                                <FaPlus size={14} /> Add Leave Type
-                            </button>
                         </div>
                         
                         {/* Bulk Set Button - Right Corner */}
@@ -398,42 +381,47 @@ const LeaveLimitation = () => {
                     </div>
                 </div>
 
-                {/* Legend */}
-                <div className="flex flex-wrap gap-3 mb-8">
-                    {LEAVE_TYPES.map(t => {
-                        const c = colorMap[t.color];
-                        return (
-                            <div key={t.key} className={`flex items-center gap-2 px-4 py-2 ${c.bg} ${c.border} border rounded-2xl`}>
-                                <div className={`h-2 w-2 rounded-full ${c.bar}`} />
-                                <span className={`text-[10px] font-black uppercase tracking-widest ${c.text}`}>{t.full}</span>
-                            </div>
-                        );
-                    })}
-                    {customLeaveTypes.map(t => {
-                        const c = colorMap[t.color] || colorMap.blue;
-                        return (
-                            <div key={t.key} className={`flex items-center gap-2 px-4 py-2 ${c.bg} ${c.border} border rounded-2xl relative`}>
-                                <div className={`h-2 w-2 rounded-full ${c.bar}`} />
-                                <span className={`text-[10px] font-black uppercase tracking-widest ${c.text}`}>{t.full}</span>
-                                <div className="flex items-center gap-1 ml-2">
-                                    <button
-                                        onClick={() => handleEditLeaveType(t)}
-                                        className="text-gray-400 hover:text-blue-600 transition-colors"
-                                        title="Edit"
-                                    >
-                                        <FaEdit size={10} />
-                                    </button>
-                                    <button
-                                        onClick={() => handleDeleteLeaveType(t)}
-                                        className="text-gray-400 hover:text-rose-600 transition-colors"
-                                        title="Delete"
-                                    >
-                                        <FaTrash size={10} />
-                                    </button>
+                {/* Legend & Leave Type Management */}
+                <div className="bg-white rounded-2xl border border-gray-100 shadow-lg shadow-sky-50/30 p-5 mb-8">
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-4">
+                        <h2 className="text-xs font-black text-gray-400 uppercase tracking-widest">Leave Types</h2>
+                        <button
+                            onClick={handleAddLeaveType}
+                            className="flex items-center gap-2 bg-sky-600 text-white px-4 py-2 rounded-xl font-black text-[10px] uppercase tracking-widest shadow-md shadow-sky-100 hover:bg-sky-700 transition-all active:scale-95"
+                        >
+                            <FaPlus size={10} /> Add Leave Type
+                        </button>
+                    </div>
+                    <div className="flex flex-wrap gap-3">
+                        {leaveTypes.map(t => {
+                            const c = colorMap[t.color] || colorMap.blue;
+                            return (
+                                <div key={t.key} className={`flex items-center gap-2.5 pl-4 pr-2 py-2 ${c.bg} ${c.border} border rounded-2xl group/lt`}>
+                                    <div className={`h-2.5 w-2.5 rounded-full ${c.bar}`} />
+                                    <span className={`text-[10px] font-black uppercase tracking-widest ${c.text}`}>{t.full}</span>
+                                    <span className="text-[9px] font-bold text-gray-400">({t.label})</span>
+                                    <div className="flex items-center gap-1 ml-1 pl-2 border-l border-gray-200">
+                                        <button
+                                            onClick={() => handleEditLeaveType(t)}
+                                            className="h-6 w-6 flex items-center justify-center rounded-lg text-gray-400 hover:text-sky-600 hover:bg-sky-100 transition-all"
+                                            title={`Edit ${t.full}`}
+                                        >
+                                            <FaEdit size={11} />
+                                        </button>
+                                        {!t.isDefault && (
+                                            <button
+                                                onClick={() => handleDeleteLeaveType(t)}
+                                                className="h-6 w-6 flex items-center justify-center rounded-lg text-gray-400 hover:text-rose-600 hover:bg-rose-100 transition-all"
+                                                title={`Delete ${t.full}`}
+                                            >
+                                                <FaTrash size={11} />
+                                            </button>
+                                        )}
+                                    </div>
                                 </div>
-                            </div>
-                        );
-                    })}
+                            );
+                        })}
+                    </div>
                 </div>
 
                 {/* Search */}
@@ -455,7 +443,7 @@ const LeaveLimitation = () => {
                             <thead>
                                 <tr className="bg-sky-50/50 border-b border-sky-100">
                                     <th className="p-5 text-[10px] font-black text-gray-400 uppercase tracking-widest min-w-[220px]">Employee</th>
-                                    {LEAVE_TYPES.map(t => (
+                                    {leaveTypes.map(t => (
                                         <th key={t.key} className="p-5 text-[10px] font-black text-gray-400 uppercase tracking-widest text-center min-w-[120px]">
                                             {t.label}
                                             <div className="text-[8px] text-gray-300 normal-case font-bold tracking-normal mt-0.5">{t.full}</div>
@@ -509,18 +497,40 @@ const LeaveLimitation = () => {
                                             </td>
 
                                             {/* Leave Type Cells */}
-                                            {LEAVE_TYPES.map(t => {
+                                            {leaveTypes.map(t => {
                                                 const limitKey = `${t.key}_limit`;
                                                 const takenKey = `${t.key}_taken`;
-                                                const limit = isEditing ? editValues[limitKey] : (emp[limitKey] ?? '-');
+                                                const isNoLimit = noLimitTypes.includes(t.key);
+                                                const isComp = t.key === 'comp';
+                                                const limit = isComp ? (emp.comp_earned ?? 0) : (isNoLimit ? null : (isEditing ? editValues[limitKey] : (emp[limitKey] ?? '-')));
                                                 const taken = emp[takenKey] ?? 0;
                                                 const pct = limit > 0 ? Math.min(100, Math.round((taken / limit) * 100)) : 0;
                                                 const c = colorMap[t.color];
-                                                const isOver = taken >= limit && limit > 0;
+                                                const isOver = limit > 0 && taken >= limit;
 
                                                 return (
                                                     <td key={t.key} className="p-4 text-center">
-                                                        {isEditing ? (
+                                                        {isNoLimit && !isComp ? (
+                                                            <div className="flex flex-col items-center gap-2">
+                                                                <span className={`text-sm font-black text-gray-800`}>{taken}</span>
+                                                                <span className="text-[9px] font-black text-emerald-500 uppercase tracking-widest">No Limit</span>
+                                                            </div>
+                                                        ) : isComp ? (
+                                                            <div className="flex flex-col items-center gap-2">
+                                                                <div className="flex items-center gap-1">
+                                                                    <span className={`text-sm font-black ${isOver ? 'text-rose-600' : 'text-gray-800'}`}>{taken}</span>
+                                                                    <span className="text-gray-300 text-xs">/</span>
+                                                                    <span className={`text-sm font-black ${c.text}`}>{limit}</span>
+                                                                </div>
+                                                                <div className="w-16 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                                                                    <div
+                                                                        className={`h-full rounded-full transition-all ${isOver ? 'bg-rose-500' : c.bar}`}
+                                                                        style={{ width: `${pct}%` }}
+                                                                    />
+                                                                </div>
+                                                                <span className={`text-[8px] font-black uppercase tracking-widest text-indigo-400`}>Auto</span>
+                                                            </div>
+                                                        ) : isEditing ? (
                                                             <input
                                                                 type="number"
                                                                 min="0"

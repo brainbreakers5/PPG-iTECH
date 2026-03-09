@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import Layout from '../../components/Layout';
 import api from '../../utils/api';
 import { useAuth } from '../../context/AuthContext';
@@ -9,7 +9,10 @@ import { motion, AnimatePresence } from 'framer-motion';
 const DepartmentStaffPage = () => {
     const { id } = useParams();
     const navigate = useNavigate();
+    const location = useLocation();
     const { user } = useAuth();
+    const isManagement = location.pathname.startsWith('/management');
+    const effectiveRole = isManagement ? 'management' : (user?.role || 'staff');
     const [personnel, setPersonnel] = useState([]);
     const [department, setDepartment] = useState(null);
     const [loading, setLoading] = useState(true);
@@ -131,7 +134,8 @@ const DepartmentStaffPage = () => {
                                 <div className="mt-8 grid grid-cols-2 gap-4 w-full">
                                     <button
                                         onClick={() => {
-                                            const rolePrefix = user.role === 'admin' ? 'admin' :
+                                            const rolePrefix = isManagement ? 'management' :
+                                                user.role === 'admin' ? 'admin' :
                                                 user.role === 'principal' ? 'principal' :
                                                     user.role === 'hod' ? 'hod' : 'staff';
                                             navigate(`/${rolePrefix}/profile/${member.emp_id}`);
@@ -143,7 +147,9 @@ const DepartmentStaffPage = () => {
                                     </button>
                                     <button
                                         onClick={() => {
-                                            if (user.role === 'admin') {
+                                            if (isManagement) {
+                                                navigate(-1);
+                                            } else if (user.role === 'admin') {
                                                 navigate(`/admin/timetable/${member.emp_id}`);
                                             } else if (user.role === 'principal') {
                                                 navigate(`/principal/timetable/${member.emp_id}`);

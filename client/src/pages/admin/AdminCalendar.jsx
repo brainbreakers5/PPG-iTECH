@@ -11,6 +11,7 @@ const AdminCalendar = () => {
     const [loading, setLoading] = useState(true);
     const [pendingChanges, setPendingChanges] = useState([]);
     const [isSaving, setIsSaving] = useState(false);
+    const [selectedDay, setSelectedDay] = useState(null);
 
     useEffect(() => {
         fetchHolidays();
@@ -67,7 +68,8 @@ const AdminCalendar = () => {
             currentType = existingHoliday.type;
             currentCaption = existingHoliday.caption;
         } else {
-            const defaultIsHoliday = dayOfWeek === 0 || dayOfWeek === 6;
+            const isFirstSat = dayOfWeek === 6 && day <= 7;
+            const defaultIsHoliday = dayOfWeek === 0 || (dayOfWeek === 6 && !isFirstSat);
             currentType = defaultIsHoliday ? 'Holiday' : 'Working Day';
             currentCaption = currentType;
         }
@@ -110,7 +112,8 @@ const AdminCalendar = () => {
         } else {
             const dateObj = new Date(currentDate.getFullYear(), currentDate.getMonth(), day);
             const dayOfWeek = dateObj.getDay();
-            currentType = (dayOfWeek === 0 || dayOfWeek === 6) ? 'Holiday' : 'Working Day';
+            const isFirstSat = dayOfWeek === 6 && day <= 7;
+            currentType = (dayOfWeek === 0 || (dayOfWeek === 6 && !isFirstSat)) ? 'Holiday' : 'Working Day';
             initialCaption = currentType;
         }
 
@@ -210,7 +213,8 @@ const AdminCalendar = () => {
             const existingHoliday = holidays.find(h => h.h_date === dateStr);
             const pendingChange = pendingChanges.find(p => p.date === dateStr);
 
-            let type = (dayOfWeek === 0 || dayOfWeek === 6) ? 'Holiday' : 'Working Day';
+            const isFirstSaturday = dayOfWeek === 6 && i <= 7;
+            let type = (dayOfWeek === 0 || (dayOfWeek === 6 && !isFirstSaturday)) ? 'Holiday' : 'Working Day';
             let caption = type;
 
             if (pendingChange) {
@@ -225,16 +229,20 @@ const AdminCalendar = () => {
 
             let bgColor = 'bg-white';
             let textColor = 'text-gray-600';
+            let accentColor = 'bg-gray-200';
 
             if (type === 'Holiday') {
                 bgColor = 'bg-rose-50 border-rose-100 shadow-inner';
                 textColor = 'text-rose-600';
+                accentColor = 'bg-rose-500';
             } else if (type === 'Working Day') {
                 bgColor = 'bg-emerald-50 border-emerald-100 shadow-inner';
                 textColor = 'text-emerald-600';
+                accentColor = 'bg-emerald-500';
             } else if (type === 'Special') {
                 bgColor = 'bg-amber-50 border-amber-100 shadow-inner';
                 textColor = 'text-amber-600';
+                accentColor = 'bg-amber-500';
             }
 
             const ringClass = isModified ? 'ring-2 ring-sky-500 ring-inset ring-offset-0 z-10' : '';
@@ -243,7 +251,8 @@ const AdminCalendar = () => {
                 <motion.div
                     key={i}
                     whileHover={{ zIndex: 10, scale: 1.02, boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)' }}
-                    className={`p-4 border-b border-r border-gray-100 h-32 relative transition-all group cursor-pointer ${bgColor} ${ringClass}`}
+                    className={`p-4 border-b border-r border-gray-100 h-24 relative transition-all group cursor-pointer ${bgColor} ${ringClass} ${selectedDay?.day === i ? 'ring-2 ring-sky-400 ring-inset' : ''}`}
+                    onClick={() => setSelectedDay({ day: i, type, caption, dateStr })}
                     onDoubleClick={() => handleToggleHoliday(i)}
                 >
                     <div className="flex justify-between items-start">
@@ -269,14 +278,11 @@ const AdminCalendar = () => {
                         </div>
                     </div>
 
-                    <div className="mt-2 space-y-1">
-                        <p className={`text-[11px] font-black uppercase tracking-wider leading-tight ${textColor} break-words`}>
-                            {caption}
-                        </p>
-                        <p className="text-[8px] font-bold text-gray-400/50 opacity-0 group-hover:opacity-100 transition-opacity">
-                            Double click to toggle
-                        </p>
-                    </div>
+                    <div className={`absolute bottom-2 left-1/2 -translate-x-1/2 w-2 h-2 rounded-full ${accentColor}`}></div>
+
+                    <p className="text-[8px] font-bold text-gray-400/50 opacity-0 group-hover:opacity-100 transition-opacity absolute bottom-4 left-1/2 -translate-x-1/2 whitespace-nowrap">
+                        Double click to toggle
+                    </p>
                 </motion.div>
             );
         }
@@ -377,6 +383,7 @@ const AdminCalendar = () => {
                     {renderDays()}
                 </div>
             </motion.div>
+
         </Layout>
     );
 };

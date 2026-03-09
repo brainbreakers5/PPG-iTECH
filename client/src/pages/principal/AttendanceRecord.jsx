@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import Layout from '../../components/Layout';
 import api from '../../utils/api';
 import { FaFileDownload, FaFilter, FaSearch, FaEye, FaTimes, FaCalendarAlt } from 'react-icons/fa';
@@ -15,7 +15,7 @@ const AttendanceRecord = () => {
 
     // Default to a range that includes the user's mock data (February)
     const [startDate, setStartDate] = useState('2026-02-01');
-    const [endDate, setEndDate] = useState(new Date().toISOString().split('T')[0]);
+    const [endDate, setEndDate] = useState(new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' }));
     const [departmentId, setDepartmentId] = useState('');
     const [role, setRole] = useState('');
     const [summaryRecords, setSummaryRecords] = useState([]);
@@ -23,6 +23,7 @@ const AttendanceRecord = () => {
     const [biometricRecords, setBiometricRecords] = useState([]);
     const [departments, setDepartments] = useState([]);
     const [viewMode, setViewMode] = useState('summary'); // 'summary', 'detailed', or 'biometric'
+    const [selectedEmployee, setSelectedEmployee] = useState(null); // For summary view modal
 
     // Helper function to expand leave type abbreviations in status
     const expandStatusName = (status) => {
@@ -35,6 +36,51 @@ const AttendanceRecord = () => {
         };
         return statusMap[status] || status;
     };
+
+    // Abbreviate status for attendance sheet cells
+    const abbreviateStatus = (status) => {
+        const map = {
+            'Present': 'P', 'Absent': 'A', 'OD': 'OD', 'ML': 'ML',
+            'CL': 'CL', 'Comp Leave': 'COMP', 'Holiday': 'H',
+            'Leave': 'L', 'LOP': 'LOP'
+        };
+        return map[status] || status || '—';
+    };
+
+    const getStatusCellColor = (status) => {
+        const colors = {
+            'Present': 'text-emerald-700 bg-emerald-50',
+            'Absent': 'text-rose-700 bg-rose-50',
+            'OD': 'text-sky-700 bg-sky-50',
+            'ML': 'text-amber-700 bg-amber-50',
+            'CL': 'text-amber-700 bg-amber-50',
+            'Comp Leave': 'text-violet-700 bg-violet-50',
+            'Holiday': 'text-gray-500 bg-gray-100',
+            'Leave': 'text-orange-700 bg-orange-50',
+            'LOP': 'text-rose-700 bg-rose-50'
+        };
+        return colors[status] || 'text-gray-400';
+    };
+
+    // Group detailed records by employee for attendance sheet view
+    const groupedByEmployee = useMemo(() => {
+        const groups = {};
+        detailedRecords.forEach(rec => {
+            if (!groups[rec.emp_id]) {
+                groups[rec.emp_id] = { emp_id: rec.emp_id, name: rec.name, role: rec.role, department_name: rec.department_name, records: {} };
+            }
+            const dateKey = String(rec.date).slice(0, 10);
+            groups[rec.emp_id].records[dateKey] = rec;
+        });
+        return Object.values(groups);
+    }, [detailedRecords]);
+
+    // Sorted unique dates across all detailed records
+    const uniqueDates = useMemo(() => {
+        const dates = new Set();
+        detailedRecords.forEach(rec => dates.add(String(rec.date).slice(0, 10)));
+        return Array.from(dates).sort();
+    }, [detailedRecords]);
 
     useEffect(() => {
         const fetchDepts = async () => {
@@ -129,12 +175,103 @@ const AttendanceRecord = () => {
         .replace(/'/g, '&#39;');
 
     const handlePrint = () => {
+        // Special print for detailed attendance sheet view
+        if (viewMode === 'detailed') {
+            if (groupedByEmployee.length === 0 || uniqueDates.length === 0) return;
+
+            const printWindow = window.open('', '_blank', 'width=1200,height=800');
+            if (!printWindow) return;
+
+            const abbreviate = (status) => {
+                const map = { 'Present': 'P', 'Absent': 'A', 'OD': 'OD', 'ML': 'ML', 'CL': 'CL', 'Comp Leave': 'COMP', 'Holiday': 'H', 'Leave': 'L', 'LOP': 'LOP' };
+                return map[status] || status || '\u2014';
+            };
+
+            const statusColor = (status) => {
+                const m = { 'Present': '#065f46', 'Absent': '#9f1239', 'OD': '#0369a1', 'ML': '#92400e', 'CL': '#92400e', 'Comp Leave': '#5b21b6', 'Holiday': '#6b7280', 'Leave': '#c2410c', 'LOP': '#9f1239' };
+                return m[status] || '#6b7280';
+            };
+
+            const employeeSections = groupedByEmployee.map(emp => {
+                const dateHeaders = uniqueDates.map(date => {
+                    const d = new Date(date + 'T00:00:00+05:30');
+                    return `<th style="border:1px dotted #9ca3af;padding:4px 2px;text-align:center;min-width:42px;font-size:8pt;background:#f3f4f6;">
+                        <div style="font-weight:800;">${d.toLocaleDateString('en-US', { timeZone: 'Asia/Kolkata', day: '2-digit' })}</div>
+                        <div style="font-size:6pt;color:#9ca3af;text-transform:uppercase;">${d.toLocaleDateString('en-US', { timeZone: 'Asia/Kolkata', weekday: 'short' })}</div>
+                    </th>`;
+                }).join('');
+
+                const makeRow = (label, getValue, bgColor) => {
+                    const cells = uniqueDates.map(date => {
+                        const rec = emp.records[date];
+                        const val = getValue(rec);
+                        const color = label === 'Status' && rec ? statusColor(rec.status) : '#374151';
+                        return `<td style="border:1px dotted #9ca3af;padding:3px 2px;text-align:center;font-size:8pt;color:${escapeHtml(color)};font-weight:${label === 'Status' || label === 'Total' ? '800' : '600'};">${escapeHtml(val)}</td>`;
+                    }).join('');
+                    return `<tr style="background:${bgColor};">
+                        <td style="border:1px dotted #9ca3af;padding:4px 8px;font-size:8pt;font-weight:800;text-transform:uppercase;letter-spacing:0.5px;color:#374151;background:${bgColor};white-space:nowrap;">${escapeHtml(label)}</td>
+                        ${cells}
+                    </tr>`;
+                };
+
+                return `
+                    <div style="margin-bottom:24px;page-break-inside:avoid;">
+                        <div style="background:#0369a1;color:white;padding:6px 12px;font-size:10pt;font-weight:800;border-radius:6px 6px 0 0;">
+                            ${escapeHtml(emp.emp_id)} &mdash; ${escapeHtml(emp.name)}
+                            ${emp.role ? `<span style="float:right;font-size:8pt;opacity:0.8;text-transform:uppercase;">${escapeHtml(emp.role)}</span>` : ''}
+                        </div>
+                        <table style="width:100%;border-collapse:collapse;table-layout:fixed;">
+                            <thead><tr>
+                                <th style="border:1px dotted #9ca3af;padding:4px 8px;text-align:left;min-width:65px;font-size:8pt;background:#e5e7eb;font-weight:800;">Day &rarr;</th>
+                                ${dateHeaders}
+                            </tr></thead>
+                            <tbody>
+                                ${makeRow('Status', rec => rec ? abbreviate(rec.status) : '\u2014', '#ffffff')}
+                                ${makeRow('InTime', rec => rec?.in_time || '\u2014', '#f9fafb')}
+                                ${makeRow('OutTime', rec => rec?.out_time || '\u2014', '#ffffff')}
+                                ${makeRow('Total', rec => rec ? calculateHours(rec.in_time, rec.out_time) : '\u2014', '#f0f9ff')}
+                            </tbody>
+                        </table>
+                    </div>`;
+            }).join('');
+
+            printWindow.document.write(`<!doctype html><html><head><meta charset="UTF-8"><title>Detailed Attendance Sheet</title>
+                <style>
+                    @page { size: landscape; margin: 0.5cm; }
+                    * { box-sizing: border-box; }
+                    body { font-family: Arial, Helvetica, sans-serif; padding: 12px; color: #111827; margin: 0; font-size: 10pt; position: relative; }
+                    h1 { margin: 0 0 6px; font-size: 14pt; font-weight: 800; color: #1e3a8a; }
+                    .print-brand { position: absolute; top: 12px; right: 12px; text-align: right; }
+                    .print-brand .app-name { font-size: 11pt; font-weight: 800; color: #1e3a8a; margin: 0; letter-spacing: 0.5px; }
+                    .print-brand .print-time { font-size: 8pt; color: #6b7280; margin: 2px 0 0; }
+                    .meta { margin-bottom: 14px; color: #6b7280; font-size: 9pt; border-bottom: 2px solid #e5e7eb; padding-bottom: 6px; }
+                    @media print { body { padding: 0; } }
+                </style></head><body>
+                <div class="print-brand">
+                    <p class="app-name">PPG iTech HUB</p>
+                    <p class="print-time">${new Date().toLocaleString('en-GB')}</p>
+                </div>
+                <h1>Detailed Attendance Sheet</h1>
+                <div class="meta">
+                    Period: ${new Date(startDate).toLocaleDateString('en-GB')} to ${new Date(endDate).toLocaleDateString('en-GB')} |
+                    Employees: ${groupedByEmployee.length}
+                    ${departmentId ? ` | Department: ${departments.find(d => String(d.id) === String(departmentId))?.name || ''}` : ''}
+                    ${role ? ` | Role: ${role.toUpperCase()}` : ''}
+                </div>
+                ${employeeSections}
+            </body></html>`);
+            printWindow.document.close();
+            printWindow.focus();
+            setTimeout(() => printWindow.print(), 250);
+            return;
+        }
+
         let items, title, headings, getRowData;
         
         if (viewMode === 'summary') {
             items = summaryRecords;
             title = 'Attendance Summary Report';
-            headings = ['#', 'Emp ID', 'Name', 'Role', 'Working Days', 'Holidays', 'Present', 'Leave', 'OD', 'LOP'];
+            headings = ['#', 'Emp ID', 'Name', 'Role', 'Working Days', 'Holidays', 'Present', 'CL', 'ML', 'Comp', 'OD'];
             getRowData = (rec, idx) => [
                 idx + 1,
                 rec.emp_id ?? '',
@@ -143,9 +280,10 @@ const AttendanceRecord = () => {
                 rec.total_working_days ?? 0,
                 rec.total_holidays ?? 0,
                 rec.total_present ?? 0,
-                rec.total_leave ?? 0,
-                rec.total_od ?? 0,
-                rec.total_lop ?? 0
+                rec.total_cl ?? 0,
+                rec.total_ml ?? 0,
+                rec.total_comp ?? 0,
+                rec.total_od ?? 0
             ];
         } else if (viewMode === 'detailed') {
             items = detailedRecords;
@@ -153,7 +291,7 @@ const AttendanceRecord = () => {
             headings = ['#', 'Date', 'Emp ID', 'Name', 'Status', 'In Time', 'Out Time', 'Hours'];
             getRowData = (log, idx) => [
                 idx + 1,
-                new Date(log.date).toLocaleDateString('en-GB'),
+                new Date(String(log.date).slice(0, 10) + 'T00:00:00+05:30').toLocaleDateString('en-GB', { timeZone: 'Asia/Kolkata' }),
                 log.emp_id ?? '',
                 log.name ?? '',
                 log.status ?? '',
@@ -169,7 +307,7 @@ const AttendanceRecord = () => {
                 idx + 1,
                 log.user_id ?? '',
                 log.name ?? log.user_id ?? '',
-                new Date(log.date).toLocaleDateString('en-GB'),
+                new Date(String(log.date).slice(0, 10) + 'T00:00:00+05:30').toLocaleDateString('en-GB', { timeZone: 'Asia/Kolkata' }),
                 log.intime ?? '--:--',
                 log.outtime ?? '--:--',
                 calculateBiometricHours(log.intime, log.outtime),
@@ -247,6 +385,26 @@ const AttendanceRecord = () => {
                         color: #111827;
                         margin: 0;
                         font-size: 10pt;
+                        position: relative;
+                    }
+                    
+                    .print-brand {
+                        position: absolute;
+                        top: 12px;
+                        right: 12px;
+                        text-align: right;
+                    }
+                    .print-brand .app-name {
+                        font-size: 11pt;
+                        font-weight: 800;
+                        color: #1e3a8a;
+                        margin: 0;
+                        letter-spacing: 0.5px;
+                    }
+                    .print-brand .print-time {
+                        font-size: 8pt;
+                        color: #6b7280;
+                        margin: 2px 0 0;
                     }
                     
                     h1 {
@@ -333,10 +491,13 @@ const AttendanceRecord = () => {
                 </style>
             </head>
             <body>
+                <div class="print-brand">
+                    <p class="app-name">PPG iTech HUB</p>
+                    <p class="print-time">${new Date().toLocaleString('en-GB')}</p>
+                </div>
                 <h1>${escapeHtml(title)}</h1>
                 <div class="meta">
                     Period: ${new Date(startDate).toLocaleDateString('en-GB')} to ${new Date(endDate).toLocaleDateString('en-GB')} | 
-                    Printed: ${new Date().toLocaleString('en-GB')} | 
                     Records: ${items.length}
                     ${departmentId ? ` | Department: ${departments.find(d => d.id == departmentId)?.name || ''}` : ''}
                     ${role ? ` | Role: ${role.toUpperCase()}` : ''}
@@ -530,9 +691,10 @@ const AttendanceRecord = () => {
                                         <th className="p-5 text-xs font-black uppercase tracking-widest bg-gray-50/50 text-center">Working Days</th>
                                         <th className="p-5 text-xs font-black uppercase tracking-widest bg-gray-50/50 text-center">Holidays</th>
                                         <th className="p-5 text-xs font-black uppercase tracking-widest bg-gray-50/50 text-center">Present</th>
-                                        <th className="p-5 text-xs font-black uppercase tracking-widest bg-gray-50/50 text-center">Leave</th>
+                                        <th className="p-5 text-xs font-black uppercase tracking-widest bg-gray-50/50 text-center">CL</th>
+                                        <th className="p-5 text-xs font-black uppercase tracking-widest bg-gray-50/50 text-center">ML</th>
+                                        <th className="p-5 text-xs font-black uppercase tracking-widest bg-gray-50/50 text-center">Comp</th>
                                         <th className="p-5 text-xs font-black uppercase tracking-widest bg-gray-50/50 text-center">OD</th>
-                                        <th className="p-5 text-xs font-black uppercase tracking-widest bg-gray-50/50 text-center">LOP</th>
                                         <th className="p-5 text-xs font-black uppercase tracking-widest bg-gray-50/50 text-center no-print">Action</th>
                                     </tr>
                                 </thead>
@@ -547,16 +709,15 @@ const AttendanceRecord = () => {
                                             <td className="p-5 text-sm font-black text-center text-emerald-600">{rec.total_working_days}</td>
                                             <td className="p-5 text-sm font-black text-center text-rose-500">{rec.total_holidays}</td>
                                             <td className="p-5 text-sm font-black text-center text-sky-600">{rec.total_present}</td>
-                                            <td className="p-5 text-sm font-black text-center text-rose-500">{rec.total_leave}</td>
+                                            <td className="p-5 text-sm font-black text-center text-amber-500">{rec.total_cl}</td>
+                                            <td className="p-5 text-sm font-black text-center text-orange-500">{rec.total_ml}</td>
+                                            <td className="p-5 text-sm font-black text-center text-violet-500">{rec.total_comp}</td>
                                             <td className="p-5 text-sm font-black text-center text-amber-500">{rec.total_od}</td>
-                                            <td className="p-5 text-sm font-black text-center text-gray-400">{rec.total_lop}</td>
-                                            <td className="p-5 text-center no-print text-left">
+                                            <td className="p-5 text-center no-print">
                                                 <button
                                                     onClick={() => {
-                                                        const rolePrefix = user?.role === 'admin' ? 'admin' :
-                                                            user?.role === 'principal' ? 'principal' :
-                                                                user?.role === 'hod' ? 'hod' : 'staff';
-                                                        navigate(`/${rolePrefix}/attendance/${rec.emp_id}/${startDate}/${endDate}`);
+                                                        const empRecords = detailedRecords.filter(d => d.emp_id === rec.emp_id);
+                                                        setSelectedEmployee({ emp_id: rec.emp_id, name: rec.name, role: rec.role, records: empRecords });
                                                     }}
                                                     className="p-3 bg-gray-50 text-gray-400 hover:text-sky-600 hover:bg-sky-50 rounded-xl transition-all"
                                                     title="View Detailed Records"
@@ -576,64 +737,145 @@ const AttendanceRecord = () => {
                         initial={{ opacity: 0, x: 20 }}
                         animate={{ opacity: 1, x: 0 }}
                         exit={{ opacity: 0, x: -20 }}
+                        className="space-y-8"
                     >
-                        {/* Live Date Display for Detailed */}
-                        <div className="mb-6 p-6 bg-white rounded-[32px] border border-sky-50 shadow-lg">
-                            <div className="flex items-center gap-3">
-                                <FaCalendarAlt className="text-emerald-600 text-lg" />
-                                <div>
-                                    <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Live Date</p>
-                                    <p className="text-sm font-black text-gray-800">
-                                        {new Date().toLocaleDateString('en-US', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' })}
-                                    </p>
-                                </div>
-                                <span className="ml-auto px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest border bg-emerald-50 text-emerald-600 border-emerald-100 flex items-center gap-1.5">
-                                    <span className="h-1.5 w-1.5 bg-emerald-500 rounded-full animate-ping" />
-                                    Live
+                        {/* Legend */}
+                        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm px-5 py-3 flex flex-wrap items-center gap-x-5 gap-y-2">
+                            <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest mr-1">Legend:</span>
+                            {[
+                                { code: 'P', label: 'Present', cls: 'text-emerald-700 bg-emerald-50' },
+                                { code: 'A', label: 'Absent', cls: 'text-rose-700 bg-rose-50' },
+                                { code: 'OD', label: 'On Duty', cls: 'text-sky-700 bg-sky-50' },
+                                { code: 'ML', label: 'Medical Leave', cls: 'text-amber-700 bg-amber-50' },
+                                { code: 'CL', label: 'Casual Leave', cls: 'text-amber-700 bg-amber-50' },
+                                { code: 'COMP', label: 'Comp Leave', cls: 'text-violet-700 bg-violet-50' },
+                                { code: 'H', label: 'Holiday', cls: 'text-gray-500 bg-gray-100' },
+                                { code: 'LOP', label: 'Loss of Pay', cls: 'text-rose-700 bg-rose-50' },
+                            ].map(item => (
+                                <span key={item.code} className="flex items-center gap-1.5">
+                                    <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-black ${item.cls}`}>{item.code}</span>
+                                    <span className="text-[10px] text-gray-500">{item.label}</span>
                                 </span>
-                            </div>
+                            ))}
                         </div>
-                        <motion.div
-                        key="cards"
-                        initial={{ opacity: 0, x: 20 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        exit={{ opacity: 0, x: -20 }}
-                        className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
-                    >
-                        {detailedRecords.map((log, idx) => (
+
+                        {/* Employee Attendance Sheets */}
+                        {groupedByEmployee.map((emp) => (
                             <motion.div
-                                key={log.id || idx}
-                                initial={{ opacity: 0, scale: 0.95 }}
-                                animate={{ opacity: 1, scale: 1 }}
-                                transition={{ delay: idx * 0.05 }}
-                                className="bg-white p-6 rounded-[32px] border border-sky-50 shadow-xl shadow-sky-500/5 hover:border-sky-200 transition-all group"
+                                key={emp.emp_id}
+                                initial={{ opacity: 0, y: 12 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                className="bg-white rounded-2xl shadow-lg shadow-sky-50/50 border border-gray-100 overflow-hidden print-section"
                             >
-                                <div className="flex justify-between items-start mb-4">
-                                    <div>
-                                        <p className="text-[11px] font-black text-gray-800 uppercase tracking-tighter">
-                                            {new Date(log.date).toLocaleDateString('en-US', { day: '2-digit', month: 'short', year: 'numeric' })}
-                                        </p>
-                                        <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mt-0.5">{log.name}</p>
+                                {/* Employee Header */}
+                                <div className="bg-gradient-to-r from-sky-700 to-sky-600 text-white px-4 sm:px-6 py-3 flex flex-wrap items-center gap-x-4 gap-y-1">
+                                    <div className="h-9 w-9 rounded-xl bg-white/20 flex items-center justify-center text-sm font-black flex-shrink-0">
+                                        {emp.name?.charAt(0) || '?'}
                                     </div>
-                                    <StatusBadge status={log.status} />
+                                    <span className="text-sm font-black tracking-wide">{emp.emp_id}</span>
+                                    <span className="text-sky-200 hidden sm:inline">|</span>
+                                    <span className="text-sm font-bold">{emp.name}</span>
+                                    {emp.department_name && (
+                                        <>
+                                            <span className="text-sky-200 hidden sm:inline">|</span>
+                                            <span className="text-xs text-sky-200 font-medium">{emp.department_name}</span>
+                                        </>
+                                    )}
+                                    <span className="ml-auto px-2.5 py-0.5 bg-white/15 rounded-full text-[9px] font-black uppercase tracking-wider">
+                                        {emp.role}
+                                    </span>
                                 </div>
-                                <div className="grid grid-cols-3 gap-4 p-4 bg-gray-50 rounded-2xl group-hover:bg-sky-50 transition-colors">
-                                    <div className="text-center">
-                                        <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest mb-1">In Time</p>
-                                        <p className="text-xs font-black text-gray-700">{log.in_time || '—'}</p>
-                                    </div>
-                                    <div className="text-center border-x border-gray-200">
-                                        <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest mb-1">Out Time</p>
-                                        <p className="text-xs font-black text-gray-700">{log.out_time || '—'}</p>
-                                    </div>
-                                    <div className="text-center">
-                                        <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest mb-1">Total</p>
-                                        <p className="text-xs font-black text-sky-600">{calculateHours(log.in_time, log.out_time)}</p>
-                                    </div>
+
+                                {/* Attendance Sheet Table */}
+                                <div className="overflow-x-auto attendance-sheet-scroll">
+                                    <table className="w-full border-collapse" style={{ minWidth: `${80 + uniqueDates.length * 64}px` }}>
+                                        <thead>
+                                            <tr>
+                                                <th className="sticky left-0 z-10 bg-gray-100 border border-dotted border-gray-300 px-3 py-2.5 text-[10px] font-black uppercase tracking-wider text-gray-500 text-left w-[80px] min-w-[80px]">
+                                                    Day &rarr;
+                                                </th>
+                                                {uniqueDates.map(date => {
+                                                    const d = new Date(date + 'T00:00:00+05:30');
+                                                    const dayNum = d.toLocaleDateString('en-US', { timeZone: 'Asia/Kolkata', day: '2-digit' });
+                                                    const dayName = d.toLocaleDateString('en-US', { timeZone: 'Asia/Kolkata', weekday: 'short' });
+                                                    const isSunday = d.getDay() === 0;
+                                                    return (
+                                                        <th key={date} className={`border border-dotted border-gray-300 px-1 py-2 text-center min-w-[56px] w-[56px] ${isSunday ? 'bg-rose-50' : 'bg-gray-50'}`}>
+                                                            <div className={`text-[11px] font-black ${isSunday ? 'text-rose-500' : 'text-gray-700'}`}>{dayNum}</div>
+                                                            <div className={`text-[8px] font-bold uppercase ${isSunday ? 'text-rose-400' : 'text-gray-400'}`}>{dayName}</div>
+                                                        </th>
+                                                    );
+                                                })}
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {/* Status Row */}
+                                            <tr>
+                                                <td className="sticky left-0 z-10 bg-white border border-dotted border-gray-300 px-3 py-2 text-[10px] font-black uppercase tracking-wider text-gray-600">
+                                                    Status
+                                                </td>
+                                                {uniqueDates.map(date => {
+                                                    const rec = emp.records[date];
+                                                    return (
+                                                        <td key={date} className="border border-dotted border-gray-300 px-0.5 py-1.5 text-center">
+                                                            {rec ? (
+                                                                <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-black leading-none ${getStatusCellColor(rec.status)}`}>
+                                                                    {abbreviateStatus(rec.status)}
+                                                                </span>
+                                                            ) : (
+                                                                <span className="text-gray-300 text-[10px]">&mdash;</span>
+                                                            )}
+                                                        </td>
+                                                    );
+                                                })}
+                                            </tr>
+                                            {/* InTime Row */}
+                                            <tr className="bg-gray-50/40">
+                                                <td className="sticky left-0 z-10 bg-gray-50 border border-dotted border-gray-300 px-3 py-2 text-[10px] font-black uppercase tracking-wider text-gray-600">
+                                                    InTime
+                                                </td>
+                                                {uniqueDates.map(date => {
+                                                    const rec = emp.records[date];
+                                                    return (
+                                                        <td key={date} className="border border-dotted border-gray-300 px-0.5 py-1.5 text-center text-[10px] font-semibold text-gray-600">
+                                                            {rec?.in_time || <span className="text-gray-300">&mdash;</span>}
+                                                        </td>
+                                                    );
+                                                })}
+                                            </tr>
+                                            {/* OutTime Row */}
+                                            <tr>
+                                                <td className="sticky left-0 z-10 bg-white border border-dotted border-gray-300 px-3 py-2 text-[10px] font-black uppercase tracking-wider text-gray-600">
+                                                    OutTime
+                                                </td>
+                                                {uniqueDates.map(date => {
+                                                    const rec = emp.records[date];
+                                                    return (
+                                                        <td key={date} className="border border-dotted border-gray-300 px-0.5 py-1.5 text-center text-[10px] font-semibold text-gray-600">
+                                                            {rec?.out_time || <span className="text-gray-300">&mdash;</span>}
+                                                        </td>
+                                                    );
+                                                })}
+                                            </tr>
+                                            {/* Total Row */}
+                                            <tr className="bg-sky-50/30">
+                                                <td className="sticky left-0 z-10 bg-sky-50 border border-dotted border-gray-300 px-3 py-2 text-[10px] font-black uppercase tracking-wider text-sky-700">
+                                                    Total
+                                                </td>
+                                                {uniqueDates.map(date => {
+                                                    const rec = emp.records[date];
+                                                    return (
+                                                        <td key={date} className="border border-dotted border-gray-300 px-0.5 py-1.5 text-center text-[10px] font-black text-sky-600">
+                                                            {rec ? calculateHours(rec.in_time, rec.out_time) : <span className="text-gray-300">&mdash;</span>}
+                                                        </td>
+                                                    );
+                                                })}
+                                            </tr>
+                                        </tbody>
+                                    </table>
                                 </div>
                             </motion.div>
                         ))}
-                    </motion.div>
                     </motion.div>
                 ) : (
                     <motion.div
@@ -655,6 +897,88 @@ const AttendanceRecord = () => {
                     <p className="text-gray-400 font-bold italic">No records found for the selected date range.</p>
                 </div>
             )}
+
+            {/* Employee Detail Full Screen - Summary View Action */}
+            <AnimatePresence>
+                {selectedEmployee && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="fixed inset-0 bg-white z-50 flex flex-col"
+                    >
+                        {/* Full Screen Header */}
+                        <div className="px-6 md:px-10 py-5 border-b border-gray-100 bg-gradient-to-r from-sky-50 to-blue-50 flex items-center justify-between flex-shrink-0">
+                            <div className="flex items-center gap-4">
+                                <div className="h-12 w-12 rounded-2xl bg-gradient-to-br from-sky-500 to-sky-700 flex items-center justify-center text-white font-black text-lg shadow-lg">
+                                    {selectedEmployee.name?.charAt(0) || '?'}
+                                </div>
+                                <div>
+                                    <p className="text-xl font-black text-gray-800 tracking-tight">{selectedEmployee.name}</p>
+                                    <div className="flex items-center gap-3 mt-0.5">
+                                        <p className="text-[10px] font-black text-sky-500 uppercase tracking-widest">{selectedEmployee.emp_id}</p>
+                                        {selectedEmployee.role && (
+                                            <span className="px-2 py-0.5 bg-gray-100 rounded-full text-[9px] font-black text-gray-500 uppercase tracking-wider">{selectedEmployee.role}</span>
+                                        )}
+                                    </div>
+                                </div>
+                                <span className="ml-2 bg-sky-100 text-sky-700 px-4 py-1.5 rounded-xl text-xs font-black">
+                                    {selectedEmployee.records.length} Records
+                                </span>
+                            </div>
+                            <button
+                                onClick={() => setSelectedEmployee(null)}
+                                className="p-3 rounded-2xl bg-white hover:bg-rose-50 text-gray-400 hover:text-rose-500 transition-all border border-gray-200 shadow-sm"
+                            >
+                                <FaTimes size={18} />
+                            </button>
+                        </div>
+                        {/* Full Screen Table */}
+                        <div className="flex-1 overflow-auto px-6 md:px-10 py-6">
+                            {selectedEmployee.records.length === 0 ? (
+                                <div className="flex items-center justify-center h-full">
+                                    <p className="text-gray-400 text-lg font-bold">No detailed records found for this employee in the selected date range.</p>
+                                </div>
+                            ) : (
+                                <table className="min-w-full text-left">
+                                    <thead className="sticky top-0 z-10">
+                                        <tr className="bg-gray-50">
+                                            <th className="px-5 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">#</th>
+                                            <th className="px-5 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Date</th>
+                                            <th className="px-5 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Status</th>
+                                            <th className="px-5 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-center">In Time</th>
+                                            <th className="px-5 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-center">Out Time</th>
+                                            <th className="px-5 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-center">Total Hours</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-gray-50">
+                                        {selectedEmployee.records.map((log, idx) => (
+                                            <motion.tr
+                                                key={log.id || idx}
+                                                initial={{ opacity: 0, y: 5 }}
+                                                animate={{ opacity: 1, y: 0 }}
+                                                transition={{ delay: idx * 0.02 }}
+                                                className="hover:bg-sky-50/50 transition-colors"
+                                            >
+                                                <td className="px-5 py-4 text-sm font-black text-gray-400">{idx + 1}</td>
+                                                <td className="px-5 py-4 text-sm font-bold text-gray-700">
+                                                    {new Date(String(log.date).slice(0, 10) + 'T00:00:00+05:30').toLocaleDateString('en-US', { timeZone: 'Asia/Kolkata', weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' })}
+                                                </td>
+                                                <td className="px-5 py-4">
+                                                    <StatusBadge status={log.status} />
+                                                </td>
+                                                <td className="px-5 py-4 text-sm font-black text-gray-700 text-center">{log.in_time || '—'}</td>
+                                                <td className="px-5 py-4 text-sm font-black text-gray-700 text-center">{log.out_time || '—'}</td>
+                                                <td className="px-5 py-4 text-sm font-black text-sky-600 text-center">{calculateHours(log.in_time, log.out_time)}</td>
+                                            </motion.tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            )}
+                        </div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
 
             </div>
         </Layout>

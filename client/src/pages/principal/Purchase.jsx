@@ -197,6 +197,26 @@ const Purchase = () => {
                         color: #111827;
                         margin: 0;
                         font-size: 10pt;
+                        position: relative;
+                    }
+                    
+                    .print-brand {
+                        position: absolute;
+                        top: 12px;
+                        right: 12px;
+                        text-align: right;
+                    }
+                    .print-brand .app-name {
+                        font-size: 11pt;
+                        font-weight: 800;
+                        color: #1e3a8a;
+                        margin: 0;
+                        letter-spacing: 0.5px;
+                    }
+                    .print-brand .print-time {
+                        font-size: 8pt;
+                        color: #6b7280;
+                        margin: 2px 0 0;
                     }
                     
                     h1 {
@@ -294,9 +314,13 @@ const Purchase = () => {
                 </style>
             </head>
             <body>
+                <div class="print-brand">
+                    <p class="app-name">PPG iTech HUB</p>
+                    <p class="print-time">${new Date().toLocaleString('en-GB')}</p>
+                </div>
                 <h1>${escapeHtml(title)}</h1>
                 <div class="meta">
-                    Printed on ${new Date().toLocaleString('en-GB')} | Total Records: ${items.length}
+                    Total Records: ${items.length}
                 </div>
                 <table>
                     <thead>

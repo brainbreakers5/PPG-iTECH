@@ -1,13 +1,14 @@
 import { useState, useEffect } from 'react';
 import Layout from '../../components/Layout';
 import api from '../../utils/api';
-import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Info } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Info, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 const InstitutionalCalendar = () => {
     const [currentDate, setCurrentDate] = useState(new Date());
     const [holidays, setHolidays] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [selectedDay, setSelectedDay] = useState(null);
 
     useEffect(() => {
         fetchHolidays();
@@ -64,7 +65,8 @@ const InstitutionalCalendar = () => {
                 currentDate.getMonth() === new Date().getMonth() &&
                 currentDate.getFullYear() === new Date().getFullYear();
 
-            let type = (dayOfWeek === 0 || dayOfWeek === 6) ? 'Holiday' : 'Working Day';
+            const isFirstSaturday = dayOfWeek === 6 && i <= 7;
+            let type = (dayOfWeek === 0 || (dayOfWeek === 6 && !isFirstSaturday)) ? 'Holiday' : 'Working Day';
             let caption = type;
 
             if (holiday) {
@@ -94,7 +96,8 @@ const InstitutionalCalendar = () => {
                 <motion.div
                     key={i}
                     whileHover={{ zIndex: 10, scale: 1.02 }}
-                    className={`p-4 border-b border-r border-gray-100 h-32 relative transition-all group ${bgColor} ${isToday ? 'ring-2 ring-sky-600 ring-inset' : ''}`}
+                    onClick={() => setSelectedDay({ day: i, type, caption, dateStr })}
+                    className={`p-4 border-b border-r border-gray-100 h-24 relative transition-all group cursor-pointer ${bgColor} ${isToday ? 'ring-2 ring-sky-600 ring-inset' : ''} ${selectedDay?.day === i ? 'ring-2 ring-sky-400 ring-inset' : ''}`}
                 >
                     <div className="flex justify-between items-start">
                         <span className={`text-sm font-black ${isToday ? 'bg-sky-600 text-white px-2 py-0.5 rounded-lg' : textColor}`}>
@@ -103,15 +106,7 @@ const InstitutionalCalendar = () => {
                         {isToday && <span className="text-[8px] font-black text-sky-600 uppercase tracking-widest mt-1">Today</span>}
                     </div>
 
-                    <div className="mt-2 space-y-1">
-                        <p className={`text-[11px] font-black uppercase tracking-wider leading-tight ${textColor} break-words line-clamp-2`}>
-                            {caption}
-                        </p>
-                    </div>
-
-                    {holiday && (
-                        <div className={`absolute bottom-2 right-2 w-1.5 h-1.5 rounded-full ${accentColor}`}></div>
-                    )}
+                    <div className={`absolute bottom-2 left-1/2 -translate-x-1/2 w-2 h-2 rounded-full ${accentColor}`}></div>
                 </motion.div>
             );
         }
@@ -173,6 +168,43 @@ const InstitutionalCalendar = () => {
                 </div>
             </div>
 
+            {/* Selected Day Caption - Above Calendar */}
+            <AnimatePresence>
+                {selectedDay && (
+                    <motion.div
+                        initial={{ opacity: 0, y: -10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -10 }}
+                        className="mb-4 px-6 py-4 rounded-2xl border shadow-md flex items-center justify-between"
+                        style={{
+                            background: selectedDay.type === 'Holiday' ? '#fff1f2' : selectedDay.type === 'Special' ? '#fffbeb' : '#ecfdf5',
+                            borderColor: selectedDay.type === 'Holiday' ? '#fecdd3' : selectedDay.type === 'Special' ? '#fde68a' : '#a7f3d0'
+                        }}
+                    >
+                        <div className="flex items-center gap-4">
+                            <div className={`w-3 h-3 rounded-full ${
+                                selectedDay.type === 'Holiday' ? 'bg-rose-500' :
+                                selectedDay.type === 'Special' ? 'bg-amber-500' : 'bg-emerald-500'
+                            }`}></div>
+                            <div>
+                                <p className="text-xs font-black text-gray-400 uppercase tracking-widest">
+                                    {selectedDay.dateStr} &middot; {selectedDay.type}
+                                </p>
+                                <p className="text-lg font-black text-gray-800 mt-0.5">
+                                    {selectedDay.caption}
+                                </p>
+                            </div>
+                        </div>
+                        <button
+                            onClick={() => setSelectedDay(null)}
+                            className="p-2 rounded-xl hover:bg-white/60 text-gray-400 hover:text-gray-600 transition-all"
+                        >
+                            <X size={18} />
+                        </button>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
             <motion.div
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -194,6 +226,7 @@ const InstitutionalCalendar = () => {
                     ) : renderDays()}
                 </div>
             </motion.div>
+
         </Layout>
     );
 };

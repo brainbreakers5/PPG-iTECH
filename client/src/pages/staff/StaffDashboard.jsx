@@ -5,23 +5,17 @@ import api from '../../utils/api';
 import { useAuth } from '../../context/AuthContext';
 import { motion } from 'framer-motion';
 import { useSocket } from '../../context/SocketContext';
-import { FaUserCheck, FaUserTimes, FaBus, FaFileAlt, FaCalendarDay, FaIdBadge, FaEnvelope, FaPhone } from 'react-icons/fa';
+import { FaUserCheck, FaUserTimes, FaBus, FaFileAlt, FaCalendarDay, FaCalendarAlt, FaStar, FaEye } from 'react-icons/fa';
 import AttendanceHistory from '../../components/AttendanceHistory';
 
 const StaffDashboard = () => {
     const { user } = useAuth();
     const navigate = useNavigate();
     const socket = useSocket();
-    const [myStats, setMyStats] = useState({ present: 0, absent: 0, leave: 0, od: 0, lop: 0 });
+    const [myStats, setMyStats] = useState({ present: 0, absent: 0, od: 0, cl: 0, ml: 0, comp_leave: 0 });
     const [profile, setProfile] = useState(null);
     const [loading, setLoading] = useState(true);
-    const [now, setNow] = useState(new Date());
-
-    // Update time every second
-    useEffect(() => {
-        const timer = setInterval(() => setNow(new Date()), 1000);
-        return () => clearInterval(timer);
-    }, []);
+    const [monthStats, setMonthStats] = useState({ workingDays: 0, holidays: 0, specialEvents: 0 });
 
     const fetchData = useCallback(async () => {
         if (!user) return;
@@ -29,19 +23,39 @@ const StaffDashboard = () => {
             const month = new Date().toISOString().slice(0, 7); // "YYYY-MM"
             const { data: records } = await api.get(`/attendance?month=${month}`);
 
-            const counts = { present: 0, absent: 0, leave: 0, od: 0, lop: 0 };
+            const counts = { present: 0, absent: 0, od: 0, cl: 0, ml: 0, comp_leave: 0 };
             (records || []).forEach(r => {
                 const s = r.status || '';
                 if (s === 'Present') counts.present++;
                 else if (s === 'OD') counts.od++;
-                else if (s === 'LOP') counts.lop++;
-                else if (['Leave', 'CL', 'ML', 'Comp Leave'].includes(s)) counts.leave++;
+                else if (s === 'CL' || s === 'Leave') counts.cl++;
+                else if (s === 'ML') counts.ml++;
+                else if (s === 'Comp Leave') counts.comp_leave++;
                 else if (s === 'Absent') counts.absent++;
             });
             setMyStats(counts);
 
             const { data: profileData } = await api.get('/auth/profile');
             setProfile(profileData);
+            // Fetch holiday/calendar data for month summary
+            const now = new Date();
+            const curMonth = now.getMonth() + 1;
+            const curYear = now.getFullYear();
+            const { data: holidayData } = await api.get(`holidays?month=${curMonth}&year=${curYear}`);
+            const daysInMonth = new Date(curYear, curMonth, 0).getDate();
+            let hCount = 0, sCount = 0;
+            const holidayDateSet = new Set();
+            (holidayData || []).forEach(h => {
+                holidayDateSet.add(h.h_date);
+                if (h.type === 'Holiday') hCount++;
+                else if (h.type === 'Special') sCount++;
+            });
+            for (let d = 1; d <= daysInMonth; d++) {
+                const dow = new Date(curYear, curMonth - 1, d).getDay();
+                const ds = `${curYear}-${String(curMonth).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+                if ((dow === 0 || dow === 6) && !holidayDateSet.has(ds)) hCount++;
+            }
+            setMonthStats({ workingDays: daysInMonth - hCount - sCount, holidays: hCount, specialEvents: sCount });
         } catch (error) {
             console.error('Staff dashboard error', error);
         } finally {
@@ -64,8 +78,10 @@ const StaffDashboard = () => {
     const stats = [
         { label: 'Present', value: myStats.present, icon: <FaUserCheck />, colorClass: 'text-sky-600', bgClass: 'bg-sky-50', borderClass: 'border-sky-100', gradientClass: 'from-sky-500 to-sky-700' },
         { label: 'Absent', value: myStats.absent, icon: <FaUserTimes />, colorClass: 'text-rose-600', bgClass: 'bg-rose-50', borderClass: 'border-rose-100', gradientClass: 'from-rose-500 to-rose-700' },
-        { label: 'On Duty', value: myStats.od, icon: <FaBus />, colorClass: 'text-emerald-600', bgClass: 'bg-emerald-50', borderClass: 'border-emerald-100', gradientClass: 'from-emerald-500 to-emerald-700' },
-        { label: 'LOP Count', value: myStats.lop, icon: <FaFileAlt />, colorClass: 'text-purple-600', bgClass: 'bg-purple-50', borderClass: 'border-purple-100', gradientClass: 'from-purple-500 to-purple-700' },
+        { label: 'On Duty', value: myStats.od, icon: <FaEye />, colorClass: 'text-emerald-600', bgClass: 'bg-emerald-50', borderClass: 'border-emerald-100', gradientClass: 'from-emerald-500 to-emerald-700' },
+        { label: 'Casual Leave', value: myStats.cl, icon: <FaCalendarDay />, colorClass: 'text-amber-600', bgClass: 'bg-amber-50', borderClass: 'border-amber-100', gradientClass: 'from-amber-500 to-amber-700' },
+        { label: 'Medical Leave', value: myStats.ml, icon: <FaFileAlt />, colorClass: 'text-purple-600', bgClass: 'bg-purple-50', borderClass: 'border-purple-100', gradientClass: 'from-purple-500 to-purple-700' },
+        { label: 'Comp Leave', value: myStats.comp_leave, icon: <FaStar />, colorClass: 'text-indigo-600', bgClass: 'bg-indigo-50', borderClass: 'border-indigo-100', gradientClass: 'from-indigo-500 to-indigo-700' },
     ];
 
     const currentMonth = new Date().toLocaleString('default', { month: 'long', year: 'numeric' });
@@ -83,21 +99,38 @@ const StaffDashboard = () => {
                             {currentMonth} · Personal Attendance Record
                         </p>
                     </div>
+                </div>
+            </motion.div>
 
-                    {/* Real-time Date & Time */}
-                    <div className="flex flex-col items-end px-5 py-3 rounded-2xl border-2 border-sky-200 bg-gradient-to-br from-sky-50 to-white shadow-lg">
-                        <p className="text-[9px] font-black uppercase tracking-wider text-sky-600 flex items-center gap-1.5">
-                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                            </svg>
-                            {now.toLocaleDateString('en-GB', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' })}
-                        </p>
-                        <p className="text-base font-black text-gray-800 tracking-wide mt-1 flex items-center gap-1.5">
-                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                            </svg>
-                            {now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true })}
-                        </p>
+            {/* Monthly Summary Bar */}
+            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="mb-10">
+                <div className="grid grid-cols-3 gap-4">
+                    <div className="bg-emerald-50 border border-emerald-100 rounded-2xl p-5 flex items-center gap-4">
+                        <div className="h-11 w-11 rounded-xl bg-emerald-500 text-white flex items-center justify-center shadow-sm">
+                            <FaCalendarAlt />
+                        </div>
+                        <div>
+                            <p className="text-[9px] font-black text-emerald-500 uppercase tracking-widest">Working Days</p>
+                            <p className="text-2xl font-black text-emerald-700 tracking-tighter">{monthStats.workingDays}</p>
+                        </div>
+                    </div>
+                    <div className="bg-rose-50 border border-rose-100 rounded-2xl p-5 flex items-center gap-4">
+                        <div className="h-11 w-11 rounded-xl bg-rose-500 text-white flex items-center justify-center shadow-sm">
+                            <FaCalendarDay />
+                        </div>
+                        <div>
+                            <p className="text-[9px] font-black text-rose-500 uppercase tracking-widest">Holidays</p>
+                            <p className="text-2xl font-black text-rose-700 tracking-tighter">{monthStats.holidays}</p>
+                        </div>
+                    </div>
+                    <div className="bg-amber-50 border border-amber-100 rounded-2xl p-5 flex items-center gap-4">
+                        <div className="h-11 w-11 rounded-xl bg-amber-500 text-white flex items-center justify-center shadow-sm">
+                            <FaStar />
+                        </div>
+                        <div>
+                            <p className="text-[9px] font-black text-amber-500 uppercase tracking-widest">Special Events</p>
+                            <p className="text-2xl font-black text-amber-700 tracking-tighter">{monthStats.specialEvents}</p>
+                        </div>
                     </div>
                 </div>
             </motion.div>
@@ -109,7 +142,7 @@ const StaffDashboard = () => {
                 </div>
             ) : (
                 <>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-12">
                         {stats.map((stat, idx) => (
                             <motion.div
                                 key={stat.label}
@@ -133,34 +166,6 @@ const StaffDashboard = () => {
                             </motion.div>
                         ))}
                     </div>
-
-                    <motion.div
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: 0.5 }}
-                        className="bg-white rounded-[40px] shadow-xl shadow-sky-50/50 border border-sky-50 p-10"
-                    >
-                        <h2 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.3em] mb-8">
-                            Personal Information
-                        </h2>
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-                            {[
-                                { icon: <FaIdBadge />, label: 'Employee ID', value: user?.emp_id || '—' },
-                                { icon: <FaEnvelope />, label: 'Email', value: profile?.email || user?.email || '—' },
-                                { icon: <FaPhone />, label: 'Mobile', value: profile?.mobile || user?.mobile || '—' },
-                            ].map(item => (
-                                <div key={item.label} className="flex items-center gap-4 p-5 rounded-2xl bg-gray-50 border border-gray-100 hover:bg-white hover:border-sky-100 hover:shadow-sm transition-all">
-                                    <div className="h-10 w-10 rounded-xl bg-sky-50 text-sky-600 flex items-center justify-center text-sm flex-shrink-0 shadow-sm">
-                                        {item.icon}
-                                    </div>
-                                    <div className="overflow-hidden">
-                                        <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest">{item.label}</p>
-                                        <p className="text-sm font-black text-gray-800 mt-0.5 truncate">{item.value}</p>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    </motion.div>
 
                     {/* Quick Action Grid Removed */}
                 </>

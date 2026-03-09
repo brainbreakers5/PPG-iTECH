@@ -40,7 +40,7 @@ const BiometricMonitor = ({ empId, onDataChange }) => {
     const fetchData = async () => {
         try {
             setLoading(true);
-            const today = new Date().toISOString().split('T')[0];
+            const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
             const query = empId
                 ? `/biometric/data?emp_id=${empId}&date=${today}`
                 : `/biometric/data?date=${today}`;
@@ -179,7 +179,7 @@ const BiometricMonitor = ({ empId, onDataChange }) => {
                                             <div className="flex items-center gap-2">
                                                 <FaCalendarDay className="text-gray-300 text-[10px]" />
                                                 <span className="text-[11px] font-black text-gray-600">
-                                                    {new Date(log.date).toLocaleDateString()}
+                                                    {new Date(String(log.date).slice(0, 10) + 'T00:00:00+05:30').toLocaleDateString('en-US', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', year: 'numeric' })}
                                                 </span>
                                             </div>
                                         </td>

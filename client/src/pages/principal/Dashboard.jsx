@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react';
-import { FaUserCheck, FaUserTimes, FaBus, FaFileAlt, FaBirthdayCake, FaCalendarDay, FaTimes, FaIdBadge, FaPhone, FaEnvelope, FaBuilding, FaArrowLeft, FaSuitcase, FaCalendarAlt, FaArrowRight, FaClipboardList, FaComments, FaShoppingBag, FaShoppingCart } from 'react-icons/fa';
+import { FaUserCheck, FaUserTimes, FaBus, FaFileAlt, FaBirthdayCake, FaCalendarDay, FaTimes, FaIdBadge, FaPhone, FaEnvelope, FaBuilding, FaArrowLeft, FaSuitcase, FaCalendarAlt, FaArrowRight, FaClipboardList, FaComments, FaShoppingBag, FaShoppingCart, FaStar, FaBriefcase } from 'react-icons/fa';
 import Layout from '../../components/Layout';
 import api from '../../utils/api';
 import { useAuth } from '../../context/AuthContext';
 import { useSocket } from '../../context/SocketContext';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import AttendanceHistory from '../../components/AttendanceHistory';
 
@@ -34,42 +34,37 @@ const Dashboard = () => {
     const { user } = useAuth();
     const navigate = useNavigate();
     const [stats, setStats] = useState({
-        present: 0, leave: 0, od: 0, lop: 0, absent: 0,
-        principal: { present: 0, leave: 0, od: 0, lop: 0, absent: 0 },
-        hod: { present: 0, leave: 0, od: 0, lop: 0, absent: 0 },
-        staff: { present: 0, leave: 0, od: 0, lop: 0, absent: 0 }
+        present: 0, absent: 0, od: 0, cl: 0, ml: 0, comp_leave: 0,
+        principal: { present: 0, absent: 0, od: 0, cl: 0, ml: 0, comp_leave: 0 },
+        hod: { present: 0, absent: 0, od: 0, cl: 0, ml: 0, comp_leave: 0 },
+        staff: { present: 0, absent: 0, od: 0, cl: 0, ml: 0, comp_leave: 0 }
     });
-    const [myStats, setMyStats] = useState({ present: 0, absent: 0, leave: 0, od: 0, lop: 0 });
+    const [myStats, setMyStats] = useState({ present: 0, absent: 0, od: 0, cl: 0, ml: 0, comp_leave: 0 });
     const [birthdays, setBirthdays] = useState([]);
     const [allEmployees, setAllEmployees] = useState([]);
     const [attendanceMap, setAttendanceMap] = useState({});
-    const [now, setNow] = useState(new Date());
+    const [monthStats, setMonthStats] = useState({ workingDays: 0, holidays: 0, specialEvents: 0 });
+    const [employeeModal, setEmployeeModal] = useState(null);
     const socket = useSocket();
-
-    // Update time every second
-    useEffect(() => {
-        const timer = setInterval(() => setNow(new Date()), 1000);
-        return () => clearInterval(timer);
-    }, []);
 
     const fetchDashboardData = async () => {
         try {
-            const date = new Date().toISOString().split('T')[0];
+            const date = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
             const { data: summary } = await api.get(`/attendance/summary?date=${date}`);
-            setStats(summary || { present: 0, leave: 0, od: 0, lop: 0, absent: 0, principal: { present: 0, leave: 0, od: 0, lop: 0, absent: 0 }, hod: { present: 0, leave: 0, od: 0, lop: 0, absent: 0 }, staff: { present: 0, leave: 0, od: 0, lop: 0, absent: 0 } });
             const { data: bdays } = await api.get('/employees/birthdays/today');
             setBirthdays(bdays);
             const { data: emps } = await api.get('/employees');
             setAllEmployees(emps);
-            const month = new Date().toISOString().slice(0, 7);
+            const month = date.slice(0, 7);
             const { data: records } = await api.get(`/attendance?month=${month}&emp_id=${user.emp_id}`);
-            const counts = { present: 0, absent: 0, leave: 0, od: 0, lop: 0 };
+            const counts = { present: 0, absent: 0, od: 0, cl: 0, ml: 0, comp_leave: 0 };
             (records || []).forEach(r => {
                 const s = r.status || '';
                 if (s === 'Present') counts.present++;
                 else if (s === 'OD') counts.od++;
-                else if (s === 'LOP') counts.lop++;
-                else if (['Leave', 'CL', 'ML', 'Comp Leave'].includes(s)) counts.leave++;
+                else if (s === 'CL' || s === 'Leave') counts.cl++;
+                else if (s === 'ML') counts.ml++;
+                else if (s === 'Comp Leave') counts.comp_leave++;
                 else if (s === 'Absent') counts.absent++;
             });
             setMyStats(counts);
@@ -78,6 +73,55 @@ const Dashboard = () => {
             const map = {};
             (todayAtt || []).forEach(r => { map[r.emp_id] = r.status; });
             setAttendanceMap(map);
+            // Aggregate per-user rows into role-based stats
+            const agg = {
+                present: 0, absent: 0, od: 0, cl: 0, ml: 0, comp_leave: 0,
+                principal: { present: 0, absent: 0, od: 0, cl: 0, ml: 0, comp_leave: 0 },
+                hod: { present: 0, absent: 0, od: 0, cl: 0, ml: 0, comp_leave: 0 },
+                staff: { present: 0, absent: 0, od: 0, cl: 0, ml: 0, comp_leave: 0 }
+            };
+            (summary || []).forEach(r => {
+                const role = (r.role || '').toLowerCase();
+                const bucket = agg[role] || agg.staff;
+                const p = Number(r.total_present) || 0;
+                const l = Number(r.total_leave) || 0;
+                const o = Number(r.total_od) || 0;
+                const lp = Number(r.total_lop) || 0;
+                bucket.present += p;
+                bucket.od += o;
+                if (p === 0 && l === 0 && o === 0 && lp === 0) bucket.absent += 1;
+                agg.present += p;
+                agg.od += o;
+            });
+            // Count individual leave types from attendance map
+            (emps || []).forEach(emp => {
+                const s = map[emp.emp_id] || '';
+                const role = (emp.role || '').toLowerCase();
+                const bucket = agg[role] || agg.staff;
+                if (s === 'CL' || s === 'Leave') { bucket.cl++; agg.cl++; }
+                else if (s === 'ML') { bucket.ml++; agg.ml++; }
+                else if (s === 'Comp Leave') { bucket.comp_leave++; agg.comp_leave++; }
+            });
+            setStats(agg);
+            // Fetch holiday/calendar data for month summary
+            const now = new Date();
+            const curMonth = now.getMonth() + 1;
+            const curYear = now.getFullYear();
+            const { data: holidayData } = await api.get(`holidays?month=${curMonth}&year=${curYear}`);
+            const daysInMonth = new Date(curYear, curMonth, 0).getDate();
+            let hCount = 0, sCount = 0;
+            const holidayDateSet = new Set();
+            (holidayData || []).forEach(h => {
+                holidayDateSet.add(h.h_date);
+                if (h.type === 'Holiday') hCount++;
+                else if (h.type === 'Special') sCount++;
+            });
+            for (let d = 1; d <= daysInMonth; d++) {
+                const dow = new Date(curYear, curMonth - 1, d).getDay();
+                const ds = `${curYear}-${String(curMonth).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+                if ((dow === 0 || dow === 6) && !holidayDateSet.has(ds)) hCount++;
+            }
+            setMonthStats({ workingDays: daysInMonth - hCount - sCount, holidays: hCount, specialEvents: sCount });
         } catch (error) { console.error("Error fetching dashboard data", error); }
     };
 
@@ -99,6 +143,20 @@ const Dashboard = () => {
 
     const hodList = allEmployees.filter(e => (e.role || '').toLowerCase() === 'hod');
     const staffList = allEmployees.filter(e => (e.role || '').toLowerCase() === 'staff');
+
+    const getFilteredEmployees = (roleKey, statusLabel) => {
+        const roleEmps = allEmployees.filter(e => (e.role || '').toLowerCase() === roleKey);
+        return roleEmps.filter(emp => {
+            const s = attendanceMap[emp.emp_id] || '';
+            if (statusLabel === 'Present') return s === 'Present';
+            if (statusLabel === 'Absent') return !s || s === 'Absent';
+            if (statusLabel === 'On Duty') return s === 'OD';
+            if (statusLabel === 'Casual Leave') return s === 'CL' || s === 'Leave';
+            if (statusLabel === 'Medical Leave') return s === 'ML';
+            if (statusLabel === 'Comp Leave') return s === 'Comp Leave';
+            return false;
+        });
+    };
 
     const menuItems = [];
 
@@ -130,21 +188,6 @@ const Dashboard = () => {
                         </p>
                     </div>
                     <div className="flex items-center gap-4">
-                        {/* Real-time Date & Time - Dashboard Only */}
-                        <div className="flex flex-col items-end px-5 py-3 rounded-2xl border-2 border-sky-200 bg-gradient-to-br from-sky-50 to-white shadow-lg">
-                            <p className="text-[9px] font-black uppercase tracking-wider text-sky-600 flex items-center gap-1.5">
-                                <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-                                    <path fillRule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clipRule="evenodd" />
-                                </svg>
-                                {now.toLocaleDateString('en-GB', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' })}
-                            </p>
-                            <p className="text-base font-black text-gray-800 tracking-wide mt-1 flex items-center gap-1.5">
-                                <svg className="w-3.5 h-3.5 text-sky-500" fill="currentColor" viewBox="0 0 20 20">
-                                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd" />
-                                </svg>
-                                {now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true })}
-                            </p>
-                        </div>
                         {birthdays.length > 0 && (
                             <motion.div
                                 whileHover={{ scale: 1.05 }}
@@ -165,6 +208,39 @@ const Dashboard = () => {
             </motion.div>
 
             {/* Personal Attendance Section - Top of the page */}
+            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="mb-10">
+                <div className="grid grid-cols-3 gap-4">
+                    <div className="bg-emerald-50 border border-emerald-100 rounded-2xl p-5 flex items-center gap-4">
+                        <div className="h-11 w-11 rounded-xl bg-emerald-500 text-white flex items-center justify-center shadow-sm">
+                            <FaCalendarAlt />
+                        </div>
+                        <div>
+                            <p className="text-[9px] font-black text-emerald-500 uppercase tracking-widest">Working Days</p>
+                            <p className="text-2xl font-black text-emerald-700 tracking-tighter">{monthStats.workingDays}</p>
+                        </div>
+                    </div>
+                    <div className="bg-rose-50 border border-rose-100 rounded-2xl p-5 flex items-center gap-4">
+                        <div className="h-11 w-11 rounded-xl bg-rose-500 text-white flex items-center justify-center shadow-sm">
+                            <FaCalendarDay />
+                        </div>
+                        <div>
+                            <p className="text-[9px] font-black text-rose-500 uppercase tracking-widest">Holidays</p>
+                            <p className="text-2xl font-black text-rose-700 tracking-tighter">{monthStats.holidays}</p>
+                        </div>
+                    </div>
+                    <div className="bg-amber-50 border border-amber-100 rounded-2xl p-5 flex items-center gap-4">
+                        <div className="h-11 w-11 rounded-xl bg-amber-500 text-white flex items-center justify-center shadow-sm">
+                            <FaStar />
+                        </div>
+                        <div>
+                            <p className="text-[9px] font-black text-amber-500 uppercase tracking-widest">Special Events</p>
+                            <p className="text-2xl font-black text-amber-700 tracking-tighter">{monthStats.specialEvents}</p>
+                        </div>
+                    </div>
+                </div>
+            </motion.div>
+
+            {/* Personal Attendance Section */}
             <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -178,8 +254,10 @@ const Dashboard = () => {
                     {[
                         { label: 'Present', value: myStats.present, icon: <FaUserCheck />, color: 'text-sky-600', bg: 'bg-sky-50', gradient: 'from-sky-500 to-sky-700' },
                         { label: 'Absent', value: myStats.absent, icon: <FaUserTimes />, color: 'text-rose-600', bg: 'bg-rose-50', gradient: 'from-rose-500 to-rose-700' },
-                        { label: 'On Duty', value: myStats.od, icon: <FaBus />, color: 'text-emerald-600', bg: 'bg-emerald-50', gradient: 'from-emerald-500 to-emerald-700' },
-                        { label: 'Loss of Pay', value: myStats.lop, icon: <FaFileAlt />, color: 'text-purple-600', bg: 'bg-purple-50', gradient: 'from-purple-500 to-purple-700' },
+                        { label: 'On Duty', value: myStats.od, icon: <FaBriefcase />, color: 'text-emerald-600', bg: 'bg-emerald-50', gradient: 'from-emerald-500 to-emerald-700' },
+                        { label: 'Casual Leave', value: myStats.cl, icon: <FaCalendarDay />, color: 'text-amber-600', bg: 'bg-amber-50', gradient: 'from-amber-500 to-amber-700' },
+                        { label: 'Medical Leave', value: myStats.ml, icon: <FaFileAlt />, color: 'text-purple-600', bg: 'bg-purple-50', gradient: 'from-purple-500 to-purple-700' },
+                        { label: 'Comp Leave', value: myStats.comp_leave, icon: <FaStar />, color: 'text-indigo-600', bg: 'bg-indigo-50', gradient: 'from-indigo-500 to-indigo-700' },
                     ].map((stat, idx) => (
                         <motion.div
                             key={stat.label}
@@ -254,11 +332,16 @@ const Dashboard = () => {
                             {[
                                 { label: 'Present', value: stats[role.key]?.present, icon: <FaUserCheck />, color: 'text-sky-600', bg: 'bg-sky-50' },
                                 { label: 'Absent', value: stats[role.key]?.absent, icon: <FaUserTimes />, color: 'text-rose-600', bg: 'bg-rose-50' },
-                                { label: 'On Leave', value: stats[role.key]?.leave, icon: <FaCalendarDay />, color: 'text-amber-600', bg: 'bg-amber-50' },
-                                { label: 'On Duty', value: stats[role.key]?.od, icon: <FaBus />, color: 'text-emerald-600', bg: 'bg-emerald-50' },
-                                { label: 'Loss of Pay', value: stats[role.key]?.lop, icon: <FaFileAlt />, color: 'text-purple-600', bg: 'bg-purple-50' }
+                                { label: 'On Duty', value: stats[role.key]?.od, icon: <FaBriefcase />, color: 'text-emerald-600', bg: 'bg-emerald-50' },
+                                { label: 'Casual Leave', value: stats[role.key]?.cl, icon: <FaCalendarDay />, color: 'text-amber-600', bg: 'bg-amber-50' },
+                                { label: 'Medical Leave', value: stats[role.key]?.ml, icon: <FaFileAlt />, color: 'text-purple-600', bg: 'bg-purple-50' },
+                                { label: 'Comp Leave', value: stats[role.key]?.comp_leave, icon: <FaStar />, color: 'text-indigo-600', bg: 'bg-indigo-50' }
                             ].map((stat) => (
-                                <div key={stat.label} className="flex items-center justify-between p-4 rounded-2xl bg-gray-50/50 hover:bg-white transition-all border border-transparent hover:border-gray-100 group/item">
+                                <div
+                                    key={stat.label}
+                                    onClick={() => setEmployeeModal({ role: role.key, statusLabel: stat.label, title: role.title })}
+                                    className="flex items-center justify-between p-4 rounded-2xl bg-gray-50/50 hover:bg-white transition-all border border-transparent hover:border-gray-100 group/item cursor-pointer"
+                                >
                                     <div className="flex items-center gap-4">
                                         <div className={`h-10 w-10 rounded-xl ${stat.bg} ${stat.color} flex items-center justify-center text-sm shadow-sm transition-transform group-hover/item:rotate-12`}>
                                             {stat.icon}
@@ -313,6 +396,92 @@ const Dashboard = () => {
             </div>
 
             <AttendanceHistory empId={user?.emp_id} />
+
+            {/* Employee List Full Screen */}
+            <AnimatePresence>
+                {employeeModal && (() => {
+                    const filtered = getFilteredEmployees(employeeModal.role, employeeModal.statusLabel);
+                    return (
+                        <motion.div
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            className="fixed inset-0 bg-white z-50 flex flex-col"
+                        >
+                            {/* Full Screen Header */}
+                            <div className="px-6 md:px-10 py-5 border-b border-gray-100 bg-gradient-to-r from-sky-50 to-blue-50 flex items-center justify-between flex-shrink-0">
+                                <div className="flex items-center gap-4">
+                                    <div className="h-12 w-12 rounded-2xl bg-gradient-to-br from-sky-500 to-sky-700 flex items-center justify-center text-white shadow-lg">
+                                        <FaUserCheck size={20} />
+                                    </div>
+                                    <div>
+                                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{employeeModal.title}</p>
+                                        <p className="text-xl font-black text-gray-800 tracking-tight">{employeeModal.statusLabel}</p>
+                                    </div>
+                                    <span className="ml-2 bg-sky-100 text-sky-700 px-4 py-1.5 rounded-xl text-xs font-black">{filtered.length} Employees</span>
+                                </div>
+                                <button onClick={() => setEmployeeModal(null)} className="p-3 rounded-2xl bg-white hover:bg-rose-50 text-gray-400 hover:text-rose-500 transition-all border border-gray-200 shadow-sm">
+                                    <FaTimes size={18} />
+                                </button>
+                            </div>
+                            {/* Full Screen Table */}
+                            <div className="flex-1 overflow-auto px-6 md:px-10 py-6">
+                                {filtered.length === 0 ? (
+                                    <div className="flex items-center justify-center h-full">
+                                        <p className="text-gray-400 text-lg font-bold">No employees found</p>
+                                    </div>
+                                ) : (
+                                    <table className="min-w-full text-left">
+                                        <thead className="sticky top-0 z-10">
+                                            <tr className="bg-gray-50">
+                                                <th className="px-5 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">#</th>
+                                                <th className="px-5 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Emp ID</th>
+                                                <th className="px-5 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Name</th>
+                                                <th className="px-5 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Department</th>
+                                                <th className="px-5 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Status</th>
+                                                <th className="px-5 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-center no-print">Action</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-gray-50">
+                                            {filtered.map((emp, idx) => (
+                                                <motion.tr
+                                                    key={emp.emp_id}
+                                                    initial={{ opacity: 0, y: 5 }}
+                                                    animate={{ opacity: 1, y: 0 }}
+                                                    transition={{ delay: idx * 0.02 }}
+                                                    className="hover:bg-sky-50/50 transition-colors cursor-pointer"
+                                                    onClick={() => { navigate(`/principal/profile/${emp.emp_id}`); setEmployeeModal(null); window.dispatchEvent(new CustomEvent('closeSidebar')); }}
+                                                >
+                                                    <td className="px-5 py-4 text-sm font-black text-gray-400">{idx + 1}</td>
+                                                    <td className="px-5 py-4 text-sm font-black text-sky-900">{emp.emp_id}</td>
+                                                    <td className="px-5 py-4">
+                                                        <div className="flex items-center gap-3">
+                                                            <div className="h-9 w-9 rounded-xl bg-sky-100 text-sky-600 flex items-center justify-center font-black text-sm shrink-0">
+                                                                {(emp.name || '?').charAt(0)}
+                                                            </div>
+                                                            <span className="text-sm font-bold text-gray-800">{emp.name}</span>
+                                                        </div>
+                                                    </td>
+                                                    <td className="px-5 py-4 text-sm font-medium text-gray-600">{emp.department_name || '—'}</td>
+                                                    <td className="px-5 py-4">
+                                                        <span className="px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest border bg-sky-50 text-sky-600 border-sky-100">
+                                                            {attendanceMap[emp.emp_id] || 'N/A'}
+                                                        </span>
+                                                    </td>
+                                                    <td className="px-5 py-4 text-center no-print">
+                                                        <FaEye className="inline text-gray-300 group-hover:text-sky-500" size={14} />
+                                                    </td>
+                                                </motion.tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                )}
+                            </div>
+                        </motion.div>
+                    );
+                })()}
+            </AnimatePresence>
+
         </Layout>
     );
 };

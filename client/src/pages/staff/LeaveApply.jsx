@@ -7,7 +7,7 @@ import {
     FaPaperPlane, FaUserFriends, FaHistory, FaCalendarCheck,
     FaClock, FaInfoCircle, FaCheckCircle, FaTimesCircle,
     FaHourglassHalf, FaPlusCircle, FaInbox, FaCheck,
-    FaTimes, FaUserTag, FaCalendarAlt
+    FaTimes, FaUserTag, FaCalendarAlt, FaSearch
 } from 'react-icons/fa';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -21,7 +21,7 @@ const LeaveApply = () => {
     const [myLimits, setMyLimits] = useState(null);
     const [limitYear, setLimitYear] = useState(new Date().getFullYear());
     const [balanceLoading, setBalanceLoading] = useState(false);
-    const [customLeaveTypes, setCustomLeaveTypes] = useState([]);
+    const [leaveTypes, setLeaveTypes] = useState([]);
 
     const [formData, setFormData] = useState({
         leave_type: 'CL',
@@ -34,37 +34,33 @@ const LeaveApply = () => {
         reason: '',
         replacements: [{ staff_id: '', periods: '' }]
     });
-    const [activeReplacementIdx, setActiveReplacementIdx] = useState(null);
     const [staffList, setStaffList] = useState([]);
-    const [isStaffModalOpen, setIsStaffModalOpen] = useState(false);
     const [staffSearch, setStaffSearch] = useState('');
     const [conflicts, setConflicts] = useState([]);
 
     // Helper function to get full leave type name
     const getLeaveTypeName = (type) => {
-        const leaveTypes = {
-            'CL': 'Casual Leave (CL)',
-            'ML': 'Medical Leave (ML)',
-            'OD': 'On Duty (OD)',
-            'Comp Leave': 'Compensatory Leave',
-            'LOP': 'Loss of Pay (LOP)'
-        };
-        
-        // Check custom leave types
-        const customType = customLeaveTypes.find(ct => ct.label === type || ct.key === type);
-        if (customType) {
-            return `${customType.full} (${customType.label})`;
-        }
-        
-        return leaveTypes[type] || type;
+        const match = leaveTypes.find(ct => ct.label === type || ct.key === type);
+        if (match) return `${match.full} (${match.label})`;
+        return type;
     };
 
     useEffect(() => {
-        // Load custom leave types from localStorage
-        const saved = localStorage.getItem('customLeaveTypes');
-        if (saved) {
-            setCustomLeaveTypes(JSON.parse(saved));
-        }
+        const fetchLeaveTypes = async () => {
+            try {
+                const { data } = await api.get('/leave-types');
+                setLeaveTypes(data.map(t => ({
+                    id: t.id,
+                    key: t.key,
+                    label: t.label,
+                    full: t.full_name,
+                    color: t.color,
+                    defaultDays: t.default_days,
+                    isDefault: t.is_default
+                })));
+            } catch { console.error('Failed to fetch leave types'); }
+        };
+        fetchLeaveTypes();
     }, []);
 
     const fetchConflicts = async () => {
@@ -349,12 +345,7 @@ const LeaveApply = () => {
                                     <div className="group">
                                         <label className={labelClass}>Leave Type</label>
                                         <select name="leave_type" value={formData.leave_type} onChange={handleChange} className={inputClass}>
-                                            <option value="CL">Casual Leave (CL)</option>
-                                            <option value="ML">Medical Leave (ML)</option>
-                                            <option value="OD">On Duty (OD)</option>
-                                            <option value="Comp Leave">Compensatory Leave</option>
-                                            <option value="LOP">Loss of Pay (LOP)</option>
-                                            {customLeaveTypes.map(ct => (
+                                            {leaveTypes.map(ct => (
                                                 <option key={ct.key} value={ct.label}>{ct.full} ({ct.label})</option>
                                             ))}
                                         </select>
@@ -414,95 +405,166 @@ const LeaveApply = () => {
                                         </div>
                                         <div>
                                             <h3 className="text-lg font-black text-gray-800 tracking-tight">Replacement Staff Matrix</h3>
-                                            <p className="text-[10px] font-black text-sky-500 uppercase tracking-widest mt-1">Specify who covers which periods</p>
+                                            <p className="text-[10px] font-black text-sky-500 uppercase tracking-widest mt-1">Select colleagues & specify periods</p>
                                         </div>
                                     </div>
 
-                                    <div className="space-y-6">
-                                        {formData.replacements.map((rep, idx) => (
-                                            <motion.div
-                                                key={idx}
-                                                initial={{ opacity: 0, x: -10 }}
-                                                animate={{ opacity: 1, x: 0 }}
-                                                className="grid grid-cols-1 md:grid-cols-12 gap-4 items-end bg-white/50 p-6 rounded-[32px] border border-white group/rep"
-                                            >
-                                                <div className="md:col-span-6">
-                                                    <label className={labelClass}>Colleague</label>
-                                                    <div className="mt-2">
-                                                        {rep.staff_id ? (() => {
-                                                            const member = staffList.find(s => s.emp_id === rep.staff_id);
-                                                            return (
-                                                                <div className="flex items-center gap-4 bg-white p-3 rounded-2xl border border-sky-50 shadow-sm relative group">
-                                                                    <div className="h-12 w-12 rounded-xl overflow-hidden border border-gray-100 shrink-0">
-                                                                        <img
-                                                                            src={member?.profile_pic || `https://ui-avatars.com/api/?name=${encodeURIComponent(member?.name || 'User')}&background=3b82f6&color=fff&bold=true`}
-                                                                            alt=""
-                                                                            className="w-full h-full object-cover"
-                                                                        />
-                                                                    </div>
-                                                                    <div className="flex-1 min-w-0">
-                                                                        <p className="text-sm font-black text-gray-800 tracking-tight truncate">{member?.name || 'Unknown Staff'}</p>
-                                                                        <p className="text-[9px] font-black text-sky-500 uppercase tracking-widest truncate">{member?.designation || member?.role || 'Personnel'}</p>
-                                                                    </div>
-                                                                    <button
-                                                                        type="button"
-                                                                        onClick={() => {
-                                                                            setActiveReplacementIdx(idx);
-                                                                            setIsStaffModalOpen(true);
-                                                                        }}
-                                                                        className="h-10 px-4 bg-gray-50 text-gray-500 rounded-xl font-black text-[9px] uppercase tracking-widest hover:bg-sky-600 hover:text-white transition-all border border-gray-100"
-                                                                    >
-                                                                        Change
-                                                                    </button>
+                                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                                        {/* Left side - Selected replacements with periods */}
+                                        <div className="lg:col-span-5 space-y-4">
+                                            <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1 mb-2">Selected Alternates</p>
+                                            {formData.replacements.map((rep, idx) => (
+                                                <motion.div
+                                                    key={idx}
+                                                    initial={{ opacity: 0, x: -10 }}
+                                                    animate={{ opacity: 1, x: 0 }}
+                                                    className="bg-white/80 p-4 rounded-2xl border border-white shadow-sm"
+                                                >
+                                                    {rep.staff_id ? (() => {
+                                                        const member = staffList.find(s => s.emp_id === rep.staff_id);
+                                                        return (
+                                                            <div className="flex items-center gap-3 mb-3">
+                                                                <div className="h-10 w-10 rounded-xl overflow-hidden border border-gray-100 shrink-0">
+                                                                    <img
+                                                                        src={member?.profile_pic || `https://ui-avatars.com/api/?name=${encodeURIComponent(member?.name || 'User')}&background=3b82f6&color=fff&bold=true`}
+                                                                        alt=""
+                                                                        className="w-full h-full object-cover"
+                                                                    />
                                                                 </div>
-                                                            );
-                                                        })() : (
-                                                            <button
-                                                                type="button"
-                                                                onClick={() => {
-                                                                    setActiveReplacementIdx(idx);
-                                                                    setIsStaffModalOpen(true);
-                                                                }}
-                                                                className="w-full h-[74px] border-2 border-dashed border-sky-100 rounded-2xl flex flex-col items-center justify-center gap-1 hover:border-sky-300 hover:bg-sky-50/30 transition-all text-sky-400 group"
-                                                            >
-                                                                <FaPlusCircle className="group-hover:scale-110 transition-transform" />
-                                                                <span className="text-[9px] font-black uppercase tracking-widest">Select Replacement Staff</span>
-                                                            </button>
-                                                        )}
-                                                    </div>
-                                                </div>
-                                                <div className="md:col-span-4">
-                                                    <label className={labelClass}>Periods / Duties</label>
+                                                                <div className="flex-1 min-w-0">
+                                                                    <p className="text-xs font-black text-gray-800 tracking-tight truncate">{member?.name || 'Unknown Staff'}</p>
+                                                                    <p className="text-[8px] font-black text-sky-500 uppercase tracking-widest truncate">{member?.designation || member?.role || 'Personnel'}</p>
+                                                                </div>
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => removeReplacement(idx)}
+                                                                    className="h-8 w-8 rounded-lg bg-rose-50 text-rose-400 hover:bg-rose-500 hover:text-white transition-all flex items-center justify-center shrink-0 active:scale-90"
+                                                                    title="Remove"
+                                                                >
+                                                                    <FaTimes size={10} />
+                                                                </button>
+                                                            </div>
+                                                        );
+                                                    })() : (
+                                                        <div className="flex items-center gap-3 mb-3 text-gray-300">
+                                                            <div className="h-10 w-10 rounded-xl border-2 border-dashed border-gray-200 flex items-center justify-center shrink-0">
+                                                                <FaUserTag size={14} />
+                                                            </div>
+                                                            <p className="text-[9px] font-black uppercase tracking-widest">Select from the panel →</p>
+                                                            {formData.replacements.length > 1 && (
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => removeReplacement(idx)}
+                                                                    className="ml-auto h-8 w-8 rounded-lg bg-rose-50 text-rose-400 hover:bg-rose-500 hover:text-white transition-all flex items-center justify-center shrink-0 active:scale-90"
+                                                                    title="Remove"
+                                                                >
+                                                                    <FaTimes size={10} />
+                                                                </button>
+                                                            )}
+                                                        </div>
+                                                    )}
                                                     <input
                                                         placeholder="e.g. Periods 1, 2, 5"
                                                         value={rep.periods}
                                                         onChange={(e) => handleReplacementChange(idx, 'periods', e.target.value)}
                                                         required
-                                                        className={inputClass + " !mt-2 !bg-white border-sky-50"}
+                                                        className="w-full bg-gray-50 border border-gray-100 rounded-xl p-3 outline-none focus:ring-2 focus:ring-sky-100 focus:border-sky-400 transition-all font-bold text-gray-700 text-xs"
+                                                    />
+                                                </motion.div>
+                                            ))}
+                                            {formData.replacements.length === 0 && (
+                                                <div className="text-center py-8 text-gray-300">
+                                                    <FaUserFriends size={28} className="mx-auto mb-2" />
+                                                    <p className="text-[9px] font-black uppercase tracking-widest">No alternates selected yet</p>
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        {/* Right side - Staff browser panel */}
+                                        <div className="lg:col-span-7 bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden flex flex-col" style={{ maxHeight: '420px' }}>
+                                            <div className="p-4 border-b border-gray-100 bg-gray-50/50 shrink-0">
+                                                <div className="relative">
+                                                    <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-300" size={12} />
+                                                    <input
+                                                        type="text"
+                                                        placeholder="Search staff by name, role, department..."
+                                                        className="w-full pl-9 pr-4 py-3 bg-white border border-gray-100 rounded-xl outline-none focus:ring-2 focus:ring-sky-100 focus:border-sky-400 transition-all font-bold text-gray-700 text-xs"
+                                                        value={staffSearch}
+                                                        onChange={(e) => setStaffSearch(e.target.value)}
                                                     />
                                                 </div>
-                                                <div className="md:col-span-2 flex justify-end">
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => removeReplacement(idx)}
-                                                        className="h-10 w-10 md:h-[74px] md:w-full rounded-2xl bg-rose-50 text-rose-500 hover:bg-rose-500 hover:text-white transition-all flex items-center justify-center border border-rose-100/50 active:scale-90"
-                                                        title="Remove Replacement"
-                                                    >
-                                                        <FaTimes size={14} />
-                                                    </button>
-                                                </div>
-                                            </motion.div>
-                                        ))}
+                                            </div>
+                                            <div className="flex-1 overflow-y-auto p-3 space-y-2 custom-scrollbar">
+                                                {staffList
+                                                    .filter(s => s.emp_id !== user.emp_id)
+                                                    .filter(s =>
+                                                        s.name.toLowerCase().includes(staffSearch.toLowerCase()) ||
+                                                        (s.designation || '').toLowerCase().includes(staffSearch.toLowerCase()) ||
+                                                        (s.department_name || '').toLowerCase().includes(staffSearch.toLowerCase())
+                                                    )
+                                                    .map((member) => {
+                                                        const isSelected = formData.replacements.some(r => r.staff_id === member.emp_id);
+                                                        const hasConflict = conflicts.includes(member.emp_id);
+                                                        return (
+                                                            <div
+                                                                key={member.emp_id}
+                                                                className={`flex items-center gap-3 px-4 py-3 rounded-xl border transition-all ${isSelected ? 'bg-sky-50 border-sky-200' : 'bg-white border-gray-100 hover:bg-gray-50'}`}
+                                                            >
+                                                                <div className="h-9 w-9 rounded-lg overflow-hidden border border-gray-100 shrink-0">
+                                                                    <img
+                                                                        src={member.profile_pic || `https://ui-avatars.com/api/?name=${encodeURIComponent(member.name)}&background=3b82f6&color=fff&bold=true`}
+                                                                        alt=""
+                                                                        className="w-full h-full object-cover"
+                                                                    />
+                                                                </div>
+                                                                <div className="flex-1 min-w-0">
+                                                                    <div className="flex items-center gap-2">
+                                                                        <p className="text-xs font-black text-gray-800 tracking-tight truncate">{member.name}</p>
+                                                                        {hasConflict && (
+                                                                            <span className="shrink-0 h-2 w-2 rounded-full bg-rose-500 animate-pulse" title="Schedule conflict"></span>
+                                                                        )}
+                                                                    </div>
+                                                                    <p className="text-[8px] font-bold text-gray-400 uppercase tracking-widest truncate">
+                                                                        {member.designation || member.role} · {member.department_name || 'Personnel'}
+                                                                    </p>
+                                                                </div>
+                                                                {isSelected ? (
+                                                                    <span className="shrink-0 px-3 py-1.5 bg-sky-100 text-sky-600 rounded-lg text-[8px] font-black uppercase tracking-widest flex items-center gap-1.5">
+                                                                        <FaCheckCircle size={10} />
+                                                                        Selected
+                                                                    </span>
+                                                                ) : (
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => {
+                                                                            // Find a replacement slot without a staff_id, or add a new one
+                                                                            const emptyIdx = formData.replacements.findIndex(r => !r.staff_id);
+                                                                            if (emptyIdx !== -1) {
+                                                                                handleReplacementChange(emptyIdx, 'staff_id', member.emp_id);
+                                                                            } else {
+                                                                                setFormData(prev => ({
+                                                                                    ...prev,
+                                                                                    replacements: [...prev.replacements, { staff_id: member.emp_id, periods: '' }]
+                                                                                }));
+                                                                            }
+                                                                        }}
+                                                                        className="shrink-0 px-3 py-1.5 bg-sky-600 text-white rounded-lg text-[8px] font-black uppercase tracking-widest hover:bg-sky-700 transition-all active:scale-95 shadow-sm"
+                                                                    >
+                                                                        Select
+                                                                    </button>
+                                                                )}
+                                                            </div>
+                                                        );
+                                                    })}
+                                            </div>
+                                            <div className="p-3 border-t border-gray-100 bg-gray-50/30 shrink-0">
+                                                <p className="text-[8px] font-bold text-gray-400 uppercase tracking-widest text-center flex items-center justify-center gap-2">
+                                                    <FaInfoCircle className="text-sky-300" size={10} />
+                                                    Click Select to add staff as alternate. Pulsing dot = schedule overlap.
+                                                </p>
+                                            </div>
+                                        </div>
                                     </div>
-
-                                    <button
-                                        type="button"
-                                        onClick={addReplacement}
-                                        className="mt-8 flex items-center gap-3 px-8 py-4 bg-white border border-sky-100 text-sky-600 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-sky-50 transition-all shadow-sm active:scale-95 mx-auto"
-                                    >
-                                        <FaPlusCircle className="text-sky-500" />
-                                        Add Another Replacement
-                                    </button>
                                 </div>
 
                                 <div>
@@ -517,8 +579,8 @@ const LeaveApply = () => {
 
                                 {/* Leave Balance Indicator */}
                                 {myLimits && (() => {
-                                    const keyMap = { CL: 'cl', ML: 'ml', OD: 'od', 'Comp Leave': 'comp', LOP: 'lop' };
-                                    const k = keyMap[formData.leave_type];
+                                    const matchedType = leaveTypes.find(t => t.label === formData.leave_type);
+                                    const k = matchedType?.key;
                                     if (!k) return null;
                                     const limit = myLimits[`${k}_limit`] ?? 0;
                                     const taken = myLimits[`${k}_taken`] ?? 0;
@@ -548,8 +610,8 @@ const LeaveApply = () => {
                                 <button
                                     type="submit"
                                     disabled={myLimits && (() => {
-                                        const keyMap = { CL: 'cl', ML: 'ml', OD: 'od', 'Comp Leave': 'comp', LOP: 'lop' };
-                                        const k = keyMap[formData.leave_type];
+                                        const matchedType = leaveTypes.find(t => t.label === formData.leave_type);
+                                        const k = matchedType?.key;
                                         if (!k) return false;
                                         const limit = myLimits[`${k}_limit`] ?? 0;
                                         const taken = myLimits[`${k}_taken`] ?? 0;
@@ -785,23 +847,19 @@ const LeaveApply = () => {
                                     <div className="h-2 w-2 bg-sky-600 rounded-full animate-bounce delay-200" />
                                 </div>
                             ) : myLimits ? (() => {
-                                const LEAVE_TYPES = [
-                                    { key: 'cl', label: 'CL', full: 'Casual Leave', color: 'blue', icon: '🏖️' },
-                                    { key: 'ml', label: 'ML', full: 'Medical Leave', color: 'rose', icon: '🏥' },
-                                    { key: 'od', label: 'OD', full: 'On Duty', color: 'amber', icon: '🏢' },
-                                    { key: 'comp', label: 'Comp Leave', full: 'Compensatory Leave', color: 'purple', icon: '⏱️' },
-                                    { key: 'lop', label: 'LOP', full: 'Loss of Pay', color: 'gray', icon: '💳' },
-                                ];
                                 const colorMap = {
                                     blue: { bg: 'bg-sky-50', text: 'text-sky-700', bar: 'bg-sky-500', border: 'border-sky-100' },
                                     rose: { bg: 'bg-rose-50', text: 'text-rose-700', bar: 'bg-rose-500', border: 'border-rose-100' },
                                     amber: { bg: 'bg-amber-50', text: 'text-amber-700', bar: 'bg-amber-500', border: 'border-amber-100' },
                                     purple: { bg: 'bg-purple-50', text: 'text-purple-700', bar: 'bg-purple-500', border: 'border-purple-100' },
                                     gray: { bg: 'bg-gray-50', text: 'text-gray-700', bar: 'bg-gray-400', border: 'border-gray-200' },
+                                    emerald: { bg: 'bg-emerald-50', text: 'text-emerald-700', bar: 'bg-emerald-500', border: 'border-emerald-100' },
+                                    indigo: { bg: 'bg-indigo-50', text: 'text-indigo-700', bar: 'bg-indigo-500', border: 'border-indigo-100' },
                                 };
+                                const iconMap = { cl: '🏖️', ml: '🏥', od: '🏢', comp: '⏱️', lop: '💳' };
                                 return (
                                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
-                                        {LEAVE_TYPES.map((t, idx) => {
+                                        {leaveTypes.map((t, idx) => {
                                             const limit = myLimits[`${t.key}_limit`] ?? 0;
                                             const taken = myLimits[`${t.key}_taken`] ?? 0;
                                             const remaining = Math.max(0, limit - taken);
@@ -816,7 +874,7 @@ const LeaveApply = () => {
                                                     className={`modern-card p-6 border ${c.border} flex flex-col gap-4 relative overflow-hidden`}
                                                 >
                                                     <div className="flex justify-between items-start">
-                                                        <div className={`h-12 w-12 rounded-2xl ${c.bg} flex items-center justify-center text-xl shadow-sm border ${c.border}`}>{t.icon}</div>
+                                                        <div className={`h-12 w-12 rounded-2xl ${c.bg} flex items-center justify-center text-xl shadow-sm border ${c.border}`}>{iconMap[t.key] || '📋'}</div>
                                                         <span className={`text-[8px] font-black uppercase tracking-widest px-2 py-1 rounded-lg ${remaining > 0 ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>
                                                             {remaining > 0 ? 'Available' : 'Finished'}
                                                         </span>
@@ -864,109 +922,6 @@ const LeaveApply = () => {
                 </AnimatePresence>
             </motion.div>
 
-            {/* Staff Availability Full-Screen Overlay */}
-            <AnimatePresence>
-                {isStaffModalOpen && (
-                    <motion.div
-                        initial={{ opacity: 0, scale: 0.95 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        exit={{ opacity: 0, scale: 0.95 }}
-                        className="fixed inset-0 z-[100] bg-white overflow-hidden flex flex-col h-screen"
-                    >
-                        <div className="p-8 md:p-12 border-b border-sky-50 flex flex-col md:flex-row justify-between items-start md:items-center shrink-0 bg-white shadow-sm gap-6">
-                            <div>
-                                <h2 className="text-3xl font-black text-gray-800 tracking-tight">Browse Personnel</h2>
-                                <p className="text-[10px] font-black text-sky-500 uppercase tracking-widest mt-1">Select an available colleague as your replacement</p>
-                            </div>
-                            <div className="flex items-center gap-6 w-full md:w-auto">
-                                <div className="relative group flex-1 md:w-80">
-                                    <FaUserFriends className="absolute left-4 top-1/2 -translate-y-1/2 text-sky-300 group-focus-within:text-sky-500 transition-colors" />
-                                    <input
-                                        type="text"
-                                        placeholder="Search name or role..."
-                                        className="w-full pl-12 pr-6 py-4 bg-gray-50 border border-gray-100 rounded-2xl outline-none focus:ring-4 focus:ring-sky-50 focus:border-sky-500 transition-all font-bold text-gray-700 text-xs"
-                                        value={staffSearch}
-                                        onChange={(e) => setStaffSearch(e.target.value)}
-                                    />
-                                </div>
-                                <button
-                                    onClick={() => setIsStaffModalOpen(false)}
-                                    className="h-14 w-14 shrink-0 rounded-2xl bg-rose-50 text-rose-500 flex items-center justify-center hover:bg-rose-500 hover:text-white transition-all active:scale-90"
-                                >
-                                    <FaTimesCircle size={24} />
-                                </button>
-                            </div>
-                        </div>
-
-                        <div className="flex-1 overflow-y-auto p-8 md:p-12 custom-scrollbar bg-gray-50/20">
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                                {staffList
-                                    .filter(s => s.emp_id !== user.emp_id)
-                                    .filter(s =>
-                                        s.name.toLowerCase().includes(staffSearch.toLowerCase()) ||
-                                        (s.designation || '').toLowerCase().includes(staffSearch.toLowerCase()) ||
-                                        (s.department_name || '').toLowerCase().includes(staffSearch.toLowerCase())
-                                    )
-                                    .map((member, idx) => (
-                                        <motion.div
-                                            key={member.emp_id}
-                                            initial={{ opacity: 0, scale: 0.95 }}
-                                            animate={{ opacity: 1, scale: 1 }}
-                                            transition={{ delay: idx * 0.02 }}
-                                            onClick={() => {
-                                                if (activeReplacementIdx !== null) {
-                                                    handleReplacementChange(activeReplacementIdx, 'staff_id', member.emp_id);
-                                                } else {
-                                                    handleReplacementChange(0, 'staff_id', member.emp_id);
-                                                }
-                                                setIsStaffModalOpen(false);
-                                            }}
-                                            className={`flex items-center gap-4 px-6 py-3 rounded-2xl border-[3px] transition-all cursor-pointer group hover:scale-[1.02] active:scale-95 min-h-[70px] ${(activeReplacementIdx !== null ? formData.replacements[activeReplacementIdx]?.staff_id : '') === member.emp_id
-                                                ? 'bg-sky-600 border-black shadow-lg'
-                                                : 'bg-white border-black hover:bg-gray-50'
-                                                }`}
-                                        >
-                                            <div className="h-10 w-10 rounded-xl overflow-hidden border-2 border-black shrink-0 shadow-sm transition-transform group-hover:rotate-3">
-                                                <img
-                                                    src={member.profile_pic || `https://ui-avatars.com/api/?name=${encodeURIComponent(member.name)}&background=3b82f6&color=fff&bold=true`}
-                                                    alt=""
-                                                    className="w-full h-full object-cover"
-                                                />
-                                            </div>
-
-                                            <div className="flex-1 min-w-0">
-                                                <div className="flex items-center justify-between gap-2">
-                                                    <p className={`text-sm font-black tracking-tight truncate ${(activeReplacementIdx !== null ? formData.replacements[activeReplacementIdx]?.staff_id : '') === member.emp_id ? 'text-white' : 'text-gray-900'}`}>{member.name}</p>
-                                                    {conflicts.includes(member.emp_id) && (
-                                                        <span className="shrink-0 h-2 w-2 rounded-full bg-rose-500 animate-pulse border border-black/10"></span>
-                                                    )}
-                                                </div>
-                                                <div className="flex items-center gap-3">
-                                                    <p className={`text-[9px] font-black uppercase tracking-widest truncate ${(activeReplacementIdx !== null ? formData.replacements[activeReplacementIdx]?.staff_id : '') === member.emp_id ? 'text-sky-100' : 'text-sky-600'}`}>{member.designation || member.role}</p>
-                                                    <span className={`text-[8px] font-bold ${(activeReplacementIdx !== null ? formData.replacements[activeReplacementIdx]?.staff_id : '') === member.emp_id ? 'text-white/40' : 'text-gray-400'}`}>|</span>
-                                                    <p className={`text-[8px] font-bold uppercase tracking-tighter truncate ${(activeReplacementIdx !== null ? formData.replacements[activeReplacementIdx]?.staff_id : '') === member.emp_id ? 'text-sky-200' : 'text-gray-500'}`}>{member.department_name || 'Personnel'}</p>
-                                                </div>
-                                            </div>
-
-                                            {(activeReplacementIdx !== null ? formData.replacements[activeReplacementIdx]?.staff_id : '') === member.emp_id && (
-                                                <div className="shrink-0 h-6 w-6 bg-white rounded-full flex items-center justify-center border-2 border-black">
-                                                    <FaCheckCircle className="text-sky-600" size={14} />
-                                                </div>
-                                            )}
-                                        </motion.div>
-                                    ))}
-                            </div>
-                        </div>
-
-                        <div className="p-10 bg-white border-t border-sky-50 flex justify-center shrink-0 shadow-inner">
-                            <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.3em] flex items-center gap-3">
-                                <FaInfoCircle className="text-sky-300" />
-                                Members with schedule overlaps are automatically highlighted for caution.
-                            </p>
-                        </div>
-                    </motion.div>
-                )}
-            </AnimatePresence>
         </Layout>
     );
 };

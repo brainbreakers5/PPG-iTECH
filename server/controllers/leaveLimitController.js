@@ -46,11 +46,22 @@ exports.getAllLeaveLimits = async (req, res) => {
                 COALESCE(lb.ml_taken, 0)   AS ml_taken,
                 COALESCE(lb.od_taken, 0)   AS od_taken,
                 COALESCE(lb.comp_taken, 0) AS comp_taken,
-                COALESCE(lb.lop_taken, 0)  AS lop_taken
+                COALESCE(lb.lop_taken, 0)  AS lop_taken,
+                COALESCE(comp_earned.cnt, 0) AS comp_earned
             FROM users u
             LEFT JOIN departments d ON u.department_id = d.id
             LEFT JOIN leave_limits ll ON ll.emp_id = u.emp_id AND ll.year = $1
             LEFT JOIN leave_balances lb ON lb.emp_id = u.emp_id AND lb.year = $1
+            LEFT JOIN LATERAL (
+                SELECT COUNT(*) AS cnt FROM attendance a
+                WHERE a.emp_id = u.emp_id
+                  AND a.status = 'Present'
+                  AND EXTRACT(YEAR FROM a.date) = $1
+                  AND (
+                    EXTRACT(DOW FROM a.date) IN (0, 6)
+                    OR a.date IN (SELECT h_date FROM holidays WHERE EXTRACT(YEAR FROM h_date) = $1)
+                  )
+            ) comp_earned ON true
             WHERE u.role IN ('staff', 'hod')
             ORDER BY u.name ASC
         `, [year]);
@@ -86,9 +97,20 @@ exports.getMyLeaveLimits = async (req, res) => {
                 COALESCE(lb.ml_taken, 0)   AS ml_taken,
                 COALESCE(lb.od_taken, 0)   AS od_taken,
                 COALESCE(lb.comp_taken, 0) AS comp_taken,
-                COALESCE(lb.lop_taken, 0)  AS lop_taken
+                COALESCE(lb.lop_taken, 0)  AS lop_taken,
+                COALESCE(comp_earned.cnt, 0) AS comp_earned
             FROM leave_limits ll
             LEFT JOIN leave_balances lb ON lb.emp_id = ll.emp_id AND lb.year = ll.year
+            LEFT JOIN LATERAL (
+                SELECT COUNT(*) AS cnt FROM attendance a
+                WHERE a.emp_id = ll.emp_id
+                  AND a.status = 'Present'
+                  AND EXTRACT(YEAR FROM a.date) = ll.year
+                  AND (
+                    EXTRACT(DOW FROM a.date) IN (0, 6)
+                    OR a.date IN (SELECT h_date FROM holidays WHERE EXTRACT(YEAR FROM h_date) = ll.year)
+                  )
+            ) comp_earned ON true
             WHERE ll.emp_id = $1 AND ll.year = $2
         `, [emp_id, year]);
 
@@ -114,20 +136,16 @@ exports.updateLeaveLimit = async (req, res) => {
     try {
         const { emp_id } = req.params;
         const year = parseInt(req.body.year) || currentYear();
-        const { cl_limit, ml_limit, od_limit, comp_limit, lop_limit } = req.body;
+        const { cl_limit } = req.body;
 
         await pool.query(`
             INSERT INTO leave_limits (emp_id, year, cl_limit, ml_limit, od_limit, comp_limit, lop_limit, updated_at)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
+            VALUES ($1, $2, $3, 0, 0, 0, 0, NOW())
             ON CONFLICT (emp_id, year) 
             DO UPDATE SET
-                cl_limit = EXCLUDED.cl_limit,
-                ml_limit = EXCLUDED.ml_limit,
-                od_limit = EXCLUDED.od_limit,
-                comp_limit = EXCLUDED.comp_limit,
-                lop_limit = EXCLUDED.lop_limit,
+                cl_limit = $3,
                 updated_at = NOW()
-        `, [emp_id, year, cl_limit, ml_limit, od_limit, comp_limit, lop_limit]);
+        `, [emp_id, year, cl_limit]);
 
         res.json({ message: 'Leave limits updated successfully' });
     } catch (error) {

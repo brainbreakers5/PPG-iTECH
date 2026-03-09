@@ -61,6 +61,37 @@ exports.loginUser = async (req, res) => {
     }
 };
 
+// @desc    Management login with PIN
+// @route   POST /api/auth/management-login
+// @access  Public
+exports.managementLogin = async (req, res) => {
+    const { pin } = req.body;
+
+    if (pin !== '1234') {
+        return res.status(401).json({ message: 'Invalid management PIN' });
+    }
+
+    try {
+        // Use the first admin user as the backing identity for API access
+        const { rows } = await pool.query(
+            "SELECT id FROM users WHERE role = 'admin' LIMIT 1"
+        );
+
+        if (rows.length === 0) {
+            return res.status(500).json({ message: 'No admin user found for management access' });
+        }
+
+        res.json({
+            role: 'management',
+            name: 'Management',
+            token: generateToken(rows[0].id),
+        });
+    } catch (error) {
+        console.error('Management Login Error:', error);
+        res.status(500).json({ message: 'Server Error' });
+    }
+};
+
 // @desc    Get user profile
 // @route   GET /api/auth/profile
 // @access  Private

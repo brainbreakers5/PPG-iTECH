@@ -12,7 +12,8 @@ export const AuthProvider = ({ children }) => {
     useEffect(() => {
         const checkUser = async () => {
             const token = localStorage.getItem('token');
-            if (token) {
+            const isManagement = sessionStorage.getItem('managementAccess') === 'true';
+            if (token && !isManagement) {
                 try {
                     const { data } = await api.get('/auth/profile');
                     setUser(data);

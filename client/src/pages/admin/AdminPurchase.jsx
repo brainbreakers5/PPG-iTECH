@@ -115,6 +115,7 @@ const AdminPurchase = () => {
                         color: #111827;
                         margin: 0;
                         font-size: 10pt;
+                        position: relative;
                     }
                     
                     h1 {
@@ -124,27 +125,20 @@ const AdminPurchase = () => {
                         color: #1e3a8a;
                     }
                     
-                    .print-header {
-                        display: flex;
-                        justify-content: space-between;
-                        align-items: flex-start;
-                        margin-bottom: 12px;
-                        border-bottom: 2px solid #e5e7eb;
-                        padding-bottom: 6px;
-                    }
-                    
-                    .brand-info {
+                    .print-brand {
+                        position: absolute;
+                        top: 12px;
+                        right: 12px;
                         text-align: right;
                     }
-                    
-                    .brand-info .brand-name {
-                        font-size: 12pt;
+                    .print-brand .app-name {
+                        font-size: 11pt;
                         font-weight: 800;
                         color: #1e3a8a;
                         margin: 0;
+                        letter-spacing: 0.5px;
                     }
-                    
-                    .brand-info .brand-date {
+                    .print-brand .print-time {
                         font-size: 8pt;
                         color: #6b7280;
                         margin: 2px 0 0;
@@ -229,13 +223,11 @@ const AdminPurchase = () => {
                 </style>
             </head>
             <body>
-                <div class="print-header">
-                    <h1>${escapeHtml(title)}</h1>
-                    <div class="brand-info">
-                        <p class="brand-name">PPG iTech HUB</p>
-                        <p class="brand-date">${new Date().toLocaleString('en-GB')}</p>
-                    </div>
+                <div class="print-brand">
+                    <p class="app-name">PPG iTech HUB</p>
+                    <p class="print-time">${new Date().toLocaleString('en-GB')}</p>
                 </div>
+                <h1>${escapeHtml(title)}</h1>
                 <table>
                     <thead>
                         <tr>

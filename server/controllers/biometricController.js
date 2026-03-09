@@ -15,8 +15,8 @@ exports.receiveLog = async (req, res) => {
 
         // Use provided timestamp or current server time
         const logDate = timestamp ? new Date(timestamp) : new Date();
-        const dateStr = logDate.toISOString().split('T')[0]; // YYYY-MM-DD
-        const timeStr = logDate.toLocaleTimeString('en-GB', { hour12: false }); // HH:MM:SS
+        const dateStr = logDate.toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' }); // YYYY-MM-DD in IST
+        const timeStr = logDate.toLocaleTimeString('en-GB', { timeZone: 'Asia/Kolkata', hour12: false }); // HH:MM:SS in IST
 
         // 1. Check if User exists in the system
         const { rows: userRows } = await pool.query(

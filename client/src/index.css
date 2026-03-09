@@ -110,6 +110,30 @@ body {
   background: rgba(0, 0, 0, 0.1);
 }
 
+/* Attendance Sheet Horizontal Scroll */
+.attendance-sheet-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 transparent;
+}
+
+.attendance-sheet-scroll::-webkit-scrollbar {
+  height: 6px;
+}
+
+.attendance-sheet-scroll::-webkit-scrollbar-track {
+  background: #f8fafc;
+  border-radius: 10px;
+}
+
+.attendance-sheet-scroll::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 10px;
+}
+
+.attendance-sheet-scroll::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
 /* Status Indicators */
 .status-sky {
   background: #0EA5E9;

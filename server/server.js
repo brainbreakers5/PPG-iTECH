@@ -26,6 +26,7 @@ const purchaseRoutes = require('./routes/purchaseRoutes');
 const conversationRoutes = require('./routes/conversationRoutes');
 const holidayRoutes = require('./routes/holidayRoutes');
 const leaveLimitRoutes = require('./routes/leaveLimitRoutes');
+const leaveTypeRoutes = require('./routes/leaveTypeRoutes');
 const biometricRoutes = require('./routes/biometricRoutes');
 
 const app = express();
@@ -75,6 +76,7 @@ app.use('/api/purchases', purchaseRoutes);
 app.use('/api/conversations', conversationRoutes);
 app.use('/api/holidays', holidayRoutes);
 app.use('/api/leave-limits', leaveLimitRoutes);
+app.use('/api/leave-types', leaveTypeRoutes);
 app.use('/api/biometric', biometricRoutes);
 
 // Production Static Files

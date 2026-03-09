@@ -1,13 +1,10 @@
 import { useState, useEffect } from 'react';
 import Layout from '../../components/Layout';
 import api from '../../utils/api';
-import Swal from 'sweetalert2';
-import { useAuth } from '../../context/AuthContext';
-import { FaCalculator, FaCheckCircle, FaFilter, FaFileAlt, FaClock, FaMoneyBillWave, FaArrowRight, FaShieldAlt, FaChartLine, FaWallet } from 'react-icons/fa';
+import { FaFilter, FaFileAlt, FaClock, FaMoneyBillWave, FaShieldAlt, FaChartLine, FaWallet, FaCheckCircle } from 'react-icons/fa';
 import { motion, AnimatePresence } from 'framer-motion';
 
-const SalaryManagement = () => {
-    const { user } = useAuth();
+const ManagementSalary = () => {
     const [salaries, setSalaries] = useState([]);
     const now = new Date();
     const firstDay = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
@@ -15,11 +12,7 @@ const SalaryManagement = () => {
     const [fromDate, setFromDate] = useState(firstDay);
     const [toDate, setToDate] = useState(lastDay);
     const [loading, setLoading] = useState(true);
-    const [isCalculating, setIsCalculating] = useState(false);
     const [activeRole, setActiveRole] = useState('all');
-    const [paidStatuses, setPaidStatuses] = useState(['Present', 'CL', 'ML', 'Comp Leave', 'OD', 'Holiday']);
-
-    const attendanceOptions = ['Present', 'OD', 'CL', 'ML', 'Comp Leave', 'Holiday', 'Absent'];
 
     useEffect(() => {
         fetchSalaries();
@@ -32,75 +25,11 @@ const SalaryManagement = () => {
             const m = d.getMonth() + 1;
             const y = d.getFullYear();
             const { data } = await api.get(`/salary?month=${m}&year=${y}`);
-            // Staff and HOD should only see their own salary
-            if (user.role === 'staff' || user.role === 'hod') {
-                setSalaries(data.filter(s => s.emp_id === user.emp_id));
-            } else {
-                setSalaries(data);
-            }
+            setSalaries(data);
             setLoading(false);
         } catch (error) {
             console.error(error);
             setLoading(false);
-        }
-    };
-
-    const handleCalculate = async () => {
-        const d = new Date(fromDate);
-        const month = d.getMonth() + 1;
-        const year = d.getFullYear();
-
-        const result = await Swal.fire({
-            title: 'Calculate Salaries?',
-            text: `Calculate payroll for: ${String(month).padStart(2, '0')}/${year}. This will process attendance records and calculate net pay.`,
-            icon: 'question',
-            showCancelButton: true,
-            confirmButtonColor: '#2563eb',
-            confirmButtonText: 'Start Calculation',
-            cancelButtonColor: '#64748b',
-            background: '#fff',
-            customClass: {
-                popup: 'rounded-[40px]',
-                title: 'font-black text-gray-800 tracking-tight'
-            }
-        });
-
-        if (result.isConfirmed) {
-            setIsCalculating(true);
-            try {
-                await api.post('/salary/calculate', { month, year, paidStatuses });
-                Swal.fire({
-                    title: 'Calculation Complete',
-                    text: 'Payroll has been successfully calculated.',
-                    icon: 'success',
-                    confirmButtonColor: '#2563eb'
-                });
-                fetchSalaries();
-            } catch (error) {
-                Swal.fire({
-                    title: 'Calculation Failed',
-                    text: 'There was an error calculating salaries.',
-                    icon: 'error',
-                    confirmButtonColor: '#2563eb'
-                });
-            } finally {
-                setIsCalculating(false);
-            }
-        }
-    };
-
-    const handleStatusUpdate = async (id, status) => {
-        try {
-            await api.put(`/salary/${id}/status`, { status });
-            fetchSalaries();
-            Swal.fire({
-                title: 'Status Updated',
-                text: `Salary record has been marked as ${status.toUpperCase()}.`,
-                icon: 'success',
-                confirmButtonColor: '#2563eb'
-            });
-        } catch (error) {
-            console.error(error);
         }
     };
 
@@ -120,7 +49,6 @@ const SalaryManagement = () => {
 
         const title = 'Salary Report';
         const headings = ['#', 'Name', 'Department', 'Role', 'Present', 'Monthly Salary', 'Computed Pay', 'Status'];
-
         const useLandscape = items.length > 15;
 
         const rowsHtml = items.map((s, idx) => `
@@ -150,91 +78,23 @@ const SalaryManagement = () => {
                 <meta charset="UTF-8">
                 <title>${escapeHtml(title)}</title>
                 <style>
-                    @page {
-                        size: ${useLandscape ? 'landscape' : 'portrait'};
-                        margin: 0.5cm;
-                    }
+                    @page { size: ${useLandscape ? 'landscape' : 'portrait'}; margin: 0.5cm; }
                     * { box-sizing: border-box; }
-                    body {
-                        font-family: Arial, Helvetica, sans-serif;
-                        padding: 12px;
-                        color: #111827;
-                        margin: 0;
-                        font-size: 10pt;
-                        position: relative;
-                    }
-                    h1 {
-                        margin: 0 0 6px;
-                        font-size: 16pt;
-                        font-weight: bold;
-                        color: #1e3a8a;
-                    }
-                    .print-brand {
-                        position: absolute;
-                        top: 12px;
-                        right: 12px;
-                        text-align: right;
-                    }
-                    .print-brand .app-name {
-                        font-size: 11pt;
-                        font-weight: 800;
-                        color: #1e3a8a;
-                        margin: 0;
-                        letter-spacing: 0.5px;
-                    }
-                    .print-brand .print-time {
-                        font-size: 8pt;
-                        color: #6b7280;
-                        margin: 2px 0 0;
-                    }
-                    .meta {
-                        margin-bottom: 12px;
-                        color: #6b7280;
-                        font-size: 9pt;
-                        border-bottom: 2px solid #e5e7eb;
-                        padding-bottom: 6px;
-                    }
-                    table {
-                        width: 100%;
-                        border-collapse: collapse;
-                        table-layout: auto;
-                    }
-                    th, td {
-                        border: 1px solid #9ca3af;
-                        padding: 6px 8px;
-                        font-size: 9pt;
-                        text-align: left;
-                        vertical-align: top;
-                        word-wrap: break-word;
-                        overflow-wrap: break-word;
-                    }
-                    th {
-                        background: #e5e7eb;
-                        font-weight: 700;
-                        text-transform: uppercase;
-                        font-size: 8pt;
-                        letter-spacing: 0.3px;
-                        color: #374151;
-                        position: sticky;
-                        top: 0;
-                    }
+                    body { font-family: Arial, Helvetica, sans-serif; padding: 12px; color: #111827; margin: 0; font-size: 10pt; position: relative; }
+                    h1 { margin: 0 0 6px; font-size: 16pt; font-weight: bold; color: #1e3a8a; }
+                    .print-brand { position: absolute; top: 12px; right: 12px; text-align: right; }
+                    .print-brand .app-name { font-size: 11pt; font-weight: 800; color: #1e3a8a; margin: 0; letter-spacing: 0.5px; }
+                    .print-brand .print-time { font-size: 8pt; color: #6b7280; margin: 2px 0 0; }
+                    .meta { margin-bottom: 12px; color: #6b7280; font-size: 9pt; border-bottom: 2px solid #e5e7eb; padding-bottom: 6px; }
+                    table { width: 100%; border-collapse: collapse; table-layout: auto; }
+                    th, td { border: 1px solid #9ca3af; padding: 6px 8px; font-size: 9pt; text-align: left; vertical-align: top; word-wrap: break-word; }
+                    th { background: #e5e7eb; font-weight: 700; text-transform: uppercase; font-size: 8pt; letter-spacing: 0.3px; color: #374151; }
                     tr:nth-child(even) { background: #f9fafb; }
                     tr { page-break-inside: avoid; }
                     thead { display: table-header-group; }
-                    .summary {
-                        margin-top: 16px;
-                        display: flex;
-                        gap: 24px;
-                        font-size: 10pt;
-                        font-weight: 700;
-                    }
+                    .summary { margin-top: 16px; display: flex; gap: 24px; font-size: 10pt; font-weight: 700; }
                     .summary span { color: #6b7280; font-weight: 400; }
-                    @media print {
-                        body { padding: 0; }
-                        table { page-break-after: auto; }
-                        tr { page-break-inside: avoid; page-break-after: auto; }
-                        thead { display: table-header-group; }
-                    }
+                    @media print { body { padding: 0; } }
                 </style>
             </head>
             <body>
@@ -249,9 +109,7 @@ const SalaryManagement = () => {
                 </div>
                 <table>
                     <thead>
-                        <tr>
-                            ${headings.map(h => `<th>${escapeHtml(h)}</th>`).join('')}
-                        </tr>
+                        <tr>${headings.map(h => `<th>${escapeHtml(h)}</th>`).join('')}</tr>
                     </thead>
                     <tbody>${rowsHtml}</tbody>
                 </table>
@@ -278,71 +136,45 @@ const SalaryManagement = () => {
                 {/* Header Section */}
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-12 gap-8">
                     <div>
-                        <h1 className="text-4xl font-black text-gray-800 tracking-tighter">Salary Management</h1>
+                        <h1 className="text-4xl font-black text-gray-800 tracking-tighter">Salary <span className="text-[#7C3AED]">Overview</span></h1>
                         <p className="text-gray-500 font-medium mt-1 uppercase tracking-widest text-[10px] flex items-center gap-2">
-                            <span className="h-2 w-2 rounded-full bg-sky-500"></span> Manage staff salaries and payroll data
+                            <span className="h-2 w-2 rounded-full bg-purple-500"></span> View-only salary and payroll data
                         </p>
                     </div>
-                    <div className="flex items-center gap-4 w-full md:w-auto">
-                        {user.role === 'admin' && (
-                            <button
-                                onClick={handlePrint}
-                                className="flex-1 md:flex-none bg-white text-gray-500 px-8 py-5 rounded-2xl shadow-xl shadow-sky-50/50 hover:bg-gray-50 transition-all font-black uppercase tracking-[0.2em] text-[10px] flex items-center justify-center border border-sky-50 no-print"
-                            >
-                                <FaFileAlt className="mr-3 text-sky-400" /> Print
-                            </button>
-                        )}
-                        {user.role === 'admin' && (
-                            <button
-                                onClick={handleCalculate}
-                                disabled={isCalculating}
-                                className={`flex-1 md:flex-none bg-sky-600 text-white px-10 py-5 rounded-2xl shadow-xl shadow-sky-200 hover:bg-sky-800 transition-all flex items-center justify-center font-black uppercase tracking-[0.2em] text-[10px] relative overflow-hidden group ${isCalculating ? 'opacity-50 cursor-not-allowed' : ''}`}
-                            >
-                                <motion.div
-                                    className="absolute inset-0 bg-white/20 -translate-x-full group-hover:translate-x-full transition-transform duration-1000"
-                                    animate={isCalculating ? { x: ["-100%", "100%"] } : {}}
-                                    transition={isCalculating ? { repeat: Infinity, duration: 1.5, ease: "linear" } : {}}
-                                />
-                                <FaCalculator className={`mr-3 ${isCalculating ? 'animate-spin' : 'group-hover:rotate-12 transition-transform'}`} />
-                                {isCalculating ? 'Calculating...' : 'Calculate All Salaries'}
-                            </button>
-                        )}
-                    </div>
+
                 </div>
 
-                {/* Role Tabs - Only for Admin and Principal */}
-                {(user.role === 'admin' || user.role === 'principal') && (
-                    <div className="flex flex-wrap gap-4 mb-10 no-print">
-                        {[
-                            { id: 'all', label: 'All Personnel', icon: <FaChartLine /> },
-                            { id: 'principal', label: 'Principal', icon: <FaShieldAlt /> },
-                            { id: 'hod', label: 'HODs', icon: <FaShieldAlt /> },
-                            { id: 'staff', label: 'Staff members', icon: <FaFileAlt /> }
-                        ].map((tab) => (
-                            <button
-                                key={tab.id}
-                                onClick={() => setActiveRole(tab.id)}
-                                className={`flex items-center gap-3 px-8 py-4 rounded-2xl font-black uppercase tracking-[0.2em] text-[10px] transition-all ${activeRole === tab.id
-                                    ? 'bg-sky-600 text-white shadow-xl shadow-sky-200 ring-4 ring-sky-50'
-                                    : 'bg-white text-gray-400 hover:bg-gray-50 border border-sky-50'
-                                    }`}
-                            >
-                                <span className={`${activeRole === tab.id ? 'text-white' : 'text-sky-500'}`}>
-                                    {tab.icon}
-                                </span>
-                                {tab.label}
-                            </button>
-                        ))}
-                    </div>
-                )}
+                {/* Role Tabs */}
+                <div className="flex flex-wrap gap-4 mb-10 no-print">
+                    {[
+                        { id: 'all', label: 'All Personnel', icon: <FaChartLine /> },
+                        { id: 'principal', label: 'Principal', icon: <FaShieldAlt /> },
+                        { id: 'hod', label: 'HODs', icon: <FaShieldAlt /> },
+                        { id: 'staff', label: 'Staff members', icon: <FaFileAlt /> }
+                    ].map((tab) => (
+                        <button
+                            key={tab.id}
+                            onClick={() => setActiveRole(tab.id)}
+                            className={`flex items-center gap-3 px-8 py-4 rounded-2xl font-black uppercase tracking-[0.2em] text-[10px] transition-all ${activeRole === tab.id
+                                ? 'bg-purple-600 text-white shadow-xl shadow-purple-200 ring-4 ring-purple-50'
+                                : 'bg-white text-gray-400 hover:bg-gray-50 border border-purple-50'
+                                }`}
+                        >
+                            <span className={`${activeRole === tab.id ? 'text-white' : 'text-purple-500'}`}>
+                                {tab.icon}
+                            </span>
+                            {tab.label}
+                        </button>
+                    ))}
+                </div>
 
                 {/* Filters & Table Grid */}
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 mb-12">
                     {/* Period Selector Sidebar */}
                     <div className="lg:col-span-3">
-                        <div className="bg-white p-10 rounded-[40px] shadow-xl shadow-sky-50/50 border border-sky-50 sticky top-6">
+                        <div className="bg-white p-10 rounded-[40px] shadow-xl shadow-purple-50/50 border border-purple-50 sticky top-6">
                             <h2 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-8 flex items-center gap-3">
-                                <FaFilter className="text-sky-600" /> Select Period
+                                <FaFilter className="text-purple-600" /> Select Period
                             </h2>
                             <div className="space-y-8">
                                 <div>
@@ -351,7 +183,7 @@ const SalaryManagement = () => {
                                         type="date"
                                         value={fromDate}
                                         onChange={(e) => setFromDate(e.target.value)}
-                                        className="w-full p-5 bg-gray-50 border border-gray-100 rounded-2xl outline-none focus:ring-4 focus:ring-sky-100 focus:border-sky-500 transition-all font-black text-gray-700 text-sm"
+                                        className="w-full p-5 bg-gray-50 border border-gray-100 rounded-2xl outline-none focus:ring-4 focus:ring-purple-100 focus:border-purple-500 transition-all font-black text-gray-700 text-sm"
                                     />
                                 </div>
                                 <div>
@@ -360,61 +192,16 @@ const SalaryManagement = () => {
                                         type="date"
                                         value={toDate}
                                         onChange={(e) => setToDate(e.target.value)}
-                                        className="w-full p-5 bg-gray-50 border border-gray-100 rounded-2xl outline-none focus:ring-4 focus:ring-sky-100 focus:border-sky-500 transition-all font-black text-gray-700 text-sm"
+                                        className="w-full p-5 bg-gray-50 border border-gray-100 rounded-2xl outline-none focus:ring-4 focus:ring-purple-100 focus:border-purple-500 transition-all font-black text-gray-700 text-sm"
                                     />
                                 </div>
-                            </div>
-
-                            {/* Attendance Rules Section */}
-                            <div className="mt-12 pt-10 border-t border-gray-100">
-                                <h2 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-8 flex items-center gap-3">
-                                    <FaCheckCircle className="text-emerald-500" /> Paid Attendance
-                                </h2>
-                                <div className="grid grid-cols-1 gap-3">
-                                    {attendanceOptions.map(status => (
-                                        <label
-                                            key={status}
-                                            className={`flex items-center gap-4 p-4 rounded-2xl transition-all border ${user.role === 'admin' ? 'cursor-pointer' : 'cursor-default opacity-75'} ${paidStatuses.includes(status)
-                                                ? 'bg-sky-50 border-sky-100 text-sky-700'
-                                                : 'bg-gray-50 border-gray-100 text-gray-400' + (user.role === 'admin' ? ' hover:bg-gray-100' : '')
-                                                }`}
-                                        >
-                                            <input
-                                                type="checkbox"
-                                                className="hidden"
-                                                checked={paidStatuses.includes(status)}
-                                                disabled={user.role !== 'admin'}
-                                                onChange={(e) => {
-                                                    if (user.role !== 'admin') return;
-                                                    if (e.target.checked) {
-                                                        setPaidStatuses([...paidStatuses, status]);
-                                                    } else {
-                                                        setPaidStatuses(paidStatuses.filter(s => s !== status));
-                                                    }
-                                                }}
-                                            />
-                                            <div className={`w-5 h-5 rounded-lg border-2 flex items-center justify-center transition-all ${paidStatuses.includes(status)
-                                                ? 'bg-sky-600 border-sky-600 text-white'
-                                                : 'border-gray-300 bg-white'
-                                                }`}>
-                                                {paidStatuses.includes(status) && <FaCheckCircle size={10} />}
-                                            </div>
-                                            <span className="text-[10px] font-black uppercase tracking-widest">{status}</span>
-                                        </label>
-                                    ))}
-                                </div>
-                                <p className="text-[9px] font-bold text-gray-400 uppercase mt-6 leading-relaxed bg-amber-50 p-4 rounded-xl border border-amber-100 italic">
-                                    {user.role === 'admin'
-                                        ? 'Selected statuses will count as 100% paid days.'
-                                        : 'Only admin can modify paid attendance rules. View only.'}
-                                </p>
                             </div>
                         </div>
                     </div>
 
                     {/* Master Ledger Table */}
                     <div className="lg:col-span-9">
-                        <div className="bg-white rounded-[40px] shadow-2xl shadow-sky-50/50 border border-sky-50 overflow-hidden">
+                        <div className="bg-white rounded-[40px] shadow-2xl shadow-purple-50/50 border border-purple-50 overflow-hidden">
                             <div className="overflow-x-auto">
                                 <table className="w-full">
                                     <thead>
@@ -423,7 +210,6 @@ const SalaryManagement = () => {
                                             <th className="p-8 text-[10px] font-black uppercase tracking-[0.2em] text-gray-400 text-center">Attendance</th>
                                             <th className="p-8 text-[10px] font-black uppercase tracking-[0.2em] text-gray-400 text-right">Computed Pay</th>
                                             <th className="p-8 text-[10px] font-black uppercase tracking-[0.2em] text-gray-400 text-center">Status</th>
-                                            <th className="p-8 text-[10px] font-black uppercase tracking-[0.2em] text-gray-400 text-right">Actions</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-gray-50/50">
@@ -437,15 +223,15 @@ const SalaryManagement = () => {
                                                         animate={{ opacity: 1, x: 0 }}
                                                         exit={{ opacity: 0, x: -20 }}
                                                         transition={{ delay: idx * 0.03 }}
-                                                        className="hover:bg-sky-50/30 transition-all group"
+                                                        className="hover:bg-purple-50/30 transition-all group"
                                                     >
                                                         <td className="p-8">
                                                             <div className="flex items-center gap-5">
-                                                                <div className="h-14 w-14 rounded-[20px] bg-gradient-to-br from-sky-50 to-white border border-sky-50 flex items-center justify-center text-sky-600 font-black text-lg shadow-sm group-hover:scale-110 group-hover:rotate-3 transition-all duration-500">
+                                                                <div className="h-14 w-14 rounded-[20px] bg-gradient-to-br from-purple-50 to-white border border-purple-50 flex items-center justify-center text-purple-600 font-black text-lg shadow-sm group-hover:scale-110 group-hover:rotate-3 transition-all duration-500">
                                                                     {s.name?.charAt(0)}
                                                                 </div>
                                                                 <div>
-                                                                    <p className="text-sm font-black text-gray-800 tracking-tight group-hover:text-sky-600 transition-colors">{s.name}</p>
+                                                                    <p className="text-sm font-black text-gray-800 tracking-tight group-hover:text-purple-600 transition-colors">{s.name}</p>
                                                                     <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mt-0.5">{s.department_name}</p>
                                                                 </div>
                                                             </div>
@@ -453,13 +239,13 @@ const SalaryManagement = () => {
                                                         <td className="p-8">
                                                             <div className="flex flex-col items-center gap-3">
                                                                 <div className="flex gap-4 text-[9px] font-black uppercase tracking-widest">
-                                                                    <span className="text-sky-500 bg-sky-50 px-2 py-1 rounded-md">PRESENT: {s.total_present}</span>
+                                                                    <span className="text-purple-500 bg-purple-50 px-2 py-1 rounded-md">PRESENT: {s.total_present}</span>
                                                                 </div>
                                                                 <div className="w-32 bg-gray-100 h-1.5 rounded-full overflow-hidden shadow-inner p-px">
                                                                     <motion.div
                                                                         initial={{ width: 0 }}
                                                                         animate={{ width: `${(s.total_present / 30) * 100}%` }}
-                                                                        className="bg-gradient-to-r from-sky-400 to-sky-600 h-full rounded-full shadow-[0_0_12px_rgba(59,130,246,0.3)]"
+                                                                        className="bg-gradient-to-r from-purple-400 to-purple-600 h-full rounded-full shadow-[0_0_12px_rgba(124,58,237,0.3)]"
                                                                     ></motion.div>
                                                                 </div>
                                                             </div>
@@ -467,7 +253,7 @@ const SalaryManagement = () => {
                                                         <td className="p-8 text-right font-black text-gray-800">
                                                             <div className="flex flex-col items-end">
                                                                 <span className="text-[9px] text-gray-300 line-through font-bold tracking-widest mb-1">₹{s.monthly_salary}</span>
-                                                                <span className="text-lg text-sky-600 tracking-tighter font-black">₹{s.calculated_salary.toLocaleString()}</span>
+                                                                <span className="text-lg text-purple-600 tracking-tighter font-black">₹{s.calculated_salary.toLocaleString()}</span>
                                                             </div>
                                                         </td>
                                                         <td className="p-8 text-center">
@@ -478,26 +264,12 @@ const SalaryManagement = () => {
                                                                 {s.status}
                                                             </span>
                                                         </td>
-                                                        <td className="p-8 text-right">
-                                                            {user.role === 'admin' && s.status === 'Pending' ? (
-                                                                <button
-                                                                    onClick={() => handleStatusUpdate(s.id, 'Paid')}
-                                                                    className="inline-flex items-center gap-3 text-[9px] font-black uppercase tracking-[0.2em] text-white bg-sky-600 px-6 py-3 rounded-2xl hover:bg-sky-800 transition-all shadow-xl shadow-sky-100 group active:scale-95"
-                                                                >
-                                                                    <FaCheckCircle className="group-hover:scale-125 transition-transform" /> Mark Paid
-                                                                </button>
-                                                            ) : (
-                                                                <button className="h-12 w-12 bg-gray-50 text-gray-400 rounded-2xl flex items-center justify-center hover:bg-sky-50 hover:text-sky-600 transition-all active:scale-90 shadow-sm border border-gray-100">
-                                                                    <FaFileAlt size={16} title="View Detailed Breakdown" />
-                                                                </button>
-                                                            )}
-                                                        </td>
                                                     </motion.tr>
                                                 ))}
                                         </AnimatePresence>
                                         {salaries.filter(s => activeRole === 'all' || s.role === activeRole).length === 0 && !loading && (
                                             <tr>
-                                                <td colSpan="5" className="p-32 text-center">
+                                                <td colSpan="4" className="p-32 text-center">
                                                     <div className="flex flex-col items-center gap-6 text-gray-300">
                                                         <div className="h-24 w-24 rounded-[40px] bg-gray-50 flex items-center justify-center border border-gray-100">
                                                             <FaMoneyBillWave size={40} className="opacity-20 translate-y-2" />
@@ -523,17 +295,17 @@ const SalaryManagement = () => {
                         initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: 0.1 }}
-                        className="bg-white p-10 rounded-[40px] shadow-2xl shadow-sky-50/50 border-t-8 border-sky-600 relative group overflow-hidden"
+                        className="bg-white p-10 rounded-[40px] shadow-2xl shadow-purple-50/50 border-t-8 border-purple-600 relative group overflow-hidden"
                     >
-                        <div className="absolute top-0 right-0 w-48 h-48 bg-sky-50 rounded-full -mr-24 -mt-24 opacity-30 group-hover:scale-125 transition-transform duration-700"></div>
+                        <div className="absolute top-0 right-0 w-48 h-48 bg-purple-50 rounded-full -mr-24 -mt-24 opacity-30 group-hover:scale-125 transition-transform duration-700"></div>
                         <div className="flex items-center justify-between mb-12 relative z-10">
                             <div>
                                 <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Gross Total</h3>
-                                <p className="text-[10px] font-bold text-sky-500 mt-2 uppercase tracking-widest flex items-center gap-2">
+                                <p className="text-[10px] font-bold text-purple-500 mt-2 uppercase tracking-widest flex items-center gap-2">
                                     <FaChartLine size={10} /> Total Salary
                                 </p>
                             </div>
-                            <div className="h-14 w-14 rounded-2xl bg-sky-600 flex items-center justify-center text-white shadow-xl shadow-sky-200 group-hover:rotate-6 transition-transform">
+                            <div className="h-14 w-14 rounded-2xl bg-purple-600 flex items-center justify-center text-white shadow-xl shadow-purple-200 group-hover:rotate-6 transition-transform">
                                 <FaMoneyBillWave size={22} />
                             </div>
                         </div>
@@ -548,7 +320,7 @@ const SalaryManagement = () => {
                         initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: 0.2 }}
-                        className="bg-white p-10 rounded-[40px] shadow-2xl shadow-sky-50/50 border-t-8 border-emerald-500 relative group overflow-hidden"
+                        className="bg-white p-10 rounded-[40px] shadow-2xl shadow-purple-50/50 border-t-8 border-emerald-500 relative group overflow-hidden"
                     >
                         <div className="absolute top-0 right-0 w-48 h-48 bg-emerald-50 rounded-full -mr-24 -mt-24 opacity-30 group-hover:scale-125 transition-transform duration-700"></div>
                         <div className="flex items-center justify-between mb-12 relative z-10">
@@ -573,7 +345,7 @@ const SalaryManagement = () => {
                         initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: 0.3 }}
-                        className="bg-white p-10 rounded-[40px] shadow-2xl shadow-sky-50/50 border-t-8 border-amber-400 relative group overflow-hidden"
+                        className="bg-white p-10 rounded-[40px] shadow-2xl shadow-purple-50/50 border-t-8 border-amber-400 relative group overflow-hidden"
                     >
                         <div className="absolute top-0 right-0 w-48 h-48 bg-amber-50 rounded-full -mr-24 -mt-24 opacity-30 group-hover:scale-125 transition-transform duration-700"></div>
                         <div className="flex items-center justify-between mb-12 relative z-10">
@@ -599,4 +371,4 @@ const SalaryManagement = () => {
     );
 };
 
-export default SalaryManagement;
+export default ManagementSalary;

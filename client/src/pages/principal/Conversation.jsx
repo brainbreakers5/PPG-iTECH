@@ -13,7 +13,8 @@ import {
     FaBullhorn,
     FaRegCommentDots,
     FaTrash,
-    FaEdit
+    FaEdit,
+    FaArrowLeft
 } from "react-icons/fa";
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -35,6 +36,7 @@ const Conversation = () => {
     });
     const [searchStaff, setSearchStaff] = useState('');
     const [isParticipantModalOpen, setIsParticipantModalOpen] = useState(false);
+    const [mobileShowChat, setMobileShowChat] = useState(false);
     const messagesEndRef = useRef(null);
 
     useEffect(() => {
@@ -290,24 +292,24 @@ const Conversation = () => {
                 animate={{ opacity: 1, y: 0 }}
                 className="h-[calc(100vh-140px)] flex flex-col"
             >
-                <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-10 gap-4 shrink-0">
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 md:mb-10 gap-4 shrink-0">
                     <div>
-                        <h1 className="text-3xl font-black text-gray-800 tracking-tight">Messages</h1>
-                        <p className="text-gray-500 font-medium mt-1">Internal announcements and staff discussions.</p>
+                        <h1 className="text-2xl md:text-3xl font-black text-gray-800 tracking-tight">Conversation</h1>
+                        <p className="text-gray-500 font-medium mt-1 text-sm">Internal announcements and staff discussions.</p>
                     </div>
                     <button
                         onClick={() => setIsCreateModalOpen(true)}
-                        className="bg-sky-600 text-white px-8 py-4 rounded-2xl shadow-xl shadow-sky-100 hover:bg-sky-700 transition-all flex items-center font-black uppercase tracking-widest text-xs active:scale-95 group"
+                        className="bg-sky-600 text-white px-5 md:px-8 py-3 md:py-4 rounded-2xl shadow-xl shadow-sky-100 hover:bg-sky-700 transition-all flex items-center font-black uppercase tracking-widest text-[10px] md:text-xs active:scale-95 group"
                     >
                         <FaPlus className="mr-3 group-hover:rotate-90 transition-transform" /> Create Topic
                     </button>
                 </div>
 
-                <div className="flex-1 flex gap-8 overflow-hidden min-h-0">
+                <div className="flex-1 flex gap-4 md:gap-8 overflow-hidden min-h-0">
                     {/* Threads Sidebar */}
-                    <div className="w-96 flex flex-col shrink-0">
+                    <div className={`${mobileShowChat ? 'hidden md:flex' : 'flex'} w-full md:w-96 flex-col shrink-0`}>
                         <div className="modern-card !p-0 flex flex-col h-full bg-white/70 backdrop-blur-xl border-sky-50">
-                            <div className="p-6 border-b border-sky-50 flex items-center justify-between">
+                            <div className="p-4 md:p-6 border-b border-sky-50 flex items-center justify-between">
                                 <h2 className="text-[10px] font-black text-sky-500 uppercase tracking-[0.2em] flex items-center">
                                     <FaComments className="mr-3" /> Active Topics
                                 </h2>
@@ -317,8 +319,8 @@ const Conversation = () => {
                                 {threads.map(thread => (
                                     <button
                                         key={thread.id}
-                                        onClick={() => setSelectedThread(thread)}
-                                        className={`w-full text-left p-5 rounded-2xl transition-all border relative group ${selectedThread?.id === thread.id
+                                        onClick={() => { setSelectedThread(thread); setMobileShowChat(true); }}
+                                        className={`w-full text-left p-4 md:p-5 rounded-2xl transition-all border relative group ${selectedThread?.id === thread.id
                                             ? 'bg-sky-600 text-white border-sky-600 shadow-xl shadow-sky-100'
                                             : 'bg-transparent text-gray-800 border-transparent hover:bg-sky-50/50 hover:border-sky-100'
                                             }`}
@@ -357,27 +359,33 @@ const Conversation = () => {
                     </div>
 
                     {/* Chat Area */}
-                    <div className="flex-1 flex flex-col min-w-0">
+                    <div className={`${mobileShowChat ? 'flex' : 'hidden md:flex'} flex-1 flex-col min-w-0`}>
                         <div className="modern-card !p-0 flex flex-col h-full bg-white border-sky-50">
                             {selectedThread ? (
                                 <>
-                                    <div className="p-6 border-b border-sky-50 flex items-center justify-between shrink-0 bg-white/50 backdrop-blur-md">
-                                        <div className="flex items-center">
-                                            <div className="h-12 w-12 rounded-2xl bg-gradient-to-br from-sky-500 to-sky-700 flex items-center justify-center text-white font-black text-xl shadow-lg mr-4">
+                                    <div className="p-4 md:p-6 border-b border-sky-50 flex items-center justify-between shrink-0 bg-white/50 backdrop-blur-md">
+                                        <div className="flex items-center min-w-0">
+                                            <button
+                                                onClick={() => setMobileShowChat(false)}
+                                                className="md:hidden h-10 w-10 rounded-xl bg-gray-50 border border-gray-100 flex items-center justify-center text-gray-400 hover:bg-sky-50 hover:text-sky-600 transition-all mr-3 shrink-0"
+                                            >
+                                                <FaArrowLeft size={14} />
+                                            </button>
+                                            <div className="h-10 w-10 md:h-12 md:w-12 rounded-2xl bg-gradient-to-br from-sky-500 to-sky-700 flex items-center justify-center text-white font-black text-lg md:text-xl shadow-lg mr-3 md:mr-4 shrink-0">
                                                 {selectedThread.title?.charAt(0) || '?'}
                                             </div>
-                                            <div>
-                                                <h3 className="text-lg font-black text-gray-800 tracking-tight">{selectedThread.title}</h3>
+                                            <div className="min-w-0">
+                                                <h3 className="text-base md:text-lg font-black text-gray-800 tracking-tight truncate">{selectedThread.title}</h3>
                                                 <div className="flex items-center gap-2 mt-0.5">
                                                     <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse shadow-sm shadow-emerald-200"></span>
                                                     <span className="text-[10px] text-emerald-600 font-black uppercase tracking-widest">Active Chat</span>
                                                 </div>
                                             </div>
                                         </div>
-                                        <div className="flex items-center gap-3">
+                                        <div className="flex items-center gap-2 md:gap-3 shrink-0 ml-2">
                                             <button
                                                 onClick={() => setIsParticipantModalOpen(true)}
-                                                className="flex items-center gap-2 text-[9px] font-black text-sky-500 bg-sky-50 px-3 py-2 rounded-xl border border-sky-100 uppercase tracking-widest hover:bg-sky-600 hover:text-white transition-all cursor-pointer"
+                                                className="flex items-center gap-2 text-[9px] font-black text-sky-500 bg-sky-50 px-2 md:px-3 py-2 rounded-xl border border-sky-100 uppercase tracking-widest hover:bg-sky-600 hover:text-white transition-all cursor-pointer"
                                             >
                                                 <FaBullhorn size={10} /> Scope: {selectedThread.target_role}
                                             </button>
@@ -400,7 +408,7 @@ const Conversation = () => {
                                         </div>
                                     </div>
 
-                                    <div className="flex-1 overflow-y-auto p-8 space-y-6 custom-scrollbar bg-gray-50/30">
+                                    <div className="flex-1 overflow-y-auto p-4 md:p-8 space-y-4 md:space-y-6 custom-scrollbar bg-gray-50/30">
                                         <AnimatePresence>
                                             {messages.map((msg, idx) => (
                                                 <motion.div
@@ -410,7 +418,7 @@ const Conversation = () => {
                                                     transition={{ delay: idx * 0.05 }}
                                                     className={`flex ${msg.sender_id === user.emp_id ? 'justify-end' : 'justify-start'}`}
                                                 >
-                                                    <div className={`max-w-[75%] flex gap-4 ${msg.sender_id === user.emp_id ? 'flex-row-reverse text-right' : 'flex-row'}`}>
+                                                    <div className={`max-w-[85%] md:max-w-[75%] flex gap-2 md:gap-4 ${msg.sender_id === user.emp_id ? 'flex-row-reverse text-right' : 'flex-row'}`}>
                                                         <div className="shrink-0 mt-auto mb-1">
                                                             <div className="h-9 w-9 rounded-xl border-2 border-white shadow-md overflow-hidden bg-gray-100 ring-2 ring-sky-50">
                                                                 <img
@@ -461,7 +469,7 @@ const Conversation = () => {
                                         <div ref={messagesEndRef} />
                                     </div>
 
-                                    <form onSubmit={handleSendMessage} className="p-6 border-t border-sky-50 bg-white shrink-0">
+                                    <form onSubmit={handleSendMessage} className="p-3 md:p-6 border-t border-sky-50 bg-white shrink-0">
                                         <div className="flex gap-4 items-center bg-gray-50 border border-gray-100 rounded-2xl p-2 focus-within:ring-4 focus-within:ring-sky-50 transition-all">
                                             <input
                                                 type="text"
@@ -480,9 +488,10 @@ const Conversation = () => {
                                     </form>
                                 </>
                             ) : (
-                                <div className="flex-1 flex flex-col items-center justify-center p-20 text-center gap-6">
-                                    <div className="h-32 w-32 rounded-[40px] bg-sky-50 flex items-center justify-center text-sky-200 shadow-inner">
-                                        <FaComments size={64} className="opacity-40" />
+                                <div className="flex-1 flex flex-col items-center justify-center p-10 md:p-20 text-center gap-4 md:gap-6">
+                                    <div className="h-20 w-20 md:h-32 md:w-32 rounded-[40px] bg-sky-50 flex items-center justify-center text-sky-200 shadow-inner">
+                                        <FaComments size={40} className="opacity-40 md:hidden" />
+                                        <FaComments size={64} className="opacity-40 hidden md:block" />
                                     </div>
                                     <div>
                                         <h3 className="text-xl font-black text-gray-400 uppercase tracking-widest">Conversation Inactive</h3>
@@ -507,10 +516,10 @@ const Conversation = () => {
                             initial={{ scale: 0.9, y: 20 }}
                             animate={{ scale: 1, y: 0 }}
                             exit={{ scale: 0.9, y: 20 }}
-                            className="bg-white w-full max-w-2xl rounded-[40px] shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
+                            className="bg-white w-full max-w-2xl rounded-3xl md:rounded-[40px] shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
                         >
                             {/* Modal Header */}
-                            <div className="p-8 border-b border-sky-50 flex items-center justify-between shrink-0 bg-white shadow-sm">
+                            <div className="p-5 md:p-8 border-b border-sky-50 flex items-center justify-between shrink-0 bg-white shadow-sm">
                                 <div>
                                     <h2 className="text-2xl font-black text-gray-800 tracking-tight">Create Topic</h2>
                                     <p className="text-[10px] font-black text-sky-500 uppercase tracking-widest mt-1">Start a new discussion thread</p>
@@ -524,7 +533,7 @@ const Conversation = () => {
                             </div>
 
                             {/* Modal Content */}
-                            <div className="flex-1 overflow-y-auto p-8 space-y-8 custom-scrollbar">
+                            <div className="flex-1 overflow-y-auto p-5 md:p-8 space-y-6 md:space-y-8 custom-scrollbar">
                                 {/* Title Input */}
                                 <div>
                                     <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 mb-2">Thread Subject</label>
@@ -641,7 +650,7 @@ const Conversation = () => {
                             </div>
 
                             {/* Modal Footer */}
-                            <div className="p-8 border-t border-sky-50 bg-gray-50/50 flex gap-4 shrink-0">
+                            <div className="p-5 md:p-8 border-t border-sky-50 bg-gray-50/50 flex gap-3 md:gap-4 shrink-0">
                                 <button
                                     onClick={() => setIsCreateModalOpen(false)}
                                     className="flex-1 px-8 py-4 bg-white border border-gray-200 text-gray-500 rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-gray-100 transition-all active:scale-95"

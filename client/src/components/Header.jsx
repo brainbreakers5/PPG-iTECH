@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { FaBell, FaBirthdayCake, FaTimes, FaCheckCircle, FaExclamationCircle, FaInfoCircle, FaUser, FaBuilding, FaFileAlt } from 'react-icons/fa';
 import { useAuth } from '../context/AuthContext';
 import { useSocket } from '../context/SocketContext';
@@ -7,7 +7,10 @@ import api from '../utils/api';
 
 const Header = ({ toggleSidebar, sidebarOpen }) => {
     const navigate = useNavigate();
+    const location = useLocation();
     const { user } = useAuth();
+    const isManagement = location.pathname.startsWith('/management');
+    const effectiveRole = isManagement ? 'management' : (user?.role || 'staff');
     const [isBirthday, setIsBirthday] = useState(false);
     const [isDismissed, setIsDismissed] = useState(sessionStorage.getItem('bday_dismissed') === 'true');
     const [notifications, setNotifications] = useState([]);
@@ -44,7 +47,7 @@ const Header = ({ toggleSidebar, sidebarOpen }) => {
             { label: 'Departments', path: '/principal/department' },
             { label: 'Leave Requests', path: '/principal/leaves' },
             { label: 'Salary Overview', path: '/principal/payroll' },
-            { label: 'Messages', path: '/principal/conversation' },
+            { label: 'Conversation', path: '/principal/conversation' },
             { label: 'Purchase Requests', path: '/principal/purchase' },
             { label: 'Academic Calendar', path: '/principal/calendar' },
         ],
@@ -53,8 +56,8 @@ const Header = ({ toggleSidebar, sidebarOpen }) => {
             { label: 'Leave Management', path: '/hod/leaves' },
             { label: 'Department Staff', path: '/hod/department' },
             { label: 'Timetable', path: '/hod/timetable' },
-            { label: 'Team Attendance', path: '/hod/attendance' },
-            { label: 'Messages', path: '/hod/conversation' },
+            { label: 'Attendance Record', path: '/hod/attendance' },
+            { label: 'Conversation', path: '/hod/conversation' },
             { label: 'Purchase Requests', path: '/hod/purchase' },
             { label: 'Academic Calendar', path: '/hod/calendar' },
         ],
@@ -66,6 +69,11 @@ const Header = ({ toggleSidebar, sidebarOpen }) => {
             { label: 'Messages', path: '/staff/conversation' },
             { label: 'Purchase Requests', path: '/staff/items' },
             { label: 'Academic Calendar', path: '/staff/calendar' },
+        ],
+        management: [
+            { label: 'Dashboard', path: '/management' },
+            { label: 'Departments', path: '/management/departments' },
+            { label: 'Salary Overview', path: '/management/payroll' },
         ],
     };
 
@@ -87,7 +95,7 @@ const Header = ({ toggleSidebar, sidebarOpen }) => {
     }, []);
 
     useEffect(() => {
-        if (user.dob) {
+        if (user?.dob) {
             const today = new Date();
             const dob = new Date(user.dob);
             if (today.getDate() === dob.getDate() && today.getMonth() === dob.getMonth()) {
@@ -166,7 +174,7 @@ const Header = ({ toggleSidebar, sidebarOpen }) => {
                 label: emp.name,
                 sublabel: `ID: ${emp.emp_id} • ${emp.designation || emp.role}`,
                 icon: <FaUser />,
-                path: `/${user.role}/personnel/${emp.role}` // Navigate to personnel list page
+                path: `/${effectiveRole}/personnel/${emp.role}` // Navigate to personnel list page
             });
         });
 
@@ -183,12 +191,12 @@ const Header = ({ toggleSidebar, sidebarOpen }) => {
                 label: dept.name,
                 sublabel: `Code: ${dept.code || 'N/A'}`,
                 icon: <FaBuilding />,
-                path: `/${user.role}/department/${dept.id}`
+                path: `/${effectiveRole}/department/${dept.id}`
             });
         });
 
         // Search menu pages
-        const currentMenuItems = menuItems[user.role] || [];
+        const currentMenuItems = menuItems[effectiveRole] || [];
         const matchedPages = currentMenuItems.filter(item =>
             item.label.toLowerCase().includes(lowerQuery)
         ).slice(0, 5);
@@ -242,15 +250,17 @@ const Header = ({ toggleSidebar, sidebarOpen }) => {
         setShowNotifs(false);
         
         // Navigate based on notification type
-        const role = user.role;
+        const role = effectiveRole;
         switch (notification.type) {
             case 'leave':
-                navigate(`/${role}/leave`);
+                if (role === 'admin') break; // admin has no leave page
+                navigate(`/${role}/leaves`);
                 break;
             case 'purchase':
-                navigate(`/${role}/purchase`);
+                navigate(role === 'staff' ? '/staff/items' : `/${role}/purchase`);
                 break;
             case 'conversation':
+                if (role === 'admin') break; // admin has no conversation page
                 navigate(`/${role}/conversation`);
                 break;
             case 'birthday':
@@ -293,7 +303,7 @@ const Header = ({ toggleSidebar, sidebarOpen }) => {
 
     return (
         <div className="flex flex-col w-full relative z-40">
-            {isBirthday && !isDismissed && (
+            {isBirthday && !isDismissed && user && (
                 <div className="bg-gradient-to-r from-pink-400 to-purple-500 text-white px-6 py-2.5 text-center animate-pulse-banner flex items-center justify-between relative shadow-xl rounded-b-xl mx-4 mt-2">
                     <div className="flex-1 flex items-center justify-center gap-3">
                         <FaBirthdayCake className="text-xl animate-bounce" />
@@ -463,21 +473,26 @@ const Header = ({ toggleSidebar, sidebarOpen }) => {
                     <div
                         className="flex items-center space-x-3 cursor-pointer hover:bg-gray-50 transition-all px-2 py-1 rounded-2xl group"
                         onClick={() => {
-                            navigate(`/${user.role}/profile/${user.emp_id}`);
+                            if (isManagement) return;
+                            navigate(`/${effectiveRole}/profile/${user.emp_id}`);
                             window.dispatchEvent(new CustomEvent('closeSidebar'));
                         }}
                     >
                         <div className="hidden md:text-right md:block">
-                            <p className="text-xs font-black text-gray-800 tracking-tight transition-colors uppercase tracking-widest text-[10px] group-hover:text-sky-600">{user.name}</p>
-                            <p className="text-[8px] text-sky-600 font-black uppercase tracking-[0.2em] mt-0.5">{user.designation || user.role}</p>
+                            <p className="text-xs font-black text-gray-800 tracking-tight transition-colors uppercase tracking-widest text-[10px] group-hover:text-sky-600">{isManagement ? 'Management' : user?.name}</p>
+                            <p className="text-[8px] text-sky-600 font-black uppercase tracking-[0.2em] mt-0.5">{isManagement ? 'Management Portal' : (user?.designation || user?.role)}</p>
                         </div>
                         <div className="relative">
                             <div className="absolute -inset-1 bg-gradient-to-tr from-sky-200 to-white rounded-2xl blur opacity-25 group-hover:opacity-50 transition duration-1000 group-hover:duration-200"></div>
+                            {isManagement ? (
+                                <div className="relative w-11 h-11 rounded-2xl border-2 border-white shadow-xl bg-gradient-to-br from-purple-500 to-purple-700 flex items-center justify-center text-white font-black text-lg">M</div>
+                            ) : (
                             <img
-                                src={user.profile_pic || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name)}&background=ffffff&color=0EA5E9`}
+                                src={user?.profile_pic || `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.name || 'U')}&background=ffffff&color=0EA5E9`}
                                 alt="Profile"
                                 className="relative w-11 h-11 rounded-2xl border-2 border-white shadow-xl group-hover:scale-105 transition-all object-cover"
                             />
+                            )}
                         </div>
                     </div>
                 </div>

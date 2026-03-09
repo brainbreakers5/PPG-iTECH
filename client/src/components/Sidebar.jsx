@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import {
   FaTachometerAlt,
@@ -21,10 +21,23 @@ import { useAuth } from '../context/AuthContext';
 const Sidebar = ({ userRole = 'staff', isOpen, onClose }) => {
   const { logout } = useAuth();
   const navigate = useNavigate();
+  const [now, setNow] = useState(new Date());
+
+  useEffect(() => {
+    const timer = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(timer);
+  }, []);
 
   const handleLogout = () => {
-    logout();
-    navigate('/login');
+    const isManagementMode = userRole === 'management';
+    sessionStorage.removeItem('managementAccess');
+    if (isManagementMode) {
+      localStorage.removeItem('token');
+      navigate('/login');
+    } else {
+      logout();
+      navigate('/login');
+    }
   };
 
   const menuItems = {
@@ -45,17 +58,18 @@ const Sidebar = ({ userRole = 'staff', isOpen, onClose }) => {
       { label: 'Departments', path: '/principal/department', icon: <FaBuilding /> },
       { label: 'Leave Requests', path: '/principal/leaves', icon: <FaClipboardList /> },
       { label: 'Salary Overview', path: '/principal/payroll', icon: <FaMoneyBillWave /> },
-      { label: 'Messages', path: '/principal/conversation', icon: <FaComments /> },
+      { label: 'Conversation', path: '/principal/conversation', icon: <FaComments /> },
       { label: 'Purchase Requests', path: '/principal/purchase', icon: <FaShoppingBag /> },
       { label: 'Academic Calendar', path: '/principal/calendar', icon: <FaCalendarDay /> },
     ],
     hod: [
       { label: 'Dashboard', path: '/hod', icon: <FaTachometerAlt /> },
       { label: 'Leave Management', path: '/hod/leaves', icon: <FaClipboardList /> },
+      { label: 'Salary Details', path: '/hod/payroll', icon: <FaMoneyBillWave /> },
       { label: 'Department Staff', path: '/hod/department', icon: <FaBuilding /> },
       { label: 'Timetable', path: '/hod/timetable', icon: <FaCalendarDay /> },
-      { label: 'Team Attendance', path: '/hod/attendance', icon: <FaUserGraduate /> },
-      { label: 'Messages', path: '/hod/conversation', icon: <FaComments /> },
+      { label: 'Attendance Record', path: '/hod/attendance', icon: <FaUserGraduate /> },
+      { label: 'Conversation', path: '/hod/conversation', icon: <FaComments /> },
       { label: 'Purchase Requests', path: '/hod/purchase', icon: <FaShoppingBag /> },
       { label: 'Academic Calendar', path: '/hod/calendar', icon: <FaCalendarDay /> },
     ],
@@ -67,6 +81,11 @@ const Sidebar = ({ userRole = 'staff', isOpen, onClose }) => {
       { label: 'Conversation', path: '/staff/conversation', icon: <FaComments /> },
       { label: 'Purchase Requests', path: '/staff/items', icon: <FaShoppingBag /> },
       { label: 'Academic Calendar', path: '/staff/calendar', icon: <FaCalendarDay /> },
+    ],
+    management: [
+      { label: 'Dashboard', path: '/management', icon: <FaTachometerAlt /> },
+      { label: 'Departments', path: '/management/departments', icon: <FaBuilding /> },
+      { label: 'Salary Overview', path: '/management/payroll', icon: <FaMoneyBillWave /> },
     ],
   };
 
@@ -86,12 +105,26 @@ const Sidebar = ({ userRole = 'staff', isOpen, onClose }) => {
         <div className="mb-4 px-4 py-3 bg-gradient-to-r from-sky-50 to-blue-50 border border-sky-100 rounded-2xl shadow-sm">
           <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Portal</p>
           <p className="text-sm font-black text-sky-600 uppercase tracking-wide">
-            {userRole === 'hod' ? 'Head of Department' : userRole === 'admin' ? 'Administrator' : userRole === 'principal' ? 'Principal' : 'Staff Member'}
+            {userRole === 'hod' ? 'Head of Department' : userRole === 'admin' ? 'Administrator' : userRole === 'principal' ? 'Principal' : userRole === 'management' ? 'Management' : 'Staff Member'}
           </p>
         </div>
         
-        {/* Close button */}
-        <div className="flex justify-end">
+        {/* Close button with real-time clock */}
+        <div className="flex items-center justify-between">
+          <div className="flex flex-col">
+            <p className="text-[8px] font-black uppercase tracking-wider text-sky-600 flex items-center gap-1">
+              <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
+              {now.toLocaleDateString('en-GB', { weekday: 'short', day: '2-digit', month: 'short' })}
+            </p>
+            <p className="text-sm font-black text-gray-800 tracking-wide flex items-center gap-1">
+              <svg className="w-3 h-3 text-sky-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              {now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true })}
+            </p>
+          </div>
           <button
             onClick={onClose}
             className="h-9 w-9 bg-white/50 text-sky-600 hover:bg-white hover:text-sky-800 rounded-xl flex items-center justify-center border border-white/50 shadow-sm transition-all active:scale-90"

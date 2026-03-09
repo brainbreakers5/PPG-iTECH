@@ -309,11 +309,11 @@ const Timetable = ({ showToggle = true }) => {
                 )}
 
                 <div className="styled-table-container modern-card !p-0 overflow-hidden border-sky-100">
-                    <div style={{ overflowX: 'visible' }}>
-                        <table className="w-full border-collapse">
+                    <div className="overflow-x-auto -mx-0">
+                        <table className="w-full border-collapse min-w-[800px]">
                             <thead>
                                 <tr className="bg-sky-50/50">
-                                    <th className="p-6 border-b border-r border-sky-100 font-black text-[10px] text-sky-500 uppercase tracking-[0.2em] text-center w-32">Timeline</th>
+                                    <th className="p-3 md:p-6 border-b border-r border-sky-100 font-black text-[10px] text-sky-500 uppercase tracking-[0.2em] text-center w-20 md:w-32">Timeline</th>
                                     {displaySlots.map((slot, idx) => {
                                         const isBreak = slot.is_break;
                                         return (
@@ -337,12 +337,12 @@ const Timetable = ({ showToggle = true }) => {
                             <tbody>
                                 {days.map((day, dIdx) => (
                                     <tr key={day} className="group">
-                                        <td className="p-6 border-b border-r border-sky-50 bg-gray-50/30 text-center font-black text-gray-700 text-xs uppercase tracking-widest">{day}</td>
+                                        <td className="p-3 md:p-6 border-b border-r border-sky-50 bg-gray-50/30 text-center font-black text-gray-700 text-[10px] md:text-xs uppercase tracking-widest">{day.slice(0, 3)}<span className="hidden md:inline">{day.slice(3)}</span></td>
                                         {displaySlots.map((slot, idx) => {
                                             const isBreak = slot.is_break;
                                             if (isBreak) {
                                                 return (
-                                                    <td key={idx} className="p-3 border-b border-r border-amber-50/30 bg-amber-50/20 align-middle h-40 text-center">
+                                                    <td key={idx} className="p-2 md:p-3 border-b border-r border-amber-50/30 bg-amber-50/20 align-middle h-24 md:h-40 text-center">
                                                         <div className="text-amber-300 opacity-50">
                                                             <span className="text-3xl">☕</span>
                                                         </div>
@@ -352,7 +352,7 @@ const Timetable = ({ showToggle = true }) => {
                                             const p = slot.period_number;
                                             const entries = timetable.filter(t => t.day_of_week === day && t.period_number === p);
                                             return (
-                                                <td key={idx} className="p-3 border-b border-r border-sky-50 align-top h-40 relative group/cell hover:bg-sky-50/20 transition-all">
+                                                <td key={idx} className="p-2 md:p-3 border-b border-r border-sky-50 align-top h-24 md:h-40 relative group/cell hover:bg-sky-50/20 transition-all">
                                                     <AnimatePresence>
                                                         {entries.map((entry, eIdx) => (
                                                             <motion.div

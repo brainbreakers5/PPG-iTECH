@@ -136,7 +136,7 @@ const AttendanceHistory = ({ empId, month: propMonth, startDate, endDate, recent
                                                 <FaCalendarAlt />
                                             </div>
                                             <span className="text-[11px] font-black text-gray-700 tracking-tight">
-                                                {new Date(record.date).toLocaleDateString('en-US', { day: '2-digit', month: 'short', year: 'numeric' })}
+                                                {new Date(String(record.date).slice(0, 10) + 'T00:00:00+05:30').toLocaleDateString('en-US', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', year: 'numeric' })}
                                             </span>
                                         </div>
                                     </td>

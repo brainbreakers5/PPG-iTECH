@@ -44,6 +44,11 @@ import EmployeeFormPage from './pages/admin/EmployeeFormPage';
 import DepartmentFormPage from './pages/admin/DepartmentFormPage';
 import PurchaseRequestPage from './pages/shared/PurchaseRequestPage';
 
+// Management Pages
+import ManagementDashboard from './pages/management/ManagementDashboard';
+import ManagementDepartment from './pages/management/ManagementDepartment';
+import ManagementSalary from './pages/management/ManagementSalary';
+
 // Placeholder Dashboards
 // const AdminDashboard = () => <div className="p-10">Admin Dashboard (Coming Soon)</div>;
 // const StaffDashboard = () => <div className="p-10">Staff Dashboard (Coming Soon)</div>;
@@ -58,6 +63,13 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
     return <Navigate to="/login" />; // Or unauthorized page
   }
 
+  return children;
+};
+
+// Management Route Wrapper (PIN-based access via sessionStorage)
+const ManagementRoute = ({ children }) => {
+  const hasAccess = sessionStorage.getItem('managementAccess') === 'true';
+  if (!hasAccess) return <Navigate to="/login" />;
   return children;
 };
 
@@ -128,6 +140,7 @@ const AppContent = () => {
           <Routes>
             <Route path="/" element={<HODDashboard />} />
             <Route path="leaves" element={<StaffLeaveApply />} />
+            <Route path="payroll" element={<SalaryManagement />} />
             <Route path="department" element={<HODDepartment />} />
             <Route path="timetable" element={<HODTimetable />} />
             <Route path="timetable/:empId" element={<HODTimetable />} />
@@ -159,6 +172,18 @@ const AppContent = () => {
             <Route path="profile/:id" element={<ProfilePage />} />
           </Routes>
         </ProtectedRoute>
+      } />
+
+      <Route path="/management/*" element={
+        <ManagementRoute>
+          <Routes>
+            <Route path="/" element={<ManagementDashboard />} />
+            <Route path="departments" element={<ManagementDepartment />} />
+            <Route path="departments/:id/staff" element={<DepartmentStaffPage rolePrefix="management" />} />
+            <Route path="payroll" element={<ManagementSalary />} />
+            <Route path="profile/:id" element={<ProfilePage />} />
+          </Routes>
+        </ManagementRoute>
       } />
 
       <Route path="/" element={<Navigate to="/login" />} />

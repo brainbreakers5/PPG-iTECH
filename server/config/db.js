@@ -1,7 +1,11 @@
-const { Pool } = require('pg');
+const { Pool, types } = require('pg');
 const dotenv = require('dotenv');
 
 dotenv.config();
+
+// Prevent pg from converting DATE columns to JS Date objects (which shifts timezone).
+// Return DATE values as plain 'YYYY-MM-DD' strings so they stay accurate.
+types.setTypeParser(1082, (val) => val);
 
 const pool = new Pool({
     host: process.env.DB_HOST,

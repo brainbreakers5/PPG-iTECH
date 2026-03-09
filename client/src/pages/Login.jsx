@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import Swal from 'sweetalert2';
+import api from '../utils/api';
 import { LogIn, User, Lock, Cpu, Database, Shield, Globe, Activity, Cloud } from 'lucide-react';
 import { motion } from 'framer-motion';
 
@@ -231,8 +232,71 @@ const Login = () => {
                     </motion.button>
                 </form>
 
+                {/* Management Access */}
+                <div className="mt-6 text-center">
+                    <motion.button
+                        type="button"
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                        onClick={() => {
+                            Swal.fire({
+                                title: 'Management Access',
+                                input: 'password',
+                                inputLabel: 'Enter Management PIN',
+                                inputPlaceholder: 'Enter PIN',
+                                inputAttributes: { autocapitalize: 'off', autocorrect: 'off' },
+                                showCancelButton: true,
+                                confirmButtonText: 'Enter',
+                                confirmButtonColor: '#7c3aed',
+                                cancelButtonColor: '#64748b',
+                                background: '#fff',
+                                customClass: {
+                                    popup: 'rounded-3xl',
+                                    title: 'font-black text-gray-800 tracking-tight',
+                                    input: 'rounded-xl'
+                                },
+                                showLoaderOnConfirm: true,
+                                preConfirm: async (value) => {
+                                    if (!value) {
+                                        Swal.showValidationMessage('Please enter a PIN');
+                                        return false;
+                                    }
+                                    try {
+                                        const { data } = await api.post('/auth/management-login', { pin: String(value) });
+                                        return data;
+                                    } catch (err) {
+                                        Swal.showValidationMessage(
+                                            err.response?.data?.message || 'Connection failed. Is the server running?'
+                                        );
+                                        return false;
+                                    }
+                                },
+                                allowOutsideClick: () => !Swal.isLoading()
+                            }).then((result) => {
+                                if (result.isConfirmed && result.value) {
+                                    localStorage.setItem('token', result.value.token);
+                                    sessionStorage.setItem('managementAccess', 'true');
+                                    Swal.fire({
+                                        icon: 'success',
+                                        title: 'Welcome!',
+                                        text: 'Management access granted',
+                                        timer: 1500,
+                                        showConfirmButton: false,
+                                        background: '#fff',
+                                        color: '#1e3a8a'
+                                    });
+                                    navigate('/management');
+                                }
+                            });
+                        }}
+                        className="text-[10px] font-black text-orange-400 hover:text-orange-300 transition-colors uppercase tracking-[0.3em] cursor-pointer"
+                    >
+                        MANAGEMENT
+                    </motion.button>
+                </div>
+
                 {/* Footer */}
-                <div className="mt-10 text-center">
+                <div className="mt-6 text-center">
                     <a
                         href="https://zorvian-agency.vercel.app"
                         target="_blank"

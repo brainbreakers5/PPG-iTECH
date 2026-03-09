@@ -13,23 +13,29 @@ const LeaveRequests = () => {
     const [leaves, setLeaves] = useState([]);
     const [loading, setLoading] = useState(true);
     const [selectedIds, setSelectedIds] = useState([]);
+    const [leaveTypesMap, setLeaveTypesMap] = useState({});
     const navigate = useNavigate();
 
     // Helper function to get full leave type name
     const getLeaveTypeName = (type) => {
-        const leaveTypes = {
-            'CL': 'Casual Leave (CL)',
-            'ML': 'Medical Leave (ML)',
-            'OD': 'On Duty (OD)',
-            'Comp Leave': 'Compensatory Leave',
-            'LOP': 'Loss of Pay (LOP)'
-        };
-        return leaveTypes[type] || type;
+        return leaveTypesMap[type] || type;
     };
 
     useEffect(() => {
         fetchLeaves();
+        fetchLeaveTypes();
     }, []);
+
+    const fetchLeaveTypes = async () => {
+        try {
+            const { data } = await api.get('/leave-types');
+            const map = {};
+            data.forEach(t => {
+                map[t.label] = `${t.full_name} (${t.label})`;
+            });
+            setLeaveTypesMap(map);
+        } catch { console.error('Failed to fetch leave types'); }
+    };
 
     const fetchLeaves = async () => {
         try {
@@ -329,10 +335,13 @@ const LeaveRequests = () => {
                 <div className="mt-16">
                     <div className="flex items-center gap-4 mb-8">
                         <div className="h-1 w-12 bg-sky-600 rounded-full"></div>
-                        <h3 className="text-xl font-black text-gray-800 tracking-tight uppercase tracking-[0.1em]">Recent Decisions</h3>
+                        <h3 className="text-xl font-black text-gray-800 tracking-tight uppercase tracking-[0.1em]">All Decisions</h3>
+                        <span className="bg-gray-100 text-gray-500 px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest">
+                            {processedLeaves.length} Processed
+                        </span>
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                        {processedLeaves.slice(0, 6).map((leave, idx) => (
+                        {processedLeaves.map((leave, idx) => (
                             <motion.div
                                 key={leave.id}
                                 initial={{ opacity: 0, scale: 0.95 }}

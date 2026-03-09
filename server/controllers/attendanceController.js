@@ -28,7 +28,7 @@ exports.getAttendance = async (req, res) => {
                 userFilter += ` AND u.emp_id = $${params.push(req.user.emp_id)}`;
             }
 
-            let uploadedDateCondition = `((a.date AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Kolkata')::date <= (CURRENT_TIMESTAMP AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Kolkata')::date)`;
+            let uploadedDateCondition = `(a.date <= (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata')::date)`;
 
             if (recent !== 'true') {
                 let start;
@@ -54,14 +54,14 @@ exports.getAttendance = async (req, res) => {
 
                 const startIdx = params.push(start);
                 const endIdx = params.push(end);
-                uploadedDateCondition = `(a.date AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Kolkata')::date BETWEEN $${startIdx} AND $${endIdx}`;
+                uploadedDateCondition = `a.date BETWEEN $${startIdx} AND $${endIdx}`;
             }
 
             const limitIdx = params.push(safeLimit);
 
             const uploadedQuery = `
                 SELECT
-                    (a.date AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Kolkata')::date as date,
+                    a.date,
                     u.emp_id,
                     u.name,
                     u.role,
@@ -74,7 +74,7 @@ exports.getAttendance = async (req, res) => {
                 JOIN users u ON u.emp_id = a.emp_id
                 LEFT JOIN departments d ON u.department_id = d.id
                 WHERE ${userFilter} AND ${uploadedDateCondition}
-                ORDER BY (a.date AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Kolkata')::date DESC, u.name ASC
+                ORDER BY a.date DESC, u.name ASC
                 LIMIT $${limitIdx}
             `;
 
@@ -132,7 +132,7 @@ exports.getAttendance = async (req, res) => {
                 SELECT $1::date as d
                 UNION ALL
                 SELECT (d + 1)::date FROM date_range 
-                WHERE d < $2::date AND d < (CURRENT_TIMESTAMP AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Kolkata')::date
+                WHERE d < $2::date AND d < (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata')::date
             ),
             target_users AS (
                 SELECT u.emp_id, u.name, u.role, u.department_id, d.name as department_name
@@ -152,7 +152,7 @@ exports.getAttendance = async (req, res) => {
                 a.id as record_id
             FROM date_range dr
             CROSS JOIN target_users tu
-            LEFT JOIN attendance_records a ON a.emp_id = tu.emp_id AND (a.date AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Kolkata')::date = dr.d
+            LEFT JOIN attendance_records a ON a.emp_id = tu.emp_id AND a.date = dr.d
             ORDER BY dr.d DESC, tu.name ASC
         `;
 
@@ -225,14 +225,16 @@ exports.getAttendanceSummary = async (req, res) => {
                 u.emp_id, u.name, u.role,
                 COALESCE(SUM(CASE WHEN a.status::text = 'Present' THEN 1 ELSE 0 END), 0) as total_present,
                 COALESCE(SUM(CASE WHEN a.status::text IN ('Comp Leave', 'CL', 'ML', 'Leave') THEN 1 ELSE 0 END), 0) as total_leave,
+                COALESCE(SUM(CASE WHEN a.status::text = 'CL' THEN 1 ELSE 0 END), 0) as total_cl,
+                COALESCE(SUM(CASE WHEN a.status::text = 'ML' THEN 1 ELSE 0 END), 0) as total_ml,
+                COALESCE(SUM(CASE WHEN a.status::text = 'Comp Leave' THEN 1 ELSE 0 END), 0) as total_comp,
                 COALESCE(SUM(CASE WHEN a.status::text = 'OD' THEN 1 ELSE 0 END), 0) as total_od,
-                COALESCE(SUM(CASE WHEN a.status::text IN ('Absent', 'LOP') THEN 1 ELSE 0 END), 0) as total_lop,
                 ct.total_working_days,
                 ct.total_holidays
             FROM public.users u
             CROSS JOIN calendar_totals ct
             LEFT JOIN attendance_records a ON u.emp_id = a.emp_id
-                AND (a.date AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Kolkata')::date BETWEEN $1 AND $2
+                AND a.date BETWEEN $1 AND $2
             WHERE ${userFilter}
             GROUP BY u.emp_id, u.name, u.role, ct.total_working_days, ct.total_holidays
             ORDER BY u.name ASC

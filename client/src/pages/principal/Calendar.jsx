@@ -37,7 +37,8 @@ const Calendar = () => {
                 currentDate.getFullYear() === new Date().getFullYear();
 
             const dayOfWeek = dateObj.getDay();
-            const isWeekend = dayOfWeek === 0 || dayOfWeek === 6; // Sunday/Saturday
+            const isFirstSaturday = dayOfWeek === 6 && i <= 7;
+            const isWeekend = dayOfWeek === 0 || (dayOfWeek === 6 && !isFirstSaturday); // Sunday & non-first Saturdays
 
             days.push(
                 <motion.div
