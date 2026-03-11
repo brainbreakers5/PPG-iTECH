@@ -219,7 +219,7 @@ exports.approvePermission = async (req, res) => {
                             }
                         }
                     }
-                }
+
                     await client.query(
                         `INSERT INTO notifications (user_id, message, type) VALUES ($1, $2, 'leave')`,
                         [emp_id, `Your permission request for ${new Date(date).toLocaleDateString('en-IN')} has been APPROVED. Attendance marked as Present.`]
