@@ -2,7 +2,7 @@ import axios from 'axios';
 import { encryptPayload } from './crypto';
 
 const api = axios.create({
-    baseURL: import.meta.env.VITE_API_URL || 'http://localhost:5000/api',
+    baseURL: import.meta.env.VITE_API_URL || 'ppg-itech.onrender.com/api',
 });
 
 // Add a request interceptor: attach token and AES-GCM encrypt JSON bodies
