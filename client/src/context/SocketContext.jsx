@@ -12,7 +12,7 @@ export const SocketProvider = ({ children }) => {
 
     useEffect(() => {
         if (user) {
-            const Socket = io('https://ppg-itech.onrender.com'); // Ensure this matches server URL
+            const newSocket = io('https://ppg-itech.onrender.com'); // Ensure this matches server URL
 
             newSocket.on('connect', () => {
                 console.log('Connected to socket server');
