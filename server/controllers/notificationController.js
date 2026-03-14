@@ -1,14 +1,60 @@
 const { pool } = require('../config/db');
+const sendEmail = require('../utils/sendEmail');
 
-// @desc    Create a notification
-// @desc    (This is typically used internally by other controllers)
-exports.createNotification = async (emp_id, title, message, type = 'info') => {
+// @desc    Create a notification and send email
+exports.createNotification = async (emp_id, message, type = 'info', metadata = null, client = null) => {
+    const db = client || pool;
     try {
-        await pool.query(
-            'INSERT INTO notifications (user_id, message, type) VALUES ($1, $2, $3)',
-            [emp_id, message, type]
+        // 1. Insert into DB
+        await db.query(
+            'INSERT INTO notifications (user_id, message, type, metadata) VALUES ($1, $2, $3, $4)',
+            [emp_id, message, type, metadata ? (typeof metadata === 'string' ? metadata : JSON.stringify(metadata)) : null]
         );
-        // Socket emit could happen here too
+
+        // 2. Fetch employee email and name for email notification
+        const { rows } = await pool.query('SELECT email, name FROM users WHERE emp_id = $1', [emp_id]);
+        
+        if (rows.length > 0 && rows[0].email) {
+            const { email, name } = rows[0];
+            const appUrl = process.env.APP_URL || 'http://localhost:3000';
+            
+            // Format subject
+            const subject = `PPG iTech HUB: New ${type.charAt(0).toUpperCase() + type.slice(1)} Notification`;
+            
+            // Email HTML content
+            const html = `
+                <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e5e7eb; border-radius: 12px; overflow: hidden;">
+                    <div style="background-color: #4A90E2; padding: 24px; text-align: center;">
+                        <h1 style="color: white; margin: 0; font-size: 24px;">PPG iTech HUB</h1>
+                    </div>
+                    <div style="padding: 32px; background-color: white;">
+                        <p style="font-size: 16px, color: #374151; margin-bottom: 24px;">Hello <strong>${name}</strong>,</p>
+                        <p style="font-size: 16px; color: #4b5563; line-height: 1.5;">You have received a new notification in the application:</p>
+                        
+                        <div style="background-color: #f9fafb; border-left: 4px solid #4A90E2; padding: 20px; margin: 24px 0; font-style: italic; color: #1f2937;">
+                            "${message}"
+                        </div>
+                        
+                        <p style="font-size: 16px; color: #4b5563; margin-bottom: 32px;">Please click the button below to log in and view the details.</p>
+                        
+                        <div style="text-align: center;">
+                            <a href="${appUrl}" style="background-color: #4A90E2; color: white; padding: 14px 28px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block;">View in Application</a>
+                        </div>
+                    </div>
+                    <div style="background-color: #f3f4f6; padding: 16px; text-align: center; color: #6b7280; font-size: 12px;">
+                        <p>© ${new Date().getFullYear()} PPG iTech HUB. All rights reserved.</p>
+                        <p>This is an automated notification. Please do not reply to this email.</p>
+                    </div>
+                </div>
+            `;
+
+            // Try sending email (don't block the main flow if mail fails)
+            sendEmail({
+                email: email,
+                subject: subject,
+                html: html
+            }).catch(err => console.error("Email notification failed:", err));
+        }
     } catch (error) {
         console.error("Error creating notification", error);
     }
@@ -20,12 +66,12 @@ exports.createNotification = async (emp_id, title, message, type = 'info') => {
 exports.getNotifications = async (req, res) => {
     try {
         const { rows } = await pool.query(
-            `SELECT id, user_id, message, is_read, type,
+            `SELECT id, user_id, message, is_read, type, metadata,
                     to_char(created_at, 'YYYY-MM-DD"T"HH24:MI:SS') as created_at
-             FROM notifications 
-             WHERE user_id = $1 
-             ORDER BY created_at DESC 
-             LIMIT 20`,
+              FROM notifications 
+              WHERE user_id = $1 
+              ORDER BY created_at DESC 
+              LIMIT 20`,
             [req.user.emp_id]
         );
         res.json(rows);

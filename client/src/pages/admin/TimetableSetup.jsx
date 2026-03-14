@@ -31,6 +31,7 @@ const TimetableSetup = () => {
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [dirty, setDirty] = useState(false);
+    const [punchTime, setPunchTime] = useState('09:00');
 
     useEffect(() => {
         fetchConfig();
@@ -39,7 +40,12 @@ const TimetableSetup = () => {
     const fetchConfig = async () => {
         setLoading(true);
         try {
-            const { data } = await api.get('/timetable/config');
+            const [timeRes, settingsRes] = await Promise.all([
+                api.get('/timetable/config'),
+                api.get('/settings')
+            ]);
+            
+            const data = timeRes.data;
             if (data.length > 0) {
                 setPeriods(data.map(p => ({ ...p, _tempId: p.id })));
             } else {
@@ -51,7 +57,11 @@ const TimetableSetup = () => {
                     DEFAULT_PERIOD(8, 6), DEFAULT_PERIOD(9, 7), DEFAULT_PERIOD(10, 8),
                 ]);
             }
-        } catch { console.error('Failed to fetch timetable config'); }
+
+            if (settingsRes.data && settingsRes.data.official_punch_time) {
+                setPunchTime(settingsRes.data.official_punch_time);
+            }
+        } catch { console.error('Failed to fetch timetable config or settings'); }
         finally { setLoading(false); }
     };
 
@@ -147,8 +157,11 @@ const TimetableSetup = () => {
 
         setSaving(true);
         try {
-            await api.put('/timetable/config', { periods });
-            Swal.fire({ title: 'Configuration Saved!', text: 'The timetable has been updated successfully.', icon: 'success', timer: 2000, showConfirmButton: false });
+            await Promise.all([
+                api.put('/timetable/config', { periods }),
+                api.put('/settings/official_punch_time', { value: punchTime })
+            ]);
+            Swal.fire({ title: 'Configuration Saved!', text: 'The timetable and settings have been updated successfully.', icon: 'success', timer: 2000, showConfirmButton: false });
             setDirty(false);
             fetchConfig();
         } catch (error) {
@@ -174,7 +187,7 @@ const TimetableSetup = () => {
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-10 gap-6">
                     <div>
                         <h1 className="text-3xl font-black text-gray-800 tracking-tight">Timetable Setup</h1>
-                        <p className="text-gray-500 font-medium mt-1">Configure college timings, period slots, and scheduled breaks.</p>
+
                     </div>
                     <div className="flex items-center gap-3 flex-wrap">
 
@@ -195,7 +208,7 @@ const TimetableSetup = () => {
                 </div>
 
                 {/* Summary Stats */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-10">
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-10">
                     {[
                         { label: 'Total Periods', value: periods.filter(p => !p.is_break).length, color: 'blue' },
                         { label: 'College Start', value: schoolStart, color: 'emerald' },
@@ -207,6 +220,22 @@ const TimetableSetup = () => {
                             <p className={`text-2xl font-black text-${s.color}-700 tracking-tight`}>{loading ? '—' : s.value}</p>
                         </div>
                     ))}
+                    
+                    {/* Punch Time Config */}
+                    <div className="modern-card p-6 border border-rose-100 bg-rose-50/30">
+                        <p className="text-[9px] font-black uppercase tracking-[0.3em] text-rose-400 mb-2">Official Punch Time</p>
+                        <div className="flex items-center gap-2">
+                            <input
+                                type="time"
+                                value={punchTime}
+                                onChange={e => {
+                                    setPunchTime(e.target.value);
+                                    setDirty(true);
+                                }}
+                                className="bg-white border text-xl border-rose-200 rounded-xl px-2 py-1 font-black text-rose-700 outline-none focus:border-rose-400 w-full"
+                            />
+                        </div>
+                    </div>
                 </div>
 
                 <div className="p-4 bg-sky-50/60 rounded-2xl border border-sky-100 flex items-start gap-3 mb-8">

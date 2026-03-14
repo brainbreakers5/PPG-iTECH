@@ -37,9 +37,6 @@ const ManagementDepartment = () => {
                     <h1 className="text-4xl font-black text-gray-800 tracking-tighter">
                         Department <span className="text-[#7C3AED]">Intelligence</span>
                     </h1>
-                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.3em] mt-2 flex items-center gap-2">
-                        Institutional Structure & Personnel Matrix
-                    </p>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">

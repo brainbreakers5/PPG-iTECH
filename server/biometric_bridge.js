@@ -1,5 +1,6 @@
 const ZKLib = require('zkteco-js');
 const axios = require('axios');
+const https = require('https');
 require('dotenv').config();
 
 /**
@@ -10,7 +11,7 @@ require('dotenv').config();
 
 const DEVICE_IP = '192.168.1.201';
 const DEVICE_PORT = 4370;
-const SERVER_API_URL = 'http://localhost:5000/api/biometric/log'; // Adjust if server is remote
+const SERVER_API_URL = process.env.SERVER_API_BIOMETRIC_URL || `http://localhost:${process.env.PORT || 5000}/api/biometric/log`; // Adjust if server is remote
 
 async function startBridge() {
     let zkInstance = new ZKLib(DEVICE_IP, DEVICE_PORT, 10000, 4000);
@@ -26,12 +27,16 @@ async function startBridge() {
 
             try {
                 // Push to our web server API
+                const axiosOptions = {};
+                if (process.env.DISABLE_TLS_VERIFY === '1') {
+                    axiosOptions.httpsAgent = new https.Agent({ rejectUnauthorized: false });
+                }
                 const response = await axios.post(SERVER_API_URL, {
                     emp_id: data.userId.toString(),
                     device_id: 'MAIN_DEVICE_01',
                     timestamp: new Date().toISOString(),
                     type: new Date().getHours() < 12 ? 'IN' : 'OUT' // Automatic detection or use device type if available
-                });
+                }, axiosOptions);
 
                 if (response.status === 200) {
                     console.log(`[${new Date().toLocaleTimeString()}] 🚀 Data pushed to server successfully.`);

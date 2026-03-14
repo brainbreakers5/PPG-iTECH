@@ -15,7 +15,10 @@ const pool = new Pool({
     port: process.env.DB_PORT || 5432,
     ssl: {
         rejectUnauthorized: false // Required for Supabase connection
-    }
+    },
+    max: 20,
+    idleTimeoutMillis: 30000,
+    connectionTimeoutMillis: 10000,
 });
 
 const connectDB = async () => {

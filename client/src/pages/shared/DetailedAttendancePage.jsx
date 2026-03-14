@@ -30,12 +30,14 @@ const DetailedAttendancePage = () => {
             const inTime = cells[2]?.textContent?.trim() || '—';
             const outTime = cells[3]?.textContent?.trim() || '—';
             const hours = cells[4]?.textContent?.trim() || '—';
+            const rmk = cells[5]?.textContent?.trim() || '—';
             return `<tr>
                 <td>${date}</td>
                 <td>${status}</td>
                 <td>${inTime}</td>
                 <td>${outTime}</td>
                 <td>${hours}</td>
+                <td>${rmk}</td>
             </tr>`;
         }).join('');
 
@@ -64,13 +66,13 @@ const DetailedAttendancePage = () => {
                 thead { display: table-header-group; }
             </style></head><body>
             <div class="print-brand">
-                <p class="app-name">PPG iTech HUB</p>
+                <p class="app-name">PPG EMP HUB</p>
                 <p class="print-time">${new Date().toLocaleString('en-GB')}</p>
             </div>
             <h1>Detailed Attendance Report</h1>
             <div class="meta">Employee: <b>${empId}</b> &nbsp;|&nbsp; Period: ${periodLabel}</div>
             <table>
-                <thead><tr><th>Date</th><th>Status</th><th>In Time</th><th>Out Time</th><th>Work Hours</th></tr></thead>
+                <thead><tr><th>Date</th><th>Status</th><th>In Time</th><th>Out Time</th><th>Work Hours</th><th>Remarks</th></tr></thead>
                 <tbody>${rowsHtml}</tbody>
             </table>
         </body></html>`);

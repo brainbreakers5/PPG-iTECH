@@ -8,6 +8,7 @@ import Login from './pages/Login';
 // Principal Pages
 import PrincipalDashboard from './pages/principal/Dashboard';
 import PrincipalLeaves from './pages/principal/LeaveRequests';
+import PrincipalLeaveHistory from './pages/principal/LeaveHistory';
 import PrincipalDepartment from './pages/principal/Department';
 import PrincipalCalendar from './pages/principal/Calendar';
 import PrincipalAttendance from './pages/principal/AttendanceRecord';
@@ -43,6 +44,7 @@ import DetailedAttendancePage from './pages/shared/DetailedAttendancePage';
 import EmployeeFormPage from './pages/admin/EmployeeFormPage';
 import DepartmentFormPage from './pages/admin/DepartmentFormPage';
 import PurchaseRequestPage from './pages/shared/PurchaseRequestPage';
+import ActivityLogs from './pages/admin/ActivityLogs';
 
 // Management Pages
 import ManagementDashboard from './pages/management/ManagementDashboard';
@@ -105,6 +107,7 @@ const AppContent = () => {
             <Route path="timetable" element={<HODTimetable />} />
             <Route path="timetable/:empId" element={<HODTimetable />} />
             <Route path="leave-limits" element={<LeaveLimitation />} />
+            <Route path="activity-logs" element={<ActivityLogs />} />
             <Route path="timetable-setup" element={<TimetableSetup />} />
             <Route path="profile/:id" element={<ProfilePage />} />
             <Route path="personnel/:role" element={<PersonnelListPage />} />
@@ -117,6 +120,7 @@ const AppContent = () => {
           <Routes>
             <Route path="/" element={<PrincipalDashboard />} />
             <Route path="leaves" element={<PrincipalLeaves />} />
+            <Route path="leave-history" element={<PrincipalLeaveHistory />} />
             <Route path="payroll" element={<SalaryManagement />} />
             <Route path="department" element={<PrincipalDepartment />} />
             <Route path="departments/:id/staff" element={<DepartmentStaffPage rolePrefix="principal" />} />
@@ -181,6 +185,9 @@ const AppContent = () => {
             <Route path="departments" element={<ManagementDepartment />} />
             <Route path="departments/:id/staff" element={<DepartmentStaffPage rolePrefix="management" />} />
             <Route path="payroll" element={<ManagementSalary />} />
+            <Route path="attendance" element={<PrincipalAttendance />} />
+            <Route path="attendance/:empId/:month" element={<DetailedAttendancePage />} />
+            <Route path="attendance/:empId/:startDate/:endDate" element={<DetailedAttendancePage />} />
             <Route path="profile/:id" element={<ProfilePage />} />
           </Routes>
         </ManagementRoute>

@@ -99,7 +99,7 @@ const ManagementSalary = () => {
             </head>
             <body>
                 <div class="print-brand">
-                    <p class="app-name">PPG iTech HUB</p>
+                    <p class="app-name">PPG EMP HUB</p>
                     <p class="print-time">${new Date().toLocaleString('en-GB')}</p>
                 </div>
                 <h1>${escapeHtml(title)}</h1>
@@ -137,9 +137,6 @@ const ManagementSalary = () => {
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-12 gap-8">
                     <div>
                         <h1 className="text-4xl font-black text-gray-800 tracking-tighter">Salary <span className="text-[#7C3AED]">Overview</span></h1>
-                        <p className="text-gray-500 font-medium mt-1 uppercase tracking-widest text-[10px] flex items-center gap-2">
-                            <span className="h-2 w-2 rounded-full bg-purple-500"></span> View-only salary and payroll data
-                        </p>
                     </div>
 
                 </div>
@@ -227,8 +224,8 @@ const ManagementSalary = () => {
                                                     >
                                                         <td className="p-8">
                                                             <div className="flex items-center gap-5">
-                                                                <div className="h-14 w-14 rounded-[20px] bg-gradient-to-br from-purple-50 to-white border border-purple-50 flex items-center justify-center text-purple-600 font-black text-lg shadow-sm group-hover:scale-110 group-hover:rotate-3 transition-all duration-500">
-                                                                    {s.name?.charAt(0)}
+                                                                <div className="h-14 w-14 rounded-[20px] bg-gradient-to-br from-purple-50 to-white border border-purple-50 flex items-center justify-center text-purple-600 font-black text-lg shadow-sm group-hover:scale-110 group-hover:rotate-3 transition-all duration-500 overflow-hidden">
+                                                                    <img src={s.profile_pic || `https://ui-avatars.com/api/?name=${encodeURIComponent(s.name || '?')}&size=100&background=9333ea&color=fff&bold=true`} alt="" className="h-full w-full object-cover" />
                                                                 </div>
                                                                 <div>
                                                                     <p className="text-sm font-black text-gray-800 tracking-tight group-hover:text-purple-600 transition-colors">{s.name}</p>

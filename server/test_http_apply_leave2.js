@@ -5,8 +5,9 @@ const axios = require('axios');
 async function testHttpApplyLeave() {
     try {
         console.log("Generating token for EMP003...");
+        // Use an existing user id from local DB — adjust if necessary
         const token = jwt.sign(
-            { emp_id: 'EMP003', id: 4 }, // Id 4 since the db has id=4 for Manoj
+            { id: 11 }, // replace with a valid user.id from your DB
             process.env.JWT_SECRET || 'fallback_secret',
             { expiresIn: '30d' }
         );

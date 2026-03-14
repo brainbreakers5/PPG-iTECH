@@ -1,5 +1,6 @@
 require('dotenv').config();
 const { Pool } = require('pg');
+const bcrypt = require('bcryptjs');
 
 const pool = new Pool({
     host: process.env.DB_HOST,
@@ -47,6 +48,17 @@ async function simulateApplyLeave() {
             [req.user.emp_id, currentYear]
         );
 
+        // Ensure test user exists in users table (for local simulation environments)
+        const { rows: userRows } = await client.query('SELECT emp_id FROM users WHERE emp_id = $1', [req.user.emp_id]);
+        if (userRows.length === 0) {
+            const hashed = bcrypt.hashSync('testpassword', 8);
+            await client.query(
+                `INSERT INTO users (emp_id, name, role, department_id, password) VALUES ($1, $2, $3, $4, $5)`,
+                [req.user.emp_id, req.user.name, req.user.role || 'staff', req.user.department_id || 2, hashed]
+            );
+            console.log('Inserted test user into users table for simulation.');
+        }
+
         console.log("Balance length: ", balance.length);
         if (balance.length === 0) {
             await client.query(
@@ -66,6 +78,19 @@ async function simulateApplyLeave() {
         // 1. Create main leave request
         const validReplacements = replacements ? replacements.filter(r => r.staff_id && r.staff_id !== '') : [];
         const firstReplacementId = validReplacements.length > 0 ? validReplacements[0].staff_id : null;
+
+        // Ensure replacement users exist (to satisfy FK on leave_approvals)
+        for (const rep of validReplacements) {
+            const { rows: repUser } = await client.query('SELECT emp_id FROM users WHERE emp_id = $1', [rep.staff_id]);
+            if (repUser.length === 0) {
+                const hashed = bcrypt.hashSync('testpassword', 8);
+                await client.query(
+                    `INSERT INTO users (emp_id, name, role, department_id, password) VALUES ($1, $2, $3, $4, $5)`,
+                    [rep.staff_id, `Rep ${rep.staff_id}`, 'staff', req.user.department_id || 2, hashed]
+                );
+                console.log(`Inserted replacement user ${rep.staff_id} for simulation.`);
+            }
+        }
 
         const { rows: resultRows } = await client.query(
             `INSERT INTO leave_requests (emp_id, leave_type, from_date, to_date, days_count, reason, subject, alternative_staff_id, status)

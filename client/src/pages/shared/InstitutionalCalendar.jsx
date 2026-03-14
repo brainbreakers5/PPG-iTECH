@@ -100,10 +100,9 @@ const InstitutionalCalendar = () => {
                     className={`p-4 border-b border-r border-gray-100 h-24 relative transition-all group cursor-pointer ${bgColor} ${isToday ? 'ring-2 ring-sky-600 ring-inset' : ''} ${selectedDay?.day === i ? 'ring-2 ring-sky-400 ring-inset' : ''}`}
                 >
                     <div className="flex justify-between items-start">
-                        <span className={`text-sm font-black ${isToday ? 'bg-sky-600 text-white px-2 py-0.5 rounded-lg' : textColor}`}>
+                        <span className={`text-sm font-black ${textColor}`}>
                             {i.toString().padStart(2, '0')}
                         </span>
-                        {isToday && <span className="text-[8px] font-black text-sky-600 uppercase tracking-widest mt-1">Today</span>}
                     </div>
 
                     <div className={`absolute bottom-2 left-1/2 -translate-x-1/2 w-2 h-2 rounded-full ${accentColor}`}></div>
@@ -121,7 +120,6 @@ const InstitutionalCalendar = () => {
                         <CalendarIcon className="text-sky-600" />
                         Institutional Calendar
                     </h1>
-                    <p className="text-gray-500 font-medium mt-1">View official holidays, events, and academic schedule.</p>
                 </div>
 
                 <div className="flex items-center bg-white p-1 rounded-2xl shadow-xl shadow-sky-50/50 border border-sky-50">

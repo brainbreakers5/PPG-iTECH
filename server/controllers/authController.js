@@ -1,6 +1,7 @@
 const { pool } = require('../config/db');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
+const logActivity = require('../utils/activityLogger');
 
 // Generate JWT
 const generateToken = (id) => {
@@ -15,7 +16,6 @@ const generateToken = (id) => {
 exports.loginUser = async (req, res) => {
     const { emp_id, pin } = req.body;
 
-    // Trim inputs
     const trimmedEmpId = emp_id?.trim();
     const trimmedPin = pin?.trim();
 
@@ -24,7 +24,6 @@ exports.loginUser = async (req, res) => {
     }
 
     try {
-        // Find user by emp_id (case-insensitive)
         const { rows } = await pool.query(
             'SELECT * FROM users WHERE LOWER(emp_id) = LOWER($1)',
             [trimmedEmpId]
@@ -32,12 +31,28 @@ exports.loginUser = async (req, res) => {
         const user = rows[0];
 
         if (user) {
-            // Check pin (Direct check for numeric PIN as string, or hashed if password field logic used)
-            const isPinMatch = user.pin === trimmedPin;
-            const isPasswordMatch = user.password ? await bcrypt.compare(trimmedPin, user.password) : false;
+            // Check hashed password (priority) or hashed pin column if legacy
+            // We use bcrypt.compare for both to ensure everything is hashed
+            let isMatch = false;
+            
+            if (user.password) {
+                isMatch = await bcrypt.compare(trimmedPin, user.password);
+            } else if (user.pin) {
+                // If pin is stored as plain text (legacy), we might need to handle it once 
+                // but sebaiknya everything is already hashed.
+                // Let's check both for safety during transition
+                isMatch = (user.pin === trimmedPin);
+                
+                // Auto-upgrade to hashed password on successful plain-text login
+                if (isMatch) {
+                    const hashed = await bcrypt.hash(trimmedPin, 10);
+                    await pool.query('UPDATE users SET password = $1 WHERE id = $2', [hashed, user.id]);
+                    console.log(`Auto-migrated password for user ${user.emp_id}`);
+                }
+            }
 
-            if (isPinMatch || isPasswordMatch) {
-                console.log('Login successful');
+            if (isMatch) {
+                await logActivity(user.id, 'LOGIN', { emp_id: user.emp_id, email_id: user.email }, req.ip);
                 res.json({
                     id: user.id,
                     emp_id: user.emp_id,
@@ -48,12 +63,12 @@ exports.loginUser = async (req, res) => {
                     token: generateToken(user.id),
                 });
             } else {
-                console.log('Login failed: Invalid PIN/Password');
-                res.status(401).json({ message: 'Invalid credentials (PIN)' });
+                await logActivity(user.id, 'FAILED_LOGIN', { emp_id: user.emp_id, email_id: user.email, reason: 'Invalid PIN' }, req.ip);
+                res.status(401).json({ message: 'Invalid credentials' });
             }
         } else {
-            console.log('Login failed: User not found');
-            res.status(401).json({ message: 'Invalid credentials (User not found)' });
+            await logActivity(null, 'FAILED_LOGIN', { emp_id: trimmedEmpId, reason: 'Unknown Employee ID' }, req.ip);
+            res.status(401).json({ message: 'Invalid credentials' });
         }
     } catch (error) {
         console.error('Login Error:', error);
@@ -96,7 +111,21 @@ exports.managementLogin = async (req, res) => {
 // @route   GET /api/auth/profile
 // @access  Private
 exports.getUserProfile = async (req, res) => {
-    res.json(req.user);
+    try {
+        const { rows } = await pool.query(`
+            SELECT u.*, d.name as department_name
+            FROM users u
+            LEFT JOIN departments d ON u.department_id = d.id
+            WHERE u.id = $1
+        `, [req.user.id]);
+        if (rows.length === 0) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+        res.json(rows[0]);
+    } catch (error) {
+        console.error('getProfile Error:', error);
+        res.status(500).json({ message: 'Server Error' });
+    }
 };
 
 // @desc    Update profile picture
@@ -130,8 +159,62 @@ exports.updateProfilePic = async (req, res) => {
                 profile_pic: user.profile_pic
             }
         });
+        await logActivity(req.user.id, 'UPDATE_PROFILE_PIC', { emp_id: user.emp_id }, req.ip);
     } catch (error) {
         console.error(error);
+        res.status(500).json({ message: 'Server Error' });
+    }
+};
+
+// @desc    Update own profile (self-service)
+// @route   PUT /api/auth/profile
+// @access  Private
+exports.updateProfile = async (req, res) => {
+    const {
+        mobile, whatsapp, email, blood_group, religion, nationality, caste, community,
+        aadhar, pan, account_no, bank_name, branch, ifsc, pin_code,
+        pf_number, uan_number, permanent_address, communication_address,
+        father_name, mother_name, marital_status, profile_pic, pin
+    } = req.body;
+
+    try {
+        let hashedPassword;
+        if (pin) {
+            hashedPassword = await bcrypt.hash(pin, 10);
+        }
+
+        const query = `
+            UPDATE users SET 
+                mobile = $1, whatsapp = $2, email = $3, blood_group = $4, religion = $5,
+                nationality = $6, caste = $7, community = $8,
+                aadhar = $9, pan = $10, account_no = $11, bank_name = $12, branch = $13,
+                ifsc = $14, pin_code = $15, pf_number = $16, uan_number = $17,
+                permanent_address = $18, communication_address = $19,
+                father_name = $20, mother_name = $21, marital_status = $22,
+                profile_pic = COALESCE($23, profile_pic),
+                pin = COALESCE($24, pin), password = COALESCE($25, password)
+            WHERE id = $26
+            RETURNING id, emp_id, name, role, profile_pic, department_id
+        `;
+
+        const { rows } = await pool.query(query, [
+            mobile || null, whatsapp || null, email || null, blood_group || null, religion || null,
+            nationality || 'Indian', caste || null, community || null,
+            aadhar || null, pan || null, account_no || null, bank_name || null, branch || null,
+            ifsc || null, pin_code || null, pf_number || null, uan_number || null,
+            permanent_address || null, communication_address || null,
+            father_name || null, mother_name || null, marital_status || null,
+            profile_pic || null, pin || null, hashedPassword || null,
+            req.user.id
+        ]);
+
+        if (rows.length === 0) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+
+        res.json({ message: 'Profile updated successfully', user: rows[0] });
+    } catch (error) {
+        console.error('Update Profile Error:', error);
         res.status(500).json({ message: 'Server Error' });
     }
 };

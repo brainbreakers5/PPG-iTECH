@@ -1,18 +1,30 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FaTimes, FaCheckCircle, FaIdBadge, FaBuilding, FaPhone, FaEnvelope, FaUser, FaCalendarAlt, FaVenusMars, FaTint, FaGlobe, FaHandsHelping, FaWhatsapp, FaMapMarkerAlt, FaUsers, FaHeart, FaBriefcase, FaMoneyBillWave, FaUniversity, FaCreditCard, FaLock, FaUserCircle, FaSuitcase, FaCamera, FaEdit, FaSave } from 'react-icons/fa';
+import { FaTimes, FaCheckCircle, FaIdBadge, FaBuilding, FaPhone, FaEnvelope, FaUser, FaCalendarAlt, FaVenusMars, FaTint, FaGlobe, FaHandsHelping, FaWhatsapp, FaMapMarkerAlt, FaUsers, FaHeart, FaBriefcase, FaMoneyBillWave, FaUniversity, FaCreditCard, FaLock, FaUserCircle, FaSuitcase, FaCamera, FaEdit, FaSave, FaCertificate, FaDownload, FaEye, FaPlus, FaTrash, FaKey } from 'react-icons/fa';
 import api from '../utils/api';
 import Swal from 'sweetalert2';
 import { useAuth } from '../context/AuthContext';
 
-const InfoRow = ({ icon, label, value }) => (
+const inputClass = "w-full p-3 bg-gray-50 border border-gray-200 rounded-2xl outline-none focus:ring-4 focus:ring-sky-100 focus:border-sky-500 transition-all font-bold text-gray-700 text-sm";
+
+const InfoRow = ({ icon, label, value, editing, name, onChange, type = 'text' }) => (
     <div className="flex items-center gap-4 p-4 rounded-3xl bg-gray-50/50 hover:bg-white transition-all border border-transparent hover:border-gray-100 group">
-        <div className="h-10 w-10 rounded-2xl bg-white shadow-sm flex items-center justify-center text-sky-600 group-hover:rotate-12 transition-transform">
+        <div className="h-10 w-10 rounded-2xl bg-white shadow-sm flex items-center justify-center text-sky-600 group-hover:rotate-12 transition-transform shrink-0">
             {icon}
         </div>
         <div className="flex-1 min-w-0">
             <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest leading-none mb-1">{label}</p>
-            <p className="text-sm font-black text-gray-800 tracking-tight truncate">{value || 'Not Specified'}</p>
+            {editing && name ? (
+                <input
+                    type={type}
+                    name={name}
+                    value={value || ''}
+                    onChange={onChange}
+                    className={inputClass}
+                />
+            ) : (
+                <p className="text-sm font-black text-gray-800 tracking-tight truncate">{value || 'Not Specified'}</p>
+            )}
         </div>
     </div>
 );
@@ -24,42 +36,191 @@ const SectionHeader = ({ title }) => (
 );
 
 const ProfileViewer = ({ user, onClose }) => {
-    const { login } = useAuth();
-    const [isEditing, setIsEditing] = useState(false);
+    const { user: authUser } = useAuth();
+    const [isEditingPic, setIsEditingPic] = useState(false);
+    const [isEditingProfile, setIsEditingProfile] = useState(false);
     const [picUrl, setPicUrl] = useState(user?.profile_pic || '');
     const [loading, setLoading] = useState(false);
+    const [certificates, setCertificates] = useState([]);
+    const [formData, setFormData] = useState({});
+    const [pinData, setPinData] = useState({ currentPin: '', newPin: '', confirmPin: '' });
+    const [isChangingPin, setIsChangingPin] = useState(false);
+    const [certName, setCertName] = useState('');
+    const [certFile, setCertFile] = useState(null);
+    const [uploadingCert, setUploadingCert] = useState(false);
+    const [showCertForm, setShowCertForm] = useState(false);
+    const certFileRef = useRef(null);
+
+    const isOwnProfile = authUser && user && (String(authUser.id) === String(user.id) || authUser.emp_id === user.emp_id);
 
     useEffect(() => {
         setPicUrl(user?.profile_pic || '');
-    }, [user?.profile_pic]);
+        if (user) {
+            setFormData({
+                mobile: user.mobile || '',
+                whatsapp: user.whatsapp || '',
+                email: user.email || '',
+                blood_group: user.blood_group || '',
+                religion: user.religion || '',
+                nationality: user.nationality || '',
+                caste: user.caste || '',
+                community: user.community || '',
+                aadhar: user.aadhar || '',
+                pan: user.pan || '',
+                account_no: user.account_no || '',
+                bank_name: user.bank_name || '',
+                branch: user.branch || '',
+                ifsc: user.ifsc || '',
+                pin_code: user.pin_code || '',
+                pf_number: user.pf_number || '',
+                uan_number: user.uan_number || '',
+                permanent_address: user.permanent_address || '',
+                communication_address: user.communication_address || '',
+                father_name: user.father_name || '',
+                mother_name: user.mother_name || '',
+                marital_status: user.marital_status || '',
+            });
+        }
+    }, [user]);
+
+    useEffect(() => {
+        if (user?.id) {
+            api.get(`/certificates/${user.id}`).then(({ data }) => setCertificates(data)).catch(() => {});
+        }
+    }, [user?.id]);
 
     if (!user) return null;
 
-    const handleUpdate = async () => {
+    const handleChange = (e) => {
+        setFormData({ ...formData, [e.target.name]: e.target.value });
+    };
+
+    const handlePicFileChange = (e) => {
+        const file = e.target.files[0];
+        if (file) {
+            if (file.size > 5 * 1024 * 1024) {
+                return Swal.fire({ title: 'File Too Large', text: 'Please select an image smaller than 5MB.', icon: 'warning', confirmButtonColor: '#2563eb' });
+            }
+            const reader = new FileReader();
+            reader.onloadend = () => setPicUrl(reader.result);
+            reader.readAsDataURL(file);
+        }
+    };
+
+    const handlePicUpdate = async () => {
         if (!picUrl) return;
         setLoading(true);
         try {
             const { data } = await api.put('/auth/profile-pic', { profile_pic: picUrl });
-            const storedToken = localStorage.getItem('token');
-            const updatedUser = { ...user, profile_pic: data.user.profile_pic, token: storedToken };
-            localStorage.setItem('user', JSON.stringify(updatedUser));
-
-            Swal.fire({
-                icon: 'success',
-                title: 'Updated!',
-                text: 'Profile picture has been updated.',
-                timer: 1500,
-                showConfirmButton: false
-            });
-            setIsEditing(false);
+            Swal.fire({ icon: 'success', title: 'Updated!', text: 'Profile picture has been updated.', timer: 1500, showConfirmButton: false });
+            setIsEditingPic(false);
             window.location.reload();
         } catch (error) {
             console.error(error);
-            Swal.fire({
-                icon: 'error',
-                title: 'Error',
-                text: 'Failed to update profile picture.'
-            });
+            Swal.fire({ icon: 'error', title: 'Error', text: 'Failed to update profile picture.' });
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleProfileUpdate = async () => {
+        setLoading(true);
+        try {
+            await api.put('/auth/profile', formData);
+            Swal.fire({ icon: 'success', title: 'Updated!', text: 'Profile has been updated successfully.', timer: 1500, showConfirmButton: false });
+            setIsEditingProfile(false);
+            window.location.reload();
+        } catch (error) {
+            console.error(error);
+            Swal.fire({ icon: 'error', title: 'Error', text: 'Failed to update profile.' });
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const viewCertificate = async (certId) => {
+        try {
+            const { data } = await api.get(`/certificates/file/${certId}`);
+            const win = window.open('', '_blank');
+            if (data.file_type?.startsWith('image/') || data.file_type === 'application/pdf') {
+                win.document.write(`<iframe src="${data.file_data}" style="width:100%;height:100%;border:none;" frameborder="0"></iframe>`);
+            } else {
+                win.document.write(`<p>Preview not available. <a href="${data.file_data}" download="${data.file_name}">Download file</a></p>`);
+            }
+        } catch {
+            Swal.fire('Error', 'Failed to load certificate', 'error');
+        }
+    };
+
+    const downloadCertificate = async (certId, fileName) => {
+        try {
+            const { data } = await api.get(`/certificates/file/${certId}`);
+            const link = document.createElement('a');
+            link.href = data.file_data;
+            link.download = fileName || 'certificate';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        } catch {
+            Swal.fire('Error', 'Failed to download certificate', 'error');
+        }
+    };
+
+    const handleCertUpload = async () => {
+        if (!certName.trim() || !certFile) {
+            return Swal.fire('Missing Info', 'Please enter certificate name and select a file.', 'warning');
+        }
+        setUploadingCert(true);
+        try {
+            const fd = new FormData();
+            fd.append('certificate_name', certName.trim());
+            fd.append('certificate', certFile);
+            await api.post(`/certificates/${user.id}`, fd, { headers: { 'Content-Type': 'multipart/form-data' } });
+            Swal.fire({ icon: 'success', title: 'Uploaded!', text: 'Certificate added successfully.', timer: 1500, showConfirmButton: false });
+            setCertName('');
+            setCertFile(null);
+            setShowCertForm(false);
+            if (certFileRef.current) certFileRef.current.value = '';
+            const { data } = await api.get(`/certificates/${user.id}`);
+            setCertificates(data);
+        } catch {
+            Swal.fire('Error', 'Failed to upload certificate.', 'error');
+        } finally {
+            setUploadingCert(false);
+        }
+    };
+
+    const handleCertDelete = async (certId) => {
+        const result = await Swal.fire({ title: 'Delete Certificate?', text: 'This action cannot be undone.', icon: 'warning', showCancelButton: true, confirmButtonColor: '#ef4444', confirmButtonText: 'Delete' });
+        if (!result.isConfirmed) return;
+        try {
+            await api.delete(`/certificates/${certId}`);
+            Swal.fire({ icon: 'success', title: 'Deleted!', timer: 1200, showConfirmButton: false });
+            const { data } = await api.get(`/certificates/${user.id}`);
+            setCertificates(data);
+        } catch {
+            Swal.fire('Error', 'Failed to delete certificate.', 'error');
+        }
+    };
+
+    const handlePinChange = async () => {
+        if (!pinData.newPin || !pinData.confirmPin) {
+            return Swal.fire('Missing Info', 'Please fill in all PIN fields.', 'warning');
+        }
+        if (pinData.newPin.length < 4) {
+            return Swal.fire('Invalid PIN', 'PIN must be at least 4 characters.', 'warning');
+        }
+        if (pinData.newPin !== pinData.confirmPin) {
+            return Swal.fire('Mismatch', 'New PIN and Confirm PIN do not match.', 'warning');
+        }
+        setLoading(true);
+        try {
+            await api.put('/auth/profile', { pin: pinData.newPin });
+            Swal.fire({ icon: 'success', title: 'PIN Updated!', text: 'Your PIN has been changed successfully.', timer: 1500, showConfirmButton: false });
+            setPinData({ currentPin: '', newPin: '', confirmPin: '' });
+            setIsChangingPin(false);
+        } catch (error) {
+            Swal.fire('Error', error.response?.data?.message || 'Failed to update PIN.', 'error');
         } finally {
             setLoading(false);
         }
@@ -82,9 +243,9 @@ const ProfileViewer = ({ user, onClose }) => {
                                 alt=""
                                 className="h-full w-full rounded-[38px] object-cover bg-gray-50 mx-auto"
                             />
-                            {user.role === 'admin' && (
+                            {isOwnProfile && (
                                 <button
-                                    onClick={() => setIsEditing(!isEditing)}
+                                    onClick={() => setIsEditingPic(!isEditingPic)}
                                     className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white"
                                 >
                                     <FaCamera size={24} />
@@ -96,29 +257,36 @@ const ProfileViewer = ({ user, onClose }) => {
                         </div>
                     </div>
 
-                    {isEditing && (
+                    {isEditingPic && (
                         <motion.div
                             initial={{ opacity: 0, y: -10 }}
                             animate={{ opacity: 1, y: 0 }}
                             className="w-full px-4 mb-4"
                         >
+                            <label className="block text-[9px] font-black text-gray-400 uppercase tracking-widest mb-2 ml-1">Upload Image or Paste URL</label>
+                            <input
+                                type="file"
+                                accept="image/*"
+                                onChange={handlePicFileChange}
+                                className="w-full mb-2 text-[10px] font-bold file:mr-2 file:py-2 file:px-3 file:rounded-lg file:border-0 file:bg-sky-50 file:text-sky-600 file:font-bold file:text-[10px] file:cursor-pointer"
+                            />
                             <input
                                 type="text"
                                 value={picUrl}
                                 onChange={(e) => setPicUrl(e.target.value)}
-                                placeholder="Paste Image URL here..."
+                                placeholder="Or paste Image URL here..."
                                 className="w-full p-3 rounded-xl bg-gray-50 border border-gray-100 text-[10px] font-bold outline-none focus:ring-2 focus:ring-sky-100"
                             />
                             <div className="flex gap-2 mt-2">
                                 <button
-                                    onClick={handleUpdate}
+                                    onClick={handlePicUpdate}
                                     disabled={loading}
                                     className="flex-1 py-2 bg-sky-600 text-white rounded-lg text-[9px] font-black uppercase tracking-widest hover:bg-sky-700 disabled:opacity-50"
                                 >
                                     {loading ? 'Saving...' : 'Save'}
                                 </button>
                                 <button
-                                    onClick={() => { setIsEditing(false); setPicUrl(user.profile_pic); }}
+                                    onClick={() => { setIsEditingPic(false); setPicUrl(user.profile_pic); }}
                                     className="flex-1 py-2 bg-gray-100 text-gray-500 rounded-lg text-[9px] font-black uppercase tracking-widest hover:bg-gray-200"
                                 >
                                     Cancel
@@ -153,18 +321,55 @@ const ProfileViewer = ({ user, onClose }) => {
                             <h3 className="text-xl font-black text-gray-800 tracking-tight">Employee Profile</h3>
                             <p className="text-[10px] font-black text-sky-500 uppercase tracking-[0.3em] mt-1">Official Personnel Data</p>
                         </div>
+                        {isOwnProfile && !isEditingProfile && (
+                            <button
+                                onClick={() => setIsEditingProfile(true)}
+                                className="flex items-center gap-2 px-5 py-2.5 bg-sky-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-sky-700 transition-all shadow-lg shadow-sky-200"
+                            >
+                                <FaEdit size={12} /> Edit Profile
+                            </button>
+                        )}
+                        {isEditingProfile && (
+                            <div className="flex items-center gap-2">
+                                <button
+                                    onClick={handleProfileUpdate}
+                                    disabled={loading}
+                                    className="flex items-center gap-2 px-5 py-2.5 bg-green-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-green-700 transition-all shadow-lg shadow-green-200 disabled:opacity-50"
+                                >
+                                    <FaSave size={12} /> {loading ? 'Saving...' : 'Save Changes'}
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        setIsEditingProfile(false);
+                                        setFormData({
+                                            mobile: user.mobile || '', whatsapp: user.whatsapp || '', email: user.email || '',
+                                            blood_group: user.blood_group || '', religion: user.religion || '', nationality: user.nationality || '',
+                                            caste: user.caste || '', community: user.community || '',
+                                            aadhar: user.aadhar || '', pan: user.pan || '',
+                                            account_no: user.account_no || '', bank_name: user.bank_name || '', branch: user.branch || '',
+                                            ifsc: user.ifsc || '', pin_code: user.pin_code || '',
+                                            pf_number: user.pf_number || '', uan_number: user.uan_number || '',
+                                            permanent_address: user.permanent_address || '', communication_address: user.communication_address || '',
+                                            father_name: user.father_name || '', mother_name: user.mother_name || '', marital_status: user.marital_status || '',
+                                        });
+                                    }}
+                                    className="flex items-center gap-2 px-5 py-2.5 bg-gray-100 text-gray-500 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-gray-200 transition-all"
+                                >
+                                    <FaTimes size={12} /> Cancel
+                                </button>
+                            </div>
+                        )}
                     </div>
 
                     <div className="flex-1 overflow-y-auto p-8 md:p-10 custom-scrollbar">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-2">
-                            {/* Core Data */}
+                            {/* Core Data - Not editable by user */}
                             <div className="col-span-full">
                                 <SectionHeader title="Employee Information" />
                             </div>
                             <InfoRow icon={<FaIdBadge />} label="Employee ID" value={user.emp_id} />
-                            <InfoRow icon={<FaLock />} label="Employee Code" value={user.emp_code} />
                             <InfoRow icon={<FaUser />} label="Full Name" value={user.name} />
-                            <InfoRow icon={<FaEnvelope />} label="Email Address" value={user.email} />
+                            <InfoRow icon={<FaEnvelope />} label="Email Address" value={isEditingProfile ? formData.email : user.email} editing={isEditingProfile} name="email" onChange={handleChange} />
                             <InfoRow icon={<FaBuilding />} label="Department" value={user.department_name} />
                             <InfoRow icon={<FaBriefcase />} label="Designation" value={user.designation || user.role} />
 
@@ -174,20 +379,27 @@ const ProfileViewer = ({ user, onClose }) => {
                             </div>
                             <InfoRow icon={<FaCalendarAlt />} label="Date of Birth" value={user.dob} />
                             <InfoRow icon={<FaVenusMars />} label="Gender" value={user.gender} />
-                            <InfoRow icon={<FaPhone />} label="Mobile Number" value={user.mobile} />
-                            <InfoRow icon={<FaWhatsapp />} label="WhatsApp" value={user.whatsapp} />
-                            <InfoRow icon={<FaTint />} label="Blood Group" value={user.blood_group} />
-                            <InfoRow icon={<FaGlobe />} label="Nationality" value={user.nationality} />
-                            <InfoRow icon={<FaHandsHelping />} label="Religion" value={user.religion} />
-                            <InfoRow icon={<FaUsers />} label="Community / Caste" value={`${user.community || ''} ${user.caste ? `(${user.caste})` : ''}`} />
+                            <InfoRow icon={<FaPhone />} label="Mobile Number" value={isEditingProfile ? formData.mobile : user.mobile} editing={isEditingProfile} name="mobile" onChange={handleChange} />
+                            <InfoRow icon={<FaWhatsapp />} label="WhatsApp" value={isEditingProfile ? formData.whatsapp : user.whatsapp} editing={isEditingProfile} name="whatsapp" onChange={handleChange} />
+                            <InfoRow icon={<FaTint />} label="Blood Group" value={isEditingProfile ? formData.blood_group : user.blood_group} editing={isEditingProfile} name="blood_group" onChange={handleChange} />
+                            <InfoRow icon={<FaGlobe />} label="Nationality" value={isEditingProfile ? formData.nationality : user.nationality} editing={isEditingProfile} name="nationality" onChange={handleChange} />
+                            <InfoRow icon={<FaHandsHelping />} label="Religion" value={isEditingProfile ? formData.religion : user.religion} editing={isEditingProfile} name="religion" onChange={handleChange} />
+                            {isEditingProfile ? (
+                                <>
+                                    <InfoRow icon={<FaUsers />} label="Community" value={formData.community} editing={true} name="community" onChange={handleChange} />
+                                    <InfoRow icon={<FaUsers />} label="Caste" value={formData.caste} editing={true} name="caste" onChange={handleChange} />
+                                </>
+                            ) : (
+                                <InfoRow icon={<FaUsers />} label="Community / Caste" value={`${user.community || ''} ${user.caste ? `(${user.caste})` : ''}`} />
+                            )}
 
                             {/* Family & Marital */}
                             <div className="col-span-full">
                                 <SectionHeader title="Family & Social" />
                             </div>
-                            <InfoRow icon={<FaUser />} label="Father's Name" value={user.father_name} />
-                            <InfoRow icon={<FaUser />} label="Mother's Name" value={user.mother_name} />
-                            <InfoRow icon={<FaHeart />} label="Marital Status" value={user.marital_status} />
+                            <InfoRow icon={<FaUser />} label="Father's Name" value={isEditingProfile ? formData.father_name : user.father_name} editing={isEditingProfile} name="father_name" onChange={handleChange} />
+                            <InfoRow icon={<FaUser />} label="Mother's Name" value={isEditingProfile ? formData.mother_name : user.mother_name} editing={isEditingProfile} name="mother_name" onChange={handleChange} />
+                            <InfoRow icon={<FaHeart />} label="Marital Status" value={isEditingProfile ? formData.marital_status : user.marital_status} editing={isEditingProfile} name="marital_status" onChange={handleChange} />
 
                             {/* Career & Financial */}
                             <div className="col-span-full">
@@ -196,12 +408,26 @@ const ProfileViewer = ({ user, onClose }) => {
                             <InfoRow icon={<FaCalendarAlt />} label="Date of Joining" value={user.doj} />
                             <InfoRow icon={<FaSuitcase />} label="Experience" value={user.experience} />
                             <InfoRow icon={<FaMoneyBillWave />} label="Monthly Salary" value={user.monthly_salary ? `₹${parseFloat(user.monthly_salary).toLocaleString()}` : 'N/A'} />
-                            <InfoRow icon={<FaUniversity />} label="Bank Name" value={user.bank_name} />
-                            <InfoRow icon={<FaCreditCard />} label="Account Number" value={user.account_no} />
-                            <InfoRow icon={<FaUniversity />} label="Branch / IFSC" value={`${user.branch || ''} ${user.ifsc ? `(${user.ifsc})` : ''}`} />
-                            <InfoRow icon={<FaIdBadge />} label="Aadhar Card" value={user.aadhar} />
-                            <InfoRow icon={<FaIdBadge />} label="PAN Number" value={user.pan} />
-                            <InfoRow icon={<FaUserCircle />} label="PF / UAN" value={`${user.pf_number || ''} ${user.uan_number ? `/ ${user.uan_number}` : ''}`} />
+                            <InfoRow icon={<FaUniversity />} label="Bank Name" value={isEditingProfile ? formData.bank_name : user.bank_name} editing={isEditingProfile} name="bank_name" onChange={handleChange} />
+                            <InfoRow icon={<FaCreditCard />} label="Account Number" value={isEditingProfile ? formData.account_no : user.account_no} editing={isEditingProfile} name="account_no" onChange={handleChange} />
+                            {isEditingProfile ? (
+                                <>
+                                    <InfoRow icon={<FaUniversity />} label="Branch" value={formData.branch} editing={true} name="branch" onChange={handleChange} />
+                                    <InfoRow icon={<FaUniversity />} label="IFSC Code" value={formData.ifsc} editing={true} name="ifsc" onChange={handleChange} />
+                                </>
+                            ) : (
+                                <InfoRow icon={<FaUniversity />} label="Branch / IFSC" value={`${user.branch || ''} ${user.ifsc ? `(${user.ifsc})` : ''}`} />
+                            )}
+                            <InfoRow icon={<FaIdBadge />} label="Aadhar Card" value={isEditingProfile ? formData.aadhar : user.aadhar} editing={isEditingProfile} name="aadhar" onChange={handleChange} />
+                            <InfoRow icon={<FaIdBadge />} label="PAN Number" value={isEditingProfile ? formData.pan : user.pan} editing={isEditingProfile} name="pan" onChange={handleChange} />
+                            {isEditingProfile ? (
+                                <>
+                                    <InfoRow icon={<FaUserCircle />} label="PF Number" value={formData.pf_number} editing={true} name="pf_number" onChange={handleChange} />
+                                    <InfoRow icon={<FaUserCircle />} label="UAN Number" value={formData.uan_number} editing={true} name="uan_number" onChange={handleChange} />
+                                </>
+                            ) : (
+                                <InfoRow icon={<FaUserCircle />} label="PF / UAN" value={`${user.pf_number || ''} ${user.uan_number ? `/ ${user.uan_number}` : ''}`} />
+                            )}
 
                             {/* Address */}
                             <div className="col-span-full">
@@ -212,20 +438,180 @@ const ProfileViewer = ({ user, onClose }) => {
                                     <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest leading-none mb-3 flex items-center gap-2">
                                         <FaMapMarkerAlt size={10} className="text-sky-500" /> Communication Address
                                     </p>
-                                    <p className="text-xs font-bold text-gray-700 leading-relaxed uppercase">{user.communication_address || 'Not Provided'}</p>
+                                    {isEditingProfile ? (
+                                        <textarea name="communication_address" value={formData.communication_address} onChange={handleChange} rows={3} className={inputClass} />
+                                    ) : (
+                                        <p className="text-xs font-bold text-gray-700 leading-relaxed uppercase">{user.communication_address || 'Not Provided'}</p>
+                                    )}
                                 </div>
                                 <div className="p-4 rounded-3xl bg-gray-50/50 border border-transparent">
                                     <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest leading-none mb-3 flex items-center gap-2">
                                         <FaMapMarkerAlt size={10} className="text-indigo-500" /> Permanent Address
                                     </p>
-                                    <p className="text-xs font-bold text-gray-700 leading-relaxed uppercase">{user.permanent_address || 'Not Provided'}</p>
+                                    {isEditingProfile ? (
+                                        <textarea name="permanent_address" value={formData.permanent_address} onChange={handleChange} rows={3} className={inputClass} />
+                                    ) : (
+                                        <p className="text-xs font-bold text-gray-700 leading-relaxed uppercase">{user.permanent_address || 'Not Provided'}</p>
+                                    )}
                                 </div>
                                 <div className="flex justify-start">
-                                    <div className="px-4 py-2 bg-gray-100 rounded-xl text-[9px] font-black text-gray-400 tracking-widest uppercase">
-                                        Pin Code: {user.pin_code || 'N/A'}
-                                    </div>
+                                    {isEditingProfile ? (
+                                        <InfoRow icon={<FaMapMarkerAlt />} label="Pin Code" value={formData.pin_code} editing={true} name="pin_code" onChange={handleChange} />
+                                    ) : (
+                                        <div className="px-4 py-2 bg-gray-100 rounded-xl text-[9px] font-black text-gray-400 tracking-widest uppercase">
+                                            Pin Code: {user.pin_code || 'N/A'}
+                                        </div>
+                                    )}
                                 </div>
                             </div>
+
+                            {/* Certificates Section */}
+                            <div className="col-span-full">
+                                <SectionHeader title="Certificates" />
+                            </div>
+                            <div className="col-span-full space-y-3">
+                                {certificates.map((cert) => (
+                                    <div key={cert.id} className="flex items-center justify-between p-4 rounded-3xl bg-gray-50/50 hover:bg-white transition-all border border-transparent hover:border-gray-100 group">
+                                        <div className="flex items-center gap-4">
+                                            <div className="h-10 w-10 rounded-2xl bg-white shadow-sm flex items-center justify-center text-sky-600 group-hover:rotate-12 transition-transform">
+                                                <FaCertificate />
+                                            </div>
+                                            <div>
+                                                <p className="text-sm font-black text-gray-800 tracking-tight">{cert.certificate_name}</p>
+                                                <p className="text-[9px] font-bold text-gray-400">{cert.file_name}</p>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <button
+                                                onClick={() => viewCertificate(cert.id)}
+                                                className="h-9 w-9 rounded-xl bg-sky-50 text-sky-600 flex items-center justify-center hover:bg-sky-100 transition-colors"
+                                                title="View"
+                                            >
+                                                <FaEye size={12} />
+                                            </button>
+                                            <button
+                                                onClick={() => downloadCertificate(cert.id, cert.file_name)}
+                                                className="h-9 w-9 rounded-xl bg-green-50 text-green-600 flex items-center justify-center hover:bg-green-100 transition-colors"
+                                                title="Download"
+                                            >
+                                                <FaDownload size={12} />
+                                            </button>
+                                            {isOwnProfile && (
+                                                <button
+                                                    onClick={() => handleCertDelete(cert.id)}
+                                                    className="h-9 w-9 rounded-xl bg-red-50 text-red-500 flex items-center justify-center hover:bg-red-100 transition-colors"
+                                                    title="Delete"
+                                                >
+                                                    <FaTrash size={12} />
+                                                </button>
+                                            )}
+                                        </div>
+                                    </div>
+                                ))}
+                                {certificates.length === 0 && (
+                                    <p className="text-xs font-bold text-gray-400 text-center py-4">No certificates uploaded yet.</p>
+                                )}
+                                {isOwnProfile && !showCertForm && (
+                                    <button
+                                        onClick={() => setShowCertForm(true)}
+                                        className="w-full flex items-center justify-center gap-2 p-3 rounded-2xl border-2 border-dashed border-sky-200 text-sky-600 text-[10px] font-black uppercase tracking-widest hover:bg-sky-50 transition-colors"
+                                    >
+                                        <FaPlus size={10} /> Add Certificate
+                                    </button>
+                                )}
+                                {isOwnProfile && showCertForm && (
+                                    <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="p-5 rounded-3xl bg-white border border-sky-100 shadow-lg space-y-3">
+                                        <p className="text-[9px] font-black text-sky-600 uppercase tracking-widest">Upload New Certificate</p>
+                                        <input
+                                            type="text"
+                                            value={certName}
+                                            onChange={(e) => setCertName(e.target.value)}
+                                            placeholder="Certificate Name (e.g. Degree, SSLC)"
+                                            className={inputClass}
+                                        />
+                                        <input
+                                            type="file"
+                                            ref={certFileRef}
+                                            accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
+                                            onChange={(e) => setCertFile(e.target.files[0])}
+                                            className="w-full text-[10px] font-bold file:mr-2 file:py-2 file:px-3 file:rounded-lg file:border-0 file:bg-sky-50 file:text-sky-600 file:font-bold file:text-[10px] file:cursor-pointer"
+                                        />
+                                        <div className="flex gap-2">
+                                            <button
+                                                onClick={handleCertUpload}
+                                                disabled={uploadingCert}
+                                                className="flex-1 py-2.5 bg-sky-600 text-white rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-sky-700 disabled:opacity-50 flex items-center justify-center gap-2"
+                                            >
+                                                <FaPlus size={10} /> {uploadingCert ? 'Uploading...' : 'Upload'}
+                                            </button>
+                                            <button
+                                                onClick={() => { setShowCertForm(false); setCertName(''); setCertFile(null); }}
+                                                className="flex-1 py-2.5 bg-gray-100 text-gray-500 rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-gray-200"
+                                            >
+                                                Cancel
+                                            </button>
+                                        </div>
+                                    </motion.div>
+                                )}
+                            </div>
+
+                            {/* PIN Change Section */}
+                            {isOwnProfile && (
+                                <>
+                                    <div className="col-span-full">
+                                        <SectionHeader title="Security" />
+                                    </div>
+                                    <div className="col-span-full">
+                                        {!isChangingPin ? (
+                                            <button
+                                                onClick={() => setIsChangingPin(true)}
+                                                className="flex items-center gap-3 p-4 rounded-3xl bg-gray-50/50 hover:bg-white transition-all border border-transparent hover:border-gray-100 group w-full"
+                                            >
+                                                <div className="h-10 w-10 rounded-2xl bg-white shadow-sm flex items-center justify-center text-sky-600 group-hover:rotate-12 transition-transform">
+                                                    <FaKey />
+                                                </div>
+                                                <div className="text-left">
+                                                    <p className="text-sm font-black text-gray-800 tracking-tight">Change PIN</p>
+                                                    <p className="text-[9px] font-bold text-gray-400">Update your login PIN</p>
+                                                </div>
+                                            </button>
+                                        ) : (
+                                            <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="p-5 rounded-3xl bg-white border border-sky-100 shadow-lg space-y-3">
+                                                <p className="text-[9px] font-black text-sky-600 uppercase tracking-widest">Change Your PIN</p>
+                                                <input
+                                                    type="password"
+                                                    value={pinData.newPin}
+                                                    onChange={(e) => setPinData({ ...pinData, newPin: e.target.value })}
+                                                    placeholder="New PIN"
+                                                    className={inputClass}
+                                                />
+                                                <input
+                                                    type="password"
+                                                    value={pinData.confirmPin}
+                                                    onChange={(e) => setPinData({ ...pinData, confirmPin: e.target.value })}
+                                                    placeholder="Confirm New PIN"
+                                                    className={inputClass}
+                                                />
+                                                <div className="flex gap-2">
+                                                    <button
+                                                        onClick={handlePinChange}
+                                                        disabled={loading}
+                                                        className="flex-1 py-2.5 bg-sky-600 text-white rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-sky-700 disabled:opacity-50"
+                                                    >
+                                                        {loading ? 'Updating...' : 'Update PIN'}
+                                                    </button>
+                                                    <button
+                                                        onClick={() => { setIsChangingPin(false); setPinData({ currentPin: '', newPin: '', confirmPin: '' }); }}
+                                                        className="flex-1 py-2.5 bg-gray-100 text-gray-500 rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-gray-200"
+                                                    >
+                                                        Cancel
+                                                    </button>
+                                                </div>
+                                            </motion.div>
+                                        )}
+                                    </div>
+                                </>
+                            )}
                         </div>
                     </div>
                 </div>

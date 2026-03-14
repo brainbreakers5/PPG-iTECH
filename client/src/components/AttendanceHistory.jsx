@@ -4,7 +4,7 @@ import { FaCalendarAlt, FaClock, FaHistory, FaCheckCircle, FaTimesCircle, FaBus 
 import api from '../utils/api';
 import { useSocket } from '../context/SocketContext';
 
-const AttendanceHistory = ({ empId, month: propMonth, startDate, endDate, recentOnly = true }) => {
+const AttendanceHistory = ({ empId, month: propMonth, startDate, endDate, recentOnly = true, statusFilter = null }) => {
     const [records, setRecords] = useState([]);
     const [loading, setLoading] = useState(true);
     const socket = useSocket();
@@ -13,34 +13,57 @@ const AttendanceHistory = ({ empId, month: propMonth, startDate, endDate, recent
         try {
             let query = `/attendance?emp_id=${empId}`;
 
-            if (recentOnly) {
-                query += `&onlyUploaded=true&recent=true&limit=10`;
-            } else if (startDate && endDate) {
-                query += `&onlyUploaded=true&startDate=${startDate}&endDate=${endDate}`;
-            } else {
+            if (statusFilter) {
+                // statusFilter mode: fetch full month data (CTE generates absent/holiday rows)
                 const selectedMonth = propMonth || new Date().toISOString().slice(0, 7);
-                query += `&onlyUploaded=true&month=${selectedMonth}`;
+                query += `&month=${selectedMonth}`;
+                // NO onlyUploaded — so absent/holiday rows are included via CTE
+            } else if (recentOnly) {
+                query += `&onlyUploaded=true&recent=true&limit=50`;
+            } else if (startDate && endDate) {
+                // Full date range — use CTE query (no onlyUploaded) to include absent days
+                query += `&startDate=${startDate}&endDate=${endDate}`;
+            } else {
+                // Month view — use CTE query to include absent/holiday rows
+                const selectedMonth = propMonth || new Date().toISOString().slice(0, 7);
+                query += `&month=${selectedMonth}`;
             }
 
             const { data } = await api.get(query);
-            // API already returns newest first for uploaded-only mode.
             setRecords(data || []);
         } catch (error) {
             console.error('Error fetching attendance history', error);
         } finally {
             setLoading(false);
         }
-    }, [empId, propMonth, startDate, endDate, recentOnly]);
+    }, [empId, propMonth, startDate, endDate, recentOnly, statusFilter]);
 
     useEffect(() => {
         fetchAttendance();
-    }, [fetchAttendance]);
+    }, [statusFilter, propMonth, fetchAttendance]);
 
     useEffect(() => {
         if (!socket) return;
         socket.on('attendance_updated', fetchAttendance);
         return () => socket.off('attendance_updated', fetchAttendance);
     }, [socket, fetchAttendance]);
+
+    // Apply client-side status filter
+    const displayedRecords = statusFilter
+        ? records.filter(r => {
+            const s = r.status || '';
+            const rem = r.remarks || '';
+            if (statusFilter === 'Present') return s.includes('Present');
+            if (statusFilter === 'Absent') return s.includes('Absent');
+            if (statusFilter === 'OD') return s.includes('OD') || rem.includes('OD') || rem.includes('On Duty');
+            if (statusFilter === 'CL') return (s.includes('CL') || rem.includes('CL') || rem.includes('Casual')) && !s.includes('Comp') && !rem.includes('Comp');
+            if (statusFilter === 'ML') return s.includes('ML') || rem.includes('ML') || rem.includes('Medical');
+            if (statusFilter === 'Comp Leave') return s.includes('Comp Leave') || rem.includes('Comp Leave') || rem.includes('Comp');
+            if (statusFilter === 'Late Entry') return rem.includes('Late Entry');
+            if (statusFilter === 'LOP') return s.includes('LOP') || rem.includes('LOP') || rem.includes('Loss of Pay');
+            return s.includes(statusFilter) || rem.includes(statusFilter);
+        })
+        : recentOnly ? records.slice(0, 10) : records; // show latest 10 for recent-only; else show all
 
     const calculateHours = (inTime, outTime) => {
         if (!inTime || !outTime) return '—';
@@ -51,12 +74,104 @@ const AttendanceHistory = ({ empId, month: propMonth, startDate, endDate, recent
     };
 
     const getStatusIcon = (status) => {
-        switch (status) {
-            case 'Present': return <FaCheckCircle className="text-emerald-500" />;
-            case 'Absent': return <FaTimesCircle className="text-rose-500" />;
-            case 'OD': return <FaBus className="text-sky-500" />;
-            default: return <FaCalendarAlt className="text-amber-500" />;
+        if (!status) return <FaCalendarAlt className="text-amber-500" />;
+        const s = status.toUpperCase();
+        if (s.includes('PRESENT')) return <FaCheckCircle className="text-emerald-500" />;
+        if (s.includes('ABSENT')) return <FaTimesCircle className="text-rose-500" />;
+        if (s.includes('LOP')) return <FaTimesCircle className="text-rose-700" />;
+        if (s.includes('OD')) return <FaBus className="text-sky-500" />;
+        if (status === 'Late Entry') return <FaClock className="text-orange-500" />;
+        return <FaCalendarAlt className="text-amber-500" />;
+    };
+
+    const isLateEntry = (record) => (record.remarks || '').includes('Late Entry');
+
+    // Remarks format from biometric controller (pipe-separated sections):
+    //   "Working Hours: 7h 30m | Alerts: Late Entry (09:07), Early Exit (16:30) | Approved Segments: CL: 09:00-11:00 (2h 0m)"
+    // Also may be simpler strings from manual entry like "Late Entry", "Leave approved", etc.
+    //
+    // When a statusFilter is active, extract ONLY the relevant part:
+    //  - Late Entry  → show only the Alerts section (or any 'Late Entry' mention)
+    //  - LOP         → show only Working Hours (key indicator of LOP reason)
+    //  - OD/CL/ML/Comp Leave → show matching Approved Segments entry
+    //  - Present     → show Working Hours
+    //  - Absent      → show '—' (no attendance data)
+    //  - No filter   → show full raw remarks
+    const getRelevantRemark = (record) => {
+        const raw = (record.remarks || '').trim();
+        if (!raw || raw === '—') return '—';
+        if (!statusFilter) return raw; // no filter → full remarks
+
+        // Split into pipe-separated sections
+        const sections = raw.split('|').map(s => s.trim()).filter(Boolean);
+
+        // Helper to find a section that starts with a given key (case-insensitive)
+        const getSection = (key) => {
+            const found = sections.find(s => s.toLowerCase().startsWith(key.toLowerCase()));
+            return found ? found.replace(/^[^:]+:\s*/i, '').trim() : null;
+        };
+
+        if (statusFilter === 'Late Entry') {
+            // Show only the Alerts section, like "Late Entry (09:07)"
+            const alerts = getSection('Alerts');
+            if (alerts) {
+                // Filter just the Late Entry flag from alerts (could have Early Exit too)
+                const lePart = alerts.split(',').map(a => a.trim()).filter(a =>
+                    a.toLowerCase().includes('late entry') || a.toLowerCase().includes('late')
+                ).join(', ');
+                return lePart || alerts;
+            }
+            // Fallback: scan whole string for "Late Entry" keyword
+            const match = raw.match(/Late Entry[^,|]*/i);
+            return match ? match[0].trim() : raw;
         }
+
+        if (statusFilter === 'Present') {
+            // Show working hours — most relevant for a present record
+            const wh = getSection('Working Hours');
+            return wh ? `Working Hours: ${wh}` : '—';
+        }
+
+        if (statusFilter === 'LOP') {
+            // Show working hours (explains why LOP happened) + any alerts
+            const wh = getSection('Working Hours');
+            const alerts = getSection('Alerts');
+            const parts = [];
+            if (wh) parts.push(`Working Hours: ${wh}`);
+            if (alerts) parts.push(`Alerts: ${alerts}`);
+            return parts.length > 0 ? parts.join(' | ') : raw;
+        }
+
+        if (statusFilter === 'Absent') {
+            return '—'; // Absent records typically have no remarks
+        }
+
+        // For leave types (OD, CL, ML, Comp Leave) — show the matching Approved Segment
+        const leaveKeywords = {
+            'OD': ['od', 'on duty'],
+            'CL': ['cl', 'casual leave'],
+            'ML': ['ml', 'medical leave'],
+            'Comp Leave': ['comp leave', 'compensatory'],
+        };
+
+        const keywords = leaveKeywords[statusFilter];
+        if (keywords) {
+            const segs = getSection('Approved Segments');
+            if (segs) {
+                // Segments are pipe-separated within the section, or just inline
+                const segParts = segs.split(/\|/).map(p => p.trim()).filter(Boolean);
+                const relevant = segParts.filter(p =>
+                    keywords.some(kw => p.toLowerCase().includes(kw))
+                );
+                return relevant.length > 0 ? relevant.join(' | ') : segs;
+            }
+            // Fallback: scan raw string
+            const match = raw.match(new RegExp(`${keywords[0]}[^|]*`, 'i'));
+            return match ? match[0].trim() : raw;
+        }
+
+        // Default fallback — show full remarks
+        return raw;
     };
 
     if (loading) return (
@@ -74,13 +189,17 @@ const AttendanceHistory = ({ empId, month: propMonth, startDate, endDate, recent
                             <FaHistory />
                         </div>
                         <div>
-                            <h2 className="text-sm font-black text-gray-800 uppercase tracking-widest">Recent Attendance History</h2>
+                            <h2 className="text-sm font-black text-gray-800 uppercase tracking-widest">
+                                {statusFilter ? `${statusFilter} Records` : 'Recent Attendance History'}
+                            </h2>
                             <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mt-0.5">
-                                {recentOnly
-                                    ? 'Showing latest 10 uploaded records'
-                                    : (startDate && endDate
-                                        ? `Records from ${startDate} to ${endDate}`
-                                        : `Showing uploaded records for ${propMonth || 'this month'}`)}  
+                                {statusFilter
+                                    ? `${displayedRecords.length} record(s) found for status: ${statusFilter}`
+                                    : recentOnly
+                                        ? 'Showing latest 10 uploaded records'
+                                        : (startDate && endDate
+                                            ? `Records from ${startDate} to ${endDate}`
+                                            : `Showing all records for ${propMonth || 'this month'}`)}
                             </p>
                         </div>
                     </div>
@@ -112,17 +231,18 @@ const AttendanceHistory = ({ empId, month: propMonth, startDate, endDate, recent
                             <th className="px-8 py-5 text-[9px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-50">In Time</th>
                             <th className="px-8 py-5 text-[9px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-50">Out Time</th>
                             <th className="px-8 py-5 text-[9px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-50">Work Hours</th>
+                            <th className="px-8 py-5 text-[9px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-50">Remarks</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-50">
-                        {records.length === 0 ? (
+                        {displayedRecords.length === 0 ? (
                             <tr>
-                                <td colSpan="5" className="px-8 py-12 text-center text-gray-400 text-[10px] font-bold uppercase tracking-widest italic">
-                                    No uploaded attendance records found.
+                                <td colSpan="6" className="px-8 py-12 text-center text-gray-400 text-[10px] font-bold uppercase tracking-widest italic">
+                                    {recentOnly ? 'No uploaded attendance records found.' : 'No attendance records found for this period.'}
                                 </td>
                             </tr>
                         ) : (
-                            records.map((record, idx) => (
+                            displayedRecords.map((record, idx) => (
                                 <motion.tr
                                     key={record.id || idx}
                                     initial={{ opacity: 0, x: -10 }}
@@ -142,12 +262,31 @@ const AttendanceHistory = ({ empId, month: propMonth, startDate, endDate, recent
                                     </td>
                                     <td className="px-8 py-5">
                                         <div className="flex items-center gap-2">
-                                            {getStatusIcon(record.status)}
-                                            <span className={`text-[9px] font-black uppercase tracking-widest ${record.status === 'Present' ? 'text-emerald-600' :
-                                                record.status === 'Absent' ? 'text-rose-500' :
-                                                    record.status === 'OD' ? 'text-sky-600' : 'text-amber-500'
+                                            {isLateEntry(record) ? <FaClock className="text-orange-500" /> : getStatusIcon(record.status)}
+                                            <span className={`text-[9px] font-black uppercase tracking-widest ${
+                                                isLateEntry(record) ? 'text-orange-600' :
+                                                String(record.status).toUpperCase().includes('PRESENT') ? 'text-emerald-600' :
+                                                String(record.status).toUpperCase().includes('LOP') ? 'text-rose-700' :
+                                                String(record.status).toUpperCase().includes('ABSENT') ? 'text-rose-500' :
+                                                String(record.status).toUpperCase().includes('OD') ? 'text-sky-600' : 'text-amber-500'
                                                 }`}>
-                                                {record.status}
+                                                {isLateEntry(record) ? (
+                                                    <span>
+                                                        {String(record.status).startsWith('Present') ? 'LE' : `${record.status} (LE)`}
+                                                    </span>
+                                                ) : (
+                                                    String(record.status).startsWith('Present +') 
+                                                        ? `P / ${record.status.replace('Present +', '').trim()}` 
+                                                        : record.status
+                                                )}
+                                                {(record.in_time && record.out_time && 
+                                                  !['Present', 'Absent', 'Holiday', 'Weekend', 'LOP'].includes(record.status) &&
+                                                  !String(record.status).startsWith('Present +')
+                                                ) && (
+                                                    <span className="ml-1 opacity-70">
+                                                        ({record.in_time.slice(0, 5)} - {record.out_time.slice(0, 5)})
+                                                    </span>
+                                                )}
                                             </span>
                                         </div>
                                     </td>
@@ -169,6 +308,13 @@ const AttendanceHistory = ({ empId, month: propMonth, startDate, endDate, recent
                                             : 'bg-gray-50 text-gray-400 border-gray-100'
                                             }`}>
                                             {calculateHours(record.in_time, record.out_time)}
+                                        </span>
+                                    </td>
+                                    <td className="px-8 py-5">
+                                        <span className={`text-[10px] font-bold italic ${statusFilter ? 'text-gray-700' : 'text-gray-500'}`}
+                                            title={record.remarks || ''}
+                                        >
+                                            {getRelevantRemark(record)}
                                         </span>
                                     </td>
                                 </motion.tr>

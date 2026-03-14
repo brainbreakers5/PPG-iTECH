@@ -28,20 +28,20 @@ exports.getTimetable = async (req, res) => {
             query += ' AND u.department_id = $' + (params.push(department_id));
         }
 
-        // Access Control
-        if (req.user.role === 'staff') {
-            const isViewingAll = req.query.all === 'true';
-            // Staff can view their own, a specific person's, or all timetables (read-only browsing)
-            if (!emp_id && !department_id && !isViewingAll) {
-                // Default: show only their own timetable
-                query += ' AND t.emp_id = $' + (params.push(req.user.emp_id));
-            }
-            // If emp_id is provided, the filter is already applied above — allow it
-            // If all=true, no restriction — allow viewing all (read-only from frontend)
+        // Access Control & Defaults
+        if (!emp_id && !department_id && req.query.all !== 'true') {
+            // Default: show only their own timetable
+            query += ' AND t.emp_id = $' + (params.push(req.user.emp_id));
         } else if (req.user.role === 'hod') {
+            // HODs are restricted to their own department when viewing others
             if (!department_id) {
                 query += ' AND u.department_id = $' + (params.push(req.user.department_id));
             }
+        } else if (req.user.role === 'staff' && req.query.all !== 'true') {
+             // Staff can only view their own OR a specific emp_id if they have the ID (implicitly allowed by the first IF or by providing emp_id)
+             // We'll keep the department filter restricted if they try to use it? 
+             // Actually, the current logic allows viewing any emp_id if passed. 
+             // We'll stick to defaulting to self if nothing is passed.
         }
 
         query += ` ORDER BY 

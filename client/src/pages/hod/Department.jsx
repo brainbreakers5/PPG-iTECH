@@ -44,7 +44,6 @@ const Department = () => {
                         {deptInfo?.code && (
                             <span className="px-2 py-1 bg-sky-50 border border-sky-100 rounded-lg text-[9px] font-black text-sky-600 tracking-widest">{deptInfo.code}</span>
                         )}
-                        <p className="text-gray-500 font-medium">{deptInfo?.name || 'Your Department'} — Managing and monitoring your department's human capital.</p>
                     </div>
                 </div>
             </div>

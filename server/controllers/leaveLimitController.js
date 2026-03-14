@@ -2,12 +2,18 @@ const { pool } = require('../config/db');
 
 const currentYear = () => new Date().getFullYear();
 
-// Ensure a leave_limits row exists for an employee for the given year
+// Ensure a leave_limits row exists for an employee for the given year, also fix NULLs
 const ensureLimitRow = async (client, emp_id, year) => {
     await client.query(`
-        INSERT INTO leave_limits (emp_id, year, cl_limit, ml_limit, od_limit, comp_limit, lop_limit)
-        VALUES ($1, $2, 12, 12, 10, 6, 30)
-        ON CONFLICT (emp_id, year) DO NOTHING
+        INSERT INTO leave_limits (emp_id, year, cl_limit, ml_limit, od_limit, comp_limit, lop_limit, permission_limit)
+        VALUES ($1, $2, 12, 12, 10, 6, 30, 2)
+        ON CONFLICT (emp_id, year) DO UPDATE SET
+            cl_limit   = COALESCE(leave_limits.cl_limit,   EXCLUDED.cl_limit),
+            ml_limit   = COALESCE(leave_limits.ml_limit,   EXCLUDED.ml_limit),
+            od_limit   = COALESCE(leave_limits.od_limit,   EXCLUDED.od_limit),
+            comp_limit = COALESCE(leave_limits.comp_limit, EXCLUDED.comp_limit),
+            lop_limit  = COALESCE(leave_limits.lop_limit,  EXCLUDED.lop_limit),
+            permission_limit = COALESCE(leave_limits.permission_limit, EXCLUDED.permission_limit)
     `, [emp_id, year]);
 };
 
@@ -22,7 +28,7 @@ exports.getAllLeaveLimits = async (req, res) => {
         const { rows: employees } = await pool.query(`
             SELECT emp_id, name, designation, role, department_id
             FROM users
-            WHERE role IN ('staff', 'hod')
+            WHERE role IN ('principal', 'hod', 'staff')
             ORDER BY name ASC
         `);
 
@@ -39,30 +45,33 @@ exports.getAllLeaveLimits = async (req, res) => {
         // Fetch limits + balances + dept name
         const { rows } = await pool.query(`
             SELECT 
-                u.emp_id, u.name, u.designation, u.role, d.name AS department_name,
-                ll.id AS limit_id, ll.year,
-                ll.cl_limit, ll.ml_limit, ll.od_limit, ll.comp_limit, ll.lop_limit,
-                COALESCE(lb.cl_taken, 0)   AS cl_taken,
-                COALESCE(lb.ml_taken, 0)   AS ml_taken,
-                COALESCE(lb.od_taken, 0)   AS od_taken,
-                COALESCE(lb.comp_taken, 0) AS comp_taken,
-                COALESCE(lb.lop_taken, 0)  AS lop_taken,
+                u.emp_id, u.name, u.designation, u.role, u.profile_pic, d.name AS department_name,
+                ll.id AS limit_id, ll.year, ll.from_month, ll.to_month,
+                COALESCE(ll.cl_limit, 12)   AS cl_limit,
+                COALESCE(ll.ml_limit, 12)   AS ml_limit,
+                COALESCE(ll.od_limit, 10)   AS od_limit,
+                COALESCE(ll.comp_limit, 6)  AS comp_limit,
+                COALESCE(ll.lop_limit, 30)  AS lop_limit,
+                COALESCE(ll.permission_limit, 2) AS permission_limit,
+                COALESCE(lb.cl_taken, 0)    AS cl_taken,
+                COALESCE(lb.ml_taken, 0)    AS ml_taken,
+                COALESCE(lb.od_taken, 0)    AS od_taken,
+                COALESCE(lb.comp_taken, 0)  AS comp_taken,
+                COALESCE(lb.lop_taken, 0)   AS lop_taken,
+                COALESCE(lb.permission_taken, 0) AS permission_taken,
                 COALESCE(comp_earned.cnt, 0) AS comp_earned
             FROM users u
             LEFT JOIN departments d ON u.department_id = d.id
             LEFT JOIN leave_limits ll ON ll.emp_id = u.emp_id AND ll.year = $1
             LEFT JOIN leave_balances lb ON lb.emp_id = u.emp_id AND lb.year = $1
             LEFT JOIN LATERAL (
-                SELECT COUNT(*) AS cnt FROM attendance a
-                WHERE a.emp_id = u.emp_id
-                  AND a.status = 'Present'
-                  AND EXTRACT(YEAR FROM a.date) = $1
-                  AND (
-                    EXTRACT(DOW FROM a.date) IN (0, 6)
-                    OR a.date IN (SELECT h_date FROM holidays WHERE EXTRACT(YEAR FROM h_date) = $1)
-                  )
+                SELECT COUNT(*) AS cnt FROM leave_requests lr
+                WHERE lr.emp_id = u.emp_id
+                  AND lr.request_type = 'comp_credit'
+                  AND lr.status = 'Approved'
+                  AND EXTRACT(YEAR FROM lr.from_date) = $1
             ) comp_earned ON true
-            WHERE u.role IN ('staff', 'hod')
+            WHERE u.role IN ('principal', 'hod', 'staff')
             ORDER BY u.name ASC
         `, [year]);
 
@@ -92,24 +101,30 @@ exports.getMyLeaveLimits = async (req, res) => {
         const { rows } = await pool.query(`
             SELECT 
                 ll.year,
-                ll.cl_limit, ll.ml_limit, ll.od_limit, ll.comp_limit, ll.lop_limit,
+                ll.updated_at,
+                ll.from_month,
+                ll.to_month,
+                COALESCE(ll.cl_limit, 12)   AS cl_limit,
+                COALESCE(ll.ml_limit, 12)   AS ml_limit,
+                COALESCE(ll.od_limit, 10)   AS od_limit,
+                COALESCE(ll.comp_limit, 6)  AS comp_limit,
+                COALESCE(ll.lop_limit, 30)  AS lop_limit,
+                COALESCE(ll.permission_limit, 2) AS permission_limit,
                 COALESCE(lb.cl_taken, 0)   AS cl_taken,
                 COALESCE(lb.ml_taken, 0)   AS ml_taken,
                 COALESCE(lb.od_taken, 0)   AS od_taken,
                 COALESCE(lb.comp_taken, 0) AS comp_taken,
                 COALESCE(lb.lop_taken, 0)  AS lop_taken,
+                COALESCE(lb.permission_taken, 0) AS permission_taken,
                 COALESCE(comp_earned.cnt, 0) AS comp_earned
             FROM leave_limits ll
             LEFT JOIN leave_balances lb ON lb.emp_id = ll.emp_id AND lb.year = ll.year
             LEFT JOIN LATERAL (
-                SELECT COUNT(*) AS cnt FROM attendance a
-                WHERE a.emp_id = ll.emp_id
-                  AND a.status = 'Present'
-                  AND EXTRACT(YEAR FROM a.date) = ll.year
-                  AND (
-                    EXTRACT(DOW FROM a.date) IN (0, 6)
-                    OR a.date IN (SELECT h_date FROM holidays WHERE EXTRACT(YEAR FROM h_date) = ll.year)
-                  )
+                SELECT COUNT(*) AS cnt FROM leave_requests lr
+                WHERE lr.emp_id = ll.emp_id
+                  AND lr.request_type = 'comp_credit'
+                  AND lr.status = 'Approved'
+                  AND EXTRACT(YEAR FROM lr.from_date) = ll.year
             ) comp_earned ON true
             WHERE ll.emp_id = $1 AND ll.year = $2
         `, [emp_id, year]);
@@ -117,8 +132,12 @@ exports.getMyLeaveLimits = async (req, res) => {
         if (rows.length === 0) {
             return res.json({
                 year,
-                cl_limit: 12, ml_limit: 12, od_limit: 10, comp_limit: 6, lop_limit: 30,
-                cl_taken: 0, ml_taken: 0, od_taken: 0, comp_taken: 0, lop_taken: 0
+                updated_at: null,
+                from_month: null,
+                to_month: null,
+                cl_limit: 12, ml_limit: 12, od_limit: 10, comp_limit: 6, lop_limit: 30, permission_limit: 2,
+                cl_taken: 0, ml_taken: 0, od_taken: 0, comp_taken: 0, lop_taken: 0, permission_taken: 0,
+                comp_earned: 0
             });
         }
 
@@ -136,16 +155,38 @@ exports.updateLeaveLimit = async (req, res) => {
     try {
         const { emp_id } = req.params;
         const year = parseInt(req.body.year) || currentYear();
-        const { cl_limit } = req.body;
+        const { cl_limit, ml_limit, od_limit, comp_limit, lop_limit, permission_limit, fromMonth, toMonth } = req.body;
 
         await pool.query(`
-            INSERT INTO leave_limits (emp_id, year, cl_limit, ml_limit, od_limit, comp_limit, lop_limit, updated_at)
-            VALUES ($1, $2, $3, 0, 0, 0, 0, NOW())
+            INSERT INTO leave_limits (emp_id, year, cl_limit, ml_limit, od_limit, comp_limit, lop_limit, permission_limit, from_month, to_month, updated_at)
+            VALUES ($1, $2, COALESCE($3, 12), COALESCE($4, 12), COALESCE($5, 10), COALESCE($6, 6), COALESCE($7, 30), COALESCE($8, 2), $9, $10, NOW())
             ON CONFLICT (emp_id, year) 
             DO UPDATE SET
-                cl_limit = $3,
+                cl_limit = COALESCE($3, leave_limits.cl_limit),
+                ml_limit = COALESCE($4, leave_limits.ml_limit),
+                od_limit = COALESCE($5, leave_limits.od_limit),
+                comp_limit = COALESCE($6, leave_limits.comp_limit),
+                lop_limit = COALESCE($7, leave_limits.lop_limit),
+                permission_limit = COALESCE($8, leave_limits.permission_limit),
+                from_month = COALESCE($9, leave_limits.from_month),
+                to_month = COALESCE($10, leave_limits.to_month),
                 updated_at = NOW()
-        `, [emp_id, year, cl_limit]);
+        `, [
+            emp_id,
+            year,
+            cl_limit !== undefined ? cl_limit : null,
+            ml_limit !== undefined ? ml_limit : null,
+            od_limit !== undefined ? od_limit : null,
+            comp_limit !== undefined ? comp_limit : null,
+            lop_limit !== undefined ? lop_limit : null,
+            permission_limit !== undefined ? permission_limit : null,
+            fromMonth !== undefined ? fromMonth : null,
+            toMonth !== undefined ? toMonth : null
+        ]);
+
+        // Notify all clients that leave limits were updated
+        const io = req.app.get('io');
+        if (io) io.emit('leave_limits_updated', { emp_id, year });
 
         res.json({ message: 'Leave limits updated successfully' });
     } catch (error) {

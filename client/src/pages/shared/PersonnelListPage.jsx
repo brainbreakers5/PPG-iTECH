@@ -131,23 +131,25 @@ const PersonnelListPage = () => {
                                     >
                                         <FaEye size={12} /> Profile
                                     </button>
-                                    <button
-                                        onClick={() => {
-                                            if (user?.role === 'admin') {
-                                                navigate(`/admin/timetable/${member.emp_id}`);
-                                            } else if (user?.role === 'principal') {
-                                                navigate(`/principal/timetable/${member.emp_id}`);
-                                            } else if (user?.role === 'hod') {
-                                                navigate(`/hod/timetable/${member.emp_id}`);
-                                            } else {
-                                                navigate(`/staff/timetables/${member.emp_id}`);
-                                            }
-                                            window.dispatchEvent(new CustomEvent('closeSidebar'));
-                                        }}
-                                        className="py-4 bg-gray-900 text-white rounded-2xl font-black uppercase tracking-widest text-[10px] hover:bg-black transition-all shadow-xl shadow-gray-200 active:scale-95 flex items-center justify-center gap-2"
-                                    >
-                                        <FaCalendarAlt size={12} /> Schedule
-                                    </button>
+                                    {(user?.role !== 'staff' || member.emp_id === user?.emp_id) && (
+                                        <button
+                                            onClick={() => {
+                                                if (user?.role === 'admin') {
+                                                    navigate(`/admin/timetable/${member.emp_id}`);
+                                                } else if (user?.role === 'principal') {
+                                                    navigate(`/principal/timetable/${member.emp_id}`);
+                                                } else if (user?.role === 'hod') {
+                                                    navigate(`/hod/timetable/${member.emp_id}`);
+                                                } else {
+                                                    navigate(`/staff/timetables/${member.emp_id}`);
+                                                }
+                                                window.dispatchEvent(new CustomEvent('closeSidebar'));
+                                            }}
+                                            className="py-4 bg-gray-900 text-white rounded-2xl font-black uppercase tracking-widest text-[10px] hover:bg-black transition-all shadow-xl shadow-gray-200 active:scale-95 flex items-center justify-center gap-2"
+                                        >
+                                            <FaCalendarAlt size={12} /> Schedule
+                                        </button>
+                                    )}
                                 </div>
                             </motion.div>
                         ))}

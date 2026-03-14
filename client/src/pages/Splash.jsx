@@ -75,7 +75,7 @@ const Splash = ({ onFinish }) => {
                                 style={{ background: 'linear-gradient(135deg, rgba(56,189,248,0.3), rgba(99,102,241,0.2))', filter: 'blur(12px)' }}
                             />
                             <div className="relative w-28 h-28 rounded-[28px] bg-white shadow-2xl flex items-center justify-center overflow-hidden border border-white/20">
-                                <img src="/ppg-logo.jpeg" alt="PPG iTech HUB" className="w-full h-full object-cover" />
+                                <img src="/ppg logo.jpeg" alt="PPG EMP HUB" className="w-full h-full object-cover" />
                             </div>
                         </motion.div>
 
@@ -92,7 +92,7 @@ const Splash = ({ onFinish }) => {
                                     className="text-transparent bg-clip-text"
                                     style={{ backgroundImage: 'linear-gradient(135deg, #38bdf8 0%, #818cf8 50%, #38bdf8 100%)' }}
                                 >
-                                    iTech HUB
+                                    EMP HUB
                                 </span>
                             </h1>
                             <motion.div

@@ -1,11 +1,12 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import Layout from '../../components/Layout';
 import api from '../../utils/api';
 import { useSocket } from '../../context/SocketContext';
 import { useAuth } from '../../context/AuthContext';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
-import { FaIdBadge, FaBirthdayCake, FaUserCheck, FaUserTimes, FaCalendarDay, FaBus, FaFileAlt, FaTimes, FaCalendarAlt, FaStar, FaBriefcase } from 'react-icons/fa';
+import { FaIdBadge, FaBirthdayCake, FaUserCheck, FaUserTimes, FaCalendarDay, FaBus, FaFileAlt, FaTimes, FaCalendarAlt, FaStar, FaBriefcase, FaEye, FaClock, FaHistory } from 'react-icons/fa';
+import AttendanceHistory from '../../components/AttendanceHistory';
 
 // ── Small helper components ─────────────────────────────────────────────────
 // Small helper components removed ...
@@ -35,16 +36,20 @@ const AdminDashboard = () => {
     const socket = useSocket();
     const navigate = useNavigate();
     const [stats, setStats] = useState({
-        present: 0, absent: 0, od: 0, cl: 0, ml: 0, comp_leave: 0,
-        principal: { present: 0, absent: 0, od: 0, cl: 0, ml: 0, comp_leave: 0 },
-        hod: { present: 0, absent: 0, od: 0, cl: 0, ml: 0, comp_leave: 0 },
-        staff: { present: 0, absent: 0, od: 0, cl: 0, ml: 0, comp_leave: 0 }
+        present: 0, absent: 0, od: 0, cl: 0, ml: 0, comp_leave: 0, lop: 0, late_entry: 0,
+        principal: { present: 0, absent: 0, od: 0, cl: 0, ml: 0, comp_leave: 0, lop: 0, late_entry: 0 },
+        hod: { present: 0, absent: 0, od: 0, cl: 0, ml: 0, comp_leave: 0, lop: 0, late_entry: 0 },
+        staff: { present: 0, absent: 0, od: 0, cl: 0, ml: 0, comp_leave: 0, lop: 0, late_entry: 0 }
     });
+    const [myStats, setMyStats] = useState({ present: 0, absent: 0, od: 0, cl: 0, ml: 0, comp_leave: 0, lop: 0, late_entry: 0 });
     const [birthdays, setBirthdays] = useState([]);
     const [allEmployees, setAllEmployees] = useState([]);
     const [attendanceMap, setAttendanceMap] = useState({});
     const [monthStats, setMonthStats] = useState({ workingDays: 0, holidays: 0, specialEvents: 0 });
+    const [statusFilter, setStatusFilter] = useState(null);
+    const historyRef = useRef(null);
     const [employeeModal, setEmployeeModal] = useState(null); // { role, statusLabel }
+    const [selectedEmployeeHistory, setSelectedEmployeeHistory] = useState(null); // { emp_id, name }
 
     const fetchDashboardData = useCallback(async () => {
         try {
@@ -54,17 +59,35 @@ const AdminDashboard = () => {
             setBirthdays(bdays);
             const { data: emps } = await api.get('/employees');
             setAllEmployees(emps);
+
+            const month = date.slice(0, 7);
+            const { data: myRecords } = await api.get(`/attendance?month=${month}&emp_id=${user?.emp_id}`);
+            const counts = { present: 0, absent: 0, od: 0, cl: 0, ml: 0, comp_leave: 0, lop: 0, late_entry: 0 };
+            (myRecords || []).forEach(r => {
+                const s = (r.status || '').toUpperCase();
+                const rem = (r.remarks || '').toUpperCase();
+                if (s.includes('PRESENT')) counts.present++;
+                if (s.includes('ABSENT')) counts.absent++;
+                if (s.includes('OD') || rem.includes('OD')) counts.od++;
+                if ((s.includes('CL') || rem.includes('CL') || rem.includes('CASUAL')) && !s.includes('COMP') && !rem.includes('COMP')) counts.cl++;
+                if (s.includes('ML') || rem.includes('ML') || rem.includes('MEDICAL')) counts.ml++;
+                if (s.includes('COMP LEAVE') || rem.includes('COMP LEAVE')) counts.comp_leave++;
+                if (s.includes('LOP') || rem.includes('LOP')) counts.lop++;
+                if (rem.includes('LATE ENTRY')) counts.late_entry++;
+            });
+            setMyStats(counts);
+
             // Build attendance map: emp_id -> status for today
             const { data: todayAtt } = await api.get(`/attendance?date=${date}`);
             const map = {};
-            (todayAtt || []).forEach(r => { map[r.emp_id] = r.status; });
+            (todayAtt || []).forEach(r => { map[r.emp_id] = r; });
             setAttendanceMap(map);
             // Aggregate per-user rows into role-based stats
             const agg = {
-                present: 0, absent: 0, od: 0, cl: 0, ml: 0, comp_leave: 0,
-                principal: { present: 0, absent: 0, od: 0, cl: 0, ml: 0, comp_leave: 0 },
-                hod: { present: 0, absent: 0, od: 0, cl: 0, ml: 0, comp_leave: 0 },
-                staff: { present: 0, absent: 0, od: 0, cl: 0, ml: 0, comp_leave: 0 }
+                present: 0, absent: 0, od: 0, cl: 0, ml: 0, comp_leave: 0, lop: 0, late_entry: 0,
+                principal: { present: 0, absent: 0, od: 0, cl: 0, ml: 0, comp_leave: 0, lop: 0, late_entry: 0 },
+                hod: { present: 0, absent: 0, od: 0, cl: 0, ml: 0, comp_leave: 0, lop: 0, late_entry: 0 },
+                staff: { present: 0, absent: 0, od: 0, cl: 0, ml: 0, comp_leave: 0, lop: 0, late_entry: 0 }
             };
             (summary || []).forEach(r => {
                 const role = (r.role || '').toLowerCase();
@@ -73,15 +96,21 @@ const AdminDashboard = () => {
                 const l = Number(r.total_leave) || 0;
                 const o = Number(r.total_od) || 0;
                 const lp = Number(r.total_lop) || 0;
+                const late = Number(r.total_late) || 0;
                 bucket.present += p;
                 bucket.od += o;
+                bucket.lop += lp;
+                bucket.late_entry += late;
                 if (p === 0 && l === 0 && o === 0 && lp === 0) bucket.absent += 1;
                 agg.present += p;
                 agg.od += o;
+                agg.lop += lp;
+                agg.late_entry += late;
             });
             // Count individual leave types from attendance map
             (emps || []).forEach(emp => {
-                const s = map[emp.emp_id] || '';
+                const r = map[emp.emp_id];
+                const s = r?.status || '';
                 const role = (emp.role || '').toLowerCase();
                 const bucket = agg[role] || agg.staff;
                 if (s === 'CL' || s === 'Leave') { bucket.cl++; agg.cl++; }
@@ -105,7 +134,7 @@ const AdminDashboard = () => {
             // Count weekends not already in holidays
             for (let d = 1; d <= daysInMonth; d++) {
                 const dow = new Date(curYear, curMonth - 1, d).getDay();
-                const ds = `${curYear}-${String(curMonth).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+                const ds = `${curYear}-${String(curMonth).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
                 if ((dow === 0 || dow === 6) && !holidayDateSet.has(ds)) hCount++;
             }
             setMonthStats({ workingDays: daysInMonth - hCount - sCount, holidays: hCount, specialEvents: sCount });
@@ -138,15 +167,29 @@ const AdminDashboard = () => {
     const getFilteredEmployees = (roleKey, statusLabel) => {
         const roleEmps = allEmployees.filter(e => (e.role || '').toLowerCase() === roleKey);
         return roleEmps.filter(emp => {
-            const s = attendanceMap[emp.emp_id] || '';
+            const r = attendanceMap[emp.emp_id]; // Get the full attendance record
+            const s = r?.status || '';
             if (statusLabel === 'Present') return s === 'Present';
-            if (statusLabel === 'Absent') return !s || s === 'Absent';
+            if (statusLabel === 'Absent') return (!s || s === 'Absent') && s !== 'LOP';
             if (statusLabel === 'On Duty') return s === 'OD';
             if (statusLabel === 'Casual Leave') return s === 'CL' || s === 'Leave';
             if (statusLabel === 'Medical Leave') return s === 'ML';
             if (statusLabel === 'Comp Leave') return s === 'Comp Leave';
+            if (statusLabel === 'Loss Of Pay') return s === 'LOP';
+            if (statusLabel === 'Late Entry') return (r?.remarks || '').includes('Late Entry');
             return false;
         });
+    };
+
+    const handleStatClick = (filterKey) => {
+        if (statusFilter === filterKey) {
+            setStatusFilter(null);
+        } else {
+            setStatusFilter(filterKey);
+            if (historyRef.current) {
+                historyRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+        }
     };
 
     const roleConfigs = [
@@ -195,9 +238,6 @@ const AdminDashboard = () => {
                         <h1 className="text-4xl font-black text-gray-800 tracking-tighter">
                             Admin <span className="text-[#0EA5E9]">Dashboard</span>
                         </h1>
-                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.3em] mt-2">
-                            Institutional Attendance Intelligence
-                        </p>
                     </div>
 
                     <div className="flex items-center gap-6">
@@ -223,10 +263,14 @@ const AdminDashboard = () => {
                 </div>
             </motion.div>
 
-            {/* Monthly Summary Bar */}
             <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="mb-10">
                 <div className="grid grid-cols-3 gap-4">
-                    <div className="bg-emerald-50 border border-emerald-100 rounded-2xl p-5 flex items-center gap-4">
+                    <motion.div
+                        whileHover={{ scale: 1.03, y: -3 }}
+                        whileTap={{ scale: 0.97 }}
+                        onClick={() => navigate('/admin/calendar')}
+                        className="bg-emerald-50 border border-emerald-100 rounded-2xl p-5 flex items-center gap-4 cursor-pointer hover:border-emerald-300 hover:shadow-md hover:shadow-emerald-100 transition-all"
+                    >
                         <div className="h-11 w-11 rounded-xl bg-emerald-500 text-white flex items-center justify-center shadow-sm">
                             <FaCalendarAlt />
                         </div>
@@ -234,8 +278,13 @@ const AdminDashboard = () => {
                             <p className="text-[9px] font-black text-emerald-500 uppercase tracking-widest">Working Days</p>
                             <p className="text-2xl font-black text-emerald-700 tracking-tighter">{monthStats.workingDays}</p>
                         </div>
-                    </div>
-                    <div className="bg-rose-50 border border-rose-100 rounded-2xl p-5 flex items-center gap-4">
+                    </motion.div>
+                    <motion.div
+                        whileHover={{ scale: 1.03, y: -3 }}
+                        whileTap={{ scale: 0.97 }}
+                        onClick={() => navigate('/admin/calendar')}
+                        className="bg-rose-50 border border-rose-100 rounded-2xl p-5 flex items-center gap-4 cursor-pointer hover:border-rose-300 hover:shadow-md hover:shadow-rose-100 transition-all"
+                    >
                         <div className="h-11 w-11 rounded-xl bg-rose-500 text-white flex items-center justify-center shadow-sm">
                             <FaCalendarDay />
                         </div>
@@ -243,8 +292,13 @@ const AdminDashboard = () => {
                             <p className="text-[9px] font-black text-rose-500 uppercase tracking-widest">Holidays</p>
                             <p className="text-2xl font-black text-rose-700 tracking-tighter">{monthStats.holidays}</p>
                         </div>
-                    </div>
-                    <div className="bg-amber-50 border border-amber-100 rounded-2xl p-5 flex items-center gap-4">
+                    </motion.div>
+                    <motion.div
+                        whileHover={{ scale: 1.03, y: -3 }}
+                        whileTap={{ scale: 0.97 }}
+                        onClick={() => navigate('/admin/calendar')}
+                        className="bg-amber-50 border border-amber-100 rounded-2xl p-5 flex items-center gap-4 cursor-pointer hover:border-amber-300 hover:shadow-md hover:shadow-amber-100 transition-all"
+                    >
                         <div className="h-11 w-11 rounded-xl bg-amber-500 text-white flex items-center justify-center shadow-sm">
                             <FaStar />
                         </div>
@@ -252,9 +306,80 @@ const AdminDashboard = () => {
                             <p className="text-[9px] font-black text-amber-500 uppercase tracking-widest">Special Events</p>
                             <p className="text-2xl font-black text-amber-700 tracking-tighter">{monthStats.specialEvents}</p>
                         </div>
-                    </div>
+                    </motion.div>
                 </div>
             </motion.div>
+
+            {/* Personal Attendance Section */}
+            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="mb-16">
+                <div className="flex items-center gap-4 mb-8">
+                    <div className="h-1 w-12 bg-sky-600 rounded-full"></div>
+                    <h2 className="text-xl font-black text-gray-800 tracking-tight uppercase tracking-[0.1em]">Your Personal Attendance</h2>
+                </div>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+                    {[
+                        { label: 'Present', value: myStats.present, icon: <FaUserCheck />, color: 'text-sky-600', bg: 'bg-sky-50', gradient: 'from-sky-500 to-sky-700', filterKey: 'Present' },
+                        { label: 'Absent', value: myStats.absent, icon: <FaUserTimes />, color: 'text-rose-600', bg: 'bg-rose-50', gradient: 'from-rose-500 to-rose-700', filterKey: 'Absent' },
+                        { label: 'Loss Of Pay', value: myStats.lop, icon: <FaTimes />, color: 'text-rose-800', bg: 'bg-rose-100', gradient: 'from-rose-600 to-rose-800', filterKey: 'LOP' },
+                        { label: 'On Duty', value: myStats.od, icon: <FaBriefcase />, color: 'text-emerald-600', bg: 'bg-emerald-50', gradient: 'from-emerald-500 to-emerald-700', filterKey: 'OD' },
+                        { label: 'Casual Leave', value: myStats.cl, icon: <FaCalendarDay />, color: 'text-amber-600', bg: 'bg-amber-50', gradient: 'from-amber-500 to-amber-700', filterKey: 'CL' },
+                        { label: 'Medical Leave', value: myStats.ml, icon: <FaFileAlt />, color: 'text-purple-600', bg: 'bg-purple-50', gradient: 'from-purple-500 to-purple-700', filterKey: 'ML' },
+                        { label: 'Comp Leave', value: myStats.comp_leave, icon: <FaStar />, color: 'text-indigo-600', bg: 'bg-indigo-50', gradient: 'from-indigo-500 to-indigo-700', filterKey: 'Comp Leave' },
+                        { label: 'Late Entry', value: myStats.late_entry, icon: <FaClock />, color: 'text-orange-600', bg: 'bg-orange-50', gradient: 'from-orange-500 to-orange-700', filterKey: 'Late Entry' },
+                    ].map((stat, idx) => {
+                        const isActive = statusFilter === stat.filterKey;
+                        return (
+                        <motion.div
+                            key={stat.label}
+                            initial={{ opacity: 0, y: 20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ delay: idx * 0.08 }}
+                            whileHover={{ y: -6, scale: 1.03 }}
+                            whileTap={{ scale: 0.97 }}
+                            onClick={() => handleStatClick(stat.filterKey)}
+                            className={`bg-white rounded-[32px] shadow-lg border p-8 group relative overflow-hidden flex flex-col items-center text-center cursor-pointer transition-all duration-200 ${
+                                isActive 
+                                    ? 'border-sky-400 shadow-sky-200 ring-2 ring-sky-400 ring-offset-2' 
+                                    : 'border-sky-50 shadow-sky-50/50 hover:border-sky-200'
+                            }`}
+                        >
+                            <div className={`absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r ${stat.gradient}`} />
+                            {isActive && (
+                                <span className="absolute top-3 right-3 px-2 py-0.5 bg-sky-600 text-white text-[8px] font-black uppercase tracking-wider rounded-full">
+                                    Filtered
+                                </span>
+                            )}
+                            <div className={`h-14 w-14 rounded-[20px] ${stat.bg} ${stat.color} flex items-center justify-center text-xl shadow-sm mb-5 group-hover:rotate-6 transition-transform duration-500`}>
+                                {stat.icon}
+                            </div>
+                            <span className="text-4xl font-black text-gray-800 tracking-tighter mb-2 leading-none">{stat.value}</span>
+                            <span className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">{stat.label}</span>
+                            <div className="absolute -bottom-8 -right-8 w-24 h-24 bg-gray-50 rounded-full blur-2xl opacity-60" />
+                        </motion.div>
+                    )})}
+                </div>
+            </motion.div>
+
+            {/* Filter Active Banner */}
+            <AnimatePresence>
+                {statusFilter && (
+                    <motion.div
+                        initial={{ opacity: 0, y: -10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -10 }}
+                        className="mb-8 flex items-center gap-3 px-5 py-3 bg-sky-50 border border-sky-200 rounded-2xl text-sm font-black text-sky-700"
+                    >
+                        <FaIdBadge className="text-sky-500" />
+                        <span>Showing records for: <span className="text-sky-900 uppercase">{statusFilter}</span></span>
+                        <button
+                            onClick={() => setStatusFilter(null)}
+                            className="ml-auto flex items-center gap-1.5 px-3 py-1 bg-white border border-sky-200 rounded-xl text-[10px] font-black text-rose-500 hover:bg-rose-50 transition-all"
+                        >
+                            <FaTimes size={10} /> Clear Filter
+                        </button>
+                    </motion.div>
+                )}
+            </AnimatePresence>
 
             {/* Stats Grid */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-12">
@@ -301,14 +426,19 @@ const AdminDashboard = () => {
                             {[
                                 { label: 'Present', value: stats[role.key]?.present, icon: <FaUserCheck />, color: 'text-sky-600', bg: 'bg-sky-50' },
                                 { label: 'Absent', value: stats[role.key]?.absent, icon: <FaUserTimes />, color: 'text-rose-600', bg: 'bg-rose-50' },
+                                { label: 'Loss Of Pay', value: stats[role.key]?.lop, icon: <FaTimes />, color: 'text-rose-800', bg: 'bg-rose-100' },
                                 { label: 'On Duty', value: stats[role.key]?.od, icon: <FaBriefcase />, color: 'text-emerald-600', bg: 'bg-emerald-50' },
                                 { label: 'Casual Leave', value: stats[role.key]?.cl, icon: <FaCalendarDay />, color: 'text-amber-600', bg: 'bg-amber-50' },
                                 { label: 'Medical Leave', value: stats[role.key]?.ml, icon: <FaFileAlt />, color: 'text-purple-600', bg: 'bg-purple-50' },
-                                { label: 'Comp Leave', value: stats[role.key]?.comp_leave, icon: <FaStar />, color: 'text-indigo-600', bg: 'bg-indigo-50' }
+                                { label: 'Comp Leave', value: stats[role.key]?.comp_leave, icon: <FaStar />, color: 'text-indigo-600', bg: 'bg-indigo-50' },
+                                { label: 'Late Entry', value: stats[role.key]?.late_entry, icon: <FaClock />, color: 'text-orange-600', bg: 'bg-orange-50' }
                             ].map((stat) => (
                                 <div
                                     key={stat.label}
-                                    onClick={() => setEmployeeModal({ role: role.key, statusLabel: stat.label, title: role.title })}
+                                    onClick={() => {
+                                        document.querySelector('main')?.scrollTo({ top: 0, behavior: 'smooth' });
+                                        setEmployeeModal({ role: role.key, statusLabel: stat.label, title: role.title });
+                                    }}
                                     className="flex items-center justify-between p-3 rounded-2xl bg-gray-50/50 hover:bg-white transition-all border border-transparent hover:border-gray-100 group/item cursor-pointer"
                                 >
                                     <div className="flex items-center gap-3">
@@ -376,6 +506,10 @@ const AdminDashboard = () => {
                 </div>
             )}
 
+            <div ref={historyRef}>
+                <AttendanceHistory empId={user?.emp_id} statusFilter={statusFilter} />
+            </div>
+
             {/* Employee List Full Screen */}
             <AnimatePresence>
                 {employeeModal && (() => {
@@ -418,6 +552,7 @@ const AdminDashboard = () => {
                                                 <th className="px-5 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Name</th>
                                                 <th className="px-5 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Department</th>
                                                 <th className="px-5 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Status</th>
+                                                <th className="px-5 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Remarks</th>
                                                 <th className="px-5 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-center no-print">Action</th>
                                             </tr>
                                         </thead>
@@ -429,26 +564,63 @@ const AdminDashboard = () => {
                                                     animate={{ opacity: 1, y: 0 }}
                                                     transition={{ delay: idx * 0.02 }}
                                                     className="hover:bg-sky-50/50 transition-colors cursor-pointer"
-                                                    onClick={() => { navigate(`/admin/profile/${emp.emp_id}`); setEmployeeModal(null); window.dispatchEvent(new CustomEvent('closeSidebar')); }}
+                                                    onClick={() => { navigate(`/admin/timetable/${emp.emp_id}`); setEmployeeModal(null); window.dispatchEvent(new CustomEvent('closeSidebar')); }}
                                                 >
                                                     <td className="px-5 py-4 text-sm font-black text-gray-400">{idx + 1}</td>
                                                     <td className="px-5 py-4 text-sm font-black text-sky-900">{emp.emp_id}</td>
                                                     <td className="px-5 py-4">
                                                         <div className="flex items-center gap-3">
-                                                            <div className="h-9 w-9 rounded-xl bg-sky-100 text-sky-600 flex items-center justify-center font-black text-sm shrink-0">
-                                                                {(emp.name || '?').charAt(0)}
-                                                            </div>
+                                                            <img src={emp.profile_pic || `https://ui-avatars.com/api/?name=${encodeURIComponent(emp.name || '?')}&size=80&background=0ea5e9&color=fff&bold=true`} alt="" className="h-9 w-9 rounded-xl object-cover shrink-0" />
                                                             <span className="text-sm font-bold text-gray-800">{emp.name}</span>
                                                         </div>
                                                     </td>
                                                     <td className="px-5 py-4 text-sm font-medium text-gray-600">{emp.department_name || '—'}</td>
                                                     <td className="px-5 py-4">
-                                                        <span className="px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest border bg-sky-50 text-sky-600 border-sky-100">
-                                                            {attendanceMap[emp.emp_id] || 'N/A'}
+                                                        <span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest border ${
+                                                            (attendanceMap[emp.emp_id]?.remarks || '').includes('Late Entry') ? 'bg-orange-50 text-orange-600 border-orange-100' :
+                                                            attendanceMap[emp.emp_id]?.status?.startsWith('Present') ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 
+                                                            'bg-sky-50 text-sky-600 border-sky-100'
+                                                        }`}>
+                                                            {(attendanceMap[emp.emp_id]?.remarks || '').includes('Late Entry') ? (
+                                                                <span>{attendanceMap[emp.emp_id]?.status === 'Present' ? 'LE' : `${attendanceMap[emp.emp_id]?.status} (LE)`}</span>
+                                                            ) : attendanceMap[emp.emp_id]?.status?.startsWith('Present +') 
+                                                                ? `P / ${attendanceMap[emp.emp_id].status.replace('Present +', '').trim()}` 
+                                                                : (attendanceMap[emp.emp_id]?.status || 'N/A')}
+                                                            {attendanceMap[emp.emp_id]?.status?.startsWith('Present') === false && attendanceMap[emp.emp_id]?.status !== 'Absent' && attendanceMap[emp.emp_id]?.in_time && attendanceMap[emp.emp_id]?.out_time && (
+                                                                <> ({attendanceMap[emp.emp_id].in_time.slice(0, 5)} - {attendanceMap[emp.emp_id].out_time.slice(0, 5)})</>
+                                                            )}
                                                         </span>
                                                     </td>
+                                                    <td className="px-5 py-4">
+                                                        <p className="text-[10px] font-bold text-gray-500 italic truncate max-w-[150px]" title={attendanceMap[emp.emp_id]?.remarks}>
+                                                            {attendanceMap[emp.emp_id]?.remarks || '—'}
+                                                        </p>
+                                                    </td>
                                                     <td className="px-5 py-4 text-center no-print">
-                                                        <FaEye className="inline text-gray-300 group-hover:text-sky-500" size={14} />
+                                                        <div className="flex items-center justify-center gap-2">
+                                                            <button 
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    setSelectedEmployeeHistory({ emp_id: emp.emp_id, name: emp.name });
+                                                                }}
+                                                                className="p-2 hover:bg-sky-50 text-sky-600 rounded-lg transition-colors"
+                                                                title="View Attendance History"
+                                                            >
+                                                                <FaHistory size={14} />
+                                                            </button>
+                                                            <button 
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    navigate(`/admin/timetable/${emp.emp_id}`);
+                                                                    window.dispatchEvent(new CustomEvent('closeSidebar'));
+                                                                }}
+                                                                className="p-2 hover:bg-sky-50 text-indigo-600 rounded-lg transition-colors"
+                                                                title="View Schedule"
+                                                            >
+                                                                <FaCalendarAlt size={14} />
+                                                            </button>
+                                                            <FaEye className="text-gray-300 group-hover:text-sky-500" size={14} />
+                                                        </div>
                                                     </td>
                                                 </motion.tr>
                                             ))}
@@ -459,6 +631,42 @@ const AdminDashboard = () => {
                         </motion.div>
                     );
                 })()}
+            </AnimatePresence>
+
+            {/* Recent Attendance History Modal */}
+            <AnimatePresence>
+                {selectedEmployeeHistory && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="fixed inset-0 bg-white z-[60] flex flex-col"
+                    >
+                        <div className="px-6 md:px-10 py-5 border-b border-gray-100 bg-gradient-to-r from-sky-50 to-blue-50 flex items-center justify-between flex-shrink-0">
+                            <div className="flex items-center gap-4">
+                                <div className="h-12 w-12 rounded-2xl bg-sky-600 flex items-center justify-center text-white shadow-lg">
+                                    <FaHistory size={20} />
+                                </div>
+                                <div>
+                                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{selectedEmployeeHistory.emp_id}</p>
+                                    <p className="text-xl font-black text-gray-800 tracking-tight">{selectedEmployeeHistory.name} - History</p>
+                                </div>
+                            </div>
+                            <button onClick={() => setSelectedEmployeeHistory(null)} className="p-3 rounded-2xl bg-white hover:bg-rose-50 text-gray-400 hover:text-rose-500 transition-all border border-gray-200 shadow-sm">
+                                <FaTimes size={18} />
+                            </button>
+                        </div>
+                        <div className="flex-1 overflow-auto px-6 md:px-10 py-8 bg-gray-50/30">
+                            <div className="max-w-5xl mx-auto">
+                                <AttendanceHistory 
+                                    empId={selectedEmployeeHistory.emp_id} 
+                                    recentOnly={false} 
+                                    month={new Date().toISOString().slice(0, 7)}
+                                />
+                            </div>
+                        </div>
+                    </motion.div>
+                )}
             </AnimatePresence>
 
         </Layout>

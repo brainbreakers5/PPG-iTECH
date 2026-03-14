@@ -135,7 +135,7 @@ const EmployeeManagement = () => {
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-10 gap-6">
                     <div>
                         <h1 className="text-3xl font-black text-gray-800 tracking-tight">Employee Management</h1>
-                        <p className="text-gray-500 font-medium mt-1">Manage and organize institutional staff records.</p>
+
                     </div>
                     <button
                         onClick={handleAdd}

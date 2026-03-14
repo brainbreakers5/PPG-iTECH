@@ -3,7 +3,8 @@ import Layout from '../../components/Layout';
 import api from '../../utils/api';
 import Swal from 'sweetalert2';
 import { useAuth } from '../../context/AuthContext';
-import { FaCalculator, FaCheckCircle, FaFilter, FaFileAlt, FaClock, FaMoneyBillWave, FaArrowRight, FaShieldAlt, FaChartLine, FaWallet } from 'react-icons/fa';
+import { useSocket } from '../../context/SocketContext';
+import { FaCalculator, FaCheckCircle, FaFilter, FaFileAlt, FaClock, FaMoneyBillWave, FaArrowRight, FaShieldAlt, FaChartLine, FaWallet, FaBullhorn } from 'react-icons/fa';
 import { motion, AnimatePresence } from 'framer-motion';
 
 const SalaryManagement = () => {
@@ -18,12 +19,20 @@ const SalaryManagement = () => {
     const [isCalculating, setIsCalculating] = useState(false);
     const [activeRole, setActiveRole] = useState('all');
     const [paidStatuses, setPaidStatuses] = useState(['Present', 'CL', 'ML', 'Comp Leave', 'OD', 'Holiday']);
+    const socket = useSocket();
 
-    const attendanceOptions = ['Present', 'OD', 'CL', 'ML', 'Comp Leave', 'Holiday', 'Absent'];
+    const attendanceOptions = ['Present', 'OD', 'CL', 'ML', 'Comp Leave', 'Holiday', 'Absent', 'LOP'];
 
     useEffect(() => {
         fetchSalaries();
     }, [fromDate, toDate]);
+
+    useEffect(() => {
+        if (!socket) return;
+        const handler = () => fetchSalaries();
+        socket.on('salary_published', handler);
+        return () => socket.off('salary_published', handler);
+    }, [socket, fromDate, toDate]);
 
     const fetchSalaries = async () => {
         setLoading(true);
@@ -89,6 +98,38 @@ const SalaryManagement = () => {
         }
     };
 
+    const handlePublish = async () => {
+        const d = new Date(fromDate);
+        const month = d.getMonth() + 1;
+        const year = d.getFullYear();
+        const pendingCount = salaries.filter(s => s.status === 'Pending').length;
+
+        if (pendingCount === 0) {
+            Swal.fire({ title: 'No Pending Salaries', text: 'All salaries have already been published.', icon: 'info', confirmButtonColor: '#2563eb' });
+            return;
+        }
+
+        const result = await Swal.fire({
+            title: 'Publish All Salaries?',
+            text: `This will mark ${pendingCount} pending salary records as Paid for ${String(month).padStart(2, '0')}/${year} and notify all employees.`,
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#059669',
+            confirmButtonText: 'Publish Now',
+            cancelButtonColor: '#64748b',
+        });
+
+        if (result.isConfirmed) {
+            try {
+                const { data } = await api.post('/salary/publish', { month, year });
+                Swal.fire({ title: 'Published!', text: `${data.count} salary records have been published to all employees.`, icon: 'success', confirmButtonColor: '#2563eb' });
+                fetchSalaries();
+            } catch (error) {
+                Swal.fire({ title: 'Publish Failed', text: 'There was an error publishing salaries.', icon: 'error', confirmButtonColor: '#2563eb' });
+            }
+        }
+    };
+
     const handleStatusUpdate = async (id, status) => {
         try {
             await api.put(`/salary/${id}/status`, { status });
@@ -119,7 +160,7 @@ const SalaryManagement = () => {
         if (!printWindow) return;
 
         const title = 'Salary Report';
-        const headings = ['#', 'Name', 'Department', 'Role', 'Present', 'Monthly Salary', 'Computed Pay', 'Status'];
+        const headings = ['#', 'Name', 'Department', 'Role', 'Paid Days', 'LOP', 'Monthly Salary', 'Computed Pay', 'Status'];
 
         const useLandscape = items.length > 15;
 
@@ -130,6 +171,7 @@ const SalaryManagement = () => {
                 <td>${escapeHtml(s.department_name)}</td>
                 <td>${escapeHtml(s.role)}</td>
                 <td style="text-align:center">${s.total_present ?? 0}</td>
+                <td style="text-align:center">${s.total_lop ?? 0}</td>
                 <td style="text-align:right">&#8377;${Number(s.monthly_salary ?? 0).toLocaleString()}</td>
                 <td style="text-align:right">&#8377;${Number(s.calculated_salary ?? 0).toLocaleString()}</td>
                 <td>${escapeHtml(s.status)}</td>
@@ -239,7 +281,7 @@ const SalaryManagement = () => {
             </head>
             <body>
                 <div class="print-brand">
-                    <p class="app-name">PPG iTech HUB</p>
+                    <p class="app-name">PPG EMP HUB</p>
                     <p class="print-time">${new Date().toLocaleString('en-GB')}</p>
                 </div>
                 <h1>${escapeHtml(title)}</h1>
@@ -279,9 +321,6 @@ const SalaryManagement = () => {
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-12 gap-8">
                     <div>
                         <h1 className="text-4xl font-black text-gray-800 tracking-tighter">Salary Management</h1>
-                        <p className="text-gray-500 font-medium mt-1 uppercase tracking-widest text-[10px] flex items-center gap-2">
-                            <span className="h-2 w-2 rounded-full bg-sky-500"></span> Manage staff salaries and payroll data
-                        </p>
                     </div>
                     <div className="flex items-center gap-4 w-full md:w-auto">
                         {user.role === 'admin' && (
@@ -305,6 +344,15 @@ const SalaryManagement = () => {
                                 />
                                 <FaCalculator className={`mr-3 ${isCalculating ? 'animate-spin' : 'group-hover:rotate-12 transition-transform'}`} />
                                 {isCalculating ? 'Calculating...' : 'Calculate All Salaries'}
+                            </button>
+                        )}
+                        {user.role === 'admin' && salaries.some(s => s.status === 'Pending') && (
+                            <button
+                                onClick={handlePublish}
+                                className="flex-1 md:flex-none bg-emerald-600 text-white px-10 py-5 rounded-2xl shadow-xl shadow-emerald-200 hover:bg-emerald-800 transition-all flex items-center justify-center font-black uppercase tracking-[0.2em] text-[10px] group"
+                            >
+                                <FaBullhorn className="mr-3 group-hover:scale-125 transition-transform" />
+                                Publish All
                             </button>
                         )}
                     </div>
@@ -441,8 +489,8 @@ const SalaryManagement = () => {
                                                     >
                                                         <td className="p-8">
                                                             <div className="flex items-center gap-5">
-                                                                <div className="h-14 w-14 rounded-[20px] bg-gradient-to-br from-sky-50 to-white border border-sky-50 flex items-center justify-center text-sky-600 font-black text-lg shadow-sm group-hover:scale-110 group-hover:rotate-3 transition-all duration-500">
-                                                                    {s.name?.charAt(0)}
+                                                                <div className="h-14 w-14 rounded-[20px] bg-gradient-to-br from-sky-50 to-white border border-sky-50 flex items-center justify-center text-sky-600 font-black text-lg shadow-sm group-hover:scale-110 group-hover:rotate-3 transition-all duration-500 overflow-hidden">
+                                                                    <img src={s.profile_pic || `https://ui-avatars.com/api/?name=${encodeURIComponent(s.name || '?')}&size=100&background=0ea5e9&color=fff&bold=true`} alt="" className="h-full w-full object-cover" />
                                                                 </div>
                                                                 <div>
                                                                     <p className="text-sm font-black text-gray-800 tracking-tight group-hover:text-sky-600 transition-colors">{s.name}</p>
@@ -453,7 +501,8 @@ const SalaryManagement = () => {
                                                         <td className="p-8">
                                                             <div className="flex flex-col items-center gap-3">
                                                                 <div className="flex gap-4 text-[9px] font-black uppercase tracking-widest">
-                                                                    <span className="text-sky-500 bg-sky-50 px-2 py-1 rounded-md">PRESENT: {s.total_present}</span>
+                                                                    <span className="text-sky-500 bg-sky-50 px-2 py-1 rounded-md">PAID DAYS: {s.total_present}</span>
+                                                                    <span className="text-rose-500 bg-rose-50 px-2 py-1 rounded-md">LOP: {s.total_lop || 0}</span>
                                                                 </div>
                                                                 <div className="w-32 bg-gray-100 h-1.5 rounded-full overflow-hidden shadow-inner p-px">
                                                                     <motion.div

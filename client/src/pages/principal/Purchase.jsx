@@ -315,7 +315,7 @@ const Purchase = () => {
             </head>
             <body>
                 <div class="print-brand">
-                    <p class="app-name">PPG iTech HUB</p>
+                    <p class="app-name">PPG EMP HUB</p>
                     <p class="print-time">${new Date().toLocaleString('en-GB')}</p>
                 </div>
                 <h1>${escapeHtml(title)}</h1>
@@ -439,7 +439,6 @@ const Purchase = () => {
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-10 gap-6">
                     <div>
                         <h1 className="text-3xl font-black text-gray-800 tracking-tight">Purchase Requests</h1>
-                        <p className="text-gray-500 font-medium mt-1">Manage and track resource purchase requests.</p>
                     </div>
                     <button
                         onClick={handleNewRequest}

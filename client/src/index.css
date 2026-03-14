@@ -203,6 +203,25 @@ button:active:not(:disabled) {
   animation: fadeIn 0.6s cubic-bezier(0.4, 0, 0.2, 1) forwards;
 }
 
+@keyframes liveBlink {
+  0% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.4; transform: scale(0.9); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+.animate-live-blink {
+  animation: liveBlink 1.2s infinite ease-in-out;
+}
+
+.animate-pulse-live {
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: .5; }
+}
+
 .attendance-grid-print-sheet {
   display: none;
 }

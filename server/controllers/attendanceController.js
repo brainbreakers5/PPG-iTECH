@@ -69,6 +69,7 @@ exports.getAttendance = async (req, res) => {
                     a.status::text as status,
                     a.in_time,
                     a.out_time,
+                    a.remarks,
                     a.id as record_id
                 FROM attendance_records a
                 JOIN users u ON u.emp_id = a.emp_id
@@ -134,6 +135,13 @@ exports.getAttendance = async (req, res) => {
                 SELECT (d + 1)::date FROM date_range 
                 WHERE d < $2::date AND d < (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata')::date
             ),
+            calendar_days AS (
+                SELECT 
+                    dr.d,
+                    COALESCE(h.type, CASE WHEN EXTRACT(DOW FROM dr.d) IN (0, 6) THEN 'Holiday' ELSE 'Working Day' END) AS day_type
+                FROM date_range dr
+                LEFT JOIN holidays h ON h.h_date = dr.d
+            ),
             target_users AS (
                 SELECT u.emp_id, u.name, u.role, u.department_id, d.name as department_name
                 FROM users u
@@ -141,19 +149,20 @@ exports.getAttendance = async (req, res) => {
                 WHERE ${userFilter}
             )
             SELECT 
-                dr.d as date,
+                cd.d as date,
                 tu.emp_id,
                 tu.name,
                 tu.role,
                 tu.department_name,
-                COALESCE(a.status::text, CASE WHEN EXTRACT(DOW FROM dr.d) = 0 THEN 'Holiday' ELSE 'Absent' END) as status,
+                COALESCE(a.status::text, CASE WHEN cd.day_type IN ('Holiday') THEN 'Holiday' ELSE 'Absent' END) as status,
                 a.in_time,
                 a.out_time,
+                a.remarks,
                 a.id as record_id
-            FROM date_range dr
+            FROM calendar_days cd
             CROSS JOIN target_users tu
-            LEFT JOIN attendance_records a ON a.emp_id = tu.emp_id AND a.date = dr.d
-            ORDER BY dr.d DESC, tu.name ASC
+            LEFT JOIN attendance_records a ON a.emp_id = tu.emp_id AND a.date = cd.d
+            ORDER BY cd.d DESC, tu.name ASC
         `;
 
         const { rows } = await pool.query(query, params);
@@ -223,14 +232,26 @@ exports.getAttendanceSummary = async (req, res) => {
             )
             SELECT 
                 u.emp_id, u.name, u.role,
-                COALESCE(SUM(CASE WHEN a.status::text = 'Present' THEN 1 ELSE 0 END), 0) as total_present,
-                COALESCE(SUM(CASE WHEN a.status::text IN ('Comp Leave', 'CL', 'ML', 'Leave') THEN 1 ELSE 0 END), 0) as total_leave,
-                COALESCE(SUM(CASE WHEN a.status::text = 'CL' THEN 1 ELSE 0 END), 0) as total_cl,
-                COALESCE(SUM(CASE WHEN a.status::text = 'ML' THEN 1 ELSE 0 END), 0) as total_ml,
-                COALESCE(SUM(CASE WHEN a.status::text = 'Comp Leave' THEN 1 ELSE 0 END), 0) as total_comp,
-                COALESCE(SUM(CASE WHEN a.status::text = 'OD' THEN 1 ELSE 0 END), 0) as total_od,
+                COALESCE(SUM(CASE WHEN a.status::text ILIKE '%Present%' THEN 1 ELSE 0 END), 0) as total_present,
+                COALESCE(SUM(CASE WHEN a.status::text ILIKE '%Absent%' THEN 1 ELSE 0 END), 0) as total_absent,
+                COALESCE(SUM(CASE WHEN 
+                    a.status::text ILIKE '%Comp Leave%' OR a.remarks ILIKE '%Comp Leave%' OR 
+                    a.status::text ILIKE '%CL%' OR a.remarks ILIKE '%CL%' OR 
+                    a.status::text ILIKE '%Casual Leave%' OR a.remarks ILIKE '%Casual Leave%' OR
+                    a.status::text ILIKE '%ML%' OR a.remarks ILIKE '%ML%' OR 
+                    a.status::text ILIKE '%Medical Leave%' OR a.remarks ILIKE '%Medical Leave%' OR
+                    a.status::text ILIKE '%Leave%' OR a.remarks ILIKE '%On Duty%' OR a.status::text ILIKE '%OD%'
+                THEN 1 ELSE 0 END), 0) as total_leave,
+                COALESCE(SUM(CASE WHEN (a.status::text ILIKE '%CL%' OR a.remarks ILIKE '%CL%' OR a.remarks ILIKE '%Casual Leave%') AND a.status::text NOT ILIKE '%Comp Leave%' AND a.remarks NOT ILIKE '%Comp Leave%' THEN 1 ELSE 0 END), 0) as total_cl,
+                COALESCE(SUM(CASE WHEN a.status::text ILIKE '%ML%' OR a.remarks ILIKE '%ML%' OR a.remarks ILIKE '%Medical Leave%' THEN 1 ELSE 0 END), 0) as total_ml,
+                COALESCE(SUM(CASE WHEN a.status::text ILIKE '%Comp Leave%' OR a.remarks ILIKE '%Comp Leave%' THEN 1 ELSE 0 END), 0) as total_comp,
+                COALESCE(SUM(CASE WHEN a.status::text ILIKE '%OD%' OR a.remarks ILIKE '%OD%' OR a.remarks ILIKE '%On Duty%' THEN 1 ELSE 0 END), 0) as total_od,
+                COALESCE(SUM(CASE WHEN a.status::text ILIKE '%LOP%' OR a.remarks ILIKE '%LOP%' OR a.remarks ILIKE '%Loss of Pay%' THEN 1 ELSE 0 END), 0) as total_lop,
+                COALESCE(SUM(CASE WHEN a.remarks ILIKE '%Late Entry%' THEN 1 ELSE 0 END), 0) as total_late,
                 ct.total_working_days,
                 ct.total_holidays
+                , GREATEST(0, ct.total_working_days - COALESCE(COUNT(a.id), 0)) as total_computed_absent
+
             FROM public.users u
             CROSS JOIN calendar_totals ct
             LEFT JOIN attendance_records a ON u.emp_id = a.emp_id
@@ -256,9 +277,9 @@ exports.getAttendanceTrend = async (req, res) => {
         const query = `
             SELECT 
                 TO_CHAR(date, 'Mon YYYY') as month_name,
-                SUM(CASE WHEN status::text = 'Present' THEN 1 ELSE 0 END) as present,
-                SUM(CASE WHEN status::text IN ('Leave', 'Comp Leave', 'CL', 'ML') THEN 1 ELSE 0 END) as "leave",
-                SUM(CASE WHEN status::text IN ('Absent', 'LOP') THEN 1 ELSE 0 END) as lop
+                SUM(CASE WHEN status::text LIKE '%Present%' THEN 1 ELSE 0 END) as present,
+                SUM(CASE WHEN status::text LIKE '%Leave%' OR status::text LIKE '%Comp Leave%' OR remarks LIKE '%Comp Leave:%' OR status::text LIKE '%CL%' OR remarks LIKE '%CL:%' OR status::text LIKE '%ML%' OR remarks LIKE '%ML:%' THEN 1 ELSE 0 END) as "leave",
+                SUM(CASE WHEN status::text LIKE '%Absent%' OR status::text LIKE '%LOP%' THEN 1 ELSE 0 END) as lop
             FROM attendance_records
             WHERE date >= CURRENT_DATE - INTERVAL '6 months'
             GROUP BY TO_CHAR(date, 'YYYY-MM'), month_name

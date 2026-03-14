@@ -4,22 +4,24 @@ import api from '../../utils/api';
 import { useSocket } from '../../context/SocketContext';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
-import { FaBirthdayCake, FaUserCheck, FaUserTimes, FaCalendarDay, FaBus, FaFileAlt, FaTimes, FaCalendarAlt, FaStar, FaBriefcase } from 'react-icons/fa';
+import { FaBirthdayCake, FaUserCheck, FaUserTimes, FaCalendarDay, FaBus, FaFileAlt, FaTimes, FaCalendarAlt, FaStar, FaBriefcase, FaClock, FaHistory, FaEye } from 'react-icons/fa';
+import AttendanceHistory from '../../components/AttendanceHistory';
 
 const ManagementDashboard = () => {
     const socket = useSocket();
     const navigate = useNavigate();
     const [stats, setStats] = useState({
-        present: 0, absent: 0, od: 0, cl: 0, ml: 0, comp_leave: 0,
-        principal: { present: 0, absent: 0, od: 0, cl: 0, ml: 0, comp_leave: 0 },
-        hod: { present: 0, absent: 0, od: 0, cl: 0, ml: 0, comp_leave: 0 },
-        staff: { present: 0, absent: 0, od: 0, cl: 0, ml: 0, comp_leave: 0 }
+        present: 0, absent: 0, od: 0, cl: 0, ml: 0, comp_leave: 0, lop: 0, late_entry: 0,
+        principal: { present: 0, absent: 0, od: 0, cl: 0, ml: 0, comp_leave: 0, lop: 0, late_entry: 0 },
+        hod: { present: 0, absent: 0, od: 0, cl: 0, ml: 0, comp_leave: 0, lop: 0, late_entry: 0 },
+        staff: { present: 0, absent: 0, od: 0, cl: 0, ml: 0, comp_leave: 0, lop: 0, late_entry: 0 }
     });
     const [birthdays, setBirthdays] = useState([]);
     const [allEmployees, setAllEmployees] = useState([]);
     const [attendanceMap, setAttendanceMap] = useState({});
     const [monthStats, setMonthStats] = useState({ workingDays: 0, holidays: 0, specialEvents: 0 });
     const [employeeModal, setEmployeeModal] = useState(null);
+    const [selectedEmployeeHistory, setSelectedEmployeeHistory] = useState(null); // { emp_id, name }
 
     const fetchDashboardData = useCallback(async () => {
         try {
@@ -31,13 +33,13 @@ const ManagementDashboard = () => {
             setAllEmployees(emps);
             const { data: todayAtt } = await api.get(`/attendance?date=${date}`);
             const map = {};
-            (todayAtt || []).forEach(r => { map[r.emp_id] = r.status; });
+            (todayAtt || []).forEach(r => { map[r.emp_id] = r; });
             setAttendanceMap(map);
             const agg = {
-                present: 0, absent: 0, od: 0, cl: 0, ml: 0, comp_leave: 0,
-                principal: { present: 0, absent: 0, od: 0, cl: 0, ml: 0, comp_leave: 0 },
-                hod: { present: 0, absent: 0, od: 0, cl: 0, ml: 0, comp_leave: 0 },
-                staff: { present: 0, absent: 0, od: 0, cl: 0, ml: 0, comp_leave: 0 }
+                present: 0, absent: 0, od: 0, cl: 0, ml: 0, comp_leave: 0, lop: 0, late_entry: 0,
+                principal: { present: 0, absent: 0, od: 0, cl: 0, ml: 0, comp_leave: 0, lop: 0, late_entry: 0 },
+                hod: { present: 0, absent: 0, od: 0, cl: 0, ml: 0, comp_leave: 0, lop: 0, late_entry: 0 },
+                staff: { present: 0, absent: 0, od: 0, cl: 0, ml: 0, comp_leave: 0, lop: 0, late_entry: 0 }
             };
             (summary || []).forEach(r => {
                 const role = (r.role || '').toLowerCase();
@@ -46,15 +48,21 @@ const ManagementDashboard = () => {
                 const l = Number(r.total_leave) || 0;
                 const o = Number(r.total_od) || 0;
                 const lp = Number(r.total_lop) || 0;
+                const late = Number(r.total_late) || 0;
                 bucket.present += p;
                 bucket.od += o;
+                bucket.lop += lp;
+                bucket.late_entry += late;
                 if (p === 0 && l === 0 && o === 0 && lp === 0) bucket.absent += 1;
                 agg.present += p;
                 agg.od += o;
+                agg.lop += lp;
+                agg.late_entry += late;
             });
             // Count individual leave types from attendance map
             (emps || []).forEach(emp => {
-                const s = map[emp.emp_id] || '';
+                const r = map[emp.emp_id];
+                const s = r?.status || '';
                 const role = (emp.role || '').toLowerCase();
                 const bucket = agg[role] || agg.staff;
                 if (s === 'CL' || s === 'Leave') { bucket.cl++; agg.cl++; }
@@ -107,13 +115,16 @@ const ManagementDashboard = () => {
         const roleEmps = allEmployees.filter(e => (e.role || '').toLowerCase() === roleKey);
         if (statusLabel === 'All') return roleEmps;
         return roleEmps.filter(emp => {
-            const s = attendanceMap[emp.emp_id] || '';
+            const r = attendanceMap[emp.emp_id];
+            const s = r?.status || '';
             if (statusLabel === 'Present') return s === 'Present';
-            if (statusLabel === 'Absent') return !s || s === 'Absent';
+            if (statusLabel === 'Absent') return (!s || s === 'Absent') && s !== 'LOP';
             if (statusLabel === 'On Duty') return s === 'OD';
             if (statusLabel === 'Casual Leave') return s === 'CL' || s === 'Leave';
             if (statusLabel === 'Medical Leave') return s === 'ML';
             if (statusLabel === 'Comp Leave') return s === 'Comp Leave';
+            if (statusLabel === 'Loss Of Pay') return s === 'LOP';
+            if (statusLabel === 'Late Entry') return (r?.remarks || '').includes('Late Entry');
             return false;
         });
     };
@@ -133,9 +144,7 @@ const ManagementDashboard = () => {
                         <h1 className="text-4xl font-black text-gray-800 tracking-tighter">
                             Management <span className="text-[#7C3AED]">Dashboard</span>
                         </h1>
-                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.3em] mt-2">
-                            Institutional Attendance Intelligence
-                        </p>
+
                     </div>
                     <div className="flex items-center gap-6">
                         {birthdays.length > 0 && (
@@ -212,7 +221,10 @@ const ManagementDashboard = () => {
                         </div>
 
                         <div
-                            onClick={() => setEmployeeModal({ role: role.key, statusLabel: 'All', title: role.title })}
+                            onClick={() => {
+                                document.querySelector('main')?.scrollTo({ top: 0, behavior: 'smooth' });
+                                setEmployeeModal({ role: role.key, statusLabel: 'All', title: role.title });
+                            }}
                             className="w-full mb-6 py-3 px-4 rounded-2xl bg-gray-50 border border-gray-100 text-[10px] font-black text-gray-500 uppercase tracking-widest flex items-center justify-between relative z-10 cursor-pointer hover:bg-white hover:border-purple-200 hover:shadow-md transition-all"
                         >
                             <span>Total {role.title}</span>
@@ -230,14 +242,19 @@ const ManagementDashboard = () => {
                             {[
                                 { label: 'Present', value: stats[role.key]?.present, icon: <FaUserCheck />, color: 'text-sky-600', bg: 'bg-sky-50' },
                                 { label: 'Absent', value: stats[role.key]?.absent, icon: <FaUserTimes />, color: 'text-rose-600', bg: 'bg-rose-50' },
+                                { label: 'Loss Of Pay', value: stats[role.key]?.lop, icon: <FaTimes />, color: 'text-rose-800', bg: 'bg-rose-100' },
                                 { label: 'On Duty', value: stats[role.key]?.od, icon: <FaBriefcase />, color: 'text-emerald-600', bg: 'bg-emerald-50' },
                                 { label: 'Casual Leave', value: stats[role.key]?.cl, icon: <FaCalendarDay />, color: 'text-amber-600', bg: 'bg-amber-50' },
                                 { label: 'Medical Leave', value: stats[role.key]?.ml, icon: <FaFileAlt />, color: 'text-purple-600', bg: 'bg-purple-50' },
-                                { label: 'Comp Leave', value: stats[role.key]?.comp_leave, icon: <FaStar />, color: 'text-indigo-600', bg: 'bg-indigo-50' }
+                                { label: 'Comp Leave', value: stats[role.key]?.comp_leave, icon: <FaStar />, color: 'text-indigo-600', bg: 'bg-indigo-50' },
+                                { label: 'Late Entry', value: stats[role.key]?.late_entry, icon: <FaClock />, color: 'text-orange-600', bg: 'bg-orange-50' }
                             ].map((stat) => (
                                 <div
                                     key={stat.label}
-                                    onClick={() => setEmployeeModal({ role: role.key, statusLabel: stat.label, title: role.title })}
+                                    onClick={() => {
+                                        document.querySelector('main')?.scrollTo({ top: 0, behavior: 'smooth' });
+                                        setEmployeeModal({ role: role.key, statusLabel: stat.label, title: role.title });
+                                    }}
                                     className="flex items-center justify-between p-3 rounded-2xl bg-gray-50/50 hover:bg-white transition-all border border-transparent hover:border-gray-100 group/item cursor-pointer"
                                 >
                                     <div className="flex items-center gap-3">
@@ -269,7 +286,11 @@ const ManagementDashboard = () => {
                                 <motion.div
                                     key={b.emp_id}
                                     whileHover={{ x: 8 }}
-                                    className="flex items-center space-x-5 bg-white/10 backdrop-blur-md p-5 rounded-[28px] border border-white/20 hover:bg-white/25 transition-all group shadow-lg shadow-black/5"
+                                    onClick={() => {
+                                        navigate(`/management/profile/${b.emp_id}`);
+                                        window.dispatchEvent(new CustomEvent('closeSidebar'));
+                                    }}
+                                    className="flex items-center space-x-5 bg-white/10 backdrop-blur-md p-5 rounded-[28px] border border-white/20 hover:bg-white/25 transition-all group shadow-lg shadow-black/5 cursor-pointer"
                                 >
                                     <div className="h-14 w-14 rounded-2xl bg-white flex items-center justify-center shadow-xl overflow-hidden border-2 border-white ring-4 ring-white/10 shrink-0">
                                         <img
@@ -335,6 +356,7 @@ const ManagementDashboard = () => {
                                                 <th className="px-5 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Name</th>
                                                 <th className="px-5 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Department</th>
                                                 <th className="px-5 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Status</th>
+                                                <th className="px-5 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-center no-print">Action</th>
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-gray-50">
@@ -350,17 +372,46 @@ const ManagementDashboard = () => {
                                                     <td className="px-5 py-4 text-sm font-black text-purple-900">{emp.emp_id}</td>
                                                     <td className="px-5 py-4">
                                                         <div className="flex items-center gap-3">
-                                                            <div className="h-9 w-9 rounded-xl bg-purple-100 text-purple-600 flex items-center justify-center font-black text-sm shrink-0">
-                                                                {(emp.name || '?').charAt(0)}
-                                                            </div>
+                                                            <img src={emp.profile_pic || `https://ui-avatars.com/api/?name=${encodeURIComponent(emp.name || '?')}&size=80&background=9333ea&color=fff&bold=true`} alt="" className="h-9 w-9 rounded-xl object-cover shrink-0" />
                                                             <span className="text-sm font-bold text-gray-800">{emp.name}</span>
                                                         </div>
                                                     </td>
                                                     <td className="px-5 py-4 text-sm font-medium text-gray-600">{emp.department_name || '—'}</td>
                                                     <td className="px-5 py-4">
-                                                        <span className="px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest border bg-purple-50 text-purple-600 border-purple-100">
-                                                            {attendanceMap[emp.emp_id] || 'N/A'}
+                                                        <span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest border ${
+                                                            (attendanceMap[emp.emp_id]?.remarks || '').includes('Late Entry') ? 'bg-orange-50 text-orange-600 border-orange-100' :
+                                                            attendanceMap[emp.emp_id]?.status?.startsWith('Present') ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 
+                                                            'bg-purple-50 text-purple-600 border-purple-100'
+                                                        }`}>
+                                                            {(attendanceMap[emp.emp_id]?.remarks || '').includes('Late Entry') ? (
+                                                                <span>{attendanceMap[emp.emp_id]?.status === 'Present' ? 'LE' : `${attendanceMap[emp.emp_id]?.status} (LE)`}</span>
+                                                            ) : attendanceMap[emp.emp_id]?.status?.startsWith('Present +') 
+                                                                ? `P / ${attendanceMap[emp.emp_id].status.replace('Present +', '').trim()}` 
+                                                                : (attendanceMap[emp.emp_id]?.status || 'N/A')}
+                                                            {attendanceMap[emp.emp_id]?.status?.startsWith('Present') === false && attendanceMap[emp.emp_id]?.status !== 'Absent' && attendanceMap[emp.emp_id]?.in_time && attendanceMap[emp.emp_id]?.out_time && (
+                                                                <> ({attendanceMap[emp.emp_id].in_time.slice(0, 5)} - {attendanceMap[emp.emp_id].out_time.slice(0, 5)})</>
+                                                            )}
                                                         </span>
+                                                    </td>
+                                                    <td className="px-5 py-4 text-center no-print">
+                                                        <div className="flex items-center justify-center gap-2">
+                                                            <button 
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    setSelectedEmployeeHistory({ emp_id: emp.emp_id, name: emp.name });
+                                                                }}
+                                                                className="p-2 hover:bg-purple-50 text-purple-600 rounded-lg transition-colors"
+                                                                title="View Attendance History"
+                                                            >
+                                                                <FaHistory size={14} />
+                                                            </button>
+                                                            <button 
+                                                                onClick={() => { navigate(`/management/profile/${emp.emp_id}`); setEmployeeModal(null); window.dispatchEvent(new CustomEvent('closeSidebar')); }}
+                                                                className="p-2 hover:bg-purple-50 text-gray-300 hover:text-purple-500 rounded-lg transition-colors"
+                                                            >
+                                                                <FaEye size={14} />
+                                                            </button>
+                                                        </div>
                                                     </td>
                                                 </motion.tr>
                                             ))}
@@ -371,6 +422,42 @@ const ManagementDashboard = () => {
                         </motion.div>
                     );
                 })()}
+            </AnimatePresence>
+
+            {/* Recent Attendance History Modal */}
+            <AnimatePresence>
+                {selectedEmployeeHistory && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="fixed inset-0 bg-white z-[60] flex flex-col"
+                    >
+                        <div className="px-6 md:px-10 py-5 border-b border-gray-100 bg-gradient-to-r from-purple-50 to-violet-50 flex items-center justify-between flex-shrink-0">
+                            <div className="flex items-center gap-4">
+                                <div className="h-12 w-12 rounded-2xl bg-purple-600 flex items-center justify-center text-white shadow-lg">
+                                    <FaHistory size={20} />
+                                </div>
+                                <div>
+                                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{selectedEmployeeHistory.emp_id}</p>
+                                    <p className="text-xl font-black text-gray-800 tracking-tight">{selectedEmployeeHistory.name} - History</p>
+                                </div>
+                            </div>
+                            <button onClick={() => setSelectedEmployeeHistory(null)} className="p-3 rounded-2xl bg-white hover:bg-rose-50 text-gray-400 hover:text-rose-500 transition-all border border-gray-200 shadow-sm">
+                                <FaTimes size={18} />
+                            </button>
+                        </div>
+                        <div className="flex-1 overflow-auto px-6 md:px-10 py-8 bg-gray-50/30">
+                            <div className="max-w-5xl mx-auto">
+                                <AttendanceHistory 
+                                    empId={selectedEmployeeHistory.emp_id} 
+                                    recentOnly={false} 
+                                    month={new Date().toISOString().slice(0, 7)}
+                                />
+                            </div>
+                        </div>
+                    </motion.div>
+                )}
             </AnimatePresence>
         </Layout>
     );

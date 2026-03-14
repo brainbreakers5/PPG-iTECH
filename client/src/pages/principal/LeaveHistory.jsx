@@ -43,7 +43,7 @@ const LeaveHistory = () => {
     };
 
     const filtered = leaves.filter(l => {
-        const matchSearch = !search || 
+        const matchSearch = !search ||
             l.applicant_name?.toLowerCase().includes(search.toLowerCase()) ||
             l.leave_type?.toLowerCase().includes(search.toLowerCase()) ||
             l.subject?.toLowerCase().includes(search.toLowerCase()) ||
@@ -88,11 +88,10 @@ const LeaveHistory = () => {
                             <button
                                 key={s}
                                 onClick={() => setStatusFilter(s)}
-                                className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${
-                                    statusFilter === s
+                                className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${statusFilter === s
                                         ? 'bg-sky-600 text-white shadow-lg'
                                         : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
-                                }`}
+                                    }`}
                             >
                                 {s} ({statusCounts[s]})
                             </button>
@@ -155,23 +154,41 @@ const LeaveHistory = () => {
                                                 <span className="text-xs text-gray-500 line-clamp-1">{leave.subject || '-'}</span>
                                             </td>
                                             <td className="p-4 text-center">
-                                                <span className="text-sm font-bold text-gray-700">{leave.days_count}</span>
+                                                <span className="text-sm font-bold text-gray-700">
+                                                    { Number(leave.days_count) > 0 ? leave.days_count : (leave.hours && Number(leave.hours) > 0 ? `${leave.hours} Hours` : leave.days_count) }
+                                                    {(() => {
+                                                        try {
+                                                            const details = typeof leave.dates_detail === 'string' ? JSON.parse(leave.dates_detail) : leave.dates_detail;
+                                                            if (details && details.length === 1 && !details[0].is_full_day) {
+                                                                return ` (${details[0].from_time} - ${details[0].to_time})`;
+                                                            }
+                                                        } catch (e) { }
+                                                        return '';
+                                                    })()}
+                                                </span>
                                             </td>
                                             <td className="p-4">
-                                                <span className="text-xs text-gray-500">{new Date(leave.from_date).toLocaleDateString('en-US', { day: '2-digit', month: 'short', year: 'numeric' })}</span>
+                                                <span className="text-xs text-gray-500">{(() => {
+                                                    try {
+                                                        const details = typeof leave.dates_detail === 'string' ? JSON.parse(leave.dates_detail) : leave.dates_detail;
+                                                        if (details && details.length === 1 && !details[0].is_full_day) {
+                                                            return `${new Date(leave.from_date).toLocaleDateString('en-US', { day: '2-digit', month: 'short', year: 'numeric' })} | ${details[0].from_time} - ${details[0].to_time}`;
+                                                        }
+                                                    } catch (e) { }
+                                                    return new Date(leave.from_date).toLocaleDateString('en-US', { day: '2-digit', month: 'short', year: 'numeric' });
+                                                })()}</span>
                                             </td>
                                             <td className="p-4">
                                                 <span className="text-xs text-gray-500">{new Date(leave.to_date).toLocaleDateString('en-US', { day: '2-digit', month: 'short', year: 'numeric' })}</span>
                                             </td>
                                             <td className="p-4 text-center">
-                                                <div className={`inline-flex items-center gap-1.5 py-1 px-3 rounded-lg border text-[9px] font-black uppercase tracking-widest ${
-                                                    leave.status === 'Approved' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' :
-                                                    leave.status === 'Rejected' ? 'bg-rose-50 text-rose-600 border-rose-100' :
-                                                    'bg-amber-50 text-amber-600 border-amber-100'
-                                                }`}>
+                                                <div className={`inline-flex items-center gap-1.5 py-1 px-3 rounded-lg border text-[9px] font-black uppercase tracking-widest ${leave.status === 'Approved' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' :
+                                                        leave.status === 'Rejected' ? 'bg-rose-50 text-rose-600 border-rose-100' :
+                                                            'bg-amber-50 text-amber-600 border-amber-100'
+                                                    }`}>
                                                     {leave.status === 'Approved' ? <FaCheckCircle size={10} /> :
-                                                     leave.status === 'Rejected' ? <FaTimesCircle size={10} /> :
-                                                     <FaHourglassHalf size={10} />}
+                                                        leave.status === 'Rejected' ? <FaTimesCircle size={10} /> :
+                                                            <FaHourglassHalf size={10} />}
                                                     {leave.status}
                                                 </div>
                                             </td>

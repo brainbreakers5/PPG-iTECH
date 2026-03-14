@@ -5,7 +5,10 @@ const {
     getLeaveRequests,
     approveLeaveStep,
     deleteLeaveRequest,
-    getLeaveConflicts
+    getLeaveConflicts,
+    getAllLeaveHistory,
+    getEligibleCompDates,
+    applyCompCredit
 } = require('../controllers/leaveController');
 const { protect, restrictTo } = require('../middleware/authMiddleware');
 
@@ -16,6 +19,9 @@ router.route('/')
     .get(getLeaveRequests);
 
 router.get('/conflicts', getLeaveConflicts);
+router.get('/history', restrictTo('principal', 'admin'), getAllLeaveHistory);
+router.get('/comp-dates', getEligibleCompDates);
+router.post('/comp-credit', applyCompCredit);
 
 router.route('/:id/approve')
     .put(approveLeaveStep);

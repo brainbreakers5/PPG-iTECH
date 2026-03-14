@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { FaBell, FaBirthdayCake, FaTimes, FaCheckCircle, FaExclamationCircle, FaInfoCircle, FaUser, FaBuilding, FaFileAlt } from 'react-icons/fa';
+import { FaBell, FaBirthdayCake, FaTimes, FaCheckCircle, FaExclamationCircle, FaInfoCircle, FaUser, FaBuilding, FaFileAlt, FaCalendarCheck } from 'react-icons/fa';
 import { useAuth } from '../context/AuthContext';
 import { useSocket } from '../context/SocketContext';
 import api from '../utils/api';
@@ -46,6 +46,7 @@ const Header = ({ toggleSidebar, sidebarOpen }) => {
             { label: 'Attendance Records', path: '/principal/attendance' },
             { label: 'Departments', path: '/principal/department' },
             { label: 'Leave Requests', path: '/principal/leaves' },
+            { label: 'Leave History', path: '/principal/leave-history' },
             { label: 'Salary Overview', path: '/principal/payroll' },
             { label: 'Conversation', path: '/principal/conversation' },
             { label: 'Purchase Requests', path: '/principal/purchase' },
@@ -53,7 +54,7 @@ const Header = ({ toggleSidebar, sidebarOpen }) => {
         ],
         hod: [
             { label: 'Dashboard', path: '/hod' },
-            { label: 'Leave Management', path: '/hod/leaves' },
+            { label: 'Leave Balance', path: '/hod/leaves' },
             { label: 'Department Staff', path: '/hod/department' },
             { label: 'Timetable', path: '/hod/timetable' },
             { label: 'Attendance Record', path: '/hod/attendance' },
@@ -63,7 +64,7 @@ const Header = ({ toggleSidebar, sidebarOpen }) => {
         ],
         staff: [
             { label: 'Dashboard', path: '/staff' },
-            { label: 'Leave Management', path: '/staff/leaves' },
+            { label: 'Leave Balance', path: '/staff/leaves' },
             { label: 'Salary Details', path: '/staff/payroll' },
             { label: 'Timetable', path: '/staff/timetables' },
             { label: 'Messages', path: '/staff/conversation' },
@@ -117,13 +118,14 @@ const Header = ({ toggleSidebar, sidebarOpen }) => {
                 const minutes = String(now.getMinutes()).padStart(2, '0');
                 const seconds = String(now.getSeconds()).padStart(2, '0');
                 const localTimestamp = `${year}-${month}-${day}T${hours}:${minutes}:${seconds}`;
-                
+
                 const newNotif = {
                     id: Date.now(),
                     message: `${data.name} punched ${data.type} at ${data.time}`,
                     type: 'system',
                     created_at: localTimestamp,
-                    is_read: false
+                    is_read: false,
+                    metadata: null
                 };
                 setNotifications(prev => [newNotif, ...prev]);
                 setUnreadCount(prev => prev + 1);
@@ -248,48 +250,85 @@ const Header = ({ toggleSidebar, sidebarOpen }) => {
     const handleNotificationClick = (notification) => {
         markRead(notification.id);
         setShowNotifs(false);
-        
-        // Navigate based on notification type
+
         const role = effectiveRole;
+        // metadata might be a string or object depending on how it's returned
+        const metadata = typeof notification.metadata === 'string' ? JSON.parse(notification.metadata) : (notification.metadata || {});
+
         switch (notification.type) {
             case 'leave':
-                if (role === 'admin') break; // admin has no leave page
-                navigate(`/${role}/leaves`);
+                // For leaves/permissions, different roles have different "incoming" pages
+                if (role === 'principal') {
+                    navigate('/principal/leaves');
+                } else if (role === 'hod') {
+                    navigate('/hod/leaves#approvals');
+                } else if (role === 'staff') {
+                    navigate('/staff/leaves#approvals');
+                }
+                break;
+            case 'permission':
+                if (role === 'principal') {
+                    navigate('/principal/leaves');
+                } else if (role === 'hod') {
+                    navigate('/hod/leaves#permission');
+                } else if (role === 'staff') {
+                    navigate('/staff/leaves#permission');
+                }
                 break;
             case 'purchase':
-                navigate(role === 'staff' ? '/staff/items' : `/${role}/purchase`);
+                if (role === 'admin') {
+                    navigate('/admin/purchase');
+                } else if (role === 'principal') {
+                    navigate('/principal/purchase');
+                } else if (role === 'hod') {
+                    navigate('/hod/purchase');
+                } else {
+                    navigate('/staff/items');
+                }
                 break;
             case 'conversation':
-                if (role === 'admin') break; // admin has no conversation page
-                navigate(`/${role}/conversation`);
+                if (role !== 'admin') {
+                    navigate(`/${role}/conversation`);
+                }
                 break;
             case 'birthday':
-                // Stay on current page
+                if (metadata && metadata.emp_id) {
+                    navigate(`/${role}/profile/${metadata.emp_id}`);
+                }
                 break;
             default:
-                // For system notifications, stay on current page
+                // No navigation for system/biometric
                 break;
         }
     };
 
     const formatNotificationTime = (dateStr) => {
+        if (!dateStr) return '';
         const date = new Date(dateStr);
+        if (isNaN(date.getTime())) return dateStr; // fallback
+
         const now = new Date();
         const isToday = date.toDateString() === now.toDateString();
+        
         const yesterday = new Date(now);
         yesterday.setDate(yesterday.getDate() - 1);
         const isYesterday = date.toDateString() === yesterday.toDateString();
-        const time = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        
+        const time = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
 
-        if (isToday) return time;
-        if (isYesterday) return `Yesterday ${time}`;
-        return `${date.toLocaleDateString()} ${time}`;
+        if (isToday) return `Today at ${time}`;
+        if (isYesterday) return `Yesterday at ${time}`;
+        
+        const stringDate = date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+        return `${stringDate} at ${time}`;
     };
 
     const getNotificationTitle = (type) => {
         switch (type) {
             case 'leave':
                 return 'Leave Notification';
+            case 'permission':
+                return 'Permission Notification';
             case 'purchase':
                 return 'Purchase Request';
             case 'conversation':
@@ -340,7 +379,7 @@ const Header = ({ toggleSidebar, sidebarOpen }) => {
                     )}
                     <div className="flex items-center gap-3">
                         <div className="h-10 w-10 rounded-xl overflow-hidden shadow-md ring-2 ring-white">
-                            <img src="/ppg-logo.jpeg" alt="PPG iTech HUB" className="w-full h-full object-cover" />
+                            <img src="/ppg-logo.jpeg" alt="PPG Institute of Technology" className="w-full h-full object-cover" />
                         </div>
                         <div>
                             <h2 className="text-lg font-black text-gray-800 tracking-tight">
@@ -400,11 +439,10 @@ const Header = ({ toggleSidebar, sidebarOpen }) => {
                                                 <p className="text-[9px] text-gray-500 leading-relaxed mt-1 uppercase tracking-wider">
                                                     {result.sublabel}
                                                 </p>
-                                                <div className={`inline-block mt-1.5 px-2 py-0.5 rounded-md text-[7px] font-black uppercase tracking-widest ${
-                                                    result.type === 'employee' ? 'bg-blue-50 text-blue-600' :
+                                                <div className={`inline-block mt-1.5 px-2 py-0.5 rounded-md text-[7px] font-black uppercase tracking-widest ${result.type === 'employee' ? 'bg-blue-50 text-blue-600' :
                                                     result.type === 'department' ? 'bg-emerald-50 text-emerald-600' :
-                                                    'bg-purple-50 text-purple-600'
-                                                }`}>
+                                                        'bg-purple-50 text-purple-600'
+                                                    }`}>
                                                     {result.type}
                                                 </div>
                                             </div>
@@ -445,11 +483,12 @@ const Header = ({ toggleSidebar, sidebarOpen }) => {
                                                 className={`p-5 hover:bg-sky-50/30 cursor-pointer transition-all border-b border-gray-50/50 flex items-start gap-4 ${!n.is_read ? 'bg-sky-50/10' : ''}`}
                                             >
                                                 <div className="mt-1">
-                                                    {n.type === 'leave' ? <FaFileAlt className="text-sky-500" size={14} /> :
-                                                        n.type === 'purchase' ? <FaBuilding className="text-purple-500" size={14} /> :
-                                                        n.type === 'birthday' ? <FaBirthdayCake className="text-pink-500" size={14} /> :
-                                                        n.type === 'conversation' ? <FaInfoCircle className="text-blue-500" size={14} /> :
-                                                            <FaInfoCircle className="text-sky-500" size={14} />}
+                                                    {n.type === 'leave' ? <FaCalendarCheck className="text-sky-500" size={14} /> :
+                                                        n.type === 'permission' ? <FaFileAlt className="text-teal-500" size={14} /> :
+                                                            n.type === 'purchase' ? <FaBuilding className="text-purple-500" size={14} /> :
+                                                                n.type === 'birthday' ? <FaBirthdayCake className="text-pink-500" size={14} /> :
+                                                                    n.type === 'conversation' ? <FaInfoCircle className="text-blue-500" size={14} /> :
+                                                                        <FaInfoCircle className="text-sky-500" size={14} />}
                                                 </div>
                                                 <div className="flex-1">
                                                     <p className="text-[11px] font-black text-gray-800 leading-tight">{getNotificationTitle(n.type)}</p>
@@ -487,11 +526,11 @@ const Header = ({ toggleSidebar, sidebarOpen }) => {
                             {isManagement ? (
                                 <div className="relative w-11 h-11 rounded-2xl border-2 border-white shadow-xl bg-gradient-to-br from-purple-500 to-purple-700 flex items-center justify-center text-white font-black text-lg">M</div>
                             ) : (
-                            <img
-                                src={user?.profile_pic || `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.name || 'U')}&background=ffffff&color=0EA5E9`}
-                                alt="Profile"
-                                className="relative w-11 h-11 rounded-2xl border-2 border-white shadow-xl group-hover:scale-105 transition-all object-cover"
-                            />
+                                <img
+                                    src={user?.profile_pic || `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.name || 'U')}&background=ffffff&color=0EA5E9`}
+                                    alt="Profile"
+                                    className="relative w-11 h-11 rounded-2xl border-2 border-white shadow-xl group-hover:scale-105 transition-all object-cover"
+                                />
                             )}
                         </div>
                     </div>

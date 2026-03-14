@@ -1,4 +1,5 @@
 const { pool } = require('../config/db');
+const { createNotification } = require('./notificationController');
 
 // @desc    Create purchase request
 // @route   POST /api/purchases
@@ -25,9 +26,11 @@ exports.createPurchaseRequest = async (req, res) => {
             INSERT INTO purchases (
                 emp_id, item_name, quantity, priority, status
             ) VALUES ($1, $2, $3, $4, $5)
+            RETURNING id
         `;
 
-        await pool.query(query, [req.user.emp_id, item_name, quantity, priority || 'Medium', status]);
+        const { rows: purchaseRows } = await pool.query(query, [req.user.emp_id, item_name, quantity, priority || 'Medium', status]);
+        const purchaseId = purchaseRows[0].id;
 
         // Notify appropriate person
         let notifyId = null;
@@ -40,10 +43,7 @@ exports.createPurchaseRequest = async (req, res) => {
         }
 
         if (notifyId) {
-            await pool.query(`
-                INSERT INTO notifications (user_id, message, type)
-                VALUES ($1, $2, 'purchase')
-            `, [notifyId, notifyMsg]);
+            await createNotification(notifyId, notifyMsg, 'purchase', { purchaseId });
         }
 
         res.status(201).json({ message: `Purchase request submitted with status: ${status}` });
@@ -146,10 +146,7 @@ exports.updatePurchaseStatus = async (req, res) => {
         await pool.query('UPDATE purchases SET status = $1 WHERE id = $2', [nextStatus, purchaseId]);
 
         if (notifyId) {
-            await pool.query(`
-                INSERT INTO notifications (user_id, message, type)
-                VALUES ($1, $2, 'purchase')
-            `, [notifyId, notifyMsg]);
+            await createNotification(notifyId, notifyMsg, 'purchase', { purchaseId });
         }
 
         res.json({ message: `Purchase request moved to ${nextStatus}` });

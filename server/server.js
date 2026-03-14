@@ -5,7 +5,9 @@ const dotenv = require('dotenv');
 // Load environment variables immediately
 dotenv.config();
 
-const { createServer } = require('http');
+const fs = require('fs');
+const { createServer: createHttpServer } = require('http');
+const { createServer: createHttpsServer } = require('https');
 const { Server } = require('socket.io');
 const path = require('path');
 const { pool, connectDB } = require('./config/db');
@@ -28,26 +30,102 @@ const holidayRoutes = require('./routes/holidayRoutes');
 const leaveLimitRoutes = require('./routes/leaveLimitRoutes');
 const leaveTypeRoutes = require('./routes/leaveTypeRoutes');
 const biometricRoutes = require('./routes/biometricRoutes');
+const certificateRoutes = require('./routes/certificateRoutes');
+const permissionRoutes = require('./routes/permissionRoutes');
+const settingsRoutes = require('./routes/settingsRoutes');
+const activityLogRoutes = require('./routes/activityLogRoutes');
+const statusRoutes = require('./routes/statusRoutes');
+
+const helmet = require('helmet');
+const morgan = require('morgan');
+const rateLimit = require('express-rate-limit');
 
 const app = express();
 
-const httpServer = createServer(app);
-const io = new Server(httpServer, {
-    cors: { origin: '*' }
+// Security: Set secure HTTP headers
+app.use(helmet());
+
+// Logging: Detailed API access logs
+const accessLogStream = fs.createWriteStream(path.join(__dirname, 'api_calls.log'), { flags: 'a' });
+app.use(morgan(':remote-addr - :remote-user [:date[clf]] ":method :url HTTP/:http-version" :status :res[content-length] ":referrer" ":user-agent"', { stream: accessLogStream }));
+app.use(morgan('dev')); // Console log for development
+
+// Rate Limiting: Prevent brute force and DoS
+const limiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 1000, // Limit each IP to 1000 requests per windowMs
+    message: 'Too many requests from this IP, please try again after 15 minutes',
+    standardHeaders: true,
+    legacyHeaders: false,
+});
+app.use('/api/', limiter);
+
+// Decryption middleware for encrypted requests (must be after body parsing)
+const decryptRequest = require('./middleware/decryptRequest');
+
+// Create HTTP or HTTPS server depending on environment configuration
+let server;
+let useHttps = false;
+try {
+    const httpsOptions = {};
+    if (process.env.HTTPS_KEY_PATH && process.env.HTTPS_CERT_PATH) {
+        httpsOptions.key = fs.readFileSync(process.env.HTTPS_KEY_PATH);
+        httpsOptions.cert = fs.readFileSync(process.env.HTTPS_CERT_PATH);
+        useHttps = true;
+    } else if (process.env.HTTPS_KEY && process.env.HTTPS_CERT) {
+        httpsOptions.key = process.env.HTTPS_KEY;
+        httpsOptions.cert = process.env.HTTPS_CERT;
+        useHttps = true;
+    }
+
+    if (useHttps) {
+        server = createHttpsServer(httpsOptions, app);
+        console.log('Starting HTTPS server');
+    } else {
+        server = createHttpServer(app);
+        console.log('Starting HTTP server');
+    }
+} catch (err) {
+    console.error('Failed to create HTTPS server, falling back to HTTP', err);
+    server = createHttpServer(app);
+}
+
+// Redirect HTTP to HTTPS in production if HTTPS is enabled
+if (process.env.NODE_ENV === 'production' && useHttps) {
+    app.use((req, res, next) => {
+        if (!req.secure) {
+            return res.redirect('https://' + req.headers.host + req.url);
+        }
+        next();
+    });
+}
+
+const io = new Server(server, {
+    cors: { 
+        origin: process.env.CORS_ORIGIN || '*',
+        methods: ["GET", "POST", "PUT", "DELETE", "PATCH"]
+    }
 });
 
 // Pass io to express app
 app.set('io', io);
 
-app.use(cors());
+// Configure CORS
+app.use(cors({
+    origin: process.env.CORS_ORIGIN || '*',
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Encrypted'],
+    credentials: true
+}));
+
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
-// Global Request Logger for Debugging
-app.use((req, res, next) => {
-    console.log(`[${new Date().toISOString()}] ${req.method} ${req.originalUrl}`);
-    next();
-});
+// Register decryption middleware after body parsing so req.body is populated
+app.use(decryptRequest);
+
+// Cloudflare / Proxy support
+app.set('trust proxy', 1);
 
 // Socket.io connection
 io.on('connection', (socket) => {
@@ -78,6 +156,11 @@ app.use('/api/holidays', holidayRoutes);
 app.use('/api/leave-limits', leaveLimitRoutes);
 app.use('/api/leave-types', leaveTypeRoutes);
 app.use('/api/biometric', biometricRoutes);
+app.use('/api/certificates', certificateRoutes);
+app.use('/api/permissions', permissionRoutes);
+app.use('/api/settings', settingsRoutes);
+app.use('/api/activity-logs', activityLogRoutes);
+app.use('/api/status', statusRoutes);
 
 // Production Static Files
 if (process.env.NODE_ENV === 'production') {
@@ -88,8 +171,8 @@ if (process.env.NODE_ENV === 'production') {
 }
 
 const PORT = process.env.PORT || 5000;
-httpServer.listen(PORT, () => {
+server.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
 });
 
-module.exports = { app, io };
+module.exports = { app, io, server };

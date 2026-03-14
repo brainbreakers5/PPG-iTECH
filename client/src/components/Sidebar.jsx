@@ -15,8 +15,10 @@ import {
   FaChevronLeft,
   FaClipboardCheck,
   FaCalendarAlt,
+  FaShieldAlt,
 } from 'react-icons/fa';
 import { useAuth } from '../context/AuthContext';
+import LiveStatus from './LiveStatus';
 
 const Sidebar = ({ userRole = 'staff', isOpen, onClose }) => {
   const { logout } = useAuth();
@@ -49,6 +51,7 @@ const Sidebar = ({ userRole = 'staff', isOpen, onClose }) => {
       { label: 'Attendance Records', path: '/admin/attendance', icon: <FaCalendarCheck /> },
       { label: 'Leave Balances', path: '/admin/leave-limits', icon: <FaClipboardCheck /> },
       { label: 'Timetable Setup', path: '/admin/timetable-setup', icon: <FaCalendarAlt /> },
+      { label: 'Security Logs', path: '/admin/activity-logs', icon: <FaShieldAlt /> },
       { label: 'Calendar', path: '/admin/calendar', icon: <FaCalendarDay /> },
       { label: 'Purchase Requests', path: '/admin/purchase', icon: <FaShoppingBag /> },
     ],
@@ -86,6 +89,7 @@ const Sidebar = ({ userRole = 'staff', isOpen, onClose }) => {
       { label: 'Dashboard', path: '/management', icon: <FaTachometerAlt /> },
       { label: 'Departments', path: '/management/departments', icon: <FaBuilding /> },
       { label: 'Salary Overview', path: '/management/payroll', icon: <FaMoneyBillWave /> },
+      { label: 'Attendance Records', path: '/management/attendance', icon: <FaCalendarCheck /> },
     ],
   };
 
@@ -111,20 +115,7 @@ const Sidebar = ({ userRole = 'staff', isOpen, onClose }) => {
         
         {/* Close button with real-time clock */}
         <div className="flex items-center justify-between">
-          <div className="flex flex-col">
-            <p className="text-[8px] font-black uppercase tracking-wider text-sky-600 flex items-center gap-1">
-              <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-              </svg>
-              {now.toLocaleDateString('en-GB', { weekday: 'short', day: '2-digit', month: 'short' })}
-            </p>
-            <p className="text-sm font-black text-gray-800 tracking-wide flex items-center gap-1">
-              <svg className="w-3 h-3 text-sky-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              {now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true })}
-            </p>
-          </div>
+          <LiveStatus />
           <button
             onClick={onClose}
             className="h-9 w-9 bg-white/50 text-sky-600 hover:bg-white hover:text-sky-800 rounded-xl flex items-center justify-center border border-white/50 shadow-sm transition-all active:scale-90"

@@ -80,7 +80,7 @@ EXCEPTION
 END $$;
 
 DO $$ BEGIN
-    CREATE TYPE notification_type_enum AS ENUM ('leave', 'purchase', 'birthday', 'system', 'conversation');
+    CREATE TYPE notification_type_enum AS ENUM ('leave', 'purchase', 'birthday', 'system', 'conversation', 'permission');
 EXCEPTION
     WHEN duplicate_object THEN null;
 END $$;

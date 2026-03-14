@@ -295,7 +295,6 @@ const Conversation = () => {
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 md:mb-10 gap-4 shrink-0">
                     <div>
                         <h1 className="text-2xl md:text-3xl font-black text-gray-800 tracking-tight">Conversation</h1>
-                        <p className="text-gray-500 font-medium mt-1 text-sm">Internal announcements and staff discussions.</p>
                     </div>
                     <button
                         onClick={() => setIsCreateModalOpen(true)}

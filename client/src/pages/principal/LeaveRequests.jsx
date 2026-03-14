@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import Layout from '../../components/Layout';
 import api from '../../utils/api';
 import Swal from 'sweetalert2';
-import { FaCheck, FaTimes, FaComment, FaCalendarDay, FaUserTag, FaClock, FaCheckCircle, FaTimesCircle, FaHourglassHalf, FaInfoCircle } from 'react-icons/fa';
+import { FaCheck, FaTimes, FaComment, FaCalendarDay, FaUserTag, FaClock, FaCheckCircle, FaHourglassHalf, FaGift, FaFileAlt, FaTimesCircle } from 'react-icons/fa';
 import { motion, AnimatePresence } from 'framer-motion';
 
 import { useAuth } from '../../context/AuthContext';
@@ -14,6 +14,7 @@ const LeaveRequests = () => {
     const [loading, setLoading] = useState(true);
     const [selectedIds, setSelectedIds] = useState([]);
     const [leaveTypesMap, setLeaveTypesMap] = useState({});
+    const [permissions, setPermissions] = useState([]);
     const navigate = useNavigate();
 
     // Helper function to get full leave type name
@@ -24,6 +25,7 @@ const LeaveRequests = () => {
     useEffect(() => {
         fetchLeaves();
         fetchLeaveTypes();
+        fetchPermissions();
     }, []);
 
     const fetchLeaveTypes = async () => {
@@ -35,6 +37,34 @@ const LeaveRequests = () => {
             });
             setLeaveTypesMap(map);
         } catch { console.error('Failed to fetch leave types'); }
+    };
+
+    const fetchPermissions = async () => {
+        try {
+            const { data } = await api.get('/permissions');
+            setPermissions(data);
+        } catch (err) { console.error('Failed to fetch permissions', err); }
+    };
+
+    const handlePermissionAction = async (id, status) => {
+        const { value: comments } = await Swal.fire({
+            title: `${status === 'Approved' ? 'Approve' : 'Reject'} Permission?`,
+            input: 'textarea',
+            inputLabel: 'Comments (Optional)',
+            inputPlaceholder: 'Enter your comments...',
+            showCancelButton: true,
+            confirmButtonColor: status === 'Approved' ? '#059669' : '#ef4444',
+            confirmButtonText: `Yes, ${status}`,
+        });
+        if (comments !== undefined) {
+            try {
+                await api.put(`/permissions/${id}/approve`, { status, comments });
+                Swal.fire({ title: 'Updated', text: 'Permission request updated.', icon: 'success', confirmButtonColor: '#2563eb' });
+                fetchPermissions();
+            } catch (err) {
+                Swal.fire({ title: 'Error', text: err.response?.data?.message || 'Failed to update.', icon: 'error', confirmButtonColor: '#2563eb' });
+            }
+        }
     };
 
     const fetchLeaves = async () => {
@@ -140,7 +170,9 @@ const LeaveRequests = () => {
     };
 
     const pendingLeaves = leaves.filter(l => l.my_approval_status === 'Pending');
-    const processedLeaves = leaves.filter(l => l.my_approval_status && l.my_approval_status !== 'Pending');
+    const pastLeaves = leaves.filter(l => (l.my_approval_status === 'Approved' || l.my_approval_status === 'Rejected') && l.emp_id !== user?.emp_id);
+    const pendingPerms = permissions.filter(p => p.my_approval_status === 'Pending' && p.emp_id !== user?.emp_id);
+    const pastPerms = permissions.filter(p => (p.my_approval_status === 'Approved' || p.my_approval_status === 'Rejected') && p.emp_id !== user?.emp_id);
 
     return (
         <Layout>
@@ -152,9 +184,76 @@ const LeaveRequests = () => {
                 <div className="mb-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                     <div>
                         <h1 className="text-3xl font-black text-gray-800 tracking-tight">Leave Requests</h1>
-                        <p className="text-gray-500 font-medium mt-1">Review and process employee leave requests.</p>
                     </div>
                 </div>
+
+                {/* Pending Permission Approvals */}
+                {pendingPerms.length > 0 && (
+                    <div className="modern-card !p-0 overflow-hidden border-teal-100 mb-12">
+                        <div className="bg-teal-50/30 p-6 border-b border-teal-50 flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                                <div className="h-10 w-10 rounded-xl bg-teal-100 flex items-center justify-center text-teal-600 shadow-sm border border-teal-100">
+                                    <FaFileAlt size={18} />
+                                </div>
+                                <h2 className="text-lg font-black text-gray-800 uppercase tracking-widest">Pending Permission Requests</h2>
+                            </div>
+                            <span className="bg-teal-600 text-white px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest shadow-lg shadow-teal-100">
+                                {pendingPerms.length} Requests
+                            </span>
+                        </div>
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-left border-collapse">
+                                <thead>
+                                    <tr className="bg-gray-50/50">
+                                        <th className="p-5 text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-teal-50">Employee</th>
+                                        <th className="p-5 text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-teal-50">Date & Time</th>
+                                        <th className="p-5 text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-teal-50">Reason</th>
+                                        <th className="p-5 text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-teal-50 text-center">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-teal-50/50">
+                                    <AnimatePresence>
+                                        {pendingPerms.map((perm, idx) => (
+                                            <motion.tr key={perm.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: idx * 0.05 }} className="hover:bg-teal-50/20 transition-all group">
+                                                <td className="p-5">
+                                                    <div className="flex items-center gap-4">
+                                                        <img
+                                                            src={perm.applicant_pic || `https://ui-avatars.com/api/?name=${encodeURIComponent(perm.applicant_name || '?')}&size=100&background=14b8a6&color=fff&bold=true`}
+                                                            alt=""
+                                                            className="h-12 w-12 rounded-2xl object-cover shadow-lg"
+                                                        />
+                                                        <div>
+                                                            <p className="text-sm font-black text-gray-800 tracking-tight">{perm.applicant_name}</p>
+                                                            <p className="text-[10px] font-black text-teal-500 uppercase tracking-widest mt-0.5">{perm.department_name}</p>
+                                                        </div>
+                                                    </div>
+                                                </td>
+                                                <td className="p-5">
+                                                    <p className="text-sm font-black text-gray-700">{new Date(perm.date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</p>
+                                                    <p className="text-[10px] font-bold text-gray-400 mt-0.5">{perm.from_time?.slice(0, 5)} — {perm.to_time?.slice(0, 5)}</p>
+                                                </td>
+                                                <td className="p-5 max-w-xs">
+                                                    <p className="text-sm font-black text-gray-800 truncate">{perm.subject || 'Permission Request'}</p>
+                                                    <p className="text-xs text-gray-400 font-medium line-clamp-2 mt-1 leading-relaxed">{perm.reason}</p>
+                                                </td>
+                                                <td className="p-5">
+                                                    <div className="flex justify-center gap-3">
+                                                        <button onClick={() => handlePermissionAction(perm.id, 'Approved')} className="h-10 w-10 bg-emerald-50 text-emerald-600 rounded-xl hover:bg-emerald-600 hover:text-white transition-all shadow-sm flex items-center justify-center active:scale-90" title="Approve">
+                                                            <FaCheck />
+                                                        </button>
+                                                        <button onClick={() => handlePermissionAction(perm.id, 'Rejected')} className="h-10 w-10 bg-rose-50 text-rose-600 rounded-xl hover:bg-rose-600 hover:text-white transition-all shadow-sm flex items-center justify-center active:scale-90" title="Reject">
+                                                            <FaTimes />
+                                                        </button>
+                                                    </div>
+                                                </td>
+                                            </motion.tr>
+                                        ))}
+                                    </AnimatePresence>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                )}
 
                 <div className="modern-card !p-0 overflow-hidden border-sky-100 mb-12">
                     <div className="bg-sky-50/30 p-6 border-b border-sky-50 flex items-center justify-between">
@@ -250,9 +349,11 @@ const LeaveRequests = () => {
                                                             window.dispatchEvent(new CustomEvent('closeSidebar'));
                                                         }}
                                                     >
-                                                        <div className="h-12 w-12 rounded-2xl bg-gradient-to-br from-sky-500 to-sky-700 flex items-center justify-center text-white font-black text-lg shadow-lg group-hover/profile:scale-110 transition-transform">
-                                                            {leave.applicant_name?.charAt(0)}
-                                                        </div>
+                                                        <img
+                                                            src={leave.applicant_pic || `https://ui-avatars.com/api/?name=${encodeURIComponent(leave.applicant_name || '?')}&size=100&background=0ea5e9&color=fff&bold=true`}
+                                                            alt=""
+                                                            className="h-12 w-12 rounded-2xl object-cover shadow-lg group-hover/profile:scale-110 transition-transform"
+                                                        />
                                                         <div>
                                                             <p className="text-sm font-black text-gray-800 tracking-tight group-hover/profile:text-sky-600 transition-colors">{leave.applicant_name}</p>
                                                             <p className="text-[10px] font-black text-sky-500 uppercase tracking-widest mt-0.5">{leave.department_name}</p>
@@ -261,15 +362,54 @@ const LeaveRequests = () => {
                                                 </td>
                                                 <td className="p-5">
                                                     <div className="space-y-1.5">
-                                                        <span className="inline-block px-2 py-0.5 bg-sky-100 text-sky-600 rounded-md text-[8px] font-black uppercase tracking-widest mb-1">{getLeaveTypeName(leave.leave_type)} • {leave.days_count} Days</span>
+                                                        {leave.request_type === 'comp_credit' ? (
+                                                            <span className="inline-block px-2 py-0.5 bg-purple-100 text-purple-600 rounded-md text-[8px] font-black uppercase tracking-widest mb-1">
+                                                                <FaGift className="inline mr-1" size={8} /> Comp Off Request
+                                                            </span>
+                                                        ) : (
+                                                            <span className="inline-block px-2 py-0.5 bg-sky-100 text-sky-600 rounded-md text-[8px] font-black uppercase tracking-widest mb-1">
+                                                                {getLeaveTypeName(leave.leave_type)}
+                                                                {leave.days_count > 0 && (
+                                                                    <> • {leave.days_count} Days</>
+                                                                )}
+                                                                {leave.hours && Number(leave.hours) > 0 && (
+                                                                    <>
+                                                                        {leave.days_count < 1 ? ` • ${leave.hours} Hours` : ` | ${leave.hours} Hours`}
+                                                                        {(() => {
+                                                                            try {
+                                                                                const details = typeof leave.dates_detail === 'string' ? JSON.parse(leave.dates_detail) : leave.dates_detail;
+                                                                                if (details && details.length === 1 && !details[0].is_full_day) {
+                                                                                    return ` (${details[0].from_time} - ${details[0].to_time})`;
+                                                                                }
+                                                                            } catch (e) { }
+                                                                            return '';
+                                                                        })()}
+                                                                    </>
+                                                                )}
+                                                            </span>
+                                                        )}
                                                         <div className="flex items-center gap-2 text-[10px] font-black text-gray-400 uppercase tracking-widest">
                                                             <FaCalendarDay className="text-sky-200" />
-                                                            {new Date(leave.from_date).toLocaleDateString('en-US', { day: '2-digit', month: 'short' })} - {new Date(leave.to_date).toLocaleDateString('en-US', { day: '2-digit', month: 'short' })}
+                                                            {leave.days_count > 0
+                                                                ? `${new Date(leave.from_date).toLocaleDateString('en-US', { day: '2-digit', month: 'short' })} - ${new Date(leave.to_date).toLocaleDateString('en-US', { day: '2-digit', month: 'short' })}`
+                                                                : (leave.hours && Number(leave.hours) > 0
+                                                                    ? (Number(leave.days_count) === 0 ? (() => {
+                                                                        try {
+                                                                            const details = typeof leave.dates_detail === 'string' ? JSON.parse(leave.dates_detail) : leave.dates_detail;
+                                                                            if (details && details.length === 1 && !details[0].is_full_day) {
+                                                                                return `${new Date(leave.from_date).toLocaleDateString('en-US', { day: '2-digit', month: 'short' })} | ${details[0].from_time} - ${details[0].to_time}`;
+                                                                            }
+                                                                        } catch (e) { }
+                                                                        return `${leave.hours} Hours`;
+                                                                    })() : `${leave.hours} Hours`)
+                                                                    : `${new Date(leave.from_date).toLocaleDateString('en-US', { day: '2-digit', month: 'short' })}`
+                                                                )
+                                                            }
                                                         </div>
                                                     </div>
                                                 </td>
                                                 <td className="p-5 max-w-xs">
-                                                    <p className="text-sm font-black text-gray-800 tracking-tight truncate">{leave.subject || 'Leave Request'}</p>
+                                                    <p className="text-sm font-black text-gray-800 tracking-tight truncate">{leave.subject || (leave.request_type === 'comp_credit' ? 'Comp Off Request' : 'Leave Request')}</p>
                                                     <p className="text-xs text-gray-400 font-medium line-clamp-2 mt-1 leading-relaxed">{leave.reason}</p>
                                                 </td>
                                                 <td className="p-5">
@@ -331,58 +471,207 @@ const LeaveRequests = () => {
                     )}
                 </div>
 
-                {/* Recently Processed Section */}
-                <div className="mt-16">
-                    <div className="flex items-center gap-4 mb-8">
-                        <div className="h-1 w-12 bg-sky-600 rounded-full"></div>
-                        <h3 className="text-xl font-black text-gray-800 tracking-tight uppercase tracking-[0.1em]">All Decisions</h3>
-                        <span className="bg-gray-100 text-gray-500 px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest">
-                            {processedLeaves.length} Processed
-                        </span>
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                        {processedLeaves.map((leave, idx) => (
-                            <motion.div
-                                key={leave.id}
-                                initial={{ opacity: 0, scale: 0.95 }}
-                                animate={{ opacity: 1, scale: 1 }}
-                                transition={{ delay: idx * 0.05 }}
-                                onClick={() => {
-                                    const rolePrefix = user?.role === 'admin' ? 'admin' :
-                                        user?.role === 'principal' ? 'principal' :
-                                            user?.role === 'hod' ? 'hod' : 'staff';
-                                    navigate(`/${rolePrefix}/profile/${leave.applicant_id || leave.emp_id}`);
-                                    window.dispatchEvent(new CustomEvent('closeSidebar'));
-                                }}
-                                className="modern-card group border-sky-50 hover:border-sky-200 cursor-pointer"
-                            >
-                                <div className="flex justify-between items-start mb-6">
-                                    <div className="flex flex-col gap-1">
-                                        <span className="text-[10px] font-black text-sky-500 uppercase tracking-[0.2em]">{getLeaveTypeName(leave.leave_type)}</span>
-                                        <span className="text-[8px] font-black text-gray-400 uppercase tracking-widest">{new Date(leave.updated_at).toLocaleDateString('en-US', { day: '2-digit', month: 'short', year: 'numeric' })}</span>
-                                    </div>
-                                    <div className={`flex items-center gap-1.5 py-1 px-3 rounded-lg border ${leave.my_approval_status === 'Approved' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-rose-50 text-rose-600 border-rose-100'
-                                        }`}>
-                                        {leave.my_approval_status === 'Approved' ? <FaCheckCircle size={10} /> : <FaTimesCircle size={10} />}
-                                        <span className="text-[9px] font-black uppercase tracking-widest">{leave.my_approval_status}</span>
-                                    </div>
+                {/* Past Requests Section */}
+                {pastLeaves.length > 0 && (
+                    <div className="modern-card !p-0 overflow-hidden border-gray-100">
+                        <div className="bg-gray-50/30 p-6 border-b border-gray-100 flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                                <div className="h-10 w-10 rounded-xl bg-gray-100 flex items-center justify-center text-gray-500 shadow-sm border border-gray-100">
+                                    <FaClock size={18} />
                                 </div>
-                                <h4 className="text-base font-black text-gray-800 tracking-tight group-hover:text-sky-600 transition-colors">{leave.applicant_name}</h4>
-                                <p className="text-xs text-gray-400 font-medium mt-2 line-clamp-1 italic italic underline-offset-4 mb-4">"{leave.subject || 'Standard Leave Request'}"</p>
+                                <h2 className="text-lg font-black text-gray-700 uppercase tracking-widest">Past Requests</h2>
+                            </div>
+                            <span className="bg-gray-200 text-gray-600 px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest">
+                                {pastLeaves.length} Processed
+                            </span>
+                        </div>
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-left border-collapse">
+                                <thead>
+                                    <tr className="bg-gray-50/50">
+                                        <th className="p-5 text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-100">Employee</th>
+                                        <th className="p-5 text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-100">Leave Details</th>
+                                        <th className="p-5 text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-100">Reason</th>
+                                        <th className="p-5 text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-100 text-center">Your Decision</th>
+                                        <th className="p-5 text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-100 text-center">Overall Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-gray-50">
+                                    <AnimatePresence>
+                                        {pastLeaves.map((leave, idx) => (
+                                            <motion.tr
+                                                key={leave.id}
+                                                initial={{ opacity: 0 }}
+                                                animate={{ opacity: 1 }}
+                                                transition={{ delay: idx * 0.03 }}
+                                                className="hover:bg-gray-50/30 transition-all group"
+                                            >
+                                                <td className="p-5">
+                                                    <div
+                                                        className="flex items-center gap-4 cursor-pointer group/profile"
+                                                        onClick={() => {
+                                                            const rolePrefix = user?.role === 'admin' ? 'admin' :
+                                                                user?.role === 'principal' ? 'principal' :
+                                                                    user?.role === 'hod' ? 'hod' : 'staff';
+                                                            navigate(`/${rolePrefix}/profile/${leave.applicant_id || leave.emp_id}`);
+                                                            window.dispatchEvent(new CustomEvent('closeSidebar'));
+                                                        }}
+                                                    >
+                                                        <img
+                                                            src={leave.applicant_pic || `https://ui-avatars.com/api/?name=${encodeURIComponent(leave.applicant_name || '?')}&size=100&background=0ea5e9&color=fff&bold=true`}
+                                                            alt=""
+                                                            className="h-12 w-12 rounded-2xl object-cover shadow-lg group-hover/profile:scale-110 transition-transform"
+                                                        />
+                                                        <div>
+                                                            <p className="text-sm font-black text-gray-800 tracking-tight group-hover/profile:text-sky-600 transition-colors">{leave.applicant_name}</p>
+                                                            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mt-0.5">{leave.department_name}</p>
+                                                        </div>
+                                                    </div>
+                                                </td>
+                                                <td className="p-5">
+                                                    <div className="space-y-1.5">
+                                                        {leave.request_type === 'comp_credit' ? (
+                                                            <span className="inline-block px-2 py-0.5 bg-purple-100 text-purple-600 rounded-md text-[8px] font-black uppercase tracking-widest mb-1">
+                                                                <FaGift className="inline mr-1" size={8} /> Comp Off Request
+                                                            </span>
+                                                        ) : (
+                                                            <span className="inline-block px-2 py-0.5 bg-sky-100 text-sky-600 rounded-md text-[8px] font-black uppercase tracking-widest mb-1">
+                                                                {getLeaveTypeName(leave.leave_type)} &bull; { (Number(leave.days_count) > 0) ? `${leave.days_count} Days` : (leave.hours && Number(leave.hours) > 0) ? `${leave.hours} Hours` : `${leave.days_count} Days` }
+                                                                {(() => {
+                                                                    try {
+                                                                        const details = typeof leave.dates_detail === 'string' ? JSON.parse(leave.dates_detail) : leave.dates_detail;
+                                                                        if (details && details.length === 1 && !details[0].is_full_day) {
+                                                                            return ` (${details[0].from_time} - ${details[0].to_time})`;
+                                                                        }
+                                                                    } catch (e) { }
+                                                                    return '';
+                                                                })()}
+                                                            </span>
+                                                        )}
+                                                        <div className="flex items-center gap-2 text-[10px] font-black text-gray-400 uppercase tracking-widest">
+                                                            <FaCalendarDay className="text-gray-300" />
+                                                            {new Date(leave.from_date).toLocaleDateString('en-US', { day: '2-digit', month: 'short' })} - {new Date(leave.to_date).toLocaleDateString('en-US', { day: '2-digit', month: 'short' })}
+                                                        </div>
+                                                    </div>
+                                                </td>
+                                                <td className="p-5 max-w-xs">
+                                                    <p className="text-sm font-black text-gray-800 tracking-tight truncate">{leave.subject || (leave.request_type === 'comp_credit' ? 'Comp Off Request' : 'Leave Request')}</p>
+                                                    <p className="text-xs text-gray-400 font-medium line-clamp-2 mt-1 leading-relaxed">{leave.reason}</p>
+                                                </td>
+                                                <td className="p-5 text-center">
+                                                    <div className="flex flex-col items-center gap-1">
+                                                        <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-widest ${leave.my_approval_status === 'Approved'
+                                                            ? 'bg-emerald-50 text-emerald-600 border border-emerald-100'
+                                                            : 'bg-rose-50 text-rose-600 border border-rose-100'
+                                                            }`}>
+                                                            {leave.my_approval_status === 'Approved' ? <FaCheckCircle size={10} /> : <FaTimes size={10} />}
+                                                            {leave.my_approval_status}
+                                                        </span>
+                                                        {leave.approval_acted_at && (
+                                                            <span className="text-[8px] font-bold text-gray-400">
+                                                                {new Date(leave.approval_acted_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                </td>
+                                                <td className="p-5 text-center">
+                                                    <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-widest ${leave.status === 'Approved' ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' :
+                                                        leave.status === 'Rejected' ? 'bg-rose-50 text-rose-600 border border-rose-100' :
+                                                            'bg-amber-50 text-amber-600 border border-amber-100'
+                                                        }`}>
+                                                        {leave.status === 'Approved' ? <FaCheckCircle size={10} /> :
+                                                            leave.status === 'Rejected' ? <FaTimes size={10} /> :
+                                                                <FaHourglassHalf size={10} />}
+                                                        {leave.status}
+                                                    </span>
+                                                </td>
+                                            </motion.tr>
+                                        ))}
+                                    </AnimatePresence>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                )}
 
-                                <div className="pt-4 border-t border-gray-50 flex items-center justify-between">
-                                    <div className="flex items-center gap-2 text-[9px] font-black text-gray-400 uppercase tracking-widest">
-                                        <FaClock size={10} className="text-sky-300" />
-                                        {leave.days_count} days
-                                    </div>
-                                    <div className="flex items-center gap-1 text-[9px] font-black text-sky-600 uppercase tracking-widest">
-                                        <FaInfoCircle size={10} /> Processed
-                                    </div>
+
+
+                {/* Past Permission Requests */}
+                {pastPerms.length > 0 && (
+                    <div className="modern-card !p-0 overflow-hidden border-gray-100 mb-12">
+                        <div className="bg-gray-50/30 p-6 border-b border-gray-100 flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                                <div className="h-10 w-10 rounded-xl bg-gray-100 flex items-center justify-center text-gray-500 shadow-sm border border-gray-100">
+                                    <FaFileAlt size={18} />
                                 </div>
-                            </motion.div>
-                        ))}
+                                <h2 className="text-lg font-black text-gray-700 uppercase tracking-widest">Past Permission Requests</h2>
+                            </div>
+                            <span className="bg-gray-200 text-gray-600 px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest">
+                                {pastPerms.length} Processed
+                            </span>
+                        </div>
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-left border-collapse">
+                                <thead>
+                                    <tr className="bg-gray-50/50">
+                                        <th className="p-5 text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-100">Employee</th>
+                                        <th className="p-5 text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-100">Date & Time</th>
+                                        <th className="p-5 text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-100">Reason</th>
+                                        <th className="p-5 text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-100 text-center">Your Decision</th>
+                                        <th className="p-5 text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-100 text-center">Overall Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-gray-50">
+                                    {pastPerms.map((perm, idx) => (
+                                        <motion.tr key={perm.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: idx * 0.03 }} className="hover:bg-gray-50/30 transition-all">
+                                            <td className="p-5">
+                                                <div className="flex items-center gap-4">
+                                                    <img
+                                                        src={perm.applicant_pic || `https://ui-avatars.com/api/?name=${encodeURIComponent(perm.applicant_name || '?')}&size=100&background=14b8a6&color=fff&bold=true`}
+                                                        alt=""
+                                                        className="h-12 w-12 rounded-2xl object-cover shadow-lg"
+                                                    />
+                                                    <div>
+                                                        <p className="text-sm font-black text-gray-800 tracking-tight">{perm.applicant_name}</p>
+                                                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mt-0.5">{perm.department_name}</p>
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td className="p-5">
+                                                <p className="text-sm font-black text-gray-700">{new Date(perm.date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</p>
+                                                <p className="text-[10px] font-bold text-gray-400 mt-0.5">{perm.from_time?.slice(0, 5)} — {perm.to_time?.slice(0, 5)}</p>
+                                            </td>
+                                            <td className="p-5 max-w-xs">
+                                                <p className="text-sm font-black text-gray-800 truncate">{perm.subject || 'Permission Request'}</p>
+                                                <p className="text-xs text-gray-400 font-medium line-clamp-2 mt-1 leading-relaxed">{perm.reason}</p>
+                                            </td>
+                                            <td className="p-5 text-center">
+                                                <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-widest ${perm.my_approval_status === 'Approved' ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' :
+                                                    'bg-rose-50 text-rose-600 border border-rose-100'
+                                                    }`}>
+                                                    {perm.my_approval_status === 'Approved' ? <FaCheckCircle size={10} /> : <FaTimesCircle size={10} />}
+                                                    {perm.my_approval_status}
+                                                </span>
+                                            </td>
+                                            <td className="p-5 text-center">
+                                                <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-widest ${perm.status === 'Approved' ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' :
+                                                    perm.status === 'Rejected' ? 'bg-rose-50 text-rose-600 border border-rose-100' :
+                                                        'bg-amber-50 text-amber-600 border border-amber-100'
+                                                    }`}>
+                                                    {perm.status === 'Approved' ? <FaCheckCircle size={10} /> :
+                                                        perm.status === 'Rejected' ? <FaTimesCircle size={10} /> :
+                                                            <FaHourglassHalf size={10} />}
+                                                    {perm.status}
+                                                </span>
+                                            </td>
+                                        </motion.tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
-                </div>
+                )}
+
             </motion.div>
         </Layout>
     );

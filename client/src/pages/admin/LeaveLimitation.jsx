@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import Layout from '../../components/Layout';
 import api from '../../utils/api';
 import Swal from 'sweetalert2';
+import { useSocket } from '../../context/SocketContext';
 import {
     FaEdit, FaSearch, FaCalendarAlt, FaCheckCircle,
     FaUserTie, FaBuilding, FaSave, FaTimes, FaClipboardList, FaPlus, FaTrash
@@ -30,16 +31,24 @@ const LeaveLimitation = () => {
     const [toMonth, setToMonth] = useState(new Date().toISOString().slice(0, 7));
     const [leaveTypes, setLeaveTypes] = useState([]);
     const [showAddLeaveType, setShowAddLeaveType] = useState(false);
+    const socket = useSocket();
 
     useEffect(() => {
         fetchLimits();
         fetchLeaveTypes();
     }, [fromMonth, toMonth]);
 
+    useEffect(() => {
+        if (!socket) return;
+        const handler = () => fetchLimits();
+        socket.on('leave_limits_updated', handler);
+        return () => socket.off('leave_limits_updated', handler);
+    }, [socket, fromMonth]);
+
     const fetchLeaveTypes = async () => {
         try {
             const { data } = await api.get('/leave-types');
-            setLeaveTypes(data.filter(t => t.key !== 'lop').map(t => ({
+            const types = data.filter(t => t.key !== 'lop').map(t => ({
                 id: t.id,
                 key: t.key,
                 label: t.label,
@@ -47,7 +56,20 @@ const LeaveLimitation = () => {
                 color: t.color,
                 defaultDays: t.default_days,
                 isDefault: t.is_default
-            })));
+            }));
+
+            // Add Permission Letter as a virtual type for tracking limits
+            types.push({
+                key: 'permission',
+                label: 'PL',
+                full: 'Permission Letter',
+                color: 'indigo',
+                defaultDays: 2,
+                isDefault: true,
+                isVirtual: true
+            });
+
+            setLeaveTypes(types);
         } catch (error) {
             console.error('Failed to fetch leave types', error);
         }
@@ -58,7 +80,7 @@ const LeaveLimitation = () => {
         try {
             const year = new Date(fromMonth).getFullYear();
             const { data } = await api.get(`/leave-limits?year=${year}`);
-            
+
             // Filter data based on month range if additional date fields exist
             // For now, we show all data for the selected year
             // This can be enhanced when month-specific leave records are available
@@ -70,13 +92,22 @@ const LeaveLimitation = () => {
         }
     };
 
-    const noLimitTypes = ['od', 'ml', 'comp'];
+    const noLimitTypes = ['od', 'ml', 'comp', 'comp_leave'];
+
+    // Map leave type key to DB column prefix (comp_leave → comp)
+    const colPrefix = (key) => key === 'comp_leave' ? 'comp' : key;
 
     const startEdit = (emp) => {
         setEditingId(emp.emp_id);
-        setEditValues({
+        const values = {
             cl_limit: emp.cl_limit ?? 12,
-        });
+            ml_limit: emp.ml_limit ?? 12,
+            od_limit: emp.od_limit ?? 10,
+            comp_limit: emp.comp_limit ?? 6,
+            lop_limit: emp.lop_limit ?? 30,
+            permission_limit: emp.permission_limit ?? 2,
+        };
+        setEditValues(values);
     };
 
     const cancelEdit = () => {
@@ -87,7 +118,7 @@ const LeaveLimitation = () => {
     const saveEdit = async (emp_id) => {
         try {
             const year = new Date(fromMonth).getFullYear();
-            await api.put(`/leave-limits/${emp_id}`, { year, ...editValues });
+            await api.put(`/leave-limits/${emp_id}`, { year, fromMonth, toMonth, ...editValues });
             Swal.fire({
                 title: 'Limits Updated!',
                 text: 'Leave limits have been saved successfully.',
@@ -145,12 +176,12 @@ const LeaveLimitation = () => {
                 const code = document.getElementById('leave_code')?.value;
                 const days = document.getElementById('leave_days')?.value;
                 const color = document.getElementById('leave_color')?.value;
-                
+
                 if (!name || !code) {
                     Swal.showValidationMessage('Please fill in all required fields');
                     return false;
                 }
-                
+
                 return { name, code, days: parseInt(days), color };
             }
         });
@@ -215,12 +246,12 @@ const LeaveLimitation = () => {
                 const code = document.getElementById('leave_code')?.value;
                 const days = document.getElementById('leave_days')?.value;
                 const color = document.getElementById('leave_color')?.value;
-                
+
                 if (!name || !code) {
                     Swal.showValidationMessage('Please fill in all required fields');
                     return false;
                 }
-                
+
                 return { name, code, days: parseInt(days), color };
             }
         });
@@ -270,7 +301,8 @@ const LeaveLimitation = () => {
     };
 
     const handleBulkSet = async () => {
-        const editableTypes = leaveTypes.filter(t => !noLimitTypes.includes(t.key));
+        // Exclude no-limit types AND permission (it has its own dedicated button)
+        const editableTypes = leaveTypes.filter(t => !noLimitTypes.includes(t.key) && t.key !== 'permission');
         const { value: formValues } = await Swal.fire({
             title: 'Set Default Limits for All Staff',
             html: `
@@ -291,12 +323,12 @@ const LeaveLimitation = () => {
                         ${editableTypes.map(t => `
                             <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:10px;">
                                 <label style="font-size:12px; font-weight:900; color:#6b7280; text-transform:uppercase; letter-spacing:0.1em; flex:1;">${t.full} (${t.label})</label>
-                                <input id="bulk_${t.key}" type="number" min="0" max="365" value="${t.defaultDays || 12}"
+                                <input id="bulk_${t.key}" type="number" min="0" max="365" value="${t.key === 'permission' ? 2 : (t.defaultDays || 12)}"
                                     style="width:80px; padding:8px 12px; border:2px solid #e5e7eb; border-radius:12px; font-weight:700; font-size:14px; text-align:center; outline:none;">
                             </div>
                         `).join('')}
                         <div style="margin-top:8px; padding:8px 12px; background:#f0fdf4; border-radius:10px; font-size:11px; color:#16a34a; font-weight:700;">
-                            Comp Leave (auto-calculated), OD &amp; ML (no limit) are not editable.
+                            ML, OD, and Comp Leave are automatically handled or have no limit. PL is monthly.
                         </div>
                     </div>
                 </div>
@@ -332,6 +364,69 @@ const LeaveLimitation = () => {
         }
     };
 
+    // Dedicated bulk-set handler for Permission Letter limit
+    const handleBulkSetPL = async () => {
+        const { value: formValues } = await Swal.fire({
+            title: '✉️ Bulk Set Permission Letter Limit',
+            html: `
+                <div style="display:grid; gap:18px; text-align:left; padding:10px 0;">
+                    <div style="background:#eef2ff; border-radius:14px; padding:14px 16px; font-size:12px; color:#4338ca; font-weight:700; line-height:1.6;">
+                        ✉️ Set the monthly permission letter allowance for <strong>all staff</strong>.
+                        Employees who reach this limit cannot apply for more permissions in that month.
+                    </div>
+                    <div>
+                        <label style="font-size:11px; font-weight:900; color:#64748b; text-transform:uppercase; letter-spacing:0.1em; display:block; margin-bottom:8px;">Monthly Permission Limit (per employee)</label>
+                        <div style="display:flex; align-items:center; gap:12px;">
+                            <input id="pl_limit_value" type="number" min="0" max="30" value="2"
+                                style="width:100px; padding:12px 16px; border:2px solid #c7d2fe; border-radius:14px; font-weight:900; font-size:24px; text-align:center; outline:none; color:#4338ca; background:#f5f3ff;"
+                            >
+                            <span style="font-size:13px; color:#6b7280; font-weight:700;">permissions / month</span>
+                        </div>
+                    </div>
+                    <div style="background:#f0fdf4; border-radius:10px; padding:10px 14px; font-size:11px; color:#16a34a; font-weight:700;">
+                        💡 Default is 2. This affects all employees. Individual limits can be edited per-employee using the edit (✏️) button.
+                    </div>
+                </div>
+            `,
+            showCancelButton: true,
+            confirmButtonColor: '#4f46e5',
+            cancelButtonColor: '#6b7280',
+            confirmButtonText: 'Apply to All Staff',
+            cancelButtonText: 'Cancel',
+            focusConfirm: false,
+            width: '480px',
+            preConfirm: () => {
+                const val = parseInt(document.getElementById('pl_limit_value')?.value);
+                if (isNaN(val) || val < 0) {
+                    Swal.showValidationMessage('Please enter a valid number (0 or more)');
+                    return false;
+                }
+                return { permission_limit: val };
+            }
+        });
+
+        if (formValues) {
+            try {
+                const year = new Date(fromMonth).getFullYear();
+                Swal.fire({ title: 'Applying...', didOpen: () => Swal.showLoading() });
+                await Promise.all(
+                    staffData.map(emp =>
+                        api.put(`/leave-limits/${emp.emp_id}`, { year, ...formValues })
+                    )
+                );
+                Swal.fire({
+                    title: 'Done!',
+                    text: `Permission limit set to ${formValues.permission_limit}/month for all staff.`,
+                    icon: 'success',
+                    confirmButtonColor: '#4f46e5'
+                });
+                fetchLimits();
+            } catch {
+                Swal.fire({ title: 'Error', text: 'Some updates failed.', icon: 'error' });
+            }
+        }
+    };
+
     const filtered = staffData.filter(emp =>
         emp.name?.toLowerCase().includes(search.toLowerCase()) ||
         emp.department_name?.toLowerCase().includes(search.toLowerCase()) ||
@@ -347,7 +442,7 @@ const LeaveLimitation = () => {
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-10 gap-6">
                     <div>
                         <h1 className="text-3xl font-black text-gray-800 tracking-tight">Leave Balances</h1>
-                        <p className="text-gray-500 font-medium mt-1">Set per-employee leave limits and manage leave types.</p>
+
                     </div>
                     <div className="flex flex-wrap items-center justify-between gap-3 w-full">
                         <div className="flex items-center gap-3">
@@ -370,14 +465,23 @@ const LeaveLimitation = () => {
                                 />
                             </div>
                         </div>
-                        
-                        {/* Bulk Set Button - Right Corner */}
-                        <button
-                            onClick={handleBulkSet}
-                            className="bg-sky-600 text-white px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-widest shadow-lg shadow-sky-100 hover:bg-sky-700 transition-all flex items-center gap-2 active:scale-95"
-                        >
-                            <FaClipboardList size={14} /> Bulk Set
-                        </button>
+
+                        {/* Bulk Set Buttons */}
+                        <div className="flex items-center gap-2">
+                            <button
+                                onClick={handleBulkSet}
+                                className="bg-sky-600 text-white px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-widest shadow-lg shadow-sky-100 hover:bg-sky-700 transition-all flex items-center gap-2 active:scale-95"
+                            >
+                                <FaClipboardList size={14} /> Bulk Set
+                            </button>
+                            <button
+                                onClick={handleBulkSetPL}
+                                className="bg-indigo-600 text-white px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-widest shadow-lg shadow-indigo-100 hover:bg-indigo-700 transition-all flex items-center gap-2 active:scale-95"
+                                title="Bulk set Permission Letter monthly limit for all staff"
+                            >
+                                ✉️ Bulk Set PL
+                            </button>
+                        </div>
                     </div>
                 </div>
 
@@ -408,7 +512,7 @@ const LeaveLimitation = () => {
                                         >
                                             <FaEdit size={11} />
                                         </button>
-                                        {!t.isDefault && (
+                                        {!t.isDefault && !t.isVirtual && (
                                             <button
                                                 onClick={() => handleDeleteLeaveType(t)}
                                                 className="h-6 w-6 flex items-center justify-center rounded-lg text-gray-400 hover:text-rose-600 hover:bg-rose-100 transition-all"
@@ -482,15 +586,25 @@ const LeaveLimitation = () => {
                                         >
                                             {/* Employee Info */}
                                             <td className="p-5">
-                                                <div>
-                                                    <p className="text-sm font-black text-gray-800 tracking-tight">{emp.name}</p>
-                                                    <div className="flex items-center gap-2 mt-0.5">
-                                                        <span className="text-[9px] font-black text-sky-500 uppercase tracking-widest">{emp.designation || emp.role}</span>
-                                                        {emp.department_name && (
-                                                            <>
-                                                                <span className="text-gray-200">•</span>
-                                                                <span className="text-[9px] font-bold text-gray-400">{emp.department_name}</span>
-                                                            </>
+                                                <div className="flex items-center gap-3">
+                                                    <img
+                                                        src={emp.profile_pic || `https://ui-avatars.com/api/?name=${encodeURIComponent(emp.name || '?')}&size=80&background=0ea5e9&color=fff&bold=true`}
+                                                        alt=""
+                                                        className="h-9 w-9 rounded-xl object-cover shadow-sm shrink-0"
+                                                    />
+                                                    <div>
+                                                        <p className="text-sm font-black text-gray-800 tracking-tight">{emp.name}</p>
+                                                        <div className="flex items-center gap-2 mt-0.5">
+                                                            <span className="text-[9px] font-black text-sky-500 uppercase tracking-widest">{emp.designation || emp.role}</span>
+                                                            {emp.department_name && (
+                                                                <>
+                                                                    <span className="text-gray-200">•</span>
+                                                                    <span className="text-[9px] font-bold text-gray-400">{emp.department_name}</span>
+                                                                </>
+                                                            )}
+                                                        </div>
+                                                        {emp.from_month && emp.to_month && (
+                                                            <p className="text-[8px] font-bold text-emerald-500 mt-0.5">{emp.from_month} → {emp.to_month}</p>
                                                         )}
                                                     </div>
                                                 </div>
@@ -498,10 +612,11 @@ const LeaveLimitation = () => {
 
                                             {/* Leave Type Cells */}
                                             {leaveTypes.map(t => {
-                                                const limitKey = `${t.key}_limit`;
-                                                const takenKey = `${t.key}_taken`;
+                                                const prefix = colPrefix(t.key);
+                                                const limitKey = `${prefix}_limit`;
+                                                const takenKey = `${prefix}_taken`;
                                                 const isNoLimit = noLimitTypes.includes(t.key);
-                                                const isComp = t.key === 'comp';
+                                                const isComp = t.key === 'comp' || t.key === 'comp_leave';
                                                 const limit = isComp ? (emp.comp_earned ?? 0) : (isNoLimit ? null : (isEditing ? editValues[limitKey] : (emp[limitKey] ?? '-')));
                                                 const taken = emp[takenKey] ?? 0;
                                                 const pct = limit > 0 ? Math.min(100, Math.round((taken / limit) * 100)) : 0;
@@ -602,7 +717,7 @@ const LeaveLimitation = () => {
                     {fromMonth} to {toMonth} · Leave Management · {filtered.length} employee{filtered.length !== 1 ? 's' : ''}
                 </p>
             </motion.div>
-        </Layout>
+        </Layout >
     );
 };
 

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { FaArrowLeft, FaSave, FaUser, FaUniversity, FaMapMarkerAlt, FaUsers, FaLock } from 'react-icons/fa';
+import { FaArrowLeft, FaSave, FaUser, FaUniversity, FaMapMarkerAlt, FaUsers, FaLock, FaCertificate, FaPlus, FaTrash } from 'react-icons/fa';
 import Layout from '../../components/Layout';
 import api from '../../utils/api';
 import Swal from 'sweetalert2';
@@ -40,11 +40,14 @@ const EmployeeFormPage = () => {
     };
 
     const [formData, setFormData] = useState(defaultData);
+    const [certificates, setCertificates] = useState([]);
+    const [existingCerts, setExistingCerts] = useState([]);
 
     useEffect(() => {
         fetchDepartments();
         if (id) {
             fetchEmployee();
+            fetchCertificates();
         } else {
             setLoading(false);
         }
@@ -54,6 +57,13 @@ const EmployeeFormPage = () => {
         try {
             const { data } = await api.get('/departments');
             setDepartments(data);
+        } catch (error) { console.error(error); }
+    };
+
+    const fetchCertificates = async () => {
+        try {
+            const { data } = await api.get(`/certificates/${id}`);
+            setExistingCerts(data);
         } catch (error) { console.error(error); }
     };
 
@@ -92,6 +102,49 @@ const EmployeeFormPage = () => {
         }
     };
 
+    const addCertRow = () => {
+        setCertificates([...certificates, { certificate_name: '', file_name: '', file_type: '', file_data: '' }]);
+    };
+
+    const removeCertRow = (index) => {
+        setCertificates(certificates.filter((_, i) => i !== index));
+    };
+
+    const handleCertNameChange = (index, value) => {
+        const updated = [...certificates];
+        updated[index].certificate_name = value;
+        setCertificates(updated);
+    };
+
+    const handleCertFileChange = (index, e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        if (file.size > 10 * 1024 * 1024) {
+            return Swal.fire({ title: 'File Too Large', text: 'Please select a file smaller than 10MB.', icon: 'warning', confirmButtonColor: '#2563eb' });
+        }
+        const reader = new FileReader();
+        reader.onloadend = () => {
+            const updated = [...certificates];
+            updated[index].file_data = reader.result;
+            updated[index].file_name = file.name;
+            updated[index].file_type = file.type;
+            setCertificates(updated);
+        };
+        reader.readAsDataURL(file);
+    };
+
+    const deleteExistingCert = async (certId) => {
+        const confirm = await Swal.fire({ title: 'Delete Certificate?', text: 'This action cannot be undone.', icon: 'warning', showCancelButton: true, confirmButtonColor: '#ef4444', confirmButtonText: 'Delete' });
+        if (!confirm.isConfirmed) return;
+        try {
+            await api.delete(`/certificates/${certId}`);
+            setExistingCerts(existingCerts.filter(c => c.id !== certId));
+            Swal.fire({ title: 'Deleted', icon: 'success', timer: 1200, showConfirmButton: false });
+        } catch (error) {
+            Swal.fire('Error', 'Failed to delete certificate', 'error');
+        }
+    };
+
 
     const handleSubmit = async (e) => {
         if (e) e.preventDefault();
@@ -106,6 +159,8 @@ const EmployeeFormPage = () => {
         }
 
         try {
+            let userId = formData.id;
+
             if (id) {
                 await api.put(`/employees/${formData.id}`, formData);
 
@@ -133,6 +188,11 @@ const EmployeeFormPage = () => {
                 });
             } else {
                 await api.post('/employees', formData);
+                // Fetch newly created employee to get userId for certificate uploads
+                try {
+                    const { data: newEmp } = await api.get(`/employees/${formData.emp_id}`);
+                    userId = newEmp.id;
+                } catch (_) {}
                 Swal.fire({
                     title: 'Added',
                     text: 'New employee has been added successfully.',
@@ -141,6 +201,19 @@ const EmployeeFormPage = () => {
                     showConfirmButton: false
                 });
             }
+
+            // Upload new certificates
+            if (userId && certificates.length > 0) {
+                const validCerts = certificates.filter(c => c.certificate_name && c.file_data);
+                for (const cert of validCerts) {
+                    try {
+                        await api.post(`/certificates/${userId}`, cert);
+                    } catch (certErr) {
+                        console.error('Certificate upload failed:', certErr);
+                    }
+                }
+            }
+
             navigate('/admin/employees');
         } catch (error) {
             Swal.fire({
@@ -383,6 +456,81 @@ const EmployeeFormPage = () => {
                                     </select>
                                 </div>
                             </div>
+                        </FormSection>
+
+                        <FormSection title="Certificates" icon={<FaCertificate />}>
+                            {/* Existing Certificates (edit mode) */}
+                            {existingCerts.length > 0 && (
+                                <div className="mb-8">
+                                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-4 ml-1">Uploaded Certificates</p>
+                                    <div className="space-y-3">
+                                        {existingCerts.map((cert) => (
+                                            <div key={cert.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-2xl border border-gray-100">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="h-10 w-10 rounded-xl bg-sky-50 text-sky-600 flex items-center justify-center">
+                                                        <FaCertificate />
+                                                    </div>
+                                                    <div>
+                                                        <p className="text-sm font-black text-gray-800">{cert.certificate_name}</p>
+                                                        <p className="text-[10px] font-bold text-gray-400">{cert.file_name}</p>
+                                                    </div>
+                                                </div>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => deleteExistingCert(cert.id)}
+                                                    className="h-9 w-9 rounded-xl bg-red-50 text-red-500 flex items-center justify-center hover:bg-red-100 transition-colors"
+                                                >
+                                                    <FaTrash size={12} />
+                                                </button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* New Certificate Rows */}
+                            <div className="space-y-6">
+                                {certificates.map((cert, index) => (
+                                    <div key={index} className="grid grid-cols-1 md:grid-cols-2 gap-6 p-6 bg-gray-50/50 rounded-2xl border border-gray-100 relative">
+                                        <button
+                                            type="button"
+                                            onClick={() => removeCertRow(index)}
+                                            className="absolute top-4 right-4 h-8 w-8 rounded-lg bg-red-50 text-red-500 flex items-center justify-center hover:bg-red-100 transition-colors"
+                                        >
+                                            <FaTrash size={10} />
+                                        </button>
+                                        <div>
+                                            <label className={labelClass}>Certificate Name</label>
+                                            <input
+                                                value={cert.certificate_name}
+                                                onChange={(e) => handleCertNameChange(index, e.target.value)}
+                                                className={inputClass}
+                                                placeholder="e.g. B.Ed Certificate, SSLC Marksheet"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className={labelClass}>Upload File</label>
+                                            <input
+                                                type="file"
+                                                accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
+                                                onChange={(e) => handleCertFileChange(index, e)}
+                                                className={inputClass + " file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-[10px] file:font-black file:bg-sky-50 file:text-sky-600 file:uppercase file:tracking-widest hover:file:bg-sky-100"}
+                                            />
+                                            {cert.file_name && (
+                                                <p className="mt-2 text-[10px] font-bold text-green-600">✓ {cert.file_name}</p>
+                                            )}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+
+                            <button
+                                type="button"
+                                onClick={addCertRow}
+                                className="mt-6 px-6 py-3 bg-sky-50 text-sky-600 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-sky-100 transition-colors flex items-center gap-2"
+                            >
+                                <FaPlus size={10} /> Add Certificate
+                            </button>
                         </FormSection>
 
                         <FormSection title="Account Security" icon={<FaLock />}>

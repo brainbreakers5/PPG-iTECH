@@ -1,6 +1,7 @@
 const { pool } = require('../config/db');
 const bcrypt = require('bcryptjs');
 const sendEmail = require('../utils/sendEmail');
+const logActivity = require('../utils/activityLogger');
 
 // @desc    Get employees with birthday today
 // @route   GET /api/employees/birthdays/today
@@ -78,6 +79,7 @@ exports.createEmployee = async (req, res) => {
         if (io) io.emit('employee_updated', { action: 'created', role, name });
 
         res.status(201).json({ message: 'Employee created successfully' });
+        await logActivity(req.user.id, 'CREATE_EMPLOYEE', { emp_id: trimmedEmpId, role }, req.ip);
 
         // Send Email Notification
         if (email) {
@@ -127,7 +129,8 @@ Please log in to the portal using these credentials.
 exports.getEmployees = async (req, res) => {
     try {
         let query = `
-            SELECT u.*, 
+            SELECT u.id, u.emp_id, u.emp_code, u.name, u.role, u.email, u.mobile,
+                   u.department_id, u.designation, u.profile_pic,
                    TO_CHAR(u.dob, 'YYYY-MM-DD') as dob,
                    TO_CHAR(u.doj, 'YYYY-MM-DD') as doj,
                    d.name as department_name 
@@ -147,6 +150,8 @@ exports.getEmployees = async (req, res) => {
             }
         }
         // Admin and Principal still see everyone
+
+        query += ` ORDER BY u.name ASC`;
 
         const { rows } = await pool.query(query, params);
         res.json(rows);
@@ -258,6 +263,7 @@ exports.updateEmployee = async (req, res) => {
         if (io) io.emit('employee_updated', { action: 'updated' });
 
         res.json({ message: 'Employee updated successfully' });
+        await logActivity(req.user.id, 'UPDATE_EMPLOYEE', { target_id: req.params.id }, req.ip);
     } catch (error) {
         console.error('UPDATE ERROR:', error);
         res.status(500).json({ message: 'Server Error: ' + error.message });
@@ -335,6 +341,7 @@ exports.deleteEmployee = async (req, res) => {
         if (io) io.emit('employee_updated', { action: 'deleted' });
 
         res.json({ message: `Employee ${name} deleted successfully. Any pending leave requests have been cancelled.` });
+        await logActivity(req.user.id, 'DELETE_EMPLOYEE', { emp_id, name }, req.ip);
     } catch (error) {
         await client.query('ROLLBACK');
         console.error('DELETE EMPLOYEE ERROR:', error);

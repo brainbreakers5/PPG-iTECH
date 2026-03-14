@@ -297,7 +297,7 @@ const AdminCalendar = () => {
                         <CalendarIcon className="text-sky-600" />
                         Manage Calendar
                     </h1>
-                    <p className="text-gray-500 font-medium mt-1">Configure institutional schedule, holidays, and events.</p>
+
                 </div>
 
                 <div className="flex items-center gap-4">

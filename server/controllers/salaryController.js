@@ -23,13 +23,13 @@ exports.calculateSalary = async (req, res) => {
             const { rows: stats } = await pool.query(`
                 SELECT 
                     SUM(CASE WHEN status::text = ANY($4::text[]) THEN 1 ELSE 0 END) as payable_days,
-                    SUM(CASE WHEN status::text = 'LOP' THEN 1 ELSE 0 END) as lop
+                    SUM(CASE WHEN status = 'LOP' THEN 1 ELSE 0 END) as total_lop
                 FROM attendance_records
                 WHERE emp_id = $1 AND EXTRACT(MONTH FROM date) = $2 AND EXTRACT(YEAR FROM date) = $3
              `, [user.emp_id, month, year, paidStatuses]);
 
             const payableDays = parseInt(stats[0].payable_days) || 0;
-            const lop = parseInt(stats[0].lop) || 0;
+            const totalLop = parseInt(stats[0].total_lop) || 0;
 
             const totalDays = 30; // Standard month
             const salaryPerDay = user.monthly_salary / totalDays;
@@ -43,7 +43,7 @@ exports.calculateSalary = async (req, res) => {
                 total_leave = EXCLUDED.total_leave, 
                 total_lop = EXCLUDED.total_lop,
                 calculated_salary = EXCLUDED.calculated_salary
-             `, [user.emp_id, month, year, payableDays, 0, lop, calculatedAmount]);
+             `, [user.emp_id, month, year, payableDays, 0, totalLop, calculatedAmount]);
 
             results.push({
                 emp_id: user.emp_id,
@@ -66,7 +66,7 @@ exports.getSalaryRecords = async (req, res) => {
         const { month, year } = req.query;
 
         let query = `
-            SELECT s.*, u.name, u.role, d.name as department_name, u.monthly_salary
+            SELECT s.*, u.name, u.role, u.profile_pic, d.name as department_name, u.monthly_salary
             FROM salary_records s
             JOIN users u ON s.emp_id = u.emp_id
             LEFT JOIN departments d ON u.department_id = d.id
@@ -108,6 +108,29 @@ exports.updateSalaryStatus = async (req, res) => {
         const { status } = req.body;
         await pool.query('UPDATE salary_records SET status = $1 WHERE id = $2', [status, req.params.id]);
         res.json({ message: `Salary marked as ${status}` });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Server Error' });
+    }
+};
+
+// @desc    Publish all pending salaries for a month/year
+// @route   POST /api/salary/publish
+// @access  Private (Admin)
+exports.publishSalaries = async (req, res) => {
+    const { month, year } = req.body;
+    if (!month || !year) return res.status(400).json({ message: 'Month and year are required' });
+
+    try {
+        const { rowCount } = await pool.query(
+            `UPDATE salary_records SET status = 'Paid' WHERE month = $1 AND year = $2 AND status = 'Pending'`,
+            [month, year]
+        );
+
+        const io = req.app.get('io');
+        if (io) io.emit('salary_published', { month, year });
+
+        res.json({ message: `${rowCount} salary records published`, count: rowCount });
     } catch (error) {
         console.error(error);
         res.status(500).json({ message: 'Server Error' });
