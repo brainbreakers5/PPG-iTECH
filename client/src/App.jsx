@@ -202,11 +202,15 @@ const AppContent = () => {
 function App() {
   return (
     <Router>
+
+      <InstallApp />
+
       <AuthProvider>
         <SocketProvider>
           <AppContent />
         </SocketProvider>
       </AuthProvider>
+
     </Router>
   );
 }
