@@ -70,6 +70,9 @@ const Login = () => {
                 console.log('📍 Navigating to:', route);
                 navigate(route, { replace: true });
                 setLoading(false);
+                // Clear form
+                setEmpId('');
+                setPin('');
             }, 600);
             
         } catch (error) {
@@ -77,14 +80,29 @@ const Login = () => {
             console.error('Error details:', {
                 message: error.message,
                 response: error.response?.data,
-                status: error.response?.status
+                status: error.response?.status,
+                url: error.config?.url
             });
             setLoading(false);
+            
+            // Determine error message
+            let errorMessage = 'Invalid credentials';
+            if (error.message === 'Network Error') {
+                errorMessage = 'Network error - Please check your connection. Is the server running?';
+            } else if (error.response?.status === 401) {
+                errorMessage = 'Invalid Employee ID or PIN';
+            } else if (error.response?.status === 500) {
+                errorMessage = 'Server error - Please try again later';
+            } else if (error.response?.data?.message) {
+                errorMessage = error.response.data.message;
+            } else if (error.message) {
+                errorMessage = error.message;
+            }
             
             Swal.fire({
                 icon: 'error',
                 title: 'Login Failed',
-                text: error.response?.data?.message || error.message || 'Invalid credentials',
+                text: errorMessage,
                 confirmButtonColor: '#2563eb'
             });
         }
