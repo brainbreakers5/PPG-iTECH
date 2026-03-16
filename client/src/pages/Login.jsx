@@ -110,12 +110,9 @@ const Login = () => {
                     <motion.div
                         whileHover={{ rotate: 5, scale: 1.05 }}
                         transition={{ type: 'spring', stiffness: 300 }}
-                        className="w-[72px] h-[72px] rounded-2xl mx-auto mb-6 flex items-center justify-center overflow-hidden"
-                        style={{
-                            boxShadow: '0 12px 30px -6px rgba(37,99,235,0.4)',
-                        }}
+                        className="w-[88px] h-[88px] mx-auto mb-6 flex items-center justify-center drop-shadow-xl"
                     >
-                        <img src="/ppg-logo.jpeg" alt="PPG Institute of Technology" className="w-full h-full object-cover" />
+                        <img src="/ppg-logo.png" alt="PPG Institute of Technology" className="w-full h-full object-contain" />
                     </motion.div>
 
                     <h1 className="text-3xl font-black text-white tracking-tight leading-tight">
