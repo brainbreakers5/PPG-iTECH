@@ -117,41 +117,59 @@ const Header = ({ toggleSidebar, sidebarOpen }) => {
         }
 
         fetchNotifications();
+        // Auto-refresh every 10 seconds like dashboard for real-time updates
+        const interval = setInterval(fetchNotifications, 10000);
+        return () => clearInterval(interval);
+    }, []);
 
-        // Listen for all notifications
-        if (socket) {
-            socket.on('notification_received', (newNotif) => {
-                setNotifications(prev => [newNotif, ...prev]);
-                setUnreadCount(prev => prev + 1);
+    // Real-time socket listeners for instant notifications
+    useEffect(() => {
+        if (!socket) return;
+
+        // Listen for all notifications - instant updates
+        socket.on('notification_received', (newNotif) => {
+            console.log('Real-time notification received:', newNotif);
+            setNotifications(prev => {
+                // Check if notification already exists to avoid duplicates
+                const exists = prev.some(n => n.id === newNotif.id);
+                return exists ? prev : [newNotif, ...prev];
             });
+            setUnreadCount(prev => prev + 1);
+        });
 
-            socket.on('biometric_punch', (data) => {
-                // Capture client's current LOCAL time
-                const now = new Date();
-                const year = now.getFullYear();
-                const month = String(now.getMonth() + 1).padStart(2, '0');
-                const day = String(now.getDate()).padStart(2, '0');
-                const hours = String(now.getHours()).padStart(2, '0');
-                const minutes = String(now.getMinutes()).padStart(2, '0');
-                const seconds = String(now.getSeconds()).padStart(2, '0');
-                const localTimestamp = `${year}-${month}-${day}T${hours}:${minutes}:${seconds}`;
+        // Listen for biometric punch specifically
+        socket.on('biometric_punch', (data) => {
+            console.log('Real-time punch received:', data);
+            // Capture client's current LOCAL time
+            const now = new Date();
+            const year = now.getFullYear();
+            const month = String(now.getMonth() + 1).padStart(2, '0');
+            const day = String(now.getDate()).padStart(2, '0');
+            const hours = String(now.getHours()).padStart(2, '0');
+            const minutes = String(now.getMinutes()).padStart(2, '0');
+            const seconds = String(now.getSeconds()).padStart(2, '0');
+            const localTimestamp = `${year}-${month}-${day}T${hours}:${minutes}:${seconds}`;
 
-                const newNotif = {
-                    id: Date.now(),
-                    message: `${data.name} punched ${data.type} at ${data.time}`,
-                    type: 'system',
-                    created_at: localTimestamp,
-                    is_read: false,
-                    metadata: null
-                };
-                setNotifications(prev => [newNotif, ...prev]);
-                setUnreadCount(prev => prev + 1);
+            const newNotif = {
+                id: Date.now(),
+                message: `${data.name} punched ${data.type} at ${data.time}`,
+                type: 'system',
+                created_at: localTimestamp,
+                is_read: false,
+                metadata: null
+            };
+            setNotifications(prev => [newNotif, ...prev]);
+            setUnreadCount(prev => prev + 1);
+        });
 
-                // Optional: Play a sound or show a system toast
-                console.log('Real-time punch received:', data);
-            });
-        }
+        return () => {
+            socket.off('notification_received');
+            socket.off('biometric_punch');
+        };
+    }, [socket]);
 
+    // Handle click outside for dropdowns
+    useEffect(() => {
         const handleClickOutside = (e) => {
             if (notifRef.current && !notifRef.current.contains(e.target)) {
                 setShowNotifs(false);
@@ -163,12 +181,8 @@ const Header = ({ toggleSidebar, sidebarOpen }) => {
         document.addEventListener('mousedown', handleClickOutside);
         return () => {
             document.removeEventListener('mousedown', handleClickOutside);
-            if (socket) {
-                socket.off('biometric_punch');
-                socket.off('notification_received');
-            }
         };
-    }, [user, socket]);
+    }, []);
 
     // Search handler
     const performSearch = (query) => {
