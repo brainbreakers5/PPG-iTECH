@@ -259,20 +259,52 @@ const AdminDashboard = () => {
                 </div>
             </motion.div>
 
-            {/* Personal Attendance Section */}
-            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="mb-16">
-                <div className="flex items-center gap-4 mb-8">
-                    <div className="h-1 w-12 bg-sky-600 rounded-full"></div>
-                    <h2 className="text-xl font-black text-gray-800 tracking-tight uppercase tracking-[0.1em]">Your Personal Attendance</h2>
+            {/* Monthly Summary Bar (Mirrors Management) */}
+            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="mb-10">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <motion.div
+                        whileHover={{ scale: 1.03, y: -3 }}
+                        whileTap={{ scale: 0.97 }}
+                        onClick={() => navigate('/admin/calendar')}
+                        className="bg-emerald-50 border border-emerald-100 rounded-2xl p-5 flex items-center gap-4 cursor-pointer hover:border-emerald-300 hover:shadow-md hover:shadow-emerald-100 transition-all font-sans"
+                    >
+                        <div className="h-11 w-11 rounded-xl bg-emerald-500 text-white flex items-center justify-center shadow-sm">
+                            <FaCalendarAlt />
+                        </div>
+                        <div>
+                            <p className="text-[9px] font-black text-emerald-500 uppercase tracking-widest">Working Days</p>
+                            <p className="text-2xl font-black text-emerald-700 tracking-tighter">{monthStats.workingDays}</p>
+                        </div>
+                    </motion.div>
+                    <motion.div
+                        whileHover={{ scale: 1.03, y: -3 }}
+                        whileTap={{ scale: 0.97 }}
+                        onClick={() => navigate('/admin/calendar')}
+                        className="bg-rose-50 border border-rose-100 rounded-2xl p-5 flex items-center gap-4 cursor-pointer hover:border-rose-300 hover:shadow-md hover:shadow-rose-100 transition-all font-sans"
+                    >
+                        <div className="h-11 w-11 rounded-xl bg-rose-500 text-white flex items-center justify-center shadow-sm">
+                            <FaCalendarDay />
+                        </div>
+                        <div>
+                            <p className="text-[9px] font-black text-rose-500 uppercase tracking-widest">Holidays</p>
+                            <p className="text-2xl font-black text-rose-700 tracking-tighter">{monthStats.holidays}</p>
+                        </div>
+                    </motion.div>
+                    <motion.div
+                        whileHover={{ scale: 1.03, y: -3 }}
+                        whileTap={{ scale: 0.97 }}
+                        onClick={() => navigate('/admin/calendar')}
+                        className="bg-amber-50 border border-amber-100 rounded-2xl p-5 flex items-center gap-4 cursor-pointer hover:border-amber-300 hover:shadow-md hover:shadow-amber-100 transition-all font-sans"
+                    >
+                        <div className="h-11 w-11 rounded-xl bg-amber-500 text-white flex items-center justify-center shadow-sm">
+                            <FaStar />
+                        </div>
+                        <div>
+                            <p className="text-[9px] font-black text-amber-500 uppercase tracking-widest">Special Events</p>
+                            <p className="text-2xl font-black text-amber-700 tracking-tighter">{monthStats.specialEvents}</p>
+                        </div>
+                    </motion.div>
                 </div>
-                
-                <PersonalAttendanceChart 
-                    stats={myStats} 
-                    onStatClick={handleStatClick} 
-                    activeFilter={statusFilter} 
-                    monthStats={monthStats}
-                    onMonthStatsClick={() => navigate('/admin/calendar')}
-                />
             </motion.div>
 
             {/* Filter Active Banner */}
@@ -295,56 +327,6 @@ const AdminDashboard = () => {
                     </motion.div>
                 )}
             </AnimatePresence>
-
-
-            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="mb-10 lg:hidden">
-                <div className="grid grid-cols-3 gap-4">
-                    <motion.div
-                        whileHover={{ scale: 1.03, y: -3 }}
-                        whileTap={{ scale: 0.97 }}
-                        onClick={() => navigate('/admin/calendar')}
-                        className="bg-emerald-50 border border-emerald-100 rounded-2xl p-5 flex items-center gap-4 cursor-pointer hover:border-emerald-300 hover:shadow-md hover:shadow-emerald-100 transition-all"
-                    >
-                        <div className="h-11 w-11 rounded-xl bg-emerald-500 text-white flex items-center justify-center shadow-sm">
-                            <FaCalendarAlt />
-                        </div>
-                        <div>
-                            <p className="text-[9px] font-black text-emerald-500 uppercase tracking-widest">Working Days</p>
-                            <p className="text-2xl font-black text-emerald-700 tracking-tighter">{monthStats.workingDays}</p>
-                        </div>
-                    </motion.div>
-                    <motion.div
-                        whileHover={{ scale: 1.03, y: -3 }}
-                        whileTap={{ scale: 0.97 }}
-                        onClick={() => navigate('/admin/calendar')}
-                        className="bg-rose-50 border border-rose-100 rounded-2xl p-5 flex items-center gap-4 cursor-pointer hover:border-rose-300 hover:shadow-md hover:shadow-rose-100 transition-all"
-                    >
-                        <div className="h-11 w-11 rounded-xl bg-rose-500 text-white flex items-center justify-center shadow-sm">
-                            <FaCalendarDay />
-                        </div>
-                        <div>
-                            <p className="text-[9px] font-black text-rose-500 uppercase tracking-widest">Holidays</p>
-                            <p className="text-2xl font-black text-rose-700 tracking-tighter">{monthStats.holidays}</p>
-                        </div>
-                    </motion.div>
-                    <motion.div
-                        whileHover={{ scale: 1.03, y: -3 }}
-                        whileTap={{ scale: 0.97 }}
-                        onClick={() => navigate('/admin/calendar')}
-                        className="bg-amber-50 border border-amber-100 rounded-2xl p-5 flex items-center gap-4 cursor-pointer hover:border-amber-300 hover:shadow-md hover:shadow-amber-100 transition-all"
-                    >
-                        <div className="h-11 w-11 rounded-xl bg-amber-500 text-white flex items-center justify-center shadow-sm">
-                            <FaStar />
-                        </div>
-                        <div>
-                            <p className="text-[9px] font-black text-amber-500 uppercase tracking-widest">Special Events</p>
-                            <p className="text-2xl font-black text-amber-700 tracking-tighter">{monthStats.specialEvents}</p>
-                        </div>
-                    </motion.div>
-                </div>
-            </motion.div>
-
-
             {/* Stats Grid */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-12">
                 {roleConfigs.map((role) => (
@@ -629,6 +611,22 @@ const AdminDashboard = () => {
                     </motion.div>
                 )}
             </AnimatePresence>
+
+            {/* Personal Attendance Section - Moved to Bottom (Similar to Management Focus) */}
+            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="mt-16 mb-10">
+                <div className="flex items-center gap-4 mb-8">
+                    <div className="h-1 w-12 bg-sky-600 rounded-full"></div>
+                    <h2 className="text-xl font-black text-gray-800 tracking-tight uppercase tracking-[0.1em]">Your Personal Attendance</h2>
+                </div>
+                
+                <PersonalAttendanceChart 
+                    stats={myStats} 
+                    onStatClick={handleStatClick} 
+                    activeFilter={statusFilter} 
+                    monthStats={monthStats}
+                    onMonthStatsClick={() => navigate('/admin/calendar')}
+                />
+            </motion.div>
 
             <div className="mt-16">
                 <AttendanceHistory empId={user?.emp_id} statusFilter={statusFilter} />
