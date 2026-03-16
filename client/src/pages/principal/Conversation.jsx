@@ -28,9 +28,11 @@ const Conversation = () => {
     const [loading, setLoading] = useState(true);
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
     const [allStaff, setAllStaff] = useState([]);
+    const [departments, setDepartments] = useState([]);
     const [topicForm, setTopicForm] = useState({
         title: '',
         target_role: 'all',
+        target_dept_id: 'all',
         target_type: 'all', // 'all' or 'particular'
         selected_users: [] // array of emp_ids
     });
@@ -42,7 +44,15 @@ const Conversation = () => {
     useEffect(() => {
         fetchThreads();
         fetchAllStaff();
+        fetchDepartments();
     }, []);
+
+    const fetchDepartments = async () => {
+        try {
+            const { data } = await api.get('/departments');
+            setDepartments(data);
+        } catch (error) { console.error("Error fetching departments", error); }
+    };
 
     const fetchAllStaff = async () => {
         try {
@@ -161,6 +171,7 @@ const Conversation = () => {
 
     const filteredTopicEmployees = eligibleEmployees
         .filter(s => topicForm.target_role === 'all' || (s.role || '').toLowerCase() === topicForm.target_role)
+        .filter(s => topicForm.target_dept_id === 'all' || Number(s.department_id) === Number(topicForm.target_dept_id))
         .filter(s =>
             s.name.toLowerCase().includes(searchStaff.toLowerCase()) ||
             (s.department_name || '').toLowerCase().includes(searchStaff.toLowerCase()) ||
@@ -172,8 +183,14 @@ const Conversation = () => {
         if (selectedThread.target_user_ids && selectedThread.target_user_ids.length > 0) {
             return eligibleEmployees.filter(s => selectedThread.target_user_ids.includes(s.emp_id));
         }
-        if (selectedThread.target_role === 'all') return eligibleEmployees;
-        return eligibleEmployees.filter(s => (s.role || '').toLowerCase() === selectedThread.target_role);
+        let filtered = eligibleEmployees;
+        if (selectedThread.target_role && selectedThread.target_role !== 'all') {
+            filtered = filtered.filter(s => (s.role || '').toLowerCase() === selectedThread.target_role);
+        }
+        if (selectedThread.target_dept_id) {
+            filtered = filtered.filter(s => Number(s.department_id) === Number(selectedThread.target_dept_id));
+        }
+        return filtered;
     };
 
     const handleSendMessage = async (e) => {
@@ -386,7 +403,7 @@ const Conversation = () => {
                                                 onClick={() => setIsParticipantModalOpen(true)}
                                                 className="flex items-center gap-2 text-[9px] font-black text-sky-500 bg-sky-50 px-2 md:px-3 py-2 rounded-xl border border-sky-100 uppercase tracking-widest hover:bg-sky-600 hover:text-white transition-all cursor-pointer"
                                             >
-                                                <FaBullhorn size={10} /> Scope: {selectedThread.target_role}
+                                                <FaBullhorn size={10} /> Scope: {selectedThread.target_role} {selectedThread.target_dept_id ? `| ${departments.find(d => Number(d.id) === Number(selectedThread.target_dept_id))?.name || 'Dept'}` : '| All Depts'}
                                             </button>
                                             {selectedThread.creator_id === user.emp_id && (
                                                 <div className="flex gap-2">
@@ -544,8 +561,8 @@ const Conversation = () => {
                                     />
                                 </div>
 
-                                {/* Target Role */}
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                 {/* Targeting Options */}
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8">
                                     <div>
                                         <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 mb-2">Target Role</label>
                                         <select
@@ -560,25 +577,39 @@ const Conversation = () => {
                                         </select>
                                     </div>
                                     <div>
-                                        <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 mb-2">Scope</label>
-                                        <div className="flex bg-gray-50 rounded-2xl p-1.5 border border-gray-100 h-[58px]">
-                                            {[
-                                                { id: 'all', label: 'All' },
-                                                { id: 'particular', label: 'Specific' }
-                                            ].map(opt => (
-                                                <button
-                                                    key={opt.id}
-                                                    type="button"
-                                                    onClick={() => setTopicForm({ ...topicForm, target_type: opt.id })}
-                                                    className={`flex-1 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all ${topicForm.target_type === opt.id
-                                                        ? 'bg-white text-sky-600 shadow-sm'
-                                                        : 'text-gray-400 hover:text-gray-600'
-                                                        }`}
-                                                >
-                                                    {opt.label}
-                                                </button>
+                                        <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 mb-2">Target Department</label>
+                                        <select
+                                            className="w-full bg-gray-50 border border-gray-100 rounded-2xl p-4 font-black text-gray-700 text-sm outline-none focus:ring-4 focus:ring-sky-50 transition-all cursor-pointer"
+                                            value={topicForm.target_dept_id}
+                                            onChange={e => setTopicForm({ ...topicForm, target_dept_id: e.target.value, target_type: 'all', selected_users: [] })}
+                                        >
+                                            <option value="all">All Departments</option>
+                                            {departments.map(dept => (
+                                                <option key={dept.id} value={dept.id}>{dept.name}</option>
                                             ))}
-                                        </div>
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 mb-2">Selection Scope</label>
+                                    <div className="flex bg-gray-50 rounded-2xl p-1.5 border border-gray-100 h-[58px]">
+                                        {[
+                                            { id: 'all', label: 'Broadcast to all in scope' },
+                                            { id: 'particular', label: 'Select Specific Individuals' }
+                                        ].map(opt => (
+                                            <button
+                                                key={opt.id}
+                                                type="button"
+                                                onClick={() => setTopicForm({ ...topicForm, target_type: opt.id })}
+                                                className={`flex-1 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all ${topicForm.target_type === opt.id
+                                                    ? 'bg-white text-sky-600 shadow-sm'
+                                                    : 'text-gray-400 hover:text-gray-600'
+                                                    }`}
+                                            >
+                                                {opt.label}
+                                            </button>
+                                        ))}
                                     </div>
                                 </div>
 
@@ -663,10 +694,11 @@ const Conversation = () => {
                                             await api.post('/conversations', {
                                                 title: topicForm.title,
                                                 target_role: topicForm.target_role,
+                                                target_dept_id: topicForm.target_dept_id === 'all' ? null : topicForm.target_dept_id,
                                                 target_user_ids: topicForm.target_type === 'particular' ? topicForm.selected_users : null
                                             });
                                             setIsCreateModalOpen(false);
-                                            setTopicForm({ title: '', target_role: 'all', target_type: 'all', selected_users: [] });
+                                            setTopicForm({ title: '', target_role: 'all', target_dept_id: 'all', target_type: 'all', selected_users: [] });
                                             fetchThreads();
                                             Swal.fire({
                                                 title: 'Topic Created',
