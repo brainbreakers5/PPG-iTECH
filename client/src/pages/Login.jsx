@@ -65,6 +65,8 @@ const Login = () => {
                 confirmButtonColor: '#2563eb'
             });
             setLoading(false);
+        } finally {
+            setLoading(false);
         }
     };
 
