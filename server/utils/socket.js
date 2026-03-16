@@ -5,7 +5,7 @@ module.exports = {
         const { Server } = require('socket.io');
         io = new Server(server, {
             cors: {
-                origin: process.env.CLIENT_URL || "https://ppg-i-tech.vercel.app",
+                origin: process.env.CLIENT_URL || "http://localhost:3000",
                 methods: ["GET", "POST"]
             }
         });
