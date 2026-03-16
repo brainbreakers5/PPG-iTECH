@@ -7,6 +7,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useSocket } from '../../context/SocketContext';
 import { FaUserCheck, FaUserTimes, FaBus, FaFileAlt, FaCalendarDay, FaCalendarAlt, FaStar, FaBriefcase, FaTimes, FaFilter, FaClock, FaBookOpen, FaDoorOpen, FaChalkboardTeacher } from 'react-icons/fa';
 import AttendanceHistory from '../../components/AttendanceHistory';
+import PersonalAttendanceChart from '../../components/PersonalAttendanceChart';
 import { useTimetableConfig } from '../../hooks/useTimetableConfig';
 
 const to12h = (timeStr) => {
@@ -206,7 +207,7 @@ const StaffDashboard = () => {
             </motion.div>
 
             {/* Monthly Summary Bar */}
-            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="mb-10">
+            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="mb-10 lg:hidden">
                 <div className="grid grid-cols-3 gap-4">
                     <motion.div
                         whileHover={{ scale: 1.03, y: -3 }}
@@ -261,44 +262,21 @@ const StaffDashboard = () => {
                 </div>
             ) : (
                 <>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-12">
-                        {stats.map((stat, idx) => {
-                            const isActive = statusFilter === stat.filterKey;
-                            return (
-                                <motion.div
-                                    key={stat.label}
-                                    initial={{ opacity: 0, y: 20 }}
-                                    animate={{ opacity: 1, y: 0 }}
-                                    transition={{ delay: idx * 0.08 }}
-                                    whileHover={{ y: -6, scale: 1.03 }}
-                                    whileTap={{ scale: 0.97 }}
-                                    onClick={() => handleStatClick(stat.filterKey)}
-                                    className={`bg-white rounded-[32px] shadow-lg border p-8 group relative overflow-hidden flex flex-col items-center text-center cursor-pointer transition-all duration-200 ${
-                                        isActive
-                                            ? 'border-sky-400 shadow-sky-200 ring-2 ring-sky-400 ring-offset-2'
-                                            : 'border-sky-50 shadow-sky-50/50 hover:border-sky-200'
-                                    }`}
-                                >
-                                    <div className={`absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r ${stat.gradientClass}`} />
-                                    {isActive && (
-                                        <span className="absolute top-3 right-3 px-2 py-0.5 bg-sky-600 text-white text-[8px] font-black uppercase tracking-wider rounded-full">
-                                            Filtered
-                                        </span>
-                                    )}
-                                    <div className={`h-14 w-14 rounded-[20px] ${stat.bgClass} ${stat.colorClass} flex items-center justify-center text-xl shadow-sm mb-5 group-hover:rotate-6 transition-transform duration-500`}>
-                                        {stat.icon}
-                                    </div>
-                                    <span className="text-4xl font-black text-gray-800 tracking-tighter mb-2 leading-none">
-                                        {stat.value}
-                                    </span>
-                                    <span className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">
-                                        {stat.label}
-                                    </span>
-                                    <div className="absolute -bottom-8 -right-8 w-24 h-24 bg-gray-50 rounded-full blur-2xl opacity-60" />
-                                </motion.div>
-                            );
-                        })}
-                    </div>
+                    {/* Personal Attendance Section */}
+                    <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="mb-16">
+                        <div className="flex items-center gap-4 mb-8">
+                            <div className="h-1 w-12 bg-sky-600 rounded-full"></div>
+                            <h2 className="text-xl font-black text-gray-800 tracking-tight uppercase tracking-[0.1em]">Your Personal Attendance</h2>
+                        </div>
+                        
+                        <PersonalAttendanceChart 
+                            stats={myStats} 
+                            onStatClick={handleStatClick} 
+                            activeFilter={statusFilter} 
+                            monthStats={monthStats}
+                            onMonthStatsClick={() => navigate('/staff/calendar')}
+                        />
+                    </motion.div>
 
                     {/* Filter Active Banner */}
                     <AnimatePresence>
