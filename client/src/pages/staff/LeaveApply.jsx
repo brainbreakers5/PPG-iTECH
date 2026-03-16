@@ -104,7 +104,8 @@ const LeaveApply = () => {
 
     const fetchStaff = async () => {
         try {
-            const { data } = await api.get('/employees');
+            // Fetch all staff across departments for replacement selection
+            const { data } = await api.get('/employees?all=true');
             setStaffList(data);
         } catch { console.error("Fetch staff failed"); }
     };
@@ -1922,3 +1923,4 @@ const LeaveApply = () => {
 };
 
 export default LeaveApply;
+
