@@ -46,6 +46,7 @@ import EmployeeFormPage from './pages/admin/EmployeeFormPage';
 import DepartmentFormPage from './pages/admin/DepartmentFormPage';
 import PurchaseRequestPage from './pages/shared/PurchaseRequestPage';
 import ActivityLogs from './pages/admin/ActivityLogs';
+import Notifications from './pages/shared/Notifications';
 
 // Management Pages
 import ManagementDashboard from './pages/management/ManagementDashboard';
@@ -135,6 +136,7 @@ const AppContent = () => {
             <Route path="timetable-setup" element={<TimetableSetup />} />
             <Route path="profile/:id" element={<ProfilePage />} />
             <Route path="personnel/:role" element={<PersonnelListPage />} />
+            <Route path="notifications" element={<Notifications />} />
           </Routes>
         </ProtectedRoute>
       } />
@@ -159,6 +161,7 @@ const AppContent = () => {
             <Route path="timetable/:empId" element={<HODTimetable />} />
             <Route path="profile/:id" element={<ProfilePage />} />
             <Route path="personnel/:role" element={<PersonnelListPage />} />
+            <Route path="notifications" element={<Notifications />} />
           </Routes>
         </ProtectedRoute>
       } />
@@ -181,6 +184,7 @@ const AppContent = () => {
             <Route path="calendar" element={<InstitutionalCalendar />} />
             <Route path="profile/:id" element={<ProfilePage />} />
             <Route path="personnel/:role" element={<PersonnelListPage />} />
+            <Route path="notifications" element={<Notifications />} />
           </Routes>
         </ProtectedRoute>
       } />
@@ -198,6 +202,7 @@ const AppContent = () => {
             <Route path="timetables/:empId" element={<StaffTimetable />} />
             <Route path="calendar" element={<InstitutionalCalendar />} />
             <Route path="profile/:id" element={<ProfilePage />} />
+            <Route path="notifications" element={<Notifications />} />
           </Routes>
         </ProtectedRoute>
       } />
@@ -213,6 +218,7 @@ const AppContent = () => {
             <Route path="attendance/:empId/:month" element={<DetailedAttendancePage />} />
             <Route path="attendance/:empId/:startDate/:endDate" element={<DetailedAttendancePage />} />
             <Route path="profile/:id" element={<ProfilePage />} />
+            <Route path="notifications" element={<Notifications />} />
           </Routes>
         </ManagementRoute>
       } />
