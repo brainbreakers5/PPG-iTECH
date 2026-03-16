@@ -257,22 +257,44 @@ const Header = ({ toggleSidebar, sidebarOpen }) => {
 
         switch (notification.type) {
             case 'leave':
-                // For leaves/permissions, different roles have different "incoming" pages
-                if (role === 'principal') {
-                    navigate('/principal/leaves');
-                } else if (role === 'hod') {
-                    navigate('/hod/leaves#approvals');
-                } else if (role === 'staff') {
-                    navigate('/staff/leaves#approvals');
+                if (metadata.isStatusUpdate) {
+                    if (role === 'principal') {
+                        navigate('/principal/leave-history');
+                    } else if (['hod', 'staff'].includes(role)) {
+                        navigate(`/${role}/leaves#history`);
+                    } else {
+                        navigate(`/${role}/profile/${user.emp_id}`);
+                    }
+                } else {
+                    // For leaves/permissions, different roles have different "incoming" pages
+                    if (role === 'principal') {
+                        navigate('/principal/leaves');
+                    } else if (role === 'hod') {
+                        navigate('/hod/leaves#approvals');
+                    } else if (role === 'staff') {
+                        navigate('/staff/leaves#approvals');
+                    }
                 }
                 break;
             case 'permission':
-                if (role === 'principal') {
-                    navigate('/principal/leaves');
-                } else if (role === 'hod') {
-                    navigate('/hod/leaves#permission');
-                } else if (role === 'staff') {
-                    navigate('/staff/leaves#permission');
+                if (metadata.isStatusUpdate) {
+                    if (role === 'principal') {
+                        // Principal might view permission history in leave-history or a dedicated page if it exists
+                        // Based on App.jsx, there's no principal/permission-history, so leave-history or leaves page
+                        navigate('/principal/leave-history');
+                    } else if (['hod', 'staff'].includes(role)) {
+                        navigate(`/${role}/leaves#permission`); // Permission tab shows "My Permission Requests"
+                    } else {
+                        navigate(`/${role}/profile/${user.emp_id}`);
+                    }
+                } else {
+                    if (role === 'principal') {
+                        navigate('/principal/leaves');
+                    } else if (role === 'hod') {
+                        navigate('/hod/leaves#permission');
+                    } else if (role === 'staff') {
+                        navigate('/staff/leaves#permission');
+                    }
                 }
                 break;
             case 'purchase':
