@@ -40,12 +40,13 @@ exports.getConversations = async (req, res) => {
                     FROM messages WHERE conversation_id = c.id) as last_message_time
             FROM conversations c
             JOIN users u ON c.creator_id = u.emp_id
-            WHERE c.target_role = 'all'
-                OR c.target_role = $1
-                OR (c.target_role = 'staff' AND $2 IN ('hod', 'principal', 'admin'))
-                OR c.target_dept_id = $3
-                OR c.creator_id = $4
+            WHERE c.creator_id = $4
                 OR $4 = ANY(c.target_user_ids)
+                OR (
+                    c.target_user_ids IS NULL
+                    AND (c.target_role = 'all' OR c.target_role = $1 OR (c.target_role = 'staff' AND $2 IN ('hod', 'principal', 'admin')))
+                    AND (c.target_dept_id IS NULL OR c.target_dept_id = $3)
+                )
             ORDER BY c.created_at DESC
         `;
 
