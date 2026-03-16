@@ -171,13 +171,6 @@ const AdminDashboard = () => {
 
     const roleConfigs = [
         {
-            key: 'principal', title: 'Principal',
-            accentClass: 'from-sky-500 to-sky-700',
-            canViewAll: true,
-            modalRole: 'principal',
-            totalCount: principalList.length
-        },
-        {
             key: 'hod', title: 'HODs',
             accentClass: 'from-amber-400 to-amber-600',
             canViewAll: true,
