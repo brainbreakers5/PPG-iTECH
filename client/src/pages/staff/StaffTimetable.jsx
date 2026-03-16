@@ -50,7 +50,8 @@ const StaffTimetable = () => {
 
     const fetchStaff = async () => {
         try {
-            const { data } = await api.get('/employees');
+            // Fetch all staff across departments to allow viewing their schedules
+            const { data } = await api.get('/employees?all=true');
             setStaffList(data);
         } catch { console.error('Failed to fetch staff'); }
     };
