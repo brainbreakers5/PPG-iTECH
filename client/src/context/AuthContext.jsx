@@ -12,13 +12,16 @@ export const AuthProvider = ({ children }) => {
     useEffect(() => {
         const checkUser = async () => {
             const token = localStorage.getItem('token');
-            const isManagement = sessionStorage.getItem('managementAccess') === 'true';
+            const isManagement = localStorage.getItem('managementAccess') === 'true';
             if (token && !isManagement) {
                 try {
                     const { data } = await api.get('/auth/profile');
                     setUser(data);
+                    // Store role for fast redirect on next open
+                    localStorage.setItem('lastRole', data.role);
                 } catch (error) {
                     localStorage.removeItem('token');
+                    localStorage.removeItem('lastRole');
                     setUser(null);
                 }
             }
@@ -30,12 +33,16 @@ export const AuthProvider = ({ children }) => {
     const login = async (emp_id, pin) => {
         const { data } = await api.post('/auth/login', { emp_id, pin });
         localStorage.setItem('token', data.token);
+        localStorage.setItem('lastRole', data.role);
         setUser(data);
         return data;
     };
 
     const logout = () => {
         localStorage.removeItem('token');
+        localStorage.removeItem('lastRole');
+        localStorage.removeItem('managementAccess');
+        sessionStorage.removeItem('managementAccess');
         setUser(null);
     };
 
