@@ -31,15 +31,13 @@ const Sidebar = ({ userRole = 'staff', isOpen, onClose }) => {
   }, []);
 
   const handleLogout = () => {
-    const isManagementMode = userRole === 'management';
+    // Clear ALL auth storage regardless of role
     sessionStorage.removeItem('managementAccess');
-    if (isManagementMode) {
-      localStorage.removeItem('token');
-      navigate('/login');
-    } else {
-      logout();
-      navigate('/login');
-    }
+    localStorage.removeItem('managementAccess');
+    localStorage.removeItem('token');
+    localStorage.removeItem('lastRole');
+    logout(); // also clears AuthContext user state
+    navigate('/login');
   };
 
   const menuItems = {
