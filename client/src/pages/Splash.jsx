@@ -74,8 +74,8 @@ const Splash = ({ onFinish }) => {
                                 className="absolute -inset-3 rounded-[32px]"
                                 style={{ background: 'linear-gradient(135deg, rgba(56,189,248,0.3), rgba(99,102,241,0.2))', filter: 'blur(12px)' }}
                             />
-                            <div className="relative w-28 h-28 rounded-[28px] bg-white shadow-2xl flex items-center justify-center overflow-hidden border border-white/20">
-                                <img src="/ppg logo.jpeg" alt="PPG EMP HUB" className="w-full h-full object-cover" />
+                            <div className="relative w-36 h-36 flex items-center justify-center drop-shadow-2xl">
+                                <img src="/ppg-logo.png" alt="PPG EMP HUB" className="w-full h-full object-contain" />
                             </div>
                         </motion.div>
 
