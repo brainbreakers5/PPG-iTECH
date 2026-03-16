@@ -275,6 +275,7 @@ const Login = () => {
                             }).then((result) => {
                                 if (result.isConfirmed && result.value) {
                                     localStorage.setItem('token', result.value.token);
+                                    localStorage.setItem('managementAccess', 'true');
                                     sessionStorage.setItem('managementAccess', 'true');
                                     Swal.fire({
                                         icon: 'success',
