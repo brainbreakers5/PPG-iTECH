@@ -191,7 +191,7 @@ exports.approvePermission = async (req, res) => {
                 [permissionId]
             );
 
-            await createNotification(reqRows[0].emp_id, `Your permission request has been REJECTED by ${req.user.name}.`, 'permission', null, client);
+            await createNotification(reqRows[0].emp_id, `Your permission request has been REJECTED by ${req.user.name}.`, 'permission', { isStatusUpdate: true }, client);
         }
 
         // 4. Handle Approval & Escalation
@@ -281,7 +281,7 @@ exports.approvePermission = async (req, res) => {
                         }
                     }
 
-                    await createNotification(emp_id, `Your permission request for ${new Date(date).toLocaleDateString('en-IN')} has been APPROVED. Attendance marked as Present.`, 'permission', null, client);
+                    await createNotification(emp_id, `Your permission request for ${new Date(date).toLocaleDateString('en-IN')} has been APPROVED. Attendance marked as Present.`, 'permission', { isStatusUpdate: true }, client);
 
                     const io = req.app.get('io');
                     if (io) {
