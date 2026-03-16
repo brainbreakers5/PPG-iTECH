@@ -52,18 +52,28 @@ const Notifications = () => {
 
     useEffect(() => {
         fetchNotifications();
+        // Auto-refresh every 15 seconds like dashboard
+        const interval = setInterval(fetchNotifications, 15000);
+        return () => clearInterval(interval);
     }, [fetchNotifications]);
 
     useEffect(() => {
         if (!socket) return;
 
-        // Listen for all notification types
+        // Listen for all notification types - instant updates
         socket.on('notification_received', (newNotif) => {
-            setNotifications(prev => [newNotif, ...prev]);
+            console.log('Real-time notification received:', newNotif);
+            setNotifications(prev => {
+                // Check if notification already exists to avoid duplicates
+                const exists = prev.some(n => n.id === newNotif.id);
+                return exists ? prev : [newNotif, ...prev];
+            });
+            setLoading(false);
         });
 
-        // Listen for biometric punch specifically if needed
+        // Listen for biometric punch specifically
         socket.on('biometric_punch', (data) => {
+            console.log('Real-time punch received:', data);
             const now = new Date();
             const localTimestamp = now.toISOString().replace('Z', '');
             const newNotif = {
@@ -75,6 +85,7 @@ const Notifications = () => {
                 metadata: null
             };
             setNotifications(prev => [newNotif, ...prev]);
+            setLoading(false);
         });
 
         return () => {
