@@ -5,8 +5,9 @@ import { useSocket } from '../../context/SocketContext';
 import { useAuth } from '../../context/AuthContext';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
-import { FaBirthdayCake, FaUserCheck, FaUserTimes, FaCalendarDay, FaFileAlt, FaTimes, FaCalendarAlt, FaStar, FaBriefcase, FaEye, FaClock, FaHistory } from 'react-icons/fa';
+import { FaBirthdayCake, FaUserCheck, FaUserTimes, FaCalendarDay, FaFileAlt, FaTimes, FaCalendarAlt, FaStar, FaBriefcase, FaEye, FaClock, FaHistory, FaFilter } from 'react-icons/fa';
 import AttendanceHistory from '../../components/AttendanceHistory';
+import PersonalAttendanceChart from '../../components/PersonalAttendanceChart';
 
 // ── Small helper components ─────────────────────────────────────────────────
 // Small helper components removed ...
@@ -41,7 +42,9 @@ const AdminDashboard = () => {
         hod: { present: 0, absent: 0, od: 0, cl: 0, ml: 0, comp_leave: 0, lop: 0, late_entry: 0 },
         staff: { present: 0, absent: 0, od: 0, cl: 0, ml: 0, comp_leave: 0, lop: 0, late_entry: 0 }
     });
+    const [myStats, setMyStats] = useState({ present: 0, absent: 0, od: 0, cl: 0, ml: 0, comp_leave: 0, lop: 0, late_entry: 0 });
     const [birthdays, setBirthdays] = useState([]);
+    const [statusFilter, setStatusFilter] = useState(null);
     const [allEmployees, setAllEmployees] = useState([]);
     const [attendanceMap, setAttendanceMap] = useState({});
     const [monthStats, setMonthStats] = useState({ workingDays: 0, holidays: 0, specialEvents: 0 });
@@ -56,6 +59,24 @@ const AdminDashboard = () => {
             setBirthdays(bdays);
             const { data: emps } = await api.get('/employees');
             setAllEmployees(emps);
+
+            // Fetch My Personal stats for the month
+            const monthStr = date.slice(0, 7);
+            const { data: myRecords } = await api.get(`/attendance?month=${monthStr}&emp_id=${user?.emp_id}`);
+            const myCounts = { present: 0, absent: 0, od: 0, cl: 0, ml: 0, comp_leave: 0, lop: 0, late_entry: 0 };
+            (myRecords || []).forEach(r => {
+                const s = (r.status || '').toUpperCase();
+                const rem = (r.remarks || '').toUpperCase();
+                if (s.includes('PRESENT')) myCounts.present++;
+                if (s.includes('ABSENT')) myCounts.absent++;
+                if (s.includes('OD') || rem.includes('OD')) myCounts.od++;
+                if ((s.includes('CL') || rem.includes('CL') || rem.includes('CASUAL')) && !s.includes('COMP') && !rem.includes('COMP')) myCounts.cl++;
+                if (s.includes('ML') || rem.includes('ML') || rem.includes('MEDICAL')) myCounts.ml++;
+                if (s.includes('COMP LEAVE') || rem.includes('COMP LEAVE')) myCounts.comp_leave++;
+                if (s.includes('LOP') || rem.includes('LOP')) myCounts.lop++;
+                if (rem.includes('LATE ENTRY')) myCounts.late_entry++;
+            });
+            setMyStats(myCounts);
 
 
             // Build attendance map: emp_id -> status for today
@@ -163,6 +184,10 @@ const AdminDashboard = () => {
     };
 
 
+    const handleStatClick = (filter) => {
+        setStatusFilter(prev => prev === filter ? null : filter);
+    };
+
     const roleConfigs = [
         {
             key: 'principal', title: 'Principal',
@@ -234,7 +259,45 @@ const AdminDashboard = () => {
                 </div>
             </motion.div>
 
-            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="mb-10">
+            {/* Personal Attendance Section */}
+            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="mb-16">
+                <div className="flex items-center gap-4 mb-8">
+                    <div className="h-1 w-12 bg-sky-600 rounded-full"></div>
+                    <h2 className="text-xl font-black text-gray-800 tracking-tight uppercase tracking-[0.1em]">Your Personal Attendance</h2>
+                </div>
+                
+                <PersonalAttendanceChart 
+                    stats={myStats} 
+                    onStatClick={handleStatClick} 
+                    activeFilter={statusFilter} 
+                    monthStats={monthStats}
+                    onMonthStatsClick={() => navigate('/admin/calendar')}
+                />
+            </motion.div>
+
+            {/* Filter Active Banner */}
+            <AnimatePresence>
+                {statusFilter && (
+                    <motion.div
+                        initial={{ opacity: 0, y: -10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -10 }}
+                        className="mb-8 flex items-center gap-3 px-5 py-3 bg-sky-50 border border-sky-200 rounded-2xl text-sm font-black text-sky-700"
+                    >
+                        <FaFilter className="text-sky-500" />
+                        <span>Showing records for: <span className="text-sky-900 uppercase">{statusFilter}</span></span>
+                        <button
+                            onClick={() => setStatusFilter(null)}
+                            className="ml-auto flex items-center gap-1.5 px-3 py-1 bg-white border border-sky-200 rounded-xl text-[10px] font-black text-rose-500 hover:bg-rose-50 transition-all"
+                        >
+                            <FaTimes size={10} /> Clear Filter
+                        </button>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
+
+            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="mb-10 lg:hidden">
                 <div className="grid grid-cols-3 gap-4">
                     <motion.div
                         whileHover={{ scale: 1.03, y: -3 }}
@@ -567,6 +630,9 @@ const AdminDashboard = () => {
                 )}
             </AnimatePresence>
 
+            <div className="mt-16">
+                <AttendanceHistory empId={user?.emp_id} statusFilter={statusFilter} />
+            </div>
         </Layout>
     );
 };
