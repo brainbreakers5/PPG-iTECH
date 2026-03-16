@@ -7,7 +7,6 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { FaBirthdayCake, FaUserCheck, FaUserTimes, FaCalendarDay, FaFileAlt, FaTimes, FaCalendarAlt, FaStar, FaBriefcase, FaEye, FaClock, FaHistory, FaFilter } from 'react-icons/fa';
 import AttendanceHistory from '../../components/AttendanceHistory';
-import PersonalAttendanceChart from '../../components/PersonalAttendanceChart';
 
 // ── Small helper components ─────────────────────────────────────────────────
 // Small helper components removed ...
@@ -42,7 +41,7 @@ const AdminDashboard = () => {
         hod: { present: 0, absent: 0, od: 0, cl: 0, ml: 0, comp_leave: 0, lop: 0, late_entry: 0 },
         staff: { present: 0, absent: 0, od: 0, cl: 0, ml: 0, comp_leave: 0, lop: 0, late_entry: 0 }
     });
-    const [myStats, setMyStats] = useState({ present: 0, absent: 0, od: 0, cl: 0, ml: 0, comp_leave: 0, lop: 0, late_entry: 0 });
+
     const [birthdays, setBirthdays] = useState([]);
     const [statusFilter, setStatusFilter] = useState(null);
     const [allEmployees, setAllEmployees] = useState([]);
@@ -59,24 +58,6 @@ const AdminDashboard = () => {
             setBirthdays(bdays);
             const { data: emps } = await api.get('/employees');
             setAllEmployees(emps);
-
-            // Fetch My Personal stats for the month
-            const monthStr = date.slice(0, 7);
-            const { data: myRecords } = await api.get(`/attendance?month=${monthStr}&emp_id=${user?.emp_id}`);
-            const myCounts = { present: 0, absent: 0, od: 0, cl: 0, ml: 0, comp_leave: 0, lop: 0, late_entry: 0 };
-            (myRecords || []).forEach(r => {
-                const s = (r.status || '').toUpperCase();
-                const rem = (r.remarks || '').toUpperCase();
-                if (s.includes('PRESENT')) myCounts.present++;
-                if (s.includes('ABSENT')) myCounts.absent++;
-                if (s.includes('OD') || rem.includes('OD')) myCounts.od++;
-                if ((s.includes('CL') || rem.includes('CL') || rem.includes('CASUAL')) && !s.includes('COMP') && !rem.includes('COMP')) myCounts.cl++;
-                if (s.includes('ML') || rem.includes('ML') || rem.includes('MEDICAL')) myCounts.ml++;
-                if (s.includes('COMP LEAVE') || rem.includes('COMP LEAVE')) myCounts.comp_leave++;
-                if (s.includes('LOP') || rem.includes('LOP')) myCounts.lop++;
-                if (rem.includes('LATE ENTRY')) myCounts.late_entry++;
-            });
-            setMyStats(myCounts);
 
 
             // Build attendance map: emp_id -> status for today
@@ -612,25 +593,6 @@ const AdminDashboard = () => {
                 )}
             </AnimatePresence>
 
-            {/* Personal Attendance Section - Moved to Bottom (Similar to Management Focus) */}
-            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="mt-16 mb-10">
-                <div className="flex items-center gap-4 mb-8">
-                    <div className="h-1 w-12 bg-sky-600 rounded-full"></div>
-                    <h2 className="text-xl font-black text-gray-800 tracking-tight uppercase tracking-[0.1em]">Your Personal Attendance</h2>
-                </div>
-                
-                <PersonalAttendanceChart 
-                    stats={myStats} 
-                    onStatClick={handleStatClick} 
-                    activeFilter={statusFilter} 
-                    monthStats={monthStats}
-                    onMonthStatsClick={() => navigate('/admin/calendar')}
-                />
-            </motion.div>
-
-            <div className="mt-16">
-                <AttendanceHistory empId={user?.emp_id} statusFilter={statusFilter} />
-            </div>
         </Layout>
     );
 };
