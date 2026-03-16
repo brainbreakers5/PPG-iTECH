@@ -17,6 +17,13 @@ const Header = ({ toggleSidebar, sidebarOpen }) => {
     const [showNotifs, setShowNotifs] = useState(false);
     const [unreadCount, setUnreadCount] = useState(0);
     const notifRef = useRef(null);
+    const [currentTime, setCurrentTime] = useState(new Date());
+
+    // Update current time every minute to refresh timestamps
+    useEffect(() => {
+        const timer = setInterval(() => setCurrentTime(new Date()), 60000);
+        return () => clearInterval(timer);
+    }, []);
 
     // Search functionality
     const [searchQuery, setSearchQuery] = useState('');
@@ -40,6 +47,7 @@ const Header = ({ toggleSidebar, sidebarOpen }) => {
             { label: 'Timetable Setup', path: '/admin/timetable-setup' },
             { label: 'Calendar', path: '/admin/calendar' },
             { label: 'Purchase Requests', path: '/admin/purchase' },
+            { label: 'Notifications', path: '/admin/notifications' },
         ],
         principal: [
             { label: 'Dashboard', path: '/principal' },
@@ -51,6 +59,7 @@ const Header = ({ toggleSidebar, sidebarOpen }) => {
             { label: 'Conversation', path: '/principal/conversation' },
             { label: 'Purchase Requests', path: '/principal/purchase' },
             { label: 'Academic Calendar', path: '/principal/calendar' },
+            { label: 'Notifications', path: '/principal/notifications' },
         ],
         hod: [
             { label: 'Dashboard', path: '/hod' },
@@ -61,6 +70,7 @@ const Header = ({ toggleSidebar, sidebarOpen }) => {
             { label: 'Conversation', path: '/hod/conversation' },
             { label: 'Purchase Requests', path: '/hod/purchase' },
             { label: 'Academic Calendar', path: '/hod/calendar' },
+            { label: 'Notifications', path: '/hod/notifications' },
         ],
         staff: [
             { label: 'Dashboard', path: '/staff' },
@@ -70,11 +80,13 @@ const Header = ({ toggleSidebar, sidebarOpen }) => {
             { label: 'Messages', path: '/staff/conversation' },
             { label: 'Purchase Requests', path: '/staff/items' },
             { label: 'Academic Calendar', path: '/staff/calendar' },
+            { label: 'Notifications', path: '/staff/notifications' },
         ],
         management: [
             { label: 'Dashboard', path: '/management' },
             { label: 'Departments', path: '/management/departments' },
             { label: 'Salary Overview', path: '/management/payroll' },
+            { label: 'Notifications', path: '/management/notifications' },
         ],
     };
 
@@ -106,8 +118,13 @@ const Header = ({ toggleSidebar, sidebarOpen }) => {
 
         fetchNotifications();
 
-        // Listen for biometric punches
+        // Listen for all notifications
         if (socket) {
+            socket.on('notification_received', (newNotif) => {
+                setNotifications(prev => [newNotif, ...prev]);
+                setUnreadCount(prev => prev + 1);
+            });
+
             socket.on('biometric_punch', (data) => {
                 // Capture client's current LOCAL time
                 const now = new Date();
@@ -146,7 +163,10 @@ const Header = ({ toggleSidebar, sidebarOpen }) => {
         document.addEventListener('mousedown', handleClickOutside);
         return () => {
             document.removeEventListener('mousedown', handleClickOutside);
-            if (socket) socket.off('biometric_punch');
+            if (socket) {
+                socket.off('biometric_punch');
+                socket.off('notification_received');
+            }
         };
     }, [user, socket]);
 
@@ -329,7 +349,7 @@ const Header = ({ toggleSidebar, sidebarOpen }) => {
         const date = new Date(dateStr);
         if (isNaN(date.getTime())) return dateStr; // fallback
 
-        const now = new Date();
+        const now = currentTime;
         const isToday = date.toDateString() === now.toDateString();
         
         const yesterday = new Date(now);
@@ -526,6 +546,18 @@ const Header = ({ toggleSidebar, sidebarOpen }) => {
                                             <p className="text-[10px] font-black text-gray-300 uppercase tracking-widest italic">All clear</p>
                                         </div>
                                     )}
+                                </div>
+                                <div className="p-4 bg-gray-50/50 border-t border-gray-50 text-center">
+                                    <button 
+                                        onClick={() => {
+                                            navigate(`/${effectiveRole}/notifications`);
+                                            setShowNotifs(false);
+                                        }}
+                                        className="text-[10px] font-black text-sky-600 hover:text-sky-800 uppercase tracking-widest transition-colors flex items-center justify-center gap-2 mx-auto"
+                                    >
+                                        View All Notifications
+                                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M9 5l7 7-7 7"></path></svg>
+                                    </button>
                                 </div>
                             </div>
                         )}
