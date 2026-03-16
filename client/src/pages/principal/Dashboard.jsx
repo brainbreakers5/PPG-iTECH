@@ -8,6 +8,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import AttendanceHistory from '../../components/AttendanceHistory';
 import MonthlyDetailsModal from '../../components/MonthlyDetailsModal';
+import PersonalAttendanceChart from '../../components/PersonalAttendanceChart';
 
 // ── Small helper components ─────────────────────────────────────────────────
 // InfoCard removed ... (it was already redundant or small)
@@ -254,7 +255,7 @@ const Dashboard = () => {
                 </div>
             </motion.div>
 
-            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="mb-10">
+            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="mb-10 lg:hidden">
                 <div className="grid grid-cols-3 gap-4">
                     <motion.div
                         whileHover={{ scale: 1.03, y: -3 }}
@@ -319,48 +320,14 @@ const Dashboard = () => {
                     <div className="h-1 w-12 bg-sky-600 rounded-full"></div>
                     <h2 className="text-xl font-black text-gray-800 tracking-tight uppercase tracking-[0.1em]">Your Personal Attendance</h2>
                 </div>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-                    {[
-                        { label: 'Present', value: myStats.present, icon: <FaUserCheck />, color: 'text-sky-600', bg: 'bg-sky-50', gradient: 'from-sky-500 to-sky-700', filterKey: 'Present' },
-                        { label: 'Absent', value: myStats.absent, icon: <FaUserTimes />, color: 'text-rose-600', bg: 'bg-rose-50', gradient: 'from-rose-500 to-rose-700', filterKey: 'Absent' },
-                        { label: 'Loss Of Pay', value: myStats.lop, icon: <FaTimes />, color: 'text-rose-800', bg: 'bg-rose-100', gradient: 'from-rose-600 to-rose-800', filterKey: 'LOP' },
-                        { label: 'On Duty', value: myStats.od, icon: <FaBriefcase />, color: 'text-emerald-600', bg: 'bg-emerald-50', gradient: 'from-emerald-500 to-emerald-700', filterKey: 'OD' },
-                        { label: 'Casual Leave', value: myStats.cl, icon: <FaCalendarDay />, color: 'text-amber-600', bg: 'bg-amber-50', gradient: 'from-amber-500 to-amber-700', filterKey: 'CL' },
-                        { label: 'Medical Leave', value: myStats.ml, icon: <FaFileAlt />, color: 'text-purple-600', bg: 'bg-purple-50', gradient: 'from-purple-500 to-purple-700', filterKey: 'ML' },
-                        { label: 'Comp Leave', value: myStats.comp_leave, icon: <FaStar />, color: 'text-indigo-600', bg: 'bg-indigo-50', gradient: 'from-indigo-500 to-indigo-700', filterKey: 'Comp Leave' },
-                        { label: 'Late Entry', value: myStats.late_entry, icon: <FaClock />, color: 'text-orange-600', bg: 'bg-orange-50', gradient: 'from-orange-500 to-orange-700', filterKey: 'Late Entry' },
-                    ].map((stat, idx) => {
-                        const isActive = statusFilter === stat.filterKey;
-                        return (
-                        <motion.div
-                            key={stat.label}
-                            initial={{ opacity: 0, y: 20 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            transition={{ delay: idx * 0.08 }}
-                            whileHover={{ y: -6, scale: 1.03 }}
-                            whileTap={{ scale: 0.97 }}
-                            onClick={() => handleStatClick(stat.filterKey)}
-                            className={`bg-white rounded-[32px] shadow-lg border p-8 group relative overflow-hidden flex flex-col items-center text-center cursor-pointer transition-all duration-200 ${
-                                isActive 
-                                    ? 'border-sky-400 shadow-sky-200 ring-2 ring-sky-400 ring-offset-2' 
-                                    : 'border-sky-50 shadow-sky-50/50 hover:border-sky-200'
-                            }`}
-                        >
-                            <div className={`absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r ${stat.gradient}`} />
-                            {isActive && (
-                                <span className="absolute top-3 right-3 px-2 py-0.5 bg-sky-600 text-white text-[8px] font-black uppercase tracking-wider rounded-full">
-                                    Filtered
-                                </span>
-                            )}
-                            <div className={`h-14 w-14 rounded-[20px] ${stat.bg} ${stat.color} flex items-center justify-center text-xl shadow-sm mb-5 group-hover:rotate-6 transition-transform duration-500`}>
-                                {stat.icon}
-                            </div>
-                            <span className="text-4xl font-black text-gray-800 tracking-tighter mb-2 leading-none">{stat.value}</span>
-                            <span className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">{stat.label}</span>
-                            <div className="absolute -bottom-8 -right-8 w-24 h-24 bg-gray-50 rounded-full blur-2xl opacity-60" />
-                        </motion.div>
-                    )})}
-                </div>
+                
+                <PersonalAttendanceChart 
+                    stats={myStats} 
+                    onStatClick={handleStatClick} 
+                    activeFilter={statusFilter} 
+                    monthStats={monthStats}
+                    onMonthStatsClick={() => navigate('/principal/calendar')}
+                />
             </motion.div>
 
             {/* Filter Active Banner */}
