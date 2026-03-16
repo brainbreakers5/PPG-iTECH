@@ -41,7 +41,9 @@ const Login = () => {
         setLoading(true);
         try {
             const data = await login(empId.trim(), pin.trim());
-            Swal.fire({
+            
+            // Wait for success dialog to close before navigating
+            await Swal.fire({
                 icon: 'success',
                 title: 'Welcome!',
                 text: `Logged in as ${data.role}`,
@@ -50,22 +52,27 @@ const Login = () => {
                 background: '#fff',
                 color: '#1e3a8a'
             });
-            switch (data.role) {
-                case 'admin': navigate('/admin'); break;
-                case 'principal': navigate('/principal'); break;
-                case 'hod': navigate('/hod'); break;
-                case 'staff': navigate('/staff'); break;
-                default: navigate('/');
-            }
+            
+            // Navigate after dialog closes
+            setTimeout(() => {
+                switch (data.role) {
+                    case 'admin': navigate('/admin'); break;
+                    case 'principal': navigate('/principal'); break;
+                    case 'hod': navigate('/hod'); break;
+                    case 'staff': navigate('/staff'); break;
+                    default: navigate('/');
+                }
+                setLoading(false);
+            }, 100);
+            
         } catch (error) {
+            console.error('Login error:', error);
             Swal.fire({
                 icon: 'error',
                 title: 'Login Failed',
-                text: error.response?.data?.message || 'Invalid credentials',
+                text: error.response?.data?.message || error.message || 'Invalid credentials',
                 confirmButtonColor: '#2563eb'
             });
-            setLoading(false);
-        } finally {
             setLoading(false);
         }
     };
