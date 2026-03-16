@@ -69,15 +69,38 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
   return children;
 };
 
-// Management Route Wrapper (PIN-based access via sessionStorage)
+// Management Route Wrapper (PIN-based access via localStorage for persistence)
 const ManagementRoute = ({ children }) => {
-  const hasAccess = sessionStorage.getItem('managementAccess') === 'true';
+  const hasAccess =
+    localStorage.getItem('managementAccess') === 'true' ||
+    sessionStorage.getItem('managementAccess') === 'true';
   if (!hasAccess) return <Navigate to="/login" />;
   return children;
 };
 
+// A wrapper for /login that redirects to dashboard if already authenticated
+const LoginRoute = () => {
+  const { user } = useAuth();
+  const isManagement =
+    localStorage.getItem('managementAccess') === 'true' ||
+    sessionStorage.getItem('managementAccess') === 'true';
+
+  if (isManagement) return <Navigate to="/management" replace />;
+  if (user) {
+    const roleMap = { admin: '/admin', principal: '/principal', hod: '/hod', staff: '/staff' };
+    return <Navigate to={roleMap[user.role] || '/login'} replace />;
+  }
+  return <Login />;
+};
+
 const AppContent = () => {
-  const [showSplash, setShowSplash] = useState(true);
+  const { user } = useAuth();
+  // Only show splash if the user has no stored session (first visit / logged out)
+  const hasStoredSession =
+    !!localStorage.getItem('token') ||
+    localStorage.getItem('managementAccess') === 'true' ||
+    sessionStorage.getItem('managementAccess') === 'true';
+  const [showSplash, setShowSplash] = useState(!hasStoredSession);
 
   if (showSplash) {
     return <Splash onFinish={() => setShowSplash(false)} />;
@@ -85,7 +108,7 @@ const AppContent = () => {
 
   return (
     <Routes>
-      <Route path="/login" element={<Login />} />
+      <Route path="/login" element={<LoginRoute />} />
 
       <Route path="/admin/*" element={
         <ProtectedRoute allowedRoles={['admin']}>
