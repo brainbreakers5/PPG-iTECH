@@ -1,5 +1,6 @@
 const { pool } = require('../config/db');
 const sendEmail = require('../utils/sendEmail');
+const socketUtil = require('../utils/socket');
 
 // @desc    Create a notification and send email
 exports.createNotification = async (emp_id, message, type = 'info', metadata = null, client = null) => {
@@ -11,32 +12,41 @@ exports.createNotification = async (emp_id, message, type = 'info', metadata = n
             [emp_id, message, type, metadata ? (typeof metadata === 'string' ? metadata : JSON.stringify(metadata)) : null]
         );
 
-        // 2. Fetch employee email and name for email notification
+        // 3. Re-fetch the inserted notification to get the ID and timestamp
+        const { rows: notifRows } = await db.query(
+            'SELECT id, user_id, message, is_read, type, metadata, created_at FROM notifications WHERE user_id = $1 ORDER BY created_at DESC LIMIT 1',
+            [emp_id]
+        );
+
+        // 4. Real-time emit
+        const io = socketUtil.getIO();
+        if (io && notifRows.length > 0) {
+            const { rows: userRows } = await pool.query('SELECT id FROM users WHERE emp_id = $1', [emp_id]);
+            if (userRows.length > 0) {
+                io.to(userRows[0].id).emit('notification_received', notifRows[0]);
+            }
+        }
+
+        // 5. Fetch employee email and name for email notification
         const { rows } = await pool.query('SELECT email, name FROM users WHERE emp_id = $1', [emp_id]);
         
         if (rows.length > 0 && rows[0].email) {
             const { email, name } = rows[0];
             const appUrl = process.env.APP_URL || 'http://localhost:3000';
-            
-            // Format subject
             const subject = `PPG iTech HUB: New ${type.charAt(0).toUpperCase() + type.slice(1)} Notification`;
             
-            // Email HTML content
             const html = `
                 <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e5e7eb; border-radius: 12px; overflow: hidden;">
                     <div style="background-color: #4A90E2; padding: 24px; text-align: center;">
                         <h1 style="color: white; margin: 0; font-size: 24px;">PPG iTech HUB</h1>
                     </div>
                     <div style="padding: 32px; background-color: white;">
-                        <p style="font-size: 16px, color: #374151; margin-bottom: 24px;">Hello <strong>${name}</strong>,</p>
+                        <p style="font-size: 16px; color: #374151; margin-bottom: 24px;">Hello <strong>${name}</strong>,</p>
                         <p style="font-size: 16px; color: #4b5563; line-height: 1.5;">You have received a new notification in the application:</p>
-                        
                         <div style="background-color: #f9fafb; border-left: 4px solid #4A90E2; padding: 20px; margin: 24px 0; font-style: italic; color: #1f2937;">
                             "${message}"
                         </div>
-                        
                         <p style="font-size: 16px; color: #4b5563; margin-bottom: 32px;">Please click the button below to log in and view the details.</p>
-                        
                         <div style="text-align: center;">
                             <a href="${appUrl}" style="background-color: #4A90E2; color: white; padding: 14px 28px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block;">View in Application</a>
                         </div>
@@ -48,7 +58,6 @@ exports.createNotification = async (emp_id, message, type = 'info', metadata = n
                 </div>
             `;
 
-            // Try sending email (don't block the main flow if mail fails)
             sendEmail({
                 email: email,
                 subject: subject,
