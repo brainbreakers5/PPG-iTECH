@@ -40,40 +40,53 @@ const Login = () => {
         e.preventDefault();
         setLoading(true);
         try {
+            console.log('🔐 Attempting login with:', { emp_id: empId, pin: '***' });
             const data = await login(empId.trim(), pin.trim());
+            console.log('✅ Login successful:', data);
             
-            // Wait for success dialog to close before navigating
-            await Swal.fire({
+            // Show success message
+            Swal.fire({
                 icon: 'success',
                 title: 'Welcome!',
                 text: `Logged in as ${data.role}`,
-                timer: 1500,
+                timer: 1000,
                 showConfirmButton: false,
                 background: '#fff',
-                color: '#1e3a8a'
+                color: '#1e3a8a',
+                allowOutsideClick: false,
+                allowEscapeKey: false
             });
             
-            // Navigate after dialog closes
+            // Navigate after a brief delay to let the dialog show
             setTimeout(() => {
-                switch (data.role) {
-                    case 'admin': navigate('/admin'); break;
-                    case 'principal': navigate('/principal'); break;
-                    case 'hod': navigate('/hod'); break;
-                    case 'staff': navigate('/staff'); break;
-                    default: navigate('/');
-                }
+                console.log('🔄 Navigating based on role:', data.role);
+                const routes = {
+                    'admin': '/admin',
+                    'principal': '/principal',
+                    'hod': '/hod',
+                    'staff': '/staff'
+                };
+                const route = routes[data.role] || '/';
+                console.log('📍 Navigating to:', route);
+                navigate(route, { replace: true });
                 setLoading(false);
-            }, 100);
+            }, 600);
             
         } catch (error) {
-            console.error('Login error:', error);
+            console.error('❌ Login error:', error);
+            console.error('Error details:', {
+                message: error.message,
+                response: error.response?.data,
+                status: error.response?.status
+            });
+            setLoading(false);
+            
             Swal.fire({
                 icon: 'error',
                 title: 'Login Failed',
                 text: error.response?.data?.message || error.message || 'Invalid credentials',
                 confirmButtonColor: '#2563eb'
             });
-            setLoading(false);
         }
     };
 
