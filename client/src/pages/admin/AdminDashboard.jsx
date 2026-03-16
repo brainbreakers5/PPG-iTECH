@@ -171,6 +171,13 @@ const AdminDashboard = () => {
 
     const roleConfigs = [
         {
+            key: 'principal', title: 'Principal',
+            accentClass: 'from-sky-500 to-sky-700',
+            canViewAll: true,
+            modalRole: 'principal',
+            totalCount: principalList.length
+        },
+        {
             key: 'hod', title: 'HODs',
             accentClass: 'from-amber-400 to-amber-600',
             canViewAll: true,
@@ -197,7 +204,7 @@ const AdminDashboard = () => {
         pink: { bg: 'bg-pink-50', text: 'text-pink-600', border: 'border-pink-100', accent: 'bg-pink-500' }
     };
 
-    // const navigate = (path) => window.location.href = path; // Removed manual navigation function collision
+
 
     return (
         <Layout>
