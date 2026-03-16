@@ -130,7 +130,6 @@ const ManagementDashboard = () => {
     };
 
     const roleConfigs = [
-        { key: 'principal', title: 'Principal', accentClass: 'from-sky-500 to-sky-700', totalCount: principalList.length },
         { key: 'hod', title: 'HODs', accentClass: 'from-amber-400 to-amber-600', totalCount: hodList.length },
         { key: 'staff', title: 'Staff', accentClass: 'from-purple-500 to-purple-700', totalCount: staffList.length }
     ];
