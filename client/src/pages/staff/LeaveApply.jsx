@@ -39,7 +39,7 @@ const LeaveApply = () => {
 
     // Permission letter states
     const [permissions, setPermissions] = useState([]);
-    const [permForm, setPermForm] = useState({ date: '', subject: '', reason: '' });
+    const [permForm, setPermForm] = useState({ date: '', subject: '', reason: '', timeSlot: 'Morning', replacement_staff_id: '' });
     const [permSubmitting, setPermSubmitting] = useState(false);
 
     const [formData, setFormData] = useState({
@@ -205,13 +205,17 @@ const LeaveApply = () => {
             return Swal.fire({ title: 'Missing Date', text: 'Please select a date for the permission.', icon: 'warning', confirmButtonColor: '#2563eb' });
         }
 
-        const config = { from_time: '09:00', to_time: '10:00' };
+        const config = permForm.timeSlot === 'Evening' 
+            ? { from_time: '15:45', to_time: '16:45' } 
+            : { from_time: '09:00', to_time: '10:00' };
+
+        const timeText = permForm.timeSlot === 'Evening' ? '03:45 PM - 04:45 PM' : '09:00 AM - 10:00 AM';
 
         setPermSubmitting(true);
         try {
             await api.post('/permissions', { ...permForm, ...config });
-            Swal.fire({ title: 'Submitted', text: 'Permission request for 09:00 AM - 10:00 AM sent for HOD approval.', icon: 'success', timer: 1500, showConfirmButton: false });
-            setPermForm({ date: '', subject: '', reason: '' });
+            Swal.fire({ title: 'Submitted', text: `Permission request for ${timeText} sent for approval.`, icon: 'success', timer: 1500, showConfirmButton: false });
+            setPermForm({ date: '', subject: '', reason: '', timeSlot: 'Morning', replacement_staff_id: '' });
             fetchPermissions();
         } catch (error) {
             Swal.fire({ title: 'Error', text: error.response?.data?.message || 'Failed to submit.', icon: 'error', confirmButtonColor: '#2563eb' });
@@ -1162,7 +1166,7 @@ const LeaveApply = () => {
                                 </div>
 
                                 <form onSubmit={handlePermissionSubmit} className="space-y-6">
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-end">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
                                         <div>
                                             <label className="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2">Date *</label>
                                             <input
@@ -1174,16 +1178,38 @@ const LeaveApply = () => {
                                             />
                                         </div>
                                         <div>
-                                            <div className="bg-teal-50 border border-teal-100 p-4 rounded-2xl flex items-center gap-3">
-                                                <div className="h-10 w-10 rounded-xl bg-white flex items-center justify-center text-teal-600 shadow-sm border border-teal-100 shrink-0">
-                                                    <FaClock size={16} />
-                                                </div>
-                                                <div>
-                                                    <p className="text-[10px] font-black text-teal-600 uppercase tracking-widest">Fixed Time Window</p>
-                                                    <p className="text-xs font-black text-gray-800 tracking-tight">09:00 AM - 10:00 AM (1 Hour)</p>
-                                                </div>
+                                            <label className="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2">Time Slot *</label>
+                                            <div className="flex gap-4">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setPermForm(p => ({ ...p, timeSlot: 'Morning' }))}
+                                                    className={`flex-1 py-4 px-4 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all ${permForm.timeSlot === 'Morning' ? 'bg-teal-600 text-white shadow-lg shadow-teal-100' : 'bg-gray-50 text-gray-400 hover:bg-gray-100 border-2 border-gray-100'}`}
+                                                >
+                                                    Morning <br/><span className="text-[11px] normal-case tracking-normal">09:00 - 10:00</span>
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setPermForm(p => ({ ...p, timeSlot: 'Evening' }))}
+                                                    className={`flex-1 py-4 px-4 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all ${permForm.timeSlot === 'Evening' ? 'bg-teal-600 text-white shadow-lg shadow-teal-100' : 'bg-gray-50 text-gray-400 hover:bg-gray-100 border-2 border-gray-100'}`}
+                                                >
+                                                    Evening <br/><span className="text-[11px] normal-case tracking-normal">15:45 - 16:45</span>
+                                                </button>
                                             </div>
                                         </div>
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2">Alternative Staff (Optional)</label>
+                                        <select
+                                            value={permForm.replacement_staff_id}
+                                            onChange={e => setPermForm(p => ({ ...p, replacement_staff_id: e.target.value }))}
+                                            className="w-full px-5 py-4 bg-gray-50 border-2 border-gray-100 rounded-2xl font-bold text-sm text-gray-800 focus:ring-4 focus:ring-teal-100 focus:border-teal-300 transition-all outline-none appearance-none"
+                                        >
+                                            <option value="">-- No Alternative Staff --</option>
+                                            {staffList.filter(s => s.emp_id !== user.emp_id).map(staff => (
+                                                <option key={staff.emp_id} value={staff.emp_id}>{staff.name} ({staff.designation || 'Staff'})</option>
+                                            ))}
+                                        </select>
                                     </div>
 
                                     <div>
