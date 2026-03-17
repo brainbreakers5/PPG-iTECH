@@ -32,6 +32,7 @@ const TimetableSetup = () => {
     const [saving, setSaving] = useState(false);
     const [dirty, setDirty] = useState(false);
     const [punchTime, setPunchTime] = useState('09:00');
+    const [punchOutTime, setPunchOutTime] = useState('16:00');
 
     useEffect(() => {
         fetchConfig();
@@ -60,6 +61,9 @@ const TimetableSetup = () => {
 
             if (settingsRes.data && settingsRes.data.official_punch_time) {
                 setPunchTime(settingsRes.data.official_punch_time);
+            }
+            if (settingsRes.data && settingsRes.data.official_punch_out_time) {
+                setPunchOutTime(settingsRes.data.official_punch_out_time);
             }
         } catch { console.error('Failed to fetch timetable config or settings'); }
         finally { setLoading(false); }
@@ -159,7 +163,8 @@ const TimetableSetup = () => {
         try {
             await Promise.all([
                 api.put('/timetable/config', { periods }),
-                api.put('/settings/official_punch_time', { value: punchTime })
+                api.put('/settings/official_punch_time', { value: punchTime }),
+                api.put('/settings/official_punch_out_time', { value: punchOutTime })
             ]);
             Swal.fire({ title: 'Configuration Saved!', text: 'The timetable and settings have been updated successfully.', icon: 'success', timer: 2000, showConfirmButton: false });
             setDirty(false);
@@ -223,7 +228,7 @@ const TimetableSetup = () => {
                     
                     {/* Punch Time Config */}
                     <div className="modern-card p-6 border border-rose-100 bg-rose-50/30">
-                        <p className="text-[9px] font-black uppercase tracking-[0.3em] text-rose-400 mb-2">Official Punch Time</p>
+                        <p className="text-[9px] font-black uppercase tracking-[0.3em] text-rose-400 mb-2">Punch In</p>
                         <div className="flex items-center gap-2">
                             <input
                                 type="time"
@@ -236,171 +241,9 @@ const TimetableSetup = () => {
                             />
                         </div>
                     </div>
-                </div>
 
-                <div className="p-4 bg-sky-50/60 rounded-2xl border border-sky-100 flex items-start gap-3 mb-8">
-                    <FaInfoCircle className="text-sky-400 shrink-0 mt-0.5" />
-                    <p className="text-xs font-bold text-gray-600">
-                        Items marked as <span className="font-black text-amber-600">Breaks</span> are excluded from the period count. Period numbering automatically adjusts when slots are added, removed, or toggled.
-                    </p>
-                </div>
-
-                {loading ? (
-                    <div className="flex items-center justify-center py-24 gap-3">
-                        <div className="h-2 w-2 bg-sky-600 rounded-full animate-bounce" />
-                        <div className="h-2 w-2 bg-sky-600 rounded-full animate-bounce delay-100" />
-                        <div className="h-2 w-2 bg-sky-600 rounded-full animate-bounce delay-200" />
-                    </div>
-                ) : (
-                    <>
-                        {/* Period Cards */}
-                        <div className="space-y-4">
-                            <AnimatePresence>
-                                {periods.map((p, idx) => (
-                                    <motion.div
-                                        key={p._tempId}
-                                        initial={{ opacity: 0, y: -10 }}
-                                        animate={{ opacity: 1, y: 0 }}
-                                        exit={{ opacity: 0, scale: 0.95 }}
-                                        transition={{ delay: idx * 0.03 }}
-                                        className={`modern-card p-6 flex flex-col md:flex-row items-start md:items-center gap-6 group ${p.is_break ? 'bg-amber-50/30 border-amber-100' : ''}`}
-                                    >
-                                        {/* Drag Handle + Period # */}
-                                        <div className="flex items-center gap-3 shrink-0">
-                                            <FaGripVertical className="text-gray-200 cursor-grab" />
-                                            <div className={`h-12 w-12 rounded-2xl flex items-center justify-center text-xl font-black shadow-sm ${p.is_break ? 'bg-amber-100 text-amber-600' : 'bg-sky-600 text-white shadow-sky-100'}`}>
-                                                {p.is_break ? '☕' : p.period_number}
-                                            </div>
-                                        </div>
-
-                                        {/* Label */}
-                                        <div className="flex-1 min-w-[140px]">
-                                            <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest block mb-2">Label</label>
-                                            <input
-                                                type="text"
-                                                value={p.label}
-                                                onChange={e => updatePeriod(p._tempId, 'label', e.target.value)}
-                                                placeholder={`Period ${p.period_number}`}
-                                                className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl font-black text-sm text-gray-700 outline-none focus:ring-4 focus:ring-sky-100 focus:border-sky-500 transition-all"
-                                            />
-                                        </div>
-
-                                        {/* Start Time */}
-                                        <div className="min-w-[140px]">
-                                            <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest block mb-2">Start Time</label>
-                                            <div className="relative">
-                                                <FaClock className="absolute left-3 top-1/2 -translate-y-1/2 text-sky-300 text-xs" />
-                                                <input
-                                                    type="time"
-                                                    value={p.start_time || ''}
-                                                    onChange={e => updatePeriod(p._tempId, 'start_time', e.target.value)}
-                                                    className="w-full pl-8 pr-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl font-black text-sm text-gray-700 outline-none focus:ring-4 focus:ring-sky-100 focus:border-sky-500 transition-all"
-                                                />
-                                                <p className="absolute -bottom-5 left-1 text-[8px] font-black text-sky-400/60 uppercase tracking-widest">{p.start_time && to12h(p.start_time)}</p>
-                                            </div>
-                                        </div>
-
-                                        {/* Divider Arrow */}
-                                        <div className="text-gray-300 font-black text-lg hidden md:block">→</div>
-
-                                        {/* End Time */}
-                                        <div className="min-w-[140px]">
-                                            <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest block mb-2">End Time</label>
-                                            <div className="relative">
-                                                <FaClock className="absolute left-3 top-1/2 -translate-y-1/2 text-sky-300 text-xs" />
-                                                <input
-                                                    type="time"
-                                                    value={p.end_time || ''}
-                                                    onChange={e => updatePeriod(p._tempId, 'end_time', e.target.value)}
-                                                    className="w-full pl-8 pr-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl font-black text-sm text-gray-700 outline-none focus:ring-4 focus:ring-sky-100 focus:border-sky-500 transition-all"
-                                                />
-                                                <p className="absolute -bottom-5 left-1 text-[8px] font-black text-sky-400/60 uppercase tracking-widest">{p.end_time && to12h(p.end_time)}</p>
-                                            </div>
-                                        </div>
-
-                                        {/* Duration Badge */}
-                                        {p.start_time && p.end_time && (() => {
-                                            const [sh, sm] = p.start_time.split(':').map(Number);
-                                            const [eh, em] = p.end_time.split(':').map(Number);
-                                            const dur = (eh * 60 + em) - (sh * 60 + sm);
-                                            return dur > 0 ? (
-                                                <div className={`px-4 py-2.5 rounded-2xl text-[10px] font-black uppercase tracking-widest shrink-0 ${p.is_break ? 'bg-amber-100 text-amber-700' : 'bg-sky-50 text-sky-600'}`}>
-                                                    {dur} min
-                                                </div>
-                                            ) : null;
-                                        })()}
-
-                                        {/* Break Toggle */}
-                                        <div className="flex flex-col items-center gap-1 shrink-0">
-                                            <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Break</label>
-                                            <button
-                                                type="button"
-                                                onClick={() => updatePeriod(p._tempId, 'is_break', !p.is_break)}
-                                                className={`text-2xl transition-all ${p.is_break ? 'text-amber-500' : 'text-gray-200 hover:text-amber-300'}`}
-                                            >
-                                                {p.is_break ? <FaToggleOn /> : <FaToggleOff />}
-                                            </button>
-                                        </div>
-
-                                        {/* Delete */}
-                                        <button
-                                            onClick={() => removePeriod(p._tempId)}
-                                            className="h-10 w-10 rounded-2xl bg-rose-50 text-rose-400 hover:bg-rose-500 hover:text-white transition-all flex items-center justify-center shrink-0 opacity-0 group-hover:opacity-100 active:scale-90"
-                                        >
-                                            <FaTrash size={13} />
-                                        </button>
-                                    </motion.div>
-                                ))}
-                            </AnimatePresence>
-
-                            {/* Add Period Card */}
-                            <motion.button
-                                onClick={addPeriod}
-                                whileHover={{ scale: 1.01 }}
-                                className="w-full py-6 border-2 border-dashed border-sky-100 rounded-3xl text-sky-300 hover:border-sky-400 hover:text-sky-500 hover:bg-sky-50/30 transition-all flex items-center justify-center gap-3 font-black text-sm uppercase tracking-widest"
-                            >
-                                <FaPlus /> Add Another Period
-                            </motion.button>
-                        </div>
-
-                        {/* Visual Timeline */}
-                        {periods.filter(p => p.start_time && p.end_time).length > 0 && (
-                            <div className="mt-12">
-                                <h2 className="text-sm font-black text-gray-500 uppercase tracking-[0.3em] mb-6">Visual Day Timeline</h2>
-                                <div className="modern-card p-8 overflow-x-auto">
-                                    <div className="relative flex items-stretch gap-1 min-w-[600px]">
-                                        {periods.map((p, idx) => {
-                                            if (!p.start_time || !p.end_time) return null;
-                                            const [sh, sm] = p.start_time.split(':').map(Number);
-                                            const [eh, em] = p.end_time.split(':').map(Number);
-                                            const dur = (eh * 60 + em) - (sh * 60 + sm);
-                                            const flex = Math.max(dur, 10);
-                                            return (
-                                                <motion.div
-                                                    key={p._tempId}
-                                                    initial={{ opacity: 0, scaleY: 0.5 }}
-                                                    animate={{ opacity: 1, scaleY: 1 }}
-                                                    transition={{ delay: idx * 0.05 }}
-                                                    style={{ flex }}
-                                                    className={`rounded-2xl p-3 flex flex-col justify-between min-w-[60px] ${p.is_break ? 'bg-amber-100 border-2 border-amber-200' : 'bg-sky-600 border-2 border-sky-700'}`}
-                                                >
-                                                    <p className={`text-[8px] font-black uppercase tracking-widest truncate ${p.is_break ? 'text-amber-700' : 'text-sky-100'}`}>{p.label}</p>
-                                                    <div>
-                                                        <p className={`text-[9px] font-black ${p.is_break ? 'text-amber-600' : 'text-white'}`}>{to12h(p.start_time)}</p>
-                                                        <p className={`text-[8px] font-bold ${p.is_break ? 'text-amber-400' : 'text-sky-200'}`}>{to12h(p.end_time)}</p>
-                                                    </div>
-                                                </motion.div>
-                                            );
-                                        })}
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-                    </>
-                )}
-            </motion.div>
-        </Layout>
-    );
-};
-
-export default TimetableSetup;
+                    {/* Punch Out Time Config */}
+                    <div className="modern-card p-6 border border-rose-100 bg-rose-50/30">
+                        <p className="text-[9px] font-black uppercase tracking-[0.3em] text-rose-400 mb-2">Punch Out</p>
+                        <div className="flex items-center gap-2">
+                            <input
