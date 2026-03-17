@@ -1,158 +1,352 @@
-import { useEffect, useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { useState } from 'react';
+import { useAuth } from '../context/AuthContext';
+import { useNavigate } from 'react-router-dom';
+import Swal from 'sweetalert2';
+import api from '../utils/api';
+import { LogIn, User, Lock, Cpu, Database, Shield, Globe, Activity, Cloud } from 'lucide-react';
+import { motion } from 'framer-motion';
 
-const Splash = ({ onFinish }) => {
-    const [phase, setPhase] = useState(0);
-    const [exiting, setExiting] = useState(false);
+const FloatingIcon = ({ icon: Icon, delay, x, y, size = 32 }) => (
+    <motion.div
+        initial={{ opacity: 0, scale: 0 }}
+        animate={{
+            opacity: [0.1, 0.4, 0.1],
+            translateX: [0, 20, -20, 0],
+            translateY: [0, -40, 20, 0],
+            rotate: [0, 15, -15, 0],
+            scale: [1, 1.1, 1]
+        }}
+        transition={{
+            duration: 8,
+            repeat: Infinity,
+            delay: delay,
+            ease: "easeInOut"
+        }}
+        className="absolute pointer-events-none z-0"
+        style={{ left: `${x}%`, top: `${y}%`, color: 'rgba(14, 165, 233, 0.25)' }}
+    >
+        <Icon size={size} strokeWidth={1.5} />
+    </motion.div>
+);
 
-    useEffect(() => {
-        const t1 = setTimeout(() => setPhase(1), 300);
-        const t2 = setTimeout(() => setPhase(2), 1200);
-        const t3 = setTimeout(() => setPhase(3), 2200);
-        const t4 = setTimeout(() => setExiting(true), 4200);
-        const t5 = setTimeout(() => onFinish(), 5000);
-        return () => [t1, t2, t3, t4, t5].forEach(clearTimeout);
-    }, [onFinish]);
+const Login = () => {
+    const [empId, setEmpId] = useState('');
+    const [pin, setPin] = useState('');
+    const [loading, setLoading] = useState(false);
+    const { login } = useAuth();
+    const navigate = useNavigate();
+
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+        setLoading(true);
+        try {
+            console.log('🔐 Attempting login with:', { emp_id: empId, pin: '***' });
+            const data = await login(empId.trim(), pin.trim());
+            console.log('✅ Login successful:', data);
+            
+            // Show success message
+            Swal.fire({
+                icon: 'success',
+                title: 'Welcome!',
+                text: `Logged in as ${data.role}`,
+                timer: 1000,
+                showConfirmButton: false,
+                background: '#fff',
+                color: '#1e3a8a',
+                allowOutsideClick: false,
+                allowEscapeKey: false
+            });
+            
+            // Navigate after a brief delay to let the dialog show
+            setTimeout(() => {
+                console.log('🔄 Navigating based on role:', data.role);
+                const routes = {
+                    'admin': '/admin',
+                    'principal': '/principal',
+                    'hod': '/hod',
+                    'staff': '/staff'
+                };
+                const route = routes[data.role] || '/';
+                console.log('📍 Navigating to:', route);
+                navigate(route, { replace: true });
+                setLoading(false);
+                // Clear form
+                setEmpId('');
+                setPin('');
+            }, 600);
+            
+        } catch (error) {
+            console.error('❌ Login error:', error);
+            console.error('Error details:', {
+                message: error.message,
+                response: error.response?.data,
+                status: error.response?.status,
+                url: error.config?.url
+            });
+            setLoading(false);
+            
+            // Determine error message
+            let errorMessage = 'Invalid credentials';
+            if (error.message === 'Network Error') {
+                errorMessage = 'Network error - Please check your connection. Is the server running?';
+            } else if (error.response?.status === 401) {
+                errorMessage = 'Invalid Employee ID or PIN';
+            } else if (error.response?.status === 500) {
+                errorMessage = 'Server error - Please try again later';
+            } else if (error.response?.data?.message) {
+                errorMessage = error.response.data.message;
+            } else if (error.message) {
+                errorMessage = error.message;
+            }
+            
+            Swal.fire({
+                icon: 'error',
+                title: 'Login Failed',
+                text: errorMessage,
+                confirmButtonColor: '#2563eb'
+            });
+        }
+    };
 
     return (
-        <AnimatePresence>
-            {!exiting ? (
-                <motion.div
-                    key="splash"
-                    exit={{ opacity: 0 }}
-                    transition={{ duration: 0.8 }}
-                    className="fixed inset-0 z-[9999] flex items-center justify-center overflow-hidden"
-                    style={{ background: 'linear-gradient(135deg, #0c1929 0%, #0f2744 30%, #0a1628 70%, #060d18 100%)' }}
-                >
-                    {/* Animated background particles */}
-                    {[...Array(6)].map((_, i) => (
-                        <motion.div
-                            key={i}
-                            initial={{ opacity: 0, scale: 0 }}
-                            animate={{
-                                opacity: [0, 0.08, 0.03, 0.08, 0],
-                                scale: [0.5, 1.2, 0.8, 1.1, 0.5],
-                                x: [0, (i % 2 ? 30 : -30), (i % 3 ? -20 : 20), 0],
-                                y: [0, (i % 2 ? -25 : 25), (i % 3 ? 15 : -15), 0],
-                            }}
-                            transition={{ duration: 5, ease: 'easeInOut', delay: i * 0.3 }}
-                            className="absolute rounded-full"
-                            style={{
-                                width: `${200 + i * 80}px`,
-                                height: `${200 + i * 80}px`,
-                                left: `${10 + i * 15}%`,
-                                top: `${15 + (i % 3) * 25}%`,
-                                background: `radial-gradient(circle, ${i % 2 ? 'rgba(56,189,248,0.15)' : 'rgba(99,102,241,0.12)'} 0%, transparent 70%)`,
-                            }}
-                        />
-                    ))}
+        <div
+            className="min-h-screen w-full flex items-center justify-center p-4 relative overflow-hidden"
+        >
+            {/* Full-screen background image */}
+            <div
+                className="absolute inset-0 w-full h-full"
+                style={{
+                    backgroundImage: 'url(/ppg-bg.jpg)',
+                    backgroundSize: 'cover',
+                    backgroundPosition: 'center',
+                    backgroundRepeat: 'no-repeat',
+                }}
+            />
+            {/* Dark overlay for readability */}
+            <div className="absolute inset-0 bg-black/50 backdrop-blur-[2px]" />
 
-                    {/* Subtle grid overlay */}
-                    <div
-                        className="absolute inset-0 opacity-[0.03]"
-                        style={{
-                            backgroundImage: 'linear-gradient(rgba(56,189,248,0.3) 1px, transparent 1px), linear-gradient(90deg, rgba(56,189,248,0.3) 1px, transparent 1px)',
-                            backgroundSize: '60px 60px',
-                        }}
-                    />
+            {/* Technology Floating Icons Background */}
+            <FloatingIcon icon={Cpu} delay={0} x={10} y={15} size={40} />
+            <FloatingIcon icon={Database} delay={2} x={85} y={10} size={36} />
+            <FloatingIcon icon={Shield} delay={4} x={12} y={80} size={32} />
+            <FloatingIcon icon={Globe} delay={1} x={78} y={85} size={44} />
+            <FloatingIcon icon={Activity} delay={3} x={50} y={5} size={32} />
+            <FloatingIcon icon={Cloud} delay={5} x={42} y={90} size={44} />
+            <FloatingIcon icon={Cpu} delay={1.5} x={90} y={55} size={28} />
+            <FloatingIcon icon={Database} delay={3.5} x={5} y={50} size={36} />
+            <FloatingIcon icon={Shield} delay={2.5} x={70} y={40} size={30} />
+            <FloatingIcon icon={Cloud} delay={4.5} x={25} y={35} size={38} />
 
-                    {/* Main content */}
-                    <div className="relative z-10 flex flex-col items-center">
+            {/* Login form */}
+            <motion.div
+                initial={{ opacity: 0, y: 30 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.6, ease: 'easeOut' }}
+                className="relative z-10 w-full max-w-md px-8 py-10 rounded-3xl"
+                style={{ background: 'rgba(255,255,255,0.12)', backdropFilter: 'blur(20px)', border: '1px solid rgba(255,255,255,0.18)' }}
+            >
+                {/* Logo + Branding */}
+                <div className="text-center mb-10">
+                    <motion.div
+                        whileHover={{ rotate: 5, scale: 1.05 }}
+                        transition={{ type: 'spring', stiffness: 300 }}
+                        className="w-[88px] h-[88px] mx-auto mb-6 flex items-center justify-center drop-shadow-xl"
+                    >
+                        <img src="/ppg-logo.png" alt="PPG Institute of Technology" className="w-full h-full object-contain" />
+                    </motion.div>
 
-                        {/* Logo */}
-                        <motion.div
-                            initial={{ opacity: 0, scale: 0.3, rotateY: -90 }}
-                            animate={phase >= 1 ? { opacity: 1, scale: 1, rotateY: 0 } : {}}
-                            transition={{ duration: 0.8, type: 'spring', stiffness: 100, damping: 12 }}
-                            className="relative mb-8"
-                        >
-                            {/* Glow ring */}
-                            <motion.div
-                                initial={{ opacity: 0 }}
-                                animate={phase >= 1 ? { opacity: [0, 0.6, 0.3], scale: [0.8, 1.15, 1.05] } : {}}
-                                transition={{ duration: 1.5, ease: 'easeOut' }}
-                                className="absolute -inset-3 rounded-[32px]"
-                                style={{ background: 'linear-gradient(135deg, rgba(56,189,248,0.3), rgba(99,102,241,0.2))', filter: 'blur(12px)' }}
-                            />
-                            <div className="relative w-36 h-36 flex items-center justify-center drop-shadow-2xl">
-                                <img src="/ppg-logo.png" alt="PPG EMP HUB" className="w-full h-full object-contain" />
-                            </div>
-                        </motion.div>
+                    <h1 className="text-3xl font-black text-white tracking-tight leading-tight">
+                        PPG <span className="text-transparent bg-clip-text" style={{ backgroundImage: 'linear-gradient(135deg, #60a5fa, #22d3ee)' }}>iTech - HUB</span>
+                    </h1>
+                    <p className="text-[7px] font-black text-sky-200 uppercase tracking-[0.35em] mt-2 whitespace-nowrap">
+                        Enterprise Attendance & Management System
+                    </p>
+                </div>
 
-                        {/* Title */}
-                        <motion.div
-                            initial={{ opacity: 0, y: 25 }}
-                            animate={phase >= 2 ? { opacity: 1, y: 0 } : {}}
-                            transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
-                            className="text-center mb-4"
-                        >
-                            <h1 className="text-4xl font-black text-white tracking-tight">
-                                PPG{' '}
-                                <span
-                                    className="text-transparent bg-clip-text"
-                                    style={{ backgroundImage: 'linear-gradient(135deg, #38bdf8 0%, #818cf8 50%, #38bdf8 100%)' }}
-                                >
-                                    EMP HUB
-                                </span>
-                            </h1>
-                            <motion.div
-                                initial={{ scaleX: 0 }}
-                                animate={phase >= 2 ? { scaleX: 1 } : {}}
-                                transition={{ duration: 0.6, delay: 0.3, ease: 'easeOut' }}
-                                className="h-0.5 w-32 mx-auto mt-3 rounded-full origin-center"
-                                style={{ background: 'linear-gradient(90deg, transparent, #38bdf8, #818cf8, transparent)' }}
-                            />
-                        </motion.div>
+                {/* Divider */}
+                <div className="flex items-center gap-3 mb-8">
+                    <div className="h-px flex-1 bg-gradient-to-r from-transparent via-white/30 to-transparent" />
+                    <span className="text-[9px] font-black text-sky-300 uppercase tracking-widest">Sign In</span>
+                    <div className="h-px flex-1 bg-gradient-to-r from-transparent via-white/30 to-transparent" />
+                </div>
 
-                        {/* Subtitle */}
-                        <motion.p
-                            initial={{ opacity: 0, y: 15 }}
-                            animate={phase >= 2 ? { opacity: 1, y: 0 } : {}}
-                            transition={{ duration: 0.6, delay: 0.4, ease: 'easeOut' }}
-                            className="text-[10px] font-bold text-sky-300/70 uppercase tracking-[0.4em] mb-10"
-                        >
-                            Enterprise Attendance & Management System
-                        </motion.p>
+                {/* Form */}
+                <form onSubmit={handleSubmit} className="space-y-5">
 
-                        {/* Loading indicator */}
-                        <motion.div
-                            initial={{ opacity: 0 }}
-                            animate={phase >= 3 ? { opacity: 1 } : {}}
-                            transition={{ duration: 0.4 }}
-                            className="flex items-center gap-1.5"
-                        >
-                            {[0, 1, 2].map(i => (
-                                <motion.div
-                                    key={i}
-                                    animate={phase >= 3 ? {
-                                        scale: [1, 1.5, 1],
-                                        opacity: [0.3, 1, 0.3],
-                                    } : {}}
-                                    transition={{
-                                        duration: 0.8,
-                                        repeat: Infinity,
-                                        delay: i * 0.15,
-                                        ease: 'easeInOut',
-                                    }}
-                                    className="w-1.5 h-1.5 rounded-full bg-sky-400"
+                    {/* Employee ID */}
+                    <div className="space-y-1.5">
+                        <label className="text-[10px] font-black text-sky-200 uppercase tracking-widest block">
+                            Employee ID
+                        </label>
+                        <div className="relative group">
+                            <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                                <User
+                                    size={16}
+                                    className="text-gray-300 group-focus-within:text-blue-500 transition-colors duration-200"
                                 />
-                            ))}
-                        </motion.div>
-
-                        {/* Footer */}
-                        <motion.p
-                            initial={{ opacity: 0 }}
-                            animate={phase >= 3 ? { opacity: 0.4 } : {}}
-                            transition={{ duration: 0.5, delay: 0.3 }}
-                            className="text-[8px] font-bold text-sky-200 uppercase tracking-[0.3em] mt-10"
-                        >
-                            Powered by Zorvian Technologies
-                        </motion.p>
+                            </div>
+                            <input
+                                type="text"
+                                value={empId}
+                                onChange={(e) => setEmpId(e.target.value)}
+                                placeholder="Enter your Employee ID"
+                                required
+                                className="w-full pl-11 pr-5 py-[14px] rounded-xl text-sm font-semibold text-gray-700 outline-none transition-all duration-200 placeholder:text-gray-300 placeholder:font-normal"
+                                style={{ background: 'rgba(255,255,255,0.7)', border: '1.5px solid #e2e8f0' }}
+                                onFocus={e => {
+                                    e.target.style.borderColor = '#2563eb';
+                                    e.target.style.boxShadow = '0 0 0 4px rgba(37,99,235,0.08)';
+                                    e.target.style.background = '#ffffff';
+                                }}
+                                onBlur={e => {
+                                    e.target.style.borderColor = '#e2e8f0';
+                                    e.target.style.boxShadow = 'none';
+                                    e.target.style.background = 'rgba(255,255,255,0.7)';
+                                }}
+                            />
+                        </div>
                     </div>
-                </motion.div>
-            ) : null}
-        </AnimatePresence>
+
+                    {/* Security PIN */}
+                    <div className="space-y-1.5">
+                        <label className="text-[10px] font-black text-sky-200 uppercase tracking-widest block">
+                            Security PIN
+                        </label>
+                        <div className="relative group">
+                            <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                                <Lock
+                                    size={16}
+                                    className="text-gray-300 group-focus-within:text-blue-500 transition-colors duration-200"
+                                />
+                            </div>
+                            <input
+                                type="password"
+                                value={pin}
+                                onChange={(e) => setPin(e.target.value)}
+                                placeholder="Enter your Security PIN"
+                                required
+                                className="w-full pl-11 pr-5 py-[14px] rounded-xl text-sm font-semibold text-gray-700 outline-none transition-all duration-200 placeholder:text-gray-300 placeholder:font-normal"
+                                style={{ background: 'rgba(255,255,255,0.7)', border: '1.5px solid #e2e8f0' }}
+                                onFocus={e => {
+                                    e.target.style.borderColor = '#2563eb';
+                                    e.target.style.boxShadow = '0 0 0 4px rgba(37,99,235,0.08)';
+                                    e.target.style.background = '#ffffff';
+                                }}
+                                onBlur={e => {
+                                    e.target.style.borderColor = '#e2e8f0';
+                                    e.target.style.boxShadow = 'none';
+                                    e.target.style.background = 'rgba(255,255,255,0.7)';
+                                }}
+                            />
+                        </div>
+                    </div>
+
+                    {/* Login Button */}
+                    <motion.button
+                        type="submit"
+                        disabled={loading}
+                        whileHover={!loading ? { scale: 1.02, boxShadow: '0 16px 40px -8px rgba(37,99,235,0.45)' } : {}}
+                        whileTap={!loading ? { scale: 0.98 } : {}}
+                        className="w-full mt-2 flex items-center justify-center gap-3 py-4 rounded-xl text-white font-black text-xs tracking-widest uppercase transition-all duration-300 cursor-pointer"
+                        style={{
+                            background: loading
+                                ? '#94a3b8'
+                                : 'linear-gradient(135deg, #2563eb 0%, #0284c7 55%, #06b6d4 100%)',
+                            boxShadow: loading ? 'none' : '0 8px 24px -4px rgba(37,99,235,0.35)',
+                        }}
+                    >
+                        {loading ? (
+                            <>
+                                <span className="h-4 w-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                <span>Authenticating...</span>
+                            </>
+                        ) : (
+                            <>
+                                <span>Sign In</span>
+                                <LogIn size={16} />
+                            </>
+                        )}
+                    </motion.button>
+                </form>
+
+                {/* Management Access */}
+                <div className="mt-6 text-center">
+                    <motion.button
+                        type="button"
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                        onClick={() => {
+                            Swal.fire({
+                                title: 'Management Access',
+                                input: 'password',
+                                inputLabel: 'Enter Management PIN',
+                                inputPlaceholder: 'Enter PIN',
+                                inputAttributes: { autocapitalize: 'off', autocorrect: 'off' },
+                                showCancelButton: true,
+                                confirmButtonText: 'Enter',
+                                confirmButtonColor: '#7c3aed',
+                                cancelButtonColor: '#64748b',
+                                background: '#fff',
+                                customClass: {
+                                    popup: 'rounded-3xl',
+                                    title: 'font-black text-gray-800 tracking-tight',
+                                    input: 'rounded-xl'
+                                },
+                                showLoaderOnConfirm: true,
+                                preConfirm: async (value) => {
+                                    if (!value) {
+                                        Swal.showValidationMessage('Please enter a PIN');
+                                        return false;
+                                    }
+                                    try {
+                                        const { data } = await api.post('/auth/management-login', { pin: String(value) });
+                                        return data;
+                                    } catch (err) {
+                                        Swal.showValidationMessage(
+                                            err.response?.data?.message || 'Connection failed. Is the server running?'
+                                        );
+                                        return false;
+                                    }
+                                },
+                                allowOutsideClick: () => !Swal.isLoading()
+                            }).then((result) => {
+                                if (result.isConfirmed && result.value) {
+                                    localStorage.setItem('token', result.value.token);
+                                    localStorage.setItem('managementAccess', 'true');
+                                    sessionStorage.setItem('managementAccess', 'true');
+                                    Swal.fire({
+                                        icon: 'success',
+                                        title: 'Welcome!',
+                                        text: 'Management access granted',
+                                        timer: 1500,
+                                        showConfirmButton: false,
+                                        background: '#fff',
+                                        color: '#1e3a8a'
+                                    });
+                                    navigate('/management');
+                                }
+                            });
+                        }}
+                        className="text-[10px] font-black text-orange-400 hover:text-orange-300 transition-colors uppercase tracking-[0.3em] cursor-pointer"
+                    >
+                        MANAGEMENT
+                    </motion.button>
+                </div>
+
+                {/* Footer */}
+                <div className="mt-6 text-center">
+                    <a
+                        href="https://zorvian-agency.vercel.app"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-[9px] font-black text-white/50 hover:text-sky-300 transition-colors uppercase tracking-widest whitespace-nowrap"
+                    >
+                        Developed By ZORVIAN TECHNOLOGIES
+                    </a>
+                </div>
+            </motion.div>
+        </div>
     );
 };
 
-export default Splash;
+export default Login;
