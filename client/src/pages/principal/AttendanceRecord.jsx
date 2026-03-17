@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import Layout from '../../components/Layout';
 import api from '../../utils/api';
-import { FaFileDownload, FaFilter, FaSearch, FaEye, FaTimes, FaCalendarAlt } from 'react-icons/fa';
+import { FaFileDownload, FaFilter, FaSearch, FaEye, FaTimes, FaCalendarAlt, FaSync } from 'react-icons/fa';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useSocket } from '../../context/SocketContext';
 import { useNavigate } from 'react-router-dom';
@@ -488,13 +488,23 @@ const AttendanceRecord = () => {
                                     Live
                                 </span>
                             </div>
-                            <button
-                                onClick={handlePrint}
-                                className="p-4 bg-sky-600 text-white rounded-2xl shadow-lg shadow-sky-100 hover:bg-sky-700 transition-all flex items-center justify-center group"
-                                title="Print Report"
-                            >
-                                <FaFileDownload className="group-hover:scale-110 transition-transform" />
-                            </button>
+                            <div className="flex gap-4">
+                                <button
+                                    onClick={() => navigate(`/${user?.role || 'admin'}/biometric-history`)}
+                                    className="px-6 py-4 bg-white border border-emerald-100 text-emerald-600 rounded-2xl shadow-lg shadow-emerald-50 hover:bg-emerald-50 transition-all flex items-center gap-2 font-black text-[10px] uppercase tracking-widest group"
+                                    title="View History"
+                                >
+                                    <FaSync className="group-hover:rotate-180 transition-transform duration-500" />
+                                    History
+                                </button>
+                                <button
+                                    onClick={handlePrint}
+                                    className="p-4 bg-sky-600 text-white rounded-2xl shadow-lg shadow-sky-100 hover:bg-sky-700 transition-all flex items-center justify-center group"
+                                    title="Print Report"
+                                >
+                                    <FaFileDownload className="group-hover:scale-110 transition-transform" />
+                                </button>
+                            </div>
                         </div>
                     ) : (
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 items-end">
