@@ -167,82 +167,97 @@ const DepartmentStaffPage = () => {
                     <p className="text-[10px] font-black text-sky-600 uppercase tracking-[0.3em] animate-pulse">Compiling Department Ledger...</p>
                 </div>
             ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                    <AnimatePresence mode="popLayout">
-                        {filteredPersonnel.map((member, idx) => (
-                            <motion.div
-                                key={member.id}
-                                layout
-                                initial={{ opacity: 0, y: 30, scale: 0.9 }}
-                                animate={{ opacity: 1, y: 0, scale: 1 }}
-                                exit={{ opacity: 0, scale: 0.9 }}
-                                transition={{ delay: idx * 0.05, duration: 0.4, ease: "circOut" }}
-                                className="bg-white rounded-[40px] shadow-2xl shadow-sky-500/5 border border-white hover:border-sky-100 transition-all group overflow-hidden flex flex-col items-center p-8 text-center relative"
-                            >
-                                <div className="absolute top-0 left-0 w-full h-24 bg-gradient-to-br from-sky-600 to-indigo-700 opacity-5" />
-                                <div className="relative mt-4 mb-8">
-                                    <div className="h-32 w-32 rounded-[45px] bg-white p-2 shadow-2xl border border-gray-100 group-hover:rotate-3 transition-transform duration-500 relative overflow-hidden">
-                                        <img
-                                            src={member.profile_pic || `https://ui-avatars.com/api/?name=${encodeURIComponent(member.name)}&size=128&background=2563eb&color=fff&bold=true`}
-                                            alt=""
-                                            className="h-full w-full rounded-[38px] object-cover"
-                                        />
-                                    </div>
-                                    <div className="absolute -bottom-2 -right-2 h-10 w-10 bg-sky-600 rounded-2xl flex items-center justify-center text-white shadow-xl shadow-sky-200 border-4 border-white group-hover:scale-110 transition-transform">
-                                        <FaUserTie size={16} />
-                                    </div>
-                                </div>
-
-                                <h3 className="text-2xl font-black text-gray-800 tracking-tighter leading-tight group-hover:text-sky-600 transition-colors">
-                                    {member.name}
-                                </h3>
-                                <div className="mt-4 flex items-center gap-3">
-                                    <span className={`px-4 py-1.5 rounded-full border text-[10px] font-black uppercase tracking-widest flex items-center gap-2 ${member.role === 'hod'
-                                        ? 'bg-amber-50 text-amber-600 border-amber-100'
-                                        : 'bg-sky-50 text-sky-600 border-sky-100'
-                                        }`}>
-                                        <FaIdBadge /> {member.emp_id} · {member.role}
-                                    </span>
-                                </div>
-                                <p className="mt-4 text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">{member.designation || member.role}</p>
-
-                                <div className="mt-8 grid grid-cols-2 gap-4 w-full">
-                                    <button
-                                        onClick={() => {
-                                            const rolePrefix = isManagement ? 'management' :
-                                                user.role === 'admin' ? 'admin' :
-                                                user.role === 'principal' ? 'principal' :
-                                                    user.role === 'hod' ? 'hod' : 'staff';
-                                            navigate(`/${rolePrefix}/profile/${member.emp_id}`);
-                                            window.dispatchEvent(new CustomEvent('closeSidebar'));
-                                        }}
-                                        className="py-4 bg-white border border-gray-100 text-gray-500 rounded-2xl font-black uppercase tracking-widest text-[10px] hover:bg-sky-600 hover:text-white hover:border-sky-600 transition-all shadow-sm active:scale-95 flex items-center justify-center gap-2"
-                                    >
-                                        <FaEye size={12} /> Profile
-                                    </button>
-                                    <button
-                                        onClick={() => {
-                                            if (isManagement) {
-                                                navigate(-1);
-                                            } else if (user.role === 'admin') {
-                                                navigate(`/admin/timetable/${member.emp_id}`);
-                                            } else if (user.role === 'principal') {
-                                                navigate(`/principal/timetable/${member.emp_id}`);
-                                            } else if (user.role === 'hod') {
-                                                navigate(`/hod/timetable/${member.emp_id}`);
-                                            } else {
-                                                navigate(`/staff/timetables/${member.emp_id}`);
-                                            }
-                                            window.dispatchEvent(new CustomEvent('closeSidebar'));
-                                        }}
-                                        className="py-4 bg-gray-900 text-white rounded-2xl font-black uppercase tracking-widest text-[10px] hover:bg-black transition-all shadow-xl shadow-gray-200 active:scale-95 flex items-center justify-center gap-2"
-                                    >
-                                        <FaCalendarAlt size={12} /> Schedule
-                                    </button>
-                                </div>
-                            </motion.div>
-                        ))}
-                    </AnimatePresence>
+                <div className="bg-white rounded-[40px] shadow-2xl shadow-sky-500/5 p-8 border border-white hover:border-sky-100 transition-colors group">
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-left border-collapse">
+                            <thead>
+                                <tr className="border-b-2 border-sky-50">
+                                    <th className="py-5 px-6 text-[10px] font-black text-sky-600 uppercase tracking-[0.2em] whitespace-nowrap">Personnel</th>
+                                    <th className="py-5 px-6 text-[10px] font-black text-sky-600 uppercase tracking-[0.2em] whitespace-nowrap">Emp ID</th>
+                                    <th className="py-5 px-6 text-[10px] font-black text-sky-600 uppercase tracking-[0.2em] whitespace-nowrap">Role</th>
+                                    <th className="py-5 px-6 text-[10px] font-black text-sky-600 uppercase tracking-[0.2em] whitespace-nowrap text-right">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <AnimatePresence mode="popLayout">
+                                    {filteredPersonnel.map((member, idx) => (
+                                        <motion.tr
+                                            key={member.id}
+                                            layout
+                                            initial={{ opacity: 0, y: 15 }}
+                                            animate={{ opacity: 1, y: 0 }}
+                                            exit={{ opacity: 0, scale: 0.95 }}
+                                            transition={{ delay: idx * 0.05, duration: 0.3 }}
+                                            className="group/row hover:bg-sky-50/50 transition-colors border-b border-gray-50 last:border-0"
+                                        >
+                                            <td className="py-4 px-6">
+                                                <div className="flex items-center gap-4">
+                                                    <img 
+                                                        src={member.profile_pic || `https://ui-avatars.com/api/?name=${encodeURIComponent(member.name)}&size=80&background=2563eb&color=fff&bold=true`} 
+                                                        className="w-12 h-12 rounded-[14px] object-cover shadow-sm bg-gray-100 border border-gray-100" 
+                                                        alt="" 
+                                                    />
+                                                    <div>
+                                                        <h3 className="text-sm font-black text-gray-800 tracking-tight group-hover/row:text-sky-600 transition-colors uppercase">{member.name}</h3>
+                                                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mt-0.5">{member.designation || member.role}</p>
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td className="py-4 px-6">
+                                                <span className="text-[11px] font-black text-gray-600 tracking-widest uppercase">{member.emp_id}</span>
+                                            </td>
+                                            <td className="py-4 px-6">
+                                                <span className={`px-3 py-1.5 rounded-[10px] border text-[9px] font-black uppercase tracking-widest inline-flex items-center gap-1.5 ${member.role === 'hod'
+                                                    ? 'bg-amber-50 text-amber-600 border-amber-100'
+                                                    : 'bg-sky-50 text-sky-600 border-sky-100'
+                                                }`}>
+                                                    <FaIdBadge /> {member.role}
+                                                </span>
+                                            </td>
+                                            <td className="py-4 px-6 text-right">
+                                                <div className="flex items-center justify-end gap-2">
+                                                    <button
+                                                        onClick={() => {
+                                                            const rolePrefix = isManagement ? 'management' :
+                                                                user?.role === 'admin' ? 'admin' :
+                                                                user?.role === 'principal' ? 'principal' :
+                                                                user?.role === 'hod' ? 'hod' : 'staff';
+                                                            navigate(`/${rolePrefix}/profile/${member.emp_id}`);
+                                                            window.dispatchEvent(new CustomEvent('closeSidebar'));
+                                                        }}
+                                                        className="h-10 px-4 bg-white border border-gray-100 rounded-xl flex items-center justify-center text-gray-500 hover:text-sky-600 hover:border-sky-200 shadow-sm active:scale-95 transition-all text-[9.5px] font-black uppercase tracking-wider gap-2"
+                                                        title="View Profile"
+                                                    >
+                                                        <FaEye size={12} /> <span className="hidden sm:inline">Profile</span>
+                                                    </button>
+                                                    <button
+                                                        onClick={() => {
+                                                            if (isManagement) {
+                                                                navigate(-1);
+                                                            } else if (user?.role === 'admin') {
+                                                                navigate(`/admin/timetable/${member.emp_id}`);
+                                                            } else if (user?.role === 'principal') {
+                                                                navigate(`/principal/timetable/${member.emp_id}`);
+                                                            } else if (user?.role === 'hod') {
+                                                                navigate(`/hod/timetable/${member.emp_id}`);
+                                                            } else {
+                                                                navigate(`/staff/timetables/${member.emp_id}`);
+                                                            }
+                                                            window.dispatchEvent(new CustomEvent('closeSidebar'));
+                                                        }}
+                                                        className="h-10 px-4 bg-gray-900 text-white rounded-xl flex items-center justify-center hover:bg-black shadow-lg shadow-gray-200 active:scale-95 transition-all text-[9.5px] font-black uppercase tracking-wider gap-2"
+                                                        title="View Schedule"
+                                                    >
+                                                        <FaCalendarAlt size={12} /> <span className="hidden xl:inline">Schedule</span>
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        </motion.tr>
+                                    ))}
+                                </AnimatePresence>
+                            </tbody>
+                        </table>
+                    </div>
 
                     {filteredPersonnel.length === 0 && (
                         <div className="col-span-full py-40 bg-white/50 backdrop-blur-xl rounded-[60px] border-4 border-dashed border-gray-100 flex flex-col items-center justify-center text-center gap-8 group">
