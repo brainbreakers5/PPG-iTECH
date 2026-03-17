@@ -190,7 +190,12 @@ const DepartmentManagement = () => {
             >
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-12 gap-6">
                     <div>
-                        <h1 className="text-4xl font-black text-gray-800 tracking-tighter">Departments</h1>
+                        <h1 className="text-4xl font-black text-gray-800 tracking-tighter flex items-center gap-4">
+                            Departments
+                            <span className="bg-sky-100 text-sky-700 font-bold px-3 py-1 rounded-xl text-sm uppercase tracking-widest">
+                                Total Faculty: {allEmployees.length}
+                            </span>
+                        </h1>
                     </div>
                     <div className="flex items-center gap-3">
                         <button
