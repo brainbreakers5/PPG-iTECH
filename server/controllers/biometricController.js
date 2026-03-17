@@ -41,7 +41,7 @@ exports.receiveLog = async (req, res) => {
         // Use provided timestamp or current server time
         const logDate = timestamp ? new Date(timestamp) : new Date();
         const dateStr = logDate.toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' }); // YYYY-MM-DD in IST
-        const timeStr = logDate.toLocaleTimeString('en-GB', { timeZone: 'Asia/Kolkata', hour12: false }); // HH:MM:SS in IST
+        const timeStr = logDate.toLocaleTimeString('en-US', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', hour12: true }); // HH:MM AM/PM in IST
 
         // 1. Check if User exists in the system
         const { rows: userRows } = await pool.query(
@@ -143,10 +143,12 @@ exports.receiveLog = async (req, res) => {
                 } catch (e) { details = []; }
 
                 const dayDetail = details.find(d => d.date === dateStr);
-                if (dayDetail && !dayDetail.is_full_day) {
-                    const f = dayDetail.from_time || '00:00';
-                    const t = dayDetail.to_time || '23:59';
-                    segments.push({ type: leave.leave_type, from: f, to: t, fromMins: toMins(f), toMins: toMins(t) });
+                if (dayDetail && (dayDetail.day_type || !dayDetail.is_full_day)) {
+                    let f, t;
+                    if (dayDetail.day_type === 'Half Day AM') { f = '09:00'; t = '13:00'; }
+                    else if (dayDetail.day_type === 'Half Day PM') { f = '13:30'; t = '16:45'; }
+                    else { f = dayDetail.from_time || '09:00'; t = dayDetail.to_time || '16:45'; }
+                    segments.push({ type: leave.leave_type, from: f, to: t, fromMins: toMins(f), toMins: toMins(t), day_type: dayDetail.day_type });
                 } else if (!leave.is_half_day) {
                     segments.push({ type: leave.leave_type, from: '09:00', to: '16:45', fromMins: toMins('09:00'), toMins: toMins('16:45'), isFull: true });
                 }
@@ -227,10 +229,12 @@ exports.receiveLog = async (req, res) => {
             const approvedInfoList = segments
                 .filter(s => s.type !== 'Present')
                 .map(s => {
+                    const fromTimeStr = new Date(`2000-01-01T${s.from}`).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+                    const toTimeStr = new Date(`2000-01-01T${s.to}`).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
                     const durationInMins = s.toMins - s.fromMins;
                     const h = Math.floor(durationInMins / 60);
                     const m = durationInMins % 60;
-                    return `${s.type}: ${s.from}-${s.to} (${h}h ${m}m)`;
+                    return `${s.type}${s.day_type ? ' (' + s.day_type + ')' : ''}: ${fromTimeStr}-${toTimeStr} (${h}h ${m}m)`;
                 });
 
             const finalRemarks = [
