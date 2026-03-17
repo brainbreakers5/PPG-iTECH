@@ -385,6 +385,7 @@ const HODDashboard = () => {
             {/* Institutional Summary - Similar to Admin/Principal */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-16">
                 {[
+                    { key: 'hod', title: 'HOD', color: 'amber' },
                     { key: 'staff', title: 'Staff', color: 'purple' }
                 ].map((role) => (
                     <motion.div
