@@ -7,7 +7,6 @@ import {
     ShoppingBag, 
     Info, 
     CheckCircle2, 
-    Clock, 
     Filter, 
     Trash2,
     CalendarCheck,
@@ -31,13 +30,9 @@ const Notifications = () => {
     const [loading, setLoading] = useState(true);
     const [filter, setFilter] = useState('ALL');
     const [searchQuery, setSearchQuery] = useState('');
-    const [currentTime, setCurrentTime] = useState(new Date());
 
-    // Update current time every minute to refresh relative timestamps
-    useEffect(() => {
-        const timer = setInterval(() => setCurrentTime(new Date()), 60000);
-        return () => clearInterval(timer);
-    }, []);
+
+
 
     const fetchNotifications = useCallback(async () => {
         try {
@@ -120,36 +115,7 @@ const Notifications = () => {
         }
     };
 
-    const formatTime = (dateStr) => {
-        if (!dateStr) return '';
-        const date = new Date(dateStr);
-        if (isNaN(date.getTime())) return dateStr;
 
-        const diffInSeconds = Math.floor((currentTime - date) / 1000);
-        
-        if (diffInSeconds < 60) return 'Just now';
-        
-        const diffInMinutes = Math.floor(diffInSeconds / 60);
-        if (diffInMinutes < 60) return `${diffInMinutes}m ago`;
-        
-        const diffInHours = Math.floor(diffInMinutes / 60);
-        if (diffInHours < 24) {
-            const isToday = date.toDateString() === currentTime.toDateString();
-            if (isToday) return `${diffInHours}h ago`;
-        }
-
-        const isYesterday = new Date(currentTime.getTime() - 86400000).toDateString() === date.toDateString();
-        const timeStr = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-        
-        if (isYesterday) return `Yesterday at ${timeStr}`;
-        
-        return date.toLocaleDateString('en-GB', { 
-            day: '2-digit', 
-            month: 'short',
-            hour: '2-digit',
-            minute: '2-digit'
-        });
-    };
 
     const getIcon = (type) => {
         switch (type) {
@@ -307,10 +273,8 @@ const Notifications = () => {
                                                     <h3 className={`text-sm font-black tracking-tight ${!n.is_read ? 'text-gray-800' : 'text-gray-500'}`}>
                                                         {getTitle(n.type)}
                                                     </h3>
-                                                    <span className="flex items-center gap-1.5 text-[9px] font-black text-gray-400 uppercase tracking-widest bg-gray-50 px-3 py-1 rounded-full">
-                                                        <Clock size={10} />
-                                                        {formatTime(n.created_at)}
-                                                    </span>
+                                                     {/* Removed date and time as per request */}
+
                                                 </div>
                                                 <p className={`text-sm leading-relaxed mb-3 ${!n.is_read ? 'text-gray-600' : 'text-gray-400'}`}>
                                                     {n.message}
