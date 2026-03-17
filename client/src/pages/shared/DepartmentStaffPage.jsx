@@ -3,7 +3,7 @@ import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import Layout from '../../components/Layout';
 import api from '../../utils/api';
 import { useAuth } from '../../context/AuthContext';
-import { FaUserTie, FaEye, FaCalendarAlt, FaIdBadge, FaEnvelope, FaPhone, FaBuilding, FaSuitcase, FaArrowLeft, FaUsers, FaSearch, FaFilter } from 'react-icons/fa';
+import { FaUserTie, FaEye, FaCalendarAlt, FaIdBadge, FaEnvelope, FaPhone, FaBuilding, FaSuitcase, FaArrowLeft, FaUsers, FaSearch, FaFilter, FaPrint } from 'react-icons/fa';
 import { motion, AnimatePresence } from 'framer-motion';
 
 const DepartmentStaffPage = () => {
@@ -22,7 +22,6 @@ const DepartmentStaffPage = () => {
     useEffect(() => {
         const fetchDepartmentData = async () => {
             try {
-                // Get all departments to find the name of the current one
                 const { data: deptData } = await api.get('/departments');
                 const currDept = deptData.find(d => String(d.id) === String(id));
                 setDepartment(currDept);
@@ -54,6 +53,72 @@ const DepartmentStaffPage = () => {
         setFilteredPersonnel(result);
     }, [searchQuery, personnel]);
 
+    const handlePrint = () => {
+        if (!filteredPersonnel || filteredPersonnel.length === 0) return;
+
+        const printWindow = window.open('', '_blank', 'width=1200,height=800');
+        if (!printWindow) return;
+
+        const escHtml = (v) => String(v ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        const roleColors = { hod: '#0891b2', staff: '#16a34a', admin: '#7c3aed', principal: '#2563eb' };
+
+        const rowsHtml = filteredPersonnel.map((member, idx) => `
+            <tr style="${idx % 2 === 0 ? 'background:#fff;' : 'background:#f8fafc;'} border-bottom:1px solid #f1f5f9;">
+                <td style="padding:10px 12px; text-align:center;">
+                    <img src="${escHtml(member.profile_pic || `https://ui-avatars.com/api/?name=${encodeURIComponent(member.name)}&size=60&background=2563eb&color=fff&bold=true`)}"
+                         style="width:40px;height:40px;border-radius:10px;object-fit:cover;" onerror="this.style.display='none'" />
+                </td>
+                <td style="padding:10px 12px; font-size:9pt; font-weight:900; color:#1e3a8a;">${escHtml(member.emp_id)}</td>
+                <td style="padding:10px 12px; font-size:9pt; font-weight:700; color:#1e293b;">${escHtml(member.name)}</td>
+                <td style="padding:10px 12px;">
+                    <span style="background:${(roleColors[member.role] || '#475569')}22; color:${roleColors[member.role] || '#475569'}; border:1px solid ${(roleColors[member.role] || '#475569')}44; padding:2px 8px; border-radius:12px; font-size:8pt; font-weight:900; text-transform:uppercase; letter-spacing:0.05em;">${escHtml(member.role)}</span>
+                </td>
+                <td style="padding:10px 12px; font-size:9pt; color:#334155;">${escHtml(member.designation || '—')}</td>
+                <td style="padding:10px 12px; font-size:8.5pt; color:#475569;">${escHtml(member.email || '—')}</td>
+                <td style="padding:10px 12px; font-size:9pt; color:#475569;">${escHtml(member.mobile || '—')}</td>
+            </tr>
+        `).join('');
+
+        printWindow.document.write(`
+            <!doctype html><html><head><meta charset="UTF-8">
+            <title>${escHtml(department?.name || 'Department')} — Staff & HOD Report</title>
+            <style>
+                @page { size: landscape; margin: 0.7cm; }
+                body { font-family: 'Segoe UI', Arial, sans-serif; color: #1e293b; margin: 0; padding: 10px; }
+                .header { display:flex; justify-content:space-between; align-items:flex-end; margin-bottom:20px; border-bottom:3px solid #1e3a8a; padding-bottom:12px; }
+                .header h1 { margin:0; color:#1e3a8a; font-size:18pt; font-weight:900; letter-spacing:-0.5px; }
+                .meta { font-size:9pt; color:#64748b; font-weight:bold; margin-top:5px; }
+                .brand { font-weight:900; color:#1e3a8a; font-size:11pt; text-align:right; }
+                .gen-date { font-size:8pt; color:#94a3b8; text-align:right; }
+                table { width:100%; border-collapse:collapse; }
+                thead tr { background:#1e3a8a; }
+                thead th { padding:10px 12px; font-size:8pt; font-weight:900; color:#fff; text-transform:uppercase; letter-spacing:0.08em; text-align:left; }
+                tbody tr { border-bottom:1px solid #f1f5f9; }
+            </style></head><body>
+            <div class="header">
+                <div>
+                    <h1>${escHtml(department?.name || 'Department')} — Staff & HOD Registry</h1>
+                    <p class="meta">Department Code: ${escHtml(department?.code || '—')} &nbsp;|&nbsp; Total Personnel: ${filteredPersonnel.length}</p>
+                </div>
+                <div>
+                    <div class="brand">PPG EMP HUB</div>
+                    <div class="gen-date">Generated: ${new Date().toLocaleString('en-GB')}</div>
+                </div>
+            </div>
+            <table>
+                <thead><tr>
+                    <th style="width:56px;">Photo</th>
+                    <th>Emp ID</th><th>Name</th><th>Role</th><th>Designation</th><th>Email</th><th>Mobile</th>
+                </tr></thead>
+                <tbody>${rowsHtml}</tbody>
+            </table>
+            </body></html>
+        `);
+        printWindow.document.close();
+        printWindow.focus();
+        setTimeout(() => printWindow.print(), 250);
+    };
+
     return (
         <Layout>
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-10 gap-6">
@@ -72,17 +137,27 @@ const DepartmentStaffPage = () => {
                     </div>
                 </div>
 
-                <div className="relative group w-full md:w-80">
-                    <div className="absolute inset-y-0 left-0 pl-5 flex items-center pointer-events-none">
-                        <FaSearch className="text-sky-300 group-focus-within:text-sky-500 transition-colors" />
+                <div className="flex items-center gap-3 w-full md:w-auto">
+                    <div className="relative group flex-1 md:w-80">
+                        <div className="absolute inset-y-0 left-0 pl-5 flex items-center pointer-events-none">
+                            <FaSearch className="text-sky-300 group-focus-within:text-sky-500 transition-colors" />
+                        </div>
+                        <input
+                            type="text"
+                            placeholder="Search personnel..."
+                            className="w-full pl-14 pr-6 py-4 bg-white border border-gray-100 rounded-2xl outline-none focus:ring-4 focus:ring-sky-100 focus:border-sky-500 transition-all font-bold text-gray-700 text-sm shadow-xl shadow-sky-500/5 shadow-inner"
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                        />
                     </div>
-                    <input
-                        type="text"
-                        placeholder="Search personnel..."
-                        className="w-full pl-14 pr-6 py-4 bg-white border border-gray-100 rounded-2xl outline-none focus:ring-4 focus:ring-sky-100 focus:border-sky-500 transition-all font-bold text-gray-700 text-sm shadow-xl shadow-sky-500/5 shadow-inner"
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                    />
+                    <button
+                        onClick={handlePrint}
+                        className="p-4 bg-sky-600 text-white rounded-2xl shadow-lg shadow-sky-100 hover:bg-sky-700 transition-all flex items-center justify-center gap-2 group font-black uppercase tracking-widest text-[10px] shrink-0"
+                        title="Print Department Staff Report"
+                    >
+                        <FaPrint className="group-hover:scale-110 transition-transform" />
+                        <span className="hidden sm:inline">Print</span>
+                    </button>
                 </div>
             </div>
 
