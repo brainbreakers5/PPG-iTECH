@@ -53,7 +53,6 @@ const Sidebar = ({ userRole = 'staff', isOpen, onClose }) => {
       { label: 'Security Logs', path: '/admin/activity-logs', icon: <FaShieldAlt /> },
       { label: 'Calendar', path: '/admin/calendar', icon: <FaCalendarDay /> },
       { label: 'Purchase Requests', path: '/admin/purchase', icon: <FaShoppingBag /> },
-      { label: 'Notifications', path: '/admin/notifications', icon: <FaBell /> },
     ],
     principal: [
       { label: 'Dashboard', path: '/principal', icon: <FaTachometerAlt /> },
@@ -64,7 +63,6 @@ const Sidebar = ({ userRole = 'staff', isOpen, onClose }) => {
       { label: 'Conversation', path: '/principal/conversation', icon: <FaComments /> },
       { label: 'Purchase Requests', path: '/principal/purchase', icon: <FaShoppingBag /> },
       { label: 'Academic Calendar', path: '/principal/calendar', icon: <FaCalendarDay /> },
-      { label: 'Notifications', path: '/principal/notifications', icon: <FaBell /> },
     ],
     hod: [
       { label: 'Dashboard', path: '/hod', icon: <FaTachometerAlt /> },
@@ -76,7 +74,6 @@ const Sidebar = ({ userRole = 'staff', isOpen, onClose }) => {
       { label: 'Conversation', path: '/hod/conversation', icon: <FaComments /> },
       { label: 'Purchase Requests', path: '/hod/purchase', icon: <FaShoppingBag /> },
       { label: 'Academic Calendar', path: '/hod/calendar', icon: <FaCalendarDay /> },
-      { label: 'Notifications', path: '/hod/notifications', icon: <FaBell /> },
     ],
     staff: [
       { label: 'Dashboard', path: '/staff', icon: <FaTachometerAlt /> },
@@ -86,14 +83,12 @@ const Sidebar = ({ userRole = 'staff', isOpen, onClose }) => {
       { label: 'Conversation', path: '/staff/conversation', icon: <FaComments /> },
       { label: 'Purchase Requests', path: '/staff/items', icon: <FaShoppingBag /> },
       { label: 'Academic Calendar', path: '/staff/calendar', icon: <FaCalendarDay /> },
-      { label: 'Notifications', path: '/staff/notifications', icon: <FaBell /> },
     ],
     management: [
       { label: 'Dashboard', path: '/management', icon: <FaTachometerAlt /> },
       { label: 'Departments', path: '/management/departments', icon: <FaBuilding /> },
       { label: 'Salary Overview', path: '/management/payroll', icon: <FaMoneyBillWave /> },
       { label: 'Attendance Records', path: '/management/attendance', icon: <FaCalendarCheck /> },
-      { label: 'Notifications', path: '/management/notifications', icon: <FaBell /> },
     ],
   };
 
