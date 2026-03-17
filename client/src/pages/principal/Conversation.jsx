@@ -56,7 +56,7 @@ const Conversation = () => {
 
     const fetchAllStaff = async () => {
         try {
-            const { data } = await api.get('/employees');
+            const { data } = await api.get('/employees?all=true');
             setAllStaff(data);
         } catch (error) { console.error("Error fetching staff", error); }
     };
