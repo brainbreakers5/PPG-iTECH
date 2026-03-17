@@ -333,6 +333,9 @@ exports.getBiometricData = async (req, res) => {
         if (date) {
             params.push(date);
             query += ` AND b.date = $${params.length}`;
+        } else if (startDate && endDate) {
+            params.push(startDate, endDate);
+            query += ` AND b.date >= $${params.length - 1} AND b.date <= $${params.length}`;
         } else if (month) {
             params.push(`${month}%`);
             query += ` AND b.date::text LIKE $${params.length}`;
