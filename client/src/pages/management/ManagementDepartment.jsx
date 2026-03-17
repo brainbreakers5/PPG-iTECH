@@ -188,3 +188,27 @@ const ManagementDepartment = () => {
                                 <div className="flex items-center gap-6 pt-4 border-t border-gray-50">
                                     <div className="flex items-center gap-2 text-gray-400">
                                         <span className="px-2 py-1 bg-gray-50 border border-gray-100 rounded-lg text-[9px] font-black text-gray-600 tracking-widest">{dept.code || 'NO-CODE'}</span>
+                                    </div>
+                                    <div className="flex items-center gap-2 text-gray-400">
+                                        <FaBuilding size={10} />
+                                        <span className="text-[9px] font-bold uppercase tracking-widest">Division</span>
+                                    </div>
+                                    <button
+                                        onClick={() => handleViewStaff(dept)}
+                                        className="ml-auto text-purple-600 hover:text-purple-800 text-[10px] font-black uppercase tracking-widest hover:underline"
+                                    >
+                                        View Personnel
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div className="absolute bottom-0 left-0 w-full h-1 bg-gradient-to-r from-purple-500 to-transparent scale-x-0 group-hover:scale-x-100 transition-transform origin-left duration-500"></div>
+                        </motion.div>
+                    ))}
+                </div>
+            </motion.div>
+        </Layout>
+    );
+};
+
+export default ManagementDepartment;
