@@ -17,13 +17,9 @@ const Header = ({ toggleSidebar, sidebarOpen }) => {
     const [showNotifs, setShowNotifs] = useState(false);
     const [unreadCount, setUnreadCount] = useState(0);
     const notifRef = useRef(null);
-    const [currentTime, setCurrentTime] = useState(new Date());
 
-    // Update current time every minute to refresh timestamps
-    useEffect(() => {
-        const timer = setInterval(() => setCurrentTime(new Date()), 60000);
-        return () => clearInterval(timer);
-    }, []);
+
+
 
     // Search functionality
     const [searchQuery, setSearchQuery] = useState('');
@@ -353,43 +349,7 @@ const Header = ({ toggleSidebar, sidebarOpen }) => {
         }
     };
 
-    const formatNotificationTime = (dateStr) => {
-        if (!dateStr) return '';
-        const date = new Date(dateStr);
-        if (isNaN(date.getTime())) return dateStr; // fallback
 
-        const now = currentTime;
-        const isToday = date.toDateString() === now.toDateString();
-        
-        const yesterday = new Date(now);
-        yesterday.setDate(yesterday.getDate() - 1);
-        const isYesterday = date.toDateString() === yesterday.toDateString();
-        
-        const time = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
-
-        if (isToday) return `Today at ${time}`;
-        if (isYesterday) return `Yesterday at ${time}`;
-        
-        const stringDate = date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
-        return `${stringDate} at ${time}`;
-    };
-
-    const getNotificationTitle = (type) => {
-        switch (type) {
-            case 'leave':
-                return 'Leave Notification';
-            case 'permission':
-                return 'Permission Notification';
-            case 'purchase':
-                return 'Purchase Request';
-            case 'conversation':
-                return 'Message Notification';
-            case 'birthday':
-                return 'Birthday Alert';
-            default:
-                return 'System Notification';
-        }
-    };
 
     return (
         <div className="flex flex-col w-full relative z-40">
@@ -542,11 +502,11 @@ const Header = ({ toggleSidebar, sidebarOpen }) => {
                                                                         <FaInfoCircle className="text-sky-500" size={14} />}
                                                 </div>
                                                 <div className="flex-1">
-                                                    <p className="text-[11px] font-black text-gray-800 leading-tight">{getNotificationTitle(n.type)}</p>
+                                                     {/* Removed title as per request */}
+
                                                     <p className="text-[10px] text-gray-500 leading-relaxed mt-1">{n.message}</p>
-                                                    <p className="text-[8px] font-black text-gray-400 mt-2 uppercase tracking-tighter">
-                                                        {formatNotificationTime(n.created_at)}
-                                                    </p>
+                                                     {/* Removed timestamp as per request */}
+
                                                 </div>
                                             </div>
                                         ))
