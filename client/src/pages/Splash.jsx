@@ -146,7 +146,7 @@ const Splash = ({ onFinish }) => {
                             transition={{ duration: 0.5, delay: 0.3 }}
                             className="text-[8px] font-bold text-sky-200 uppercase tracking-[0.3em] mt-10"
                         >
-                            Powered by Zorvian Agency
+                            Powered by Zorvian Technologies
                         </motion.p>
                     </div>
                 </motion.div>
