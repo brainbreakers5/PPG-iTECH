@@ -36,6 +36,7 @@ import AdminPurchase from './pages/admin/AdminPurchase';
 import AdminCalendar from './pages/admin/AdminCalendar';
 import LeaveLimitation from './pages/admin/LeaveLimitation';
 import TimetableSetup from './pages/admin/TimetableSetup';
+import BiometricHistory from './pages/admin/BiometricHistory';
 
 // Shared Pages
 import ProfilePage from './pages/shared/ProfilePage';
@@ -137,6 +138,7 @@ const AppContent = () => {
             <Route path="profile/:id" element={<ProfilePage />} />
             <Route path="personnel/:role" element={<PersonnelListPage />} />
             <Route path="notifications" element={<Notifications />} />
+            <Route path="biometric-history" element={<BiometricHistory />} />
           </Routes>
         </ProtectedRoute>
       } />
@@ -162,6 +164,7 @@ const AppContent = () => {
             <Route path="profile/:id" element={<ProfilePage />} />
             <Route path="personnel/:role" element={<PersonnelListPage />} />
             <Route path="notifications" element={<Notifications />} />
+            <Route path="biometric-history" element={<BiometricHistory />} />
           </Routes>
         </ProtectedRoute>
       } />
@@ -185,6 +188,7 @@ const AppContent = () => {
             <Route path="profile/:id" element={<ProfilePage />} />
             <Route path="personnel/:role" element={<PersonnelListPage />} />
             <Route path="notifications" element={<Notifications />} />
+            <Route path="biometric-history" element={<BiometricHistory />} />
           </Routes>
         </ProtectedRoute>
       } />
@@ -219,6 +223,7 @@ const AppContent = () => {
             <Route path="attendance/:empId/:startDate/:endDate" element={<DetailedAttendancePage />} />
             <Route path="profile/:id" element={<ProfilePage />} />
             <Route path="notifications" element={<Notifications />} />
+            <Route path="biometric-history" element={<BiometricHistory />} />
           </Routes>
         </ManagementRoute>
       } />
