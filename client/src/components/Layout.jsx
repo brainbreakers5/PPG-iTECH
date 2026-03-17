@@ -55,7 +55,7 @@ const Layout = ({ children }) => {
                 />
             )}
 
-            <div className={`flex-1 flex flex-col overflow-hidden transition-all duration-500 ease-in-out ${sidebarOpen ? 'lg:ml-64' : 'ml-0'}`}>
+            <div className={`flex-1 flex flex-col overflow-hidden transition-all duration-500 ease-in-out ml-0 lg:ml-64`}>
                 <Header
                     toggleSidebar={() => setSidebarOpen(!sidebarOpen)}
                     sidebarOpen={sidebarOpen}
