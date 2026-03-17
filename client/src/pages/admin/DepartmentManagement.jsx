@@ -3,7 +3,7 @@ import Layout from '../../components/Layout';
 import api from '../../utils/api';
 import { useNavigate } from 'react-router-dom';
 import Swal from 'sweetalert2';
-import { FaTrash, FaPlus, FaLayerGroup, FaBuilding, FaProjectDiagram, FaArrowRight, FaPen } from 'react-icons/fa';
+import { FaTrash, FaPlus, FaLayerGroup, FaBuilding, FaProjectDiagram, FaArrowRight, FaPen, FaPrint } from 'react-icons/fa';
 import { motion, AnimatePresence } from 'framer-motion';
 
 const DepartmentManagement = () => {
@@ -72,6 +72,42 @@ const DepartmentManagement = () => {
         window.dispatchEvent(new CustomEvent('closeSidebar'));
     };
 
+    const handlePrint = () => {
+        if (!departments || departments.length === 0) return;
+        const printWindow = window.open('', '_blank', 'width=1200,height=800');
+        if (!printWindow) return;
+        const escHtml = (v) => String(v ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        const rowsHtml = departments.map((dept, idx) => `
+            <tr style="${idx % 2 === 0 ? 'background:#fff;' : 'background:#f8fafc;'}">
+                <td style="padding:10px 14px; font-size:10pt; font-weight:900; color:#1e3a8a;">${escHtml(dept.name)}</td>
+                <td style="padding:10px 14px; font-size:9pt; color:#475569; font-weight:700;">${escHtml(dept.code || '—')}</td>
+            </tr>
+        `).join('');
+        printWindow.document.write(`
+            <!doctype html><html><head><meta charset="UTF-8">
+            <title>Department Management Report</title>
+            <style>
+                @page { size: portrait; margin: 1cm; }
+                body { font-family: 'Segoe UI', Arial, sans-serif; color: #1e293b; margin: 0; padding: 10px; }
+                .header { display:flex; justify-content:space-between; align-items:flex-end; margin-bottom:20px; border-bottom:3px solid #1e3a8a; padding-bottom:12px; }
+                .header h1 { margin:0; color:#1e3a8a; font-size:18pt; font-weight:900; } .meta { font-size:9pt; color:#64748b; font-weight:bold; margin-top:5px; }
+                .brand { font-weight:900; color:#1e3a8a; font-size:11pt; text-align:right; } .gen-date { font-size:8pt; color:#94a3b8; text-align:right; }
+                table { width:100%; border-collapse:collapse; } thead tr { background:#1e3a8a; }
+                thead th { padding:10px 14px; font-size:8pt; font-weight:900; color:#fff; text-transform:uppercase; letter-spacing:0.08em; text-align:left; }
+                tbody tr { border-bottom:1px solid #f1f5f9; }
+            </style></head><body>
+            <div class="header">
+                <div><h1>Department Management Report</h1><p class="meta">Total Departments: ${departments.length}</p></div>
+                <div><div class="brand">PPG EMP HUB</div><div class="gen-date">Generated: ${new Date().toLocaleString('en-GB')}</div></div>
+            </div>
+            <table><thead><tr><th>Department Name</th><th>Code</th></tr></thead><tbody>${rowsHtml}</tbody></table>
+            </body></html>
+        `);
+        printWindow.document.close();
+        printWindow.focus();
+        setTimeout(() => printWindow.print(), 250);
+    };
+
     return (
         <Layout>
             <motion.div
@@ -82,15 +118,24 @@ const DepartmentManagement = () => {
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-12 gap-6">
                     <div>
                         <h1 className="text-4xl font-black text-gray-800 tracking-tighter">Departments</h1>
-
                     </div>
-                    <button
-                        onClick={() => handleAction()}
-                        className="bg-sky-600 text-white px-10 py-5 rounded-2xl shadow-xl shadow-sky-100 hover:bg-sky-800 transition-all font-black uppercase tracking-[0.2em] text-[10px] flex items-center gap-4 active:scale-95 group"
-                    >
-                        <FaPlus className="group-hover:rotate-90 transition-transform duration-500" />
-                        Add Department
-                    </button>
+                    <div className="flex items-center gap-3">
+                        <button
+                            onClick={handlePrint}
+                            className="p-4 bg-sky-600 text-white rounded-2xl shadow-lg shadow-sky-100 hover:bg-sky-700 transition-all flex items-center justify-center gap-2 group font-black uppercase tracking-widest text-[10px]"
+                            title="Print Department Report"
+                        >
+                            <FaPrint className="group-hover:scale-110 transition-transform" />
+                            <span className="hidden sm:inline">Print</span>
+                        </button>
+                        <button
+                            onClick={() => handleAction()}
+                            className="bg-sky-600 text-white px-10 py-5 rounded-2xl shadow-xl shadow-sky-100 hover:bg-sky-800 transition-all font-black uppercase tracking-[0.2em] text-[10px] flex items-center gap-4 active:scale-95 group"
+                        >
+                            <FaPlus className="group-hover:rotate-90 transition-transform duration-500" />
+                            Add Department
+                        </button>
+                    </div>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10">
