@@ -39,7 +39,7 @@ const LeaveApply = () => {
 
     // Permission letter states
     const [permissions, setPermissions] = useState([]);
-    const [permForm, setPermForm] = useState({ date: '', day_type: 'Half Day AM', subject: '', reason: '' });
+    const [permForm, setPermForm] = useState({ date: '', subject: '', reason: '' });
     const [permSubmitting, setPermSubmitting] = useState(false);
 
     const [formData, setFormData] = useState({
@@ -201,21 +201,17 @@ const LeaveApply = () => {
 
     const handlePermissionSubmit = async (e) => {
         e.preventDefault();
-        if (!permForm.date || !permForm.day_type) {
-            return Swal.fire({ title: 'Missing Fields', text: 'Please fill date and select a permission option.', icon: 'warning', confirmButtonColor: '#2563eb' });
+        if (!permForm.date) {
+            return Swal.fire({ title: 'Missing Date', text: 'Please select a date for the permission.', icon: 'warning', confirmButtonColor: '#2563eb' });
         }
 
-        const typeToTimes = {
-            'Half Day AM': { from_time: '09:00', to_time: '13:00' },
-            'Half Day PM': { from_time: '13:30', to_time: '16:45' }
-        };
-        const config = typeToTimes[permForm.day_type];
+        const config = { from_time: '09:00', to_time: '10:00' };
 
         setPermSubmitting(true);
         try {
             await api.post('/permissions', { ...permForm, ...config });
-            Swal.fire({ title: 'Submitted', text: 'Permission request sent for HOD approval.', icon: 'success', timer: 1500, showConfirmButton: false });
-            setPermForm({ date: '', day_type: 'Half Day AM', subject: '', reason: '' });
+            Swal.fire({ title: 'Submitted', text: 'Permission request for 09:00 AM - 10:00 AM sent for HOD approval.', icon: 'success', timer: 1500, showConfirmButton: false });
+            setPermForm({ date: '', subject: '', reason: '' });
             fetchPermissions();
         } catch (error) {
             Swal.fire({ title: 'Error', text: error.response?.data?.message || 'Failed to submit.', icon: 'error', confirmButtonColor: '#2563eb' });
@@ -1166,7 +1162,7 @@ const LeaveApply = () => {
                                 </div>
 
                                 <form onSubmit={handlePermissionSubmit} className="space-y-6">
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-end">
                                         <div>
                                             <label className="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2">Date *</label>
                                             <input
@@ -1178,22 +1174,14 @@ const LeaveApply = () => {
                                             />
                                         </div>
                                         <div>
-                                            <label className="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2">Permission Option *</label>
-                                            <div className="flex gap-4 bg-white/50 p-1.5 rounded-2xl border-2 border-gray-100">
-                                                {['Half Day AM', 'Half Day PM'].map(type => (
-                                                    <button
-                                                        key={type}
-                                                        type="button"
-                                                        onClick={() => setPermForm(p => ({ ...p, day_type: type }))}
-                                                        className={`flex-1 py-3 px-4 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
-                                                            permForm.day_type === type 
-                                                            ? 'bg-teal-600 text-white shadow-lg' 
-                                                            : 'bg-white text-gray-400 hover:bg-gray-50'
-                                                        }`}
-                                                    >
-                                                        {type}
-                                                    </button>
-                                                ))}
+                                            <div className="bg-teal-50 border border-teal-100 p-4 rounded-2xl flex items-center gap-3">
+                                                <div className="h-10 w-10 rounded-xl bg-white flex items-center justify-center text-teal-600 shadow-sm border border-teal-100 shrink-0">
+                                                    <FaClock size={16} />
+                                                </div>
+                                                <div>
+                                                    <p className="text-[10px] font-black text-teal-600 uppercase tracking-widest">Fixed Time Window</p>
+                                                    <p className="text-xs font-black text-gray-800 tracking-tight">09:00 AM - 10:00 AM (1 Hour)</p>
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
