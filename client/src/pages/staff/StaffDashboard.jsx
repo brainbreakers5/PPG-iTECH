@@ -1,264 +1,313 @@
-import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate, useLocation } from 'react-router-dom';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import Layout from '../../components/Layout';
 import api from '../../utils/api';
 import { useAuth } from '../../context/AuthContext';
-import { FaUserTie, FaEye, FaCalendarAlt, FaIdBadge, FaEnvelope, FaPhone, FaBuilding, FaSuitcase, FaArrowLeft, FaUsers, FaSearch, FaFilter, FaPrint } from 'react-icons/fa';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useSocket } from '../../context/SocketContext';
+import { FaUserCheck, FaUserTimes, FaBus, FaFileAlt, FaCalendarDay, FaCalendarAlt, FaStar, FaBriefcase, FaTimes, FaFilter, FaClock, FaBookOpen, FaDoorOpen, FaChalkboardTeacher } from 'react-icons/fa';
+import AttendanceHistory from '../../components/AttendanceHistory';
+import PersonalAttendanceChart from '../../components/PersonalAttendanceChart';
+import { useTimetableConfig } from '../../hooks/useTimetableConfig';
 
-const DepartmentStaffPage = () => {
-    const { id } = useParams();
-    const navigate = useNavigate();
-    const location = useLocation();
+const to12h = (timeStr) => {
+    if (!timeStr) return '';
+    const [h, m] = timeStr.split(':').map(Number);
+    const ampm = h >= 12 ? 'PM' : 'AM';
+    const h12 = h % 12 || 12;
+    return `${h12}:${String(m).padStart(2, '0')} ${ampm}`;
+};
+
+const StaffDashboard = () => {
     const { user } = useAuth();
-    const isManagement = location.pathname.startsWith('/management');
-    const effectiveRole = isManagement ? 'management' : (user?.role || 'staff');
-    const [personnel, setPersonnel] = useState([]);
-    const [department, setDepartment] = useState(null);
+    const navigate = useNavigate();
+    const socket = useSocket();
+    const [myStats, setMyStats] = useState({ present: 0, absent: 0, od: 0, cl: 0, ml: 0, comp_leave: 0, lop: 0, late_entry: 0 });
+    const [profile, setProfile] = useState(null);
     const [loading, setLoading] = useState(true);
-    const [searchQuery, setSearchQuery] = useState('');
-    const [filteredPersonnel, setFilteredPersonnel] = useState([]);
+    const [monthStats, setMonthStats] = useState({ workingDays: 0, holidays: 0, specialEvents: 0 });
+    const [todayTimetable, setTodayTimetable] = useState([]);
+    const { getPeriodConfig } = useTimetableConfig();
+    const [statusFilter, setStatusFilter] = useState(null); // null = show all
+    const historyRef = useRef(null);
 
-    useEffect(() => {
-        const fetchDepartmentData = async () => {
-            try {
-                const { data: deptData } = await api.get('/departments');
-                const currDept = deptData.find(d => String(d.id) === String(id));
-                setDepartment(currDept);
+    const fetchData = useCallback(async () => {
+        if (!user) return;
+        try {
+            const month = new Date().toISOString().slice(0, 7); // "YYYY-MM"
+            const { data: records } = await api.get(`/attendance?month=${month}`);
 
-                const { data } = await api.get('/employees');
-                const filtered = data
-                    .filter(e => String(e.department_id) === String(id))
-                    .sort((a, b) => {
-                        if (a.role === 'hod' && b.role !== 'hod') return -1;
-                        if (a.role !== 'hod' && b.role === 'hod') return 1;
-                        return 0;
-                    });
-                setPersonnel(filtered);
-                setFilteredPersonnel(filtered);
-            } catch (error) {
-                console.error("Error fetching department staff", error);
-            } finally {
-                setLoading(false);
+            const counts = { present: 0, absent: 0, od: 0, cl: 0, ml: 0, comp_leave: 0, lop: 0, late_entry: 0 };
+            (records || []).forEach(r => {
+                const s = (r.status || '').toUpperCase();
+                const rem = (r.remarks || '').toUpperCase();
+                if (s.includes('PRESENT')) counts.present++;
+                if (s.includes('ABSENT')) counts.absent++;
+                if (s.includes('OD') || rem.includes('OD')) counts.od++;
+                if ((s.includes('CL') || rem.includes('CL') || rem.includes('CASUAL')) && !s.includes('COMP') && !rem.includes('COMP')) counts.cl++;
+                if (s.includes('ML') || rem.includes('ML') || rem.includes('MEDICAL')) counts.ml++;
+                if (s.includes('COMP LEAVE') || rem.includes('COMP LEAVE')) counts.comp_leave++;
+                if (s.includes('LOP') || rem.includes('LOP')) counts.lop++;
+                if (rem.includes('LATE ENTRY')) counts.late_entry++;
+            });
+            setMyStats(counts);
+
+            const { data: profileData } = await api.get('/auth/profile');
+            setProfile(profileData);
+            // Fetch holiday/calendar data for month summary
+            const now = new Date();
+            const curMonth = now.getMonth() + 1;
+            const curYear = now.getFullYear();
+            const { data: holidayData } = await api.get(`holidays?month=${curMonth}&year=${curYear}`);
+            const daysInMonth = new Date(curYear, curMonth, 0).getDate();
+            let hCount = 0, sCount = 0;
+            const holidayDateSet = new Set();
+            (holidayData || []).forEach(h => {
+                holidayDateSet.add(h.h_date);
+                if (h.type === 'Holiday') hCount++;
+                else if (h.type === 'Special') sCount++;
+            });
+            for (let d = 1; d <= daysInMonth; d++) {
+                const dow = new Date(curYear, curMonth - 1, d).getDay();
+                const ds = `${curYear}-${String(curMonth).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+                if ((dow === 0 || dow === 6) && !holidayDateSet.has(ds)) hCount++;
             }
-        };
-        fetchDepartmentData();
-    }, [id]);
+            setMonthStats({ workingDays: daysInMonth - hCount - sCount, holidays: hCount, specialEvents: sCount });
+
+            // Fetch today's timetable
+            const { data: ttData } = await api.get('/timetable');
+            const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+            const today = dayNames[new Date().getDay()];
+            const entries = (ttData || [])
+                .filter(t => t.day_of_week === today)
+                .sort((a, b) => (a.period_number - b.period_number));
+            setTodayTimetable(entries);
+        } catch (error) {
+            console.error('Staff dashboard error', error);
+        } finally {
+            setLoading(false);
+        }
+    }, [user]);
 
     useEffect(() => {
-        const result = personnel.filter(p =>
-            p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            p.emp_id.toLowerCase().includes(searchQuery.toLowerCase())
-        );
-        setFilteredPersonnel(result);
-    }, [searchQuery, personnel]);
+        fetchData();
+        const interval = setInterval(fetchData, 15000);
+        return () => clearInterval(interval);
+    }, [fetchData]);
 
-    const handlePrint = () => {
-        if (!filteredPersonnel || filteredPersonnel.length === 0) return;
+    useEffect(() => {
+        if (!socket) return;
+        socket.on('attendance_updated', fetchData);
+        return () => socket.off('attendance_updated', fetchData);
+    }, [socket, fetchData]);
 
-        const printWindow = window.open('', '_blank', 'width=1200,height=800');
-        if (!printWindow) return;
-
-        const escHtml = (v) => String(v ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-        const roleColors = { hod: '#0891b2', staff: '#16a34a', admin: '#7c3aed', principal: '#2563eb' };
-
-        const rowsHtml = filteredPersonnel.map((member, idx) => `
-            <tr style="${idx % 2 === 0 ? 'background:#fff;' : 'background:#f8fafc;'} border-bottom:1px solid #f1f5f9;">
-                <td style="padding:10px 12px; text-align:center;">
-                    <img src="${escHtml(member.profile_pic || `https://ui-avatars.com/api/?name=${encodeURIComponent(member.name)}&size=60&background=2563eb&color=fff&bold=true`)}"
-                         style="width:40px;height:40px;border-radius:10px;object-fit:cover;" onerror="this.style.display='none'" />
-                </td>
-                <td style="padding:10px 12px; font-size:9pt; font-weight:900; color:#1e3a8a;">${escHtml(member.emp_id)}</td>
-                <td style="padding:10px 12px; font-size:9pt; font-weight:700; color:#1e293b;">${escHtml(member.name)}</td>
-                <td style="padding:10px 12px;">
-                    <span style="background:${(roleColors[member.role] || '#475569')}22; color:${roleColors[member.role] || '#475569'}; border:1px solid ${(roleColors[member.role] || '#475569')}44; padding:2px 8px; border-radius:12px; font-size:8pt; font-weight:900; text-transform:uppercase; letter-spacing:0.05em;">${escHtml(member.role)}</span>
-                </td>
-                <td style="padding:10px 12px; font-size:9pt; color:#334155;">${escHtml(member.designation || '—')}</td>
-                <td style="padding:10px 12px; font-size:8.5pt; color:#475569;">${escHtml(member.email || '—')}</td>
-                <td style="padding:10px 12px; font-size:9pt; color:#475569;">${escHtml(member.mobile || '—')}</td>
-            </tr>
-        `).join('');
-
-        printWindow.document.write(`
-            <!doctype html><html><head><meta charset="UTF-8">
-            <title>${escHtml(department?.name || 'Department')} — Staff & HOD Report</title>
-            <style>
-                @page { size: landscape; margin: 0.7cm; }
-                body { font-family: 'Segoe UI', Arial, sans-serif; color: #1e293b; margin: 0; padding: 10px; }
-                .header { display:flex; justify-content:space-between; align-items:flex-end; margin-bottom:20px; border-bottom:3px solid #1e3a8a; padding-bottom:12px; }
-                .header h1 { margin:0; color:#1e3a8a; font-size:18pt; font-weight:900; letter-spacing:-0.5px; }
-                .meta { font-size:9pt; color:#64748b; font-weight:bold; margin-top:5px; }
-                .brand { font-weight:900; color:#1e3a8a; font-size:11pt; text-align:right; }
-                .gen-date { font-size:8pt; color:#94a3b8; text-align:right; }
-                table { width:100%; border-collapse:collapse; }
-                thead tr { background:#1e3a8a; }
-                thead th { padding:10px 12px; font-size:8pt; font-weight:900; color:#fff; text-transform:uppercase; letter-spacing:0.08em; text-align:left; }
-                tbody tr { border-bottom:1px solid #f1f5f9; }
-            </style></head><body>
-            <div class="header">
-                <div>
-                    <h1>${escHtml(department?.name || 'Department')} — Staff & HOD Registry</h1>
-                    <p class="meta">Department Code: ${escHtml(department?.code || '—')} &nbsp;|&nbsp; Total Personnel: ${filteredPersonnel.length}</p>
-                </div>
-                <div>
-                    <div class="brand">PPG EMP HUB</div>
-                    <div class="gen-date">Generated: ${new Date().toLocaleString('en-GB')}</div>
-                </div>
-            </div>
-            <table>
-                <thead><tr>
-                    <th style="width:56px;">Photo</th>
-                    <th>Emp ID</th><th>Name</th><th>Role</th><th>Designation</th><th>Email</th><th>Mobile</th>
-                </tr></thead>
-                <tbody>${rowsHtml}</tbody>
-            </table>
-            </body></html>
-        `);
-        printWindow.document.close();
-        printWindow.focus();
-        setTimeout(() => printWindow.print(), 250);
+    const handleStatClick = (filter) => {
+        setStatusFilter(prev => prev === filter ? null : filter);
+        // Smooth scroll to history section
+        setTimeout(() => {
+            historyRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }, 100);
     };
+
+    const stats = [
+        { label: 'Present', value: myStats.present, filterKey: 'Present', icon: <FaUserCheck />, colorClass: 'text-sky-600', bgClass: 'bg-sky-50', borderClass: 'border-sky-100', gradientClass: 'from-sky-500 to-sky-700' },
+        { label: 'Absent', value: myStats.absent, filterKey: 'Absent', icon: <FaUserTimes />, colorClass: 'text-rose-600', bgClass: 'bg-rose-50', borderClass: 'border-rose-100', gradientClass: 'from-rose-500 to-rose-700' },
+        { label: 'Loss Of Pay', value: myStats.lop, filterKey: 'LOP', icon: <FaTimes />, colorClass: 'text-rose-800', bgClass: 'bg-rose-100', borderClass: 'border-rose-200', gradientClass: 'from-rose-600 to-rose-800' },
+        { label: 'On Duty', value: myStats.od, filterKey: 'OD', icon: <FaBriefcase />, colorClass: 'text-emerald-600', bgClass: 'bg-emerald-50', borderClass: 'border-emerald-100', gradientClass: 'from-emerald-500 to-emerald-700' },
+        { label: 'Casual Leave', value: myStats.cl, filterKey: 'CL', icon: <FaCalendarDay />, colorClass: 'text-amber-600', bgClass: 'bg-amber-50', borderClass: 'border-amber-100', gradientClass: 'from-amber-500 to-amber-700' },
+        { label: 'Medical Leave', value: myStats.ml, filterKey: 'ML', icon: <FaFileAlt />, colorClass: 'text-purple-600', bgClass: 'bg-purple-50', borderClass: 'border-purple-100', gradientClass: 'from-purple-500 to-purple-700' },
+        { label: 'Comp Leave', value: myStats.comp_leave, filterKey: 'Comp Leave', icon: <FaStar />, colorClass: 'text-indigo-600', bgClass: 'bg-indigo-50', borderClass: 'border-indigo-100', gradientClass: 'from-indigo-500 to-indigo-700' },
+        { label: 'Late Entry', value: myStats.late_entry, filterKey: 'Late Entry', icon: <FaClock />, colorClass: 'text-orange-600', bgClass: 'bg-orange-50', borderClass: 'border-orange-100', gradientClass: 'from-orange-500 to-orange-700' },
+    ];
+
+    const currentMonth = new Date().toLocaleString('default', { month: 'long', year: 'numeric' });
 
     return (
         <Layout>
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-10 gap-6">
-                <div className="flex items-center gap-6">
-                    <button
-                        onClick={() => navigate(-1)}
-                        className="h-14 w-14 rounded-2xl bg-white border border-gray-100 flex items-center justify-center text-gray-400 hover:bg-white hover:text-sky-600 transition-all shadow-xl shadow-sky-500/5 hover:-translate-x-1 active:scale-90"
-                    >
-                        <FaArrowLeft size={18} />
-                    </button>
+            {/* Header */}
+            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="mb-10">
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                     <div>
-                        <h1 className="text-3xl font-black text-gray-800 tracking-tight">
-                            {department?.name || 'Institutional Unit'} <span className="text-sky-600 uppercase">Registry</span>
+                        <h1 className="text-4xl font-black text-gray-800 tracking-tighter">
+                            My <span className="text-[#4A90E2]">Dashboard</span>
                         </h1>
-                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.4em] mt-2">Departmental Personnel Matrix for Code: {department?.code || '...'}</p>
+                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.3em] mt-2">
+                            {currentMonth} · Personal Attendance Record
+                        </p>
                     </div>
                 </div>
+            </motion.div>
 
-                <div className="flex items-center gap-3 w-full md:w-auto">
-                    <div className="relative group flex-1 md:w-80">
-                        <div className="absolute inset-y-0 left-0 pl-5 flex items-center pointer-events-none">
-                            <FaSearch className="text-sky-300 group-focus-within:text-sky-500 transition-colors" />
-                        </div>
-                        <input
-                            type="text"
-                            placeholder="Search personnel..."
-                            className="w-full pl-14 pr-6 py-4 bg-white border border-gray-100 rounded-2xl outline-none focus:ring-4 focus:ring-sky-100 focus:border-sky-500 transition-all font-bold text-gray-700 text-sm shadow-xl shadow-sky-500/5 shadow-inner"
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                        />
+            {/* Today's Timetable Section */}
+            <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.1 }} className="mb-10">
+                <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-2">
+                        <div className="h-2 w-2 bg-sky-500 rounded-full animate-pulse" />
+                        <h2 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Today's Schedule</h2>
                     </div>
-                    <button
-                        onClick={handlePrint}
-                        className="p-4 bg-sky-600 text-white rounded-2xl shadow-lg shadow-sky-100 hover:bg-sky-700 transition-all flex items-center justify-center gap-2 group font-black uppercase tracking-widest text-[10px] shrink-0"
-                        title="Print Department Staff Report"
+                    <button 
+                        onClick={() => navigate('/staff/timetables')}
+                        className="text-[9px] font-black text-sky-600 uppercase tracking-widest hover:underline"
                     >
-                        <FaPrint className="group-hover:scale-110 transition-transform" />
-                        <span className="hidden sm:inline">Print</span>
+                        View Full Timetable
                     </button>
                 </div>
-            </div>
 
-            {loading ? (
-                <div className="flex flex-col items-center justify-center py-40 gap-6">
-                    <div className="h-16 w-16 border-4 border-sky-50 border-t-sky-600 rounded-full animate-spin shadow-xl"></div>
-                    <p className="text-[10px] font-black text-sky-600 uppercase tracking-[0.3em] animate-pulse">Compiling Department Ledger...</p>
-                </div>
-            ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                    <AnimatePresence mode="popLayout">
-                        {filteredPersonnel.map((member, idx) => (
+                <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-hide -mx-2 px-2">
+                    {todayTimetable.length > 0 ? (
+                        todayTimetable.map((period, idx) => (
                             <motion.div
-                                key={member.id}
-                                layout
-                                initial={{ opacity: 0, y: 30, scale: 0.9 }}
-                                animate={{ opacity: 1, y: 0, scale: 1 }}
-                                exit={{ opacity: 0, scale: 0.9 }}
-                                transition={{ delay: idx * 0.05, duration: 0.4, ease: "circOut" }}
-                                className="bg-white rounded-[40px] shadow-2xl shadow-sky-500/5 border border-white hover:border-sky-100 transition-all group overflow-hidden flex flex-col items-center p-8 text-center relative"
+                                key={idx}
+                                whileHover={{ y: -5 }}
+                                className="min-w-[240px] bg-white border border-gray-100 rounded-[24px] p-5 shadow-sm hover:shadow-xl hover:shadow-sky-500/5 transition-all relative overflow-hidden group"
                             >
-                                <div className="absolute top-0 left-0 w-full h-24 bg-gradient-to-br from-sky-600 to-indigo-700 opacity-5" />
-                                <div className="relative mt-4 mb-8">
-                                    <div className="h-32 w-32 rounded-[45px] bg-white p-2 shadow-2xl border border-gray-100 group-hover:rotate-3 transition-transform duration-500 relative overflow-hidden">
-                                        <img
-                                            src={member.profile_pic || `https://ui-avatars.com/api/?name=${encodeURIComponent(member.name)}&size=128&background=2563eb&color=fff&bold=true`}
-                                            alt=""
-                                            className="h-full w-full rounded-[38px] object-cover"
-                                        />
-                                    </div>
-                                    <div className="absolute -bottom-2 -right-2 h-10 w-10 bg-sky-600 rounded-2xl flex items-center justify-center text-white shadow-xl shadow-sky-200 border-4 border-white group-hover:scale-110 transition-transform">
-                                        <FaUserTie size={16} />
-                                    </div>
-                                </div>
-
-                                <h3 className="text-2xl font-black text-gray-800 tracking-tighter leading-tight group-hover:text-sky-600 transition-colors">
-                                    {member.name}
-                                </h3>
-                                <div className="mt-4 flex items-center gap-3">
-                                    <span className={`px-4 py-1.5 rounded-full border text-[10px] font-black uppercase tracking-widest flex items-center gap-2 ${member.role === 'hod'
-                                        ? 'bg-amber-50 text-amber-600 border-amber-100'
-                                        : 'bg-sky-50 text-sky-600 border-sky-100'
-                                        }`}>
-                                        <FaIdBadge /> {member.emp_id} · {member.role}
+                                <div className="absolute top-0 right-0 p-3">
+                                    <span className="text-[9px] font-black text-sky-500/20 uppercase tracking-widest group-hover:text-sky-500/40 transition-colors">
+                                        P{period.period_number}
                                     </span>
                                 </div>
-                                <p className="mt-4 text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">{member.designation || member.role}</p>
-
-                                <div className="mt-8 grid grid-cols-2 gap-4 w-full">
-                                    <button
-                                        onClick={() => {
-                                            const rolePrefix = isManagement ? 'management' :
-                                                user.role === 'admin' ? 'admin' :
-                                                user.role === 'principal' ? 'principal' :
-                                                    user.role === 'hod' ? 'hod' : 'staff';
-                                            navigate(`/${rolePrefix}/profile/${member.emp_id}`);
-                                            window.dispatchEvent(new CustomEvent('closeSidebar'));
-                                        }}
-                                        className="py-4 bg-white border border-gray-100 text-gray-500 rounded-2xl font-black uppercase tracking-widest text-[10px] hover:bg-sky-600 hover:text-white hover:border-sky-600 transition-all shadow-sm active:scale-95 flex items-center justify-center gap-2"
-                                    >
-                                        <FaEye size={12} /> Profile
-                                    </button>
-                                    <button
-                                        onClick={() => {
-                                            if (isManagement) {
-                                                navigate(-1);
-                                            } else if (user.role === 'admin') {
-                                                navigate(`/admin/timetable/${member.emp_id}`);
-                                            } else if (user.role === 'principal') {
-                                                navigate(`/principal/timetable/${member.emp_id}`);
-                                            } else if (user.role === 'hod') {
-                                                navigate(`/hod/timetable/${member.emp_id}`);
-                                            } else {
-                                                navigate(`/staff/timetables/${member.emp_id}`);
-                                            }
-                                            window.dispatchEvent(new CustomEvent('closeSidebar'));
-                                        }}
-                                        className="py-4 bg-gray-900 text-white rounded-2xl font-black uppercase tracking-widest text-[10px] hover:bg-black transition-all shadow-xl shadow-gray-200 active:scale-95 flex items-center justify-center gap-2"
-                                    >
-                                        <FaCalendarAlt size={12} /> Schedule
-                                    </button>
+                                <div className="flex flex-col h-full">
+                                    <div className="flex items-center gap-2 mb-3">
+                                        <div className="h-8 w-8 rounded-xl bg-sky-50 text-sky-600 flex items-center justify-center">
+                                            <FaBookOpen size={12} />
+                                        </div>
+                                        <div className="overflow-hidden">
+                                            <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest truncate">{period.subject_code || 'SUBJECT'}</p>
+                                            <h3 className="text-sm font-black text-gray-800 truncate tracking-tight">{period.subject}</h3>
+                                        </div>
+                                    </div>
+                                    
+                                    <div className="mt-auto space-y-2">
+                                        <div className="flex items-center gap-2 text-[10px] font-bold text-gray-500">
+                                            <FaClock className="text-sky-400" size={10} />
+                                            <span>
+                                                {to12h(getPeriodConfig(period.period_number)?.start_time || period.start_time)} – {to12h(getPeriodConfig(period.period_number)?.end_time || period.end_time)}
+                                            </span>
+                                        </div>
+                                        {period.room_number && (
+                                            <div className="flex items-center gap-2 text-[10px] font-bold text-sky-600 bg-sky-50/50 w-fit px-2 py-0.5 rounded-lg">
+                                                <FaDoorOpen size={10} />
+                                                <span className="uppercase tracking-widest">Room: {period.room_number}</span>
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
                             </motion.div>
-                        ))}
-                    </AnimatePresence>
-
-                    {filteredPersonnel.length === 0 && (
-                        <div className="col-span-full py-40 bg-white/50 backdrop-blur-xl rounded-[60px] border-4 border-dashed border-gray-100 flex flex-col items-center justify-center text-center gap-8 group">
-                            <div className="h-32 w-32 rounded-[50px] bg-gray-50 flex items-center justify-center text-gray-200 group-hover:scale-110 group-hover:rotate-6 transition-all duration-700 shadow-inner">
-                                <FaUsers size={60} />
+                        ))
+                    ) : (
+                        <div className="w-full bg-gray-50/50 border border-dashed border-gray-200 rounded-[32px] p-8 flex flex-col items-center justify-center text-center">
+                            <div className="h-12 w-12 rounded-2xl bg-white border border-gray-100 flex items-center justify-center text-gray-300 mb-3 shadow-sm">
+                                <FaChalkboardTeacher size={20} />
                             </div>
-                            <div>
-                                <h3 className="text-3xl font-black text-gray-800 tracking-tight">No Personnel Found</h3>
-                                <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.3em] mt-3 italic">No registry records match current department identification</p>
-                            </div>
+                            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">No classes scheduled for today</p>
+                            <p className="text-[9px] text-gray-300 font-bold mt-1 uppercase tracking-wider">Enjoy your free time!</p>
                         </div>
                     )}
                 </div>
+            </motion.div>
+
+            {/* Monthly Summary Bar */}
+            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="mb-10 lg:hidden">
+                <div className="grid grid-cols-3 gap-4">
+                    <motion.div
+                        whileHover={{ scale: 1.03, y: -3 }}
+                        whileTap={{ scale: 0.97 }}
+                        onClick={() => navigate('/staff/calendar')}
+                        className="bg-emerald-50 border border-emerald-100 rounded-2xl p-5 flex items-center gap-4 cursor-pointer hover:border-emerald-300 hover:shadow-md hover:shadow-emerald-100 transition-all"
+                    >
+                        <div className="h-11 w-11 rounded-xl bg-emerald-500 text-white flex items-center justify-center shadow-sm">
+                            <FaCalendarAlt />
+                        </div>
+                        <div>
+                            <p className="text-[9px] font-black text-emerald-500 uppercase tracking-widest">Working Days</p>
+                            <p className="text-2xl font-black text-emerald-700 tracking-tighter">{monthStats.workingDays}</p>
+                        </div>
+                    </motion.div>
+                    <motion.div
+                        whileHover={{ scale: 1.03, y: -3 }}
+                        whileTap={{ scale: 0.97 }}
+                        onClick={() => navigate('/staff/calendar')}
+                        className="bg-rose-50 border border-rose-100 rounded-2xl p-5 flex items-center gap-4 cursor-pointer hover:border-rose-300 hover:shadow-md hover:shadow-rose-100 transition-all"
+                    >
+                        <div className="h-11 w-11 rounded-xl bg-rose-500 text-white flex items-center justify-center shadow-sm">
+                            <FaCalendarDay />
+                        </div>
+                        <div>
+                            <p className="text-[9px] font-black text-rose-500 uppercase tracking-widest">Holidays</p>
+                            <p className="text-2xl font-black text-rose-700 tracking-tighter">{monthStats.holidays}</p>
+                        </div>
+                    </motion.div>
+                    <motion.div
+                        whileHover={{ scale: 1.03, y: -3 }}
+                        whileTap={{ scale: 0.97 }}
+                        onClick={() => navigate('/staff/calendar')}
+                        className="bg-amber-50 border border-amber-100 rounded-2xl p-5 flex items-center gap-4 cursor-pointer hover:border-amber-300 hover:shadow-md hover:shadow-amber-100 transition-all"
+                    >
+                        <div className="h-11 w-11 rounded-xl bg-amber-500 text-white flex items-center justify-center shadow-sm">
+                            <FaStar />
+                        </div>
+                        <div>
+                            <p className="text-[9px] font-black text-amber-500 uppercase tracking-widest">Special Events</p>
+                            <p className="text-2xl font-black text-amber-700 tracking-tighter">{monthStats.specialEvents}</p>
+                        </div>
+                    </motion.div>
+                </div>
+            </motion.div>
+
+
+            {loading ? (
+                <div className="flex flex-col items-center justify-center py-32 gap-4">
+                    <div className="h-12 w-12 border-4 border-sky-100 border-t-sky-600 rounded-full animate-spin" />
+                    <p className="text-[10px] font-black text-sky-500 uppercase tracking-widest">Loading attendance...</p>
+                </div>
+            ) : (
+                <>
+                    {/* Personal Attendance Section */}
+                    <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="mb-16">
+                        <div className="flex items-center gap-4 mb-8">
+                            <div className="h-1 w-12 bg-sky-600 rounded-full"></div>
+                            <h2 className="text-xl font-black text-gray-800 tracking-tight uppercase tracking-[0.1em]">Your Personal Attendance</h2>
+                        </div>
+                        
+                        <PersonalAttendanceChart 
+                            stats={myStats} 
+                            onStatClick={handleStatClick} 
+                            activeFilter={statusFilter} 
+                            monthStats={monthStats}
+                            onMonthStatsClick={() => navigate('/staff/calendar')}
+                        />
+                    </motion.div>
+
+                    {/* Filter Active Banner */}
+                    <AnimatePresence>
+                        {statusFilter && (
+                            <motion.div
+                                initial={{ opacity: 0, y: -10 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                exit={{ opacity: 0, y: -10 }}
+                                className="mb-6 flex items-center gap-3 px-5 py-3 bg-sky-50 border border-sky-200 rounded-2xl text-sm font-black text-sky-700"
+                            >
+                                <FaFilter className="text-sky-500" />
+                                <span>Showing records for: <span className="text-sky-900 uppercase">{statusFilter}</span></span>
+                                <button
+                                    onClick={() => setStatusFilter(null)}
+                                    className="ml-auto flex items-center gap-1.5 px-3 py-1 bg-white border border-sky-200 rounded-xl text-[10px] font-black text-rose-500 hover:bg-rose-50 transition-all"
+                                >
+                                    <FaTimes size={10} /> Clear Filter
+                                </button>
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
+                </>
             )}
+
+            {/* Attendance History Section */}
+            <div ref={historyRef}>
+                <AttendanceHistory empId={user?.emp_id} statusFilter={statusFilter} />
+            </div>
         </Layout>
     );
 };
 
-export default DepartmentStaffPage;
+export default StaffDashboard;
+
