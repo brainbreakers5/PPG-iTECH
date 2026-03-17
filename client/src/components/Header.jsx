@@ -378,7 +378,7 @@ const Header = ({ toggleSidebar, sidebarOpen }) => {
                     {!sidebarOpen && (
                         <button
                             onClick={toggleSidebar}
-                            className="flex items-center justify-center h-10 w-10 rounded-xl bg-sky-50 text-sky-600 hover:bg-sky-100 border border-sky-100 hover:border-sky-200 transition-all duration-200 active:scale-90 focus:outline-none no-print group"
+                            className="lg:hidden flex items-center justify-center h-10 w-10 rounded-xl bg-sky-50 text-sky-600 hover:bg-sky-100 border border-sky-100 hover:border-sky-200 transition-all duration-200 active:scale-90 focus:outline-none no-print group"
                             title="Open Menu"
                         >
                             <div className="relative w-5 h-4 flex flex-col justify-between overflow-hidden text-sky-600">
