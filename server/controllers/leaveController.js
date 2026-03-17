@@ -188,7 +188,9 @@ exports.getLeaveRequests = async (req, res) => {
             const hoursVal = r.hours !== null && r.hours !== undefined ? parseFloat(r.hours) : null;
             let single_day_time_range = null;
             if (Array.isArray(dates_detail) && dates_detail.length === 1 && dates_detail[0].is_full_day === false) {
-                single_day_time_range = `${dates_detail[0].from_time} - ${dates_detail[0].to_time}`;
+                const f = new Date('2000-01-01T' + dates_detail[0].from_time).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+                const t = new Date('2000-01-01T' + dates_detail[0].to_time).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+                single_day_time_range = `${f} - ${t}`;
             }
             return { ...r, dates_detail, hours: hoursVal, single_day_time_range };
         });
@@ -364,13 +366,15 @@ exports.approveLeaveStep = async (req, res) => {
                         // Find matching date in datesDetail
                         const detail = datesDetail.find(dd => dd.date === dateStr);
                         let remarks;
-                        if (detail && !detail.is_full_day) {
+                        if (detail && (detail.day_type || !detail.is_full_day)) {
                             const [fH, fM] = detail.from_time.split(':').map(Number);
                             const [tH, tM] = detail.to_time.split(':').map(Number);
                             let diff = (tH * 60 + tM) - (fH * 60 + fM);
                             if (diff < 0) diff += 1440;
                             const dur = `${Math.floor(diff / 60)}h ${diff % 60}m`;
-                            remarks = `${leave_type}: ${detail.from_time}-${detail.to_time} (${dur})`;
+                            const fromTimeStr = new Date(`2000-01-01T${detail.from_time}`).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+                            const toTimeStr = new Date(`2000-01-01T${detail.to_time}`).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+                            remarks = `${leave_type}${detail.day_type ? ' (' + detail.day_type + ')' : ''}: ${fromTimeStr}-${toTimeStr} (${dur})`;
                         } else {
                             remarks = `${leave_type} (Full Day)`;
                         }
@@ -523,7 +527,9 @@ exports.getAllLeaveHistory = async (req, res) => {
             const hoursVal = r.hours !== null && r.hours !== undefined ? parseFloat(r.hours) : null;
             let single_day_time_range = null;
             if (Array.isArray(dates_detail) && dates_detail.length === 1 && dates_detail[0].is_full_day === false) {
-                single_day_time_range = `${dates_detail[0].from_time} - ${dates_detail[0].to_time}`;
+                const f = new Date('2000-01-01T' + dates_detail[0].from_time).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+                const t = new Date('2000-01-01T' + dates_detail[0].to_time).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+                single_day_time_range = `${f} - ${t}`;
             }
             return { ...r, dates_detail, hours: hoursVal, single_day_time_range };
         });
