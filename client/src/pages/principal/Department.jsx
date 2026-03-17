@@ -137,8 +137,11 @@ const Department = () => {
                 className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8"
             >
                 <div className="mb-12 flex items-start justify-between">
-                    <h1 className="text-4xl font-black text-gray-800 tracking-tighter">
-                        Department <span className="text-[#4A90E2]">Intelligence</span>
+                    <h1 className="text-4xl font-black text-gray-800 tracking-tighter flex flex-wrap items-center gap-4">
+                        <span>Department <span className="text-[#4A90E2]">Intelligence</span></span>
+                        <span className="bg-sky-100 text-sky-700 font-bold px-3 py-1 rounded-xl text-sm uppercase tracking-widest mt-2 sm:mt-0">
+                            Total Faculty: {allEmployees.length}
+                        </span>
                     </h1>
                     <button
                         onClick={handlePrint}
@@ -156,31 +159,52 @@ const Department = () => {
                             key={dept.id}
                             initial={{ opacity: 0, scale: 0.95 }}
                             animate={{ opacity: 1, scale: 1 }}
-                            transition={{ delay: idx * 0.1 }}
-                            whileHover={{ y: -5, scale: 1.02 }}
-                            className="modern-card p-10 bg-white/70 backdrop-blur-xl border border-white/50 group relative overflow-hidden"
+                            exit={{ opacity: 0, scale: 0.9 }}
+                            transition={{ delay: idx * 0.05 }}
+                            className="group bg-white p-10 rounded-[40px] shadow-xl shadow-sky-50/50 border border-transparent hover:border-sky-100 hover:shadow-2xl transition-all duration-500 relative overflow-hidden"
                         >
-                            <div className="flex justify-between items-start mb-8 relative z-10">
-                                <div className="h-16 w-16 rounded-[24px] bg-gradient-to-br from-sky-50 to-sky-100/50 flex items-center justify-center text-[#4A90E2] shadow-inner group-hover:rotate-6 transition-transform">
-                                    <FaBuilding size={28} />
+                            <div className="absolute top-0 right-0 w-48 h-48 bg-sky-50 rounded-full -mr-24 -mt-24 opacity-30 group-hover:scale-125 transition-transform duration-700"></div>
+
+                            <div className="flex justify-between items-start relative z-10 mb-8">
+                                <div className="h-16 w-16 rounded-[24px] bg-gradient-to-br from-sky-500 to-sky-700 flex items-center justify-center text-white shadow-lg shadow-sky-200 group-hover:rotate-6 transition-transform">
+                                    <FaBuilding size={24} />
+                                </div>
+                                <div className="flex gap-2 relative z-10">
+                                    <div className="bg-sky-50 text-sky-600 px-3 py-1 rounded-xl text-[10px] font-black tracking-widest uppercase flex items-center gap-1">
+                                        Total Faculty: {allEmployees.filter(emp => String(emp.department_id) === String(dept.id)).length}
+                                    </div>
                                 </div>
                             </div>
 
 
-                            <div className="mb-10 relative z-10">
-                                <h2 className="text-2xl font-black text-gray-800 tracking-tight leading-tight mb-2 group-hover:text-sky-600 transition-colors uppercase">{dept.name}</h2>
-                                <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">{dept.code || 'Unit'} • Operational Unit</p>
+                            <div className="relative z-10 space-y-4">
+                                <div className="flex items-center gap-3">
+                                    <div className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse"></div>
+                                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Active Department</p>
+                                </div>
+                                <div className="flex items-center gap-3">
+                                    <h3 className="text-2xl font-black text-gray-800 tracking-tight group-hover:text-sky-600 transition-colors uppercase">{dept.name}</h3>
+                                </div>
+
+                                <div className="flex items-center gap-6 pt-4 border-t border-gray-50">
+                                    <div className="flex items-center gap-2 text-gray-400">
+                                        <span className="px-2 py-1 bg-gray-50 border border-gray-100 rounded-lg text-[9px] font-black text-gray-600 tracking-widest">{dept.code || 'NO-CODE'}</span>
+                                    </div>
+                                    <div className="flex items-center gap-2 text-gray-400">
+                                        <FaBuilding size={10} />
+                                        <span className="text-[9px] font-bold uppercase tracking-widest">Division</span>
+                                    </div>
+                                    <button
+                                        onClick={() => handleViewStaff(dept)}
+                                        className="ml-auto text-sky-600 hover:text-sky-800 text-[10px] font-black uppercase tracking-widest hover:underline"
+                                    >
+                                        View Personnel
+                                    </button>
+                                </div>
                             </div>
 
-                            <button
-                                onClick={() => handleViewStaff(dept)}
-                                className="w-full flex items-center justify-between p-6 bg-gradient-to-r from-gray-50 to-white text-gray-800 rounded-[24px] font-black text-[10px] uppercase tracking-widest hover:translate-x-2 transition-all shadow-sm border border-gray-100 group/btn relative z-10"
-                            >
-                                View Personnel <div className="p-2 rounded-xl bg-sky-50 text-[#4A90E2] group-hover/btn:bg-[#4A90E2] group-hover/btn:text-white transition-all"><FaArrowRight size={10} /></div>
-                            </button>
-
                             {/* Background Decor */}
-                            <div className="absolute -bottom-10 -right-10 w-32 h-32 bg-sky-50/30 rounded-full blur-3xl opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                            <div className="absolute bottom-0 left-0 w-full h-1 bg-gradient-to-r from-sky-500 to-transparent scale-x-0 group-hover:scale-x-100 transition-transform origin-left duration-500"></div>
                         </motion.div>
                     ))}
                 </div>
