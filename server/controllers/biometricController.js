@@ -316,7 +316,7 @@ exports.receiveLog = async (req, res) => {
 // @route   GET /api/biometric/data
 exports.getBiometricData = async (req, res) => {
     try {
-        const { emp_id, date, month } = req.query;
+        const { emp_id, date, month, startDate, endDate } = req.query;
         let query = `
             SELECT b.*, u.name, u.role, d.name as department_name
             FROM biometric_attendance b
