@@ -57,8 +57,19 @@ exports.applyPermission = async (req, res) => {
         );
         const permissionId = rows[0].id;
 
-        // 2. Determine next approver: If applicant is HOD, send directly to Principal; otherwise send to department HOD (if exists) or Principal
-        if (req.user.role === 'hod') {
+        // 2. Determine next approver
+        const { replacement_staff_id } = req.body;
+
+        if (replacement_staff_id) {
+            await client.query(
+                `INSERT INTO permission_approvals (permission_id, approver_id, approver_type, status)
+                 VALUES ($1, $2, 'replacement', 'Pending')`,
+                [permissionId, replacement_staff_id]
+            );
+
+            const reqDateStrInLocal = new Date(date).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', year: 'numeric' });
+            await createNotification(replacement_staff_id, `${req.user.name} has requested you as an alternative staff for their permission on ${reqDateStrInLocal}.`, 'permission', { permissionId }, client);
+        } else if (req.user.role === 'hod') {
             const { rows: principalRows } = await client.query(
                 `SELECT emp_id FROM users WHERE role = 'principal' LIMIT 1`
             );
@@ -196,7 +207,54 @@ exports.approvePermission = async (req, res) => {
 
         // 4. Handle Approval & Escalation
         if (status === 'Approved') {
-            if (currentStep.approver_type === 'hod') {
+            if (currentStep.approver_type === 'replacement') {
+                const { rows: reqRows } = await client.query(`
+                    SELECT u.department_id, u.name, u.role FROM permission_requests p 
+                    JOIN users u ON p.emp_id = u.emp_id WHERE p.id = $1
+                `, [permissionId]);
+                const applicant = reqRows[0];
+                const reqDateStrInLocal = new Date().toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', year: 'numeric' });
+
+                if (applicant?.role === 'hod') {
+                    const { rows: principalRows } = await client.query(
+                        `SELECT emp_id FROM users WHERE role = 'principal' LIMIT 1`
+                    );
+                    if (principalRows.length > 0) {
+                        await client.query(
+                            `INSERT INTO permission_approvals (permission_id, approver_id, approver_type, status)
+                             VALUES ($1, $2, 'principal', 'Pending')`,
+                            [permissionId, principalRows[0].emp_id]
+                        );
+                        await createNotification(principalRows[0].emp_id, `Permission request from HOD ${applicant.name} (alternative staff approved) requires your approval.`, 'permission', { permissionId }, client);
+                    }
+                } else {
+                    const { rows: hodRows } = await client.query(
+                        `SELECT emp_id FROM users WHERE department_id = $1 AND role = 'hod'`,
+                        [applicant?.department_id]
+                    );
+    
+                    if (hodRows.length > 0) {
+                        await client.query(
+                            `INSERT INTO permission_approvals (permission_id, approver_id, approver_type, status)
+                             VALUES ($1, $2, 'hod', 'Pending')`,
+                            [permissionId, hodRows[0].emp_id]
+                        );
+                        await createNotification(hodRows[0].emp_id, `Permission request from ${applicant.name} (alternative staff approved) requires your approval.`, 'permission', { permissionId }, client);
+                    } else {
+                        const { rows: principalRows } = await client.query(
+                            `SELECT emp_id FROM users WHERE role = 'principal' LIMIT 1`
+                        );
+                        if (principalRows.length > 0) {
+                            await client.query(
+                                `INSERT INTO permission_approvals (permission_id, approver_id, approver_type, status)
+                                 VALUES ($1, $2, 'principal', 'Pending')`,
+                                [permissionId, principalRows[0].emp_id]
+                            );
+                            await createNotification(principalRows[0].emp_id, `Permission request from ${applicant.name} (alternative staff approved) requires your approval.`, 'permission', { permissionId }, client);
+                        }
+                    }
+                }
+            } else if (currentStep.approver_type === 'hod') {
                 // Escalate to principal
                 const { rows: principalRows } = await client.query(
                     `SELECT emp_id FROM users WHERE role = 'principal' LIMIT 1`
