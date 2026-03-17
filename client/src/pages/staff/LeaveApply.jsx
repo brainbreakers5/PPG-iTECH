@@ -39,7 +39,7 @@ const LeaveApply = () => {
 
     // Permission letter states
     const [permissions, setPermissions] = useState([]);
-    const [permForm, setPermForm] = useState({ date: '', from_time: '', to_time: '', subject: '', reason: '' });
+    const [permForm, setPermForm] = useState({ date: '', day_type: 'Half Day AM', subject: '', reason: '' });
     const [permSubmitting, setPermSubmitting] = useState(false);
 
     const [formData, setFormData] = useState({
@@ -50,9 +50,7 @@ const LeaveApply = () => {
     });
     const [currentDate, setCurrentDate] = useState({
         date: '',
-        is_full_day: false,
-        from_time: '09:00',
-        to_time: '16:45',
+        day_type: 'Full Day', // 'Full Day', 'Half Day AM', 'Half Day PM'
         replacements: [{ staff_id: '', periods: '' }]
     });
     const [staffList, setStaffList] = useState([]);
@@ -201,22 +199,23 @@ const LeaveApply = () => {
         }
     };
 
-    // Compute pending permission approvals count for current user
-    const approverTypesForUser = user.role === 'principal' ? ['principal', 'admin'] : [user.role];
-    const pendingPermissionCount = permissions.filter(
-        p => p.my_approval_status === 'Pending' && p.emp_id !== user.emp_id && p.my_approver_type && approverTypesForUser.includes(p.my_approver_type)
-    ).length;
-
     const handlePermissionSubmit = async (e) => {
         e.preventDefault();
-        if (!permForm.date || !permForm.from_time || !permForm.to_time) {
-            return Swal.fire({ title: 'Missing Fields', text: 'Please fill date and time range.', icon: 'warning', confirmButtonColor: '#2563eb' });
+        if (!permForm.date || !permForm.day_type) {
+            return Swal.fire({ title: 'Missing Fields', text: 'Please fill date and select a permission option.', icon: 'warning', confirmButtonColor: '#2563eb' });
         }
+
+        const typeToTimes = {
+            'Half Day AM': { from_time: '09:00', to_time: '13:00' },
+            'Half Day PM': { from_time: '13:30', to_time: '16:45' }
+        };
+        const config = typeToTimes[permForm.day_type];
+
         setPermSubmitting(true);
         try {
-            await api.post('/permissions', permForm);
+            await api.post('/permissions', { ...permForm, ...config });
             Swal.fire({ title: 'Submitted', text: 'Permission request sent for HOD approval.', icon: 'success', timer: 1500, showConfirmButton: false });
-            setPermForm({ date: '', from_time: '', to_time: '', subject: '', reason: '' });
+            setPermForm({ date: '', day_type: 'Half Day AM', subject: '', reason: '' });
             fetchPermissions();
         } catch (error) {
             Swal.fire({ title: 'Error', text: error.response?.data?.message || 'Failed to submit.', icon: 'error', confirmButtonColor: '#2563eb' });
@@ -278,23 +277,24 @@ const LeaveApply = () => {
         return () => socket.off('leave_limits_updated', handler);
     }, [socket, limitYear]);
 
+    // Compute pending permission approvals count for current user
+    const approverTypesForUser = user.role === 'principal' ? ['principal', 'admin'] : [user.role];
+    const pendingPermissionCount = permissions.filter(
+        p => p.my_approval_status === 'Pending' && p.emp_id !== user.emp_id && p.my_approver_type && approverTypesForUser.includes(p.my_approver_type)
+    ).length;
+
     // Calculate total days and hours from dates array
     const calculateTotalDays = () => {
-        if (formData.dates.length === 0) return { total: 0, hours: 0, isHalfDayOnly: false };
+        if (formData.dates.length === 0) return { total: 0, isHalfDayOnly: false };
         let total = 0;
-        let hours = 0;
         formData.dates.forEach(d => {
-            if (d.from_time === '09:00' && d.to_time === '16:45') {
+            if (d.day_type === 'Full Day') {
                 total += 1;
-            } else if (d.from_time && d.to_time) {
-                const [fromH, fromM] = d.from_time.split(":").map(Number);
-                const [toH, toM] = d.to_time.split(":").map(Number);
-                let diff = (toH * 60 + toM) - (fromH * 60 + fromM);
-                if (diff < 0) diff += 24 * 60;
-                hours += diff / 60;
+            } else {
+                total += 0.5;
             }
         });
-        return { total, hours, isHalfDayOnly: (total === 0 && hours > 0) };
+        return { total, isHalfDayOnly: (total < formData.dates.length && total > 0) };
     };
 
     const handleAction = async (id, status) => {
@@ -486,9 +486,6 @@ const LeaveApply = () => {
         if (!currentDate.date) {
             return Swal.fire({ title: 'Missing Date', text: 'Please select a date first.', icon: 'warning', confirmButtonColor: '#2563eb' });
         }
-        if (!currentDate.from_time || !currentDate.to_time) {
-            return Swal.fire({ title: 'Missing Time', text: 'Please select from-to time.', icon: 'warning', confirmButtonColor: '#2563eb' });
-        }
         if (formData.dates.some(d => d.date === currentDate.date)) {
             return Swal.fire({ title: 'Duplicate Date', text: 'This date is already added.', icon: 'warning', confirmButtonColor: '#2563eb' });
         }
@@ -499,16 +496,21 @@ const LeaveApply = () => {
              return Swal.fire({ title: 'Missing Replacement info', text: 'Please ensure all replacement staff and periods are selected and filled, or remove unused replacement slots.', icon: 'warning', confirmButtonColor: '#2563eb' });
         }
 
-        const is_full = currentDate.from_time === '09:00' && currentDate.to_time === '16:45';
+        const typeToTimes = {
+            'Full Day': { from_time: '09:00', to_time: '16:45', is_full_day: true },
+            'Half Day AM': { from_time: '09:00', to_time: '13:00', is_full_day: false },
+            'Half Day PM': { from_time: '13:30', to_time: '16:45', is_full_day: false }
+        };
+
+        const config = typeToTimes[currentDate.day_type];
+
         setFormData({
             ...formData,
-            dates: [...formData.dates, { ...currentDate, is_full_day: is_full }]
+            dates: [...formData.dates, { ...currentDate, ...config }]
         });
         setCurrentDate({
             date: '',
-            is_full_day: false,
-            from_time: '09:00',
-            to_time: '16:45',
+            day_type: 'Full Day',
             replacements: [{ staff_id: '', periods: '' }]
         });
         setStaffSearch('');
@@ -556,7 +558,7 @@ const LeaveApply = () => {
         const sortedDates = formData.dates.map(d => d.date).sort();
         const from_date = sortedDates[0];
         const to_date = sortedDates[sortedDates.length - 1];
-        const { total, hours, isHalfDayOnly } = calculateTotalDays();
+        const { total, isHalfDayOnly } = calculateTotalDays();
 
         // Flatten replacements from all dates
         const allReplacements = [];
@@ -576,9 +578,9 @@ const LeaveApply = () => {
             leave_type: formData.leave_type,
             from_date,
             to_date,
-            days_count: isHalfDayOnly ? 0 : total,
-            is_half_day: formData.dates.some(d => !d.is_full_day),
-            hours: hours > 0 ? hours.toFixed(1) : '',
+            days_count: total,
+            is_half_day: formData.dates.some(d => d.day_type !== 'Full Day'),
+            hours: '',
             subject: formData.subject,
             reason: formData.reason,
             replacements: allReplacements,
@@ -696,25 +698,24 @@ const LeaveApply = () => {
                                                     className={inputClass}
                                                 />
                                             </div>
-                                            <div>
-                                                <label className={labelClass}>From Time *</label>
-                                                <input
-                                                    type="time"
-                                                    value={currentDate.from_time}
-                                                    onChange={(e) => handleCurrentDateChange('from_time', e.target.value)}
-                                                    className={inputClass}
-                                                    required
-                                                />
-                                            </div>
-                                            <div>
-                                                <label className={labelClass}>To Time *</label>
-                                                <input
-                                                    type="time"
-                                                    value={currentDate.to_time}
-                                                    onChange={(e) => handleCurrentDateChange('to_time', e.target.value)}
-                                                    className={inputClass}
-                                                    required
-                                                />
+                                            <div className="md:col-span-2">
+                                                <label className={labelClass}>Leave Option *</label>
+                                                <div className="flex gap-4 mt-2 bg-white/50 p-2 rounded-2xl border border-gray-100">
+                                                    {['Full Day', 'Half Day AM', 'Half Day PM'].map(type => (
+                                                        <button
+                                                            key={type}
+                                                            type="button"
+                                                            onClick={() => handleCurrentDateChange('day_type', type)}
+                                                            className={`flex-1 py-3 px-4 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
+                                                                currentDate.day_type === type 
+                                                                ? 'bg-sky-600 text-white shadow-lg' 
+                                                                : 'bg-white text-gray-400 hover:bg-gray-50'
+                                                            }`}
+                                                        >
+                                                            {type}
+                                                        </button>
+                                                    ))}
+                                                </div>
                                             </div>
                                         </div>
 
@@ -907,16 +908,17 @@ const LeaveApply = () => {
                                                                     {new Date(dateEntry.date).getDate()}
                                                                 </div>
                                                                 <div>
-                                                                    <p className="text-sm font-black text-gray-800 tracking-tight">
-                                                                        {new Date(dateEntry.date).toLocaleDateString('en-IN', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' })}
-                                                                    </p>
                                                                     <div className="flex items-center gap-2 mt-1">
-                                                                        <span className={`px-2 py-0.5 rounded-md text-[8px] font-black uppercase tracking-widest ${dateEntry.is_full_day ? 'bg-emerald-100 text-emerald-600' : 'bg-amber-100 text-amber-600'}`}>
-                                                                            {dateEntry.is_full_day ? 'Full Day' : 'Half Day'}
+                                                                        <span className={`px-2 py-0.5 rounded-md text-[8px] font-black uppercase tracking-widest ${dateEntry.day_type === 'Full Day' ? 'bg-emerald-100 text-emerald-600' : 'bg-amber-100 text-amber-600'}`}>
+                                                                            {dateEntry.day_type}
                                                                         </span>
-                                                                        {!dateEntry.is_full_day && (
+                                                                        {dateEntry.day_type !== 'Full Day' && (
                                                                             <span className="text-[9px] font-bold text-gray-400 flex items-center gap-1">
-                                                                                <FaClock size={8} /> {dateEntry.from_time} — {dateEntry.to_time}
+                                                                                <FaClock size={8} /> {(() => {
+                                                                                    if (dateEntry.day_type === 'Half Day AM') return '09:00 AM - 01:00 PM';
+                                                                                    if (dateEntry.day_type === 'Half Day PM') return '01:30 PM - 04:45 PM';
+                                                                                    return '';
+                                                                                })()}
                                                                             </span>
                                                                         )}
                                                                     </div>
@@ -1121,7 +1123,12 @@ const LeaveApply = () => {
                                                             </td>
                                                             <td className="p-5">
                                                                 <p className="text-sm font-black text-gray-700">{new Date(perm.date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</p>
-                                                                <p className="text-[10px] font-bold text-gray-400 mt-0.5">{perm.from_time?.slice(0, 5)} — {perm.to_time?.slice(0, 5)}</p>
+                                                                <p className="text-[10px] font-bold text-gray-400 mt-0.5">{(() => {
+                                                                    // Map back to display string if saved as day_type
+                                                                    if (perm.from_time === '09:00:00') return 'Half Day AM (09:00 AM - 01:00 PM)';
+                                                                    if (perm.from_time === '13:30:00' || perm.from_time === '13:00:00') return 'Half Day PM (01:30 PM - 04:45 PM)';
+                                                                    return `${new Date('2000-01-01T' + perm.from_time).toLocaleTimeString('en-US', {hour:'2-digit', minute:'2-digit', hour12: true})} - ${new Date('2000-01-01T' + perm.to_time).toLocaleTimeString('en-US', {hour:'2-digit', minute:'2-digit', hour12: true})}`;
+                                                                })()}</p>
                                                             </td>
                                                             <td className="p-5 max-w-xs">
                                                                 <p className="text-sm font-black text-gray-800 truncate">{perm.subject || 'Permission Request'}</p>
@@ -1159,7 +1166,7 @@ const LeaveApply = () => {
                                 </div>
 
                                 <form onSubmit={handlePermissionSubmit} className="space-y-6">
-                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                         <div>
                                             <label className="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2">Date *</label>
                                             <input
@@ -1171,24 +1178,23 @@ const LeaveApply = () => {
                                             />
                                         </div>
                                         <div>
-                                            <label className="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2">From Time *</label>
-                                            <input
-                                                type="time"
-                                                value={permForm.from_time}
-                                                onChange={e => setPermForm(p => ({ ...p, from_time: e.target.value }))}
-                                                className="w-full px-5 py-4 bg-gray-50 border-2 border-gray-100 rounded-2xl font-bold text-sm text-gray-800 focus:ring-4 focus:ring-teal-100 focus:border-teal-300 transition-all outline-none"
-                                                required
-                                            />
-                                        </div>
-                                        <div>
-                                            <label className="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2">To Time *</label>
-                                            <input
-                                                type="time"
-                                                value={permForm.to_time}
-                                                onChange={e => setPermForm(p => ({ ...p, to_time: e.target.value }))}
-                                                className="w-full px-5 py-4 bg-gray-50 border-2 border-gray-100 rounded-2xl font-bold text-sm text-gray-800 focus:ring-4 focus:ring-teal-100 focus:border-teal-300 transition-all outline-none"
-                                                required
-                                            />
+                                            <label className="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2">Permission Option *</label>
+                                            <div className="flex gap-4 bg-white/50 p-1.5 rounded-2xl border-2 border-gray-100">
+                                                {['Half Day AM', 'Half Day PM'].map(type => (
+                                                    <button
+                                                        key={type}
+                                                        type="button"
+                                                        onClick={() => setPermForm(p => ({ ...p, day_type: type }))}
+                                                        className={`flex-1 py-3 px-4 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
+                                                            permForm.day_type === type 
+                                                            ? 'bg-teal-600 text-white shadow-lg' 
+                                                            : 'bg-white text-gray-400 hover:bg-gray-50'
+                                                        }`}
+                                                    >
+                                                        {type}
+                                                    </button>
+                                                ))}
+                                            </div>
                                         </div>
                                     </div>
 
@@ -1266,7 +1272,17 @@ const LeaveApply = () => {
                                                         </div>
                                                     </div>
                                                     <div className="flex items-center gap-3 mb-3 text-[10px] font-bold text-gray-500">
-                                                        <span className="flex items-center gap-1"><FaClock size={10} className="text-teal-400" /> {perm.from_time?.slice(0, 5)} — {perm.to_time?.slice(0, 5)}</span>
+                                                        <span className="flex items-center gap-1">
+                                                            <FaClock size={10} className="text-teal-400" /> 
+                                                            {perm.from_time === '09:00:00' ? 'Half Day AM' : perm.from_time === '13:30:00' || perm.from_time === '13:00:00' ? 'Half Day PM' : 'Permission'}
+                                                            {' ('}
+                                                            {(() => {
+                                                                const f = new Date('2000-01-01T' + perm.from_time).toLocaleTimeString('en-US', {hour:'2-digit', minute:'2-digit', hour12: true});
+                                                                const t = new Date('2000-01-01T' + perm.to_time).toLocaleTimeString('en-US', {hour:'2-digit', minute:'2-digit', hour12: true});
+                                                                return `${f} - ${t}`;
+                                                            })()}
+                                                            {')'}
+                                                        </span>
                                                     </div>
                                                     <p className="text-sm font-black text-gray-700 tracking-tight">{perm.subject || 'Permission Request'}</p>
                                                     <p className="text-xs text-gray-400 font-medium line-clamp-2 mt-1 leading-relaxed">{perm.reason}</p>
@@ -1326,8 +1342,8 @@ const LeaveApply = () => {
                                             const dateObj = new Date(d.date);
                                             const dayName = dateObj.toLocaleDateString('en-US', { weekday: 'long' });
                                             const dateDisplay = dateObj.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
-                                            const inTime = d.in_time ? new Date(d.in_time).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) : '--';
-                                            const outTime = d.out_time ? new Date(d.out_time).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) : '--';
+                                            const inTime = d.in_time ? new Date(d.in_time).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true }) : '--';
+                                            const outTime = d.out_time ? new Date(d.out_time).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true }) : '--';
                                             return (
                                                 <motion.div
                                                     key={d.date}
@@ -1923,4 +1939,3 @@ const LeaveApply = () => {
 };
 
 export default LeaveApply;
-
