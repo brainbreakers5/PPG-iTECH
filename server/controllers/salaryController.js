@@ -19,16 +19,25 @@ exports.calculateSalary = async (req, res) => {
         const results = [];
 
         for (const user of users) {
-            // Updated query to use IN clause with paidStatuses
-            const { rows: stats } = await pool.query(`
+             // Updated query to handle 0.5 days for half-days/partial leaves
+             const { rows: stats } = await pool.query(`
                 SELECT 
-                    SUM(CASE WHEN status::text = ANY($4::text[]) THEN 1 ELSE 0 END) as payable_days,
+                    SUM(
+                        CASE 
+                            WHEN status::text = ANY($4::text[]) THEN
+                                CASE 
+                                    WHEN remarks LIKE '%Half Day%' OR remarks LIKE '%0.5 days%' OR remarks LIKE '%: %-% (%)%' THEN 0.5
+                                    ELSE 1.0
+                                END
+                            ELSE 0 
+                        END
+                    ) as payable_days,
                     SUM(CASE WHEN status = 'LOP' THEN 1 ELSE 0 END) as total_lop
                 FROM attendance_records
                 WHERE emp_id = $1 AND EXTRACT(MONTH FROM date) = $2 AND EXTRACT(YEAR FROM date) = $3
              `, [user.emp_id, month, year, paidStatuses]);
 
-            const payableDays = parseInt(stats[0].payable_days) || 0;
+            const payableDays = parseFloat(stats[0].payable_days) || 0;
             const totalLop = parseInt(stats[0].total_lop) || 0;
 
             const totalDays = 30; // Standard month
