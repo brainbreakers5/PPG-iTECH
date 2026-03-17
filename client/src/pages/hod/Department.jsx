@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Layout from '../../components/Layout';
 import api from '../../utils/api';
-import { FaUserTie, FaEye, FaCalendarAlt, FaIdBadge, FaEnvelope, FaPhone, FaBuilding, FaSuitcase } from 'react-icons/fa';
+import { FaUserTie, FaEye, FaCalendarAlt, FaIdBadge, FaEnvelope, FaPhone, FaBuilding, FaSuitcase, FaPrint } from 'react-icons/fa';
 import { motion } from 'framer-motion';
 
 const Department = () => {
@@ -27,13 +27,78 @@ const Department = () => {
         const fetchDept = async () => {
             try {
                 const { data } = await api.get('/departments');
-                // HOD's data is only from their own dept, so get first result that matches staff
                 if (data.length > 0) setDeptInfo(data[0]);
             } catch (e) { /* ignore */ }
         };
         fetchStaff();
         fetchDept();
     }, []);
+
+    const handlePrint = () => {
+        if (!staff || staff.length === 0) return;
+
+        const printWindow = window.open('', '_blank', 'width=1200,height=800');
+        if (!printWindow) return;
+
+        const escHtml = (v) => String(v ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        const roleColors = { hod: '#0891b2', staff: '#16a34a', admin: '#7c3aed', principal: '#2563eb' };
+
+        const rowsHtml = staff.map((member, idx) => `
+            <tr style="${idx % 2 === 0 ? 'background:#fff;' : 'background:#f8fafc;'}">
+                <td style="padding:10px 12px; text-align:center;">
+                    <img src="${escHtml(member.profile_pic || `https://ui-avatars.com/api/?name=${encodeURIComponent(member.name)}&size=60&background=2563eb&color=fff&bold=true`)}"
+                         style="width:40px;height:40px;border-radius:10px;object-fit:cover;" onerror="this.style.display='none'" />
+                </td>
+                <td style="padding:10px 12px; font-size:9pt; font-weight:900; color:#1e3a8a;">${escHtml(member.emp_id)}</td>
+                <td style="padding:10px 12px; font-size:9pt; font-weight:700; color:#1e293b;">${escHtml(member.name)}</td>
+                <td style="padding:10px 12px;">
+                    <span style="background:${(roleColors[member.role] || '#475569')}22; color:${(roleColors[member.role] || '#475569')}; border:1px solid ${(roleColors[member.role] || '#475569')}44; padding:2px 8px; border-radius:12px; font-size:8pt; font-weight:900; text-transform:uppercase;">${escHtml(member.role)}</span>
+                </td>
+                <td style="padding:10px 12px; font-size:9pt; color:#334155;">${escHtml(member.designation || '—')}</td>
+                <td style="padding:10px 12px; font-size:8.5pt; color:#475569;">${escHtml(member.email || '—')}</td>
+                <td style="padding:10px 12px; font-size:9pt; color:#475569;">${escHtml(member.mobile || '—')}</td>
+            </tr>
+        `).join('');
+
+        printWindow.document.write(`
+            <!doctype html><html><head><meta charset="UTF-8">
+            <title>Departmental Matrix Report</title>
+            <style>
+                @page { size: landscape; margin: 0.7cm; }
+                body { font-family: 'Segoe UI', Arial, sans-serif; color: #1e293b; margin: 0; padding: 10px; }
+                .header { display:flex; justify-content:space-between; align-items:flex-end; margin-bottom:20px; border-bottom:3px solid #1e3a8a; padding-bottom:12px; }
+                .header h1 { margin:0; color:#1e3a8a; font-size:18pt; font-weight:900; letter-spacing:-0.5px; }
+                .meta { font-size:9pt; color:#64748b; font-weight:bold; margin-top:5px; }
+                .brand { font-weight:900; color:#1e3a8a; font-size:11pt; text-align:right; }
+                .gen-date { font-size:8pt; color:#94a3b8; text-align:right; }
+                table { width:100%; border-collapse:collapse; }
+                thead tr { background:#1e3a8a; }
+                thead th { padding:10px 12px; font-size:8pt; font-weight:900; color:#fff; text-transform:uppercase; letter-spacing:0.08em; text-align:left; }
+                tbody tr { border-bottom:1px solid #f1f5f9; }
+            </style></head><body>
+            <div class="header">
+                <div>
+                    <h1>Departmental Matrix — ${escHtml(deptInfo?.name || 'Department')}</h1>
+                    <p class="meta">Department Code: ${escHtml(deptInfo?.code || '—')} &nbsp;|&nbsp; Total Personnel: ${staff.length}</p>
+                </div>
+                <div>
+                    <div class="brand">PPG EMP HUB</div>
+                    <div class="gen-date">Generated: ${new Date().toLocaleString('en-GB')}</div>
+                </div>
+            </div>
+            <table>
+                <thead><tr>
+                    <th style="width:56px;">Photo</th>
+                    <th>Emp ID</th><th>Name</th><th>Role</th><th>Designation</th><th>Email</th><th>Mobile</th>
+                </tr></thead>
+                <tbody>${rowsHtml}</tbody>
+            </table>
+            </body></html>
+        `);
+        printWindow.document.close();
+        printWindow.focus();
+        setTimeout(() => printWindow.print(), 250);
+    };
 
     return (
         <Layout>
@@ -46,6 +111,14 @@ const Department = () => {
                         )}
                     </div>
                 </div>
+                <button
+                    onClick={handlePrint}
+                    className="p-4 bg-sky-600 text-white rounded-2xl shadow-lg shadow-sky-100 hover:bg-sky-700 transition-all flex items-center justify-center gap-2 group font-black uppercase tracking-widest text-[10px]"
+                    title="Print Department Report"
+                >
+                    <FaPrint className="group-hover:scale-110 transition-transform" />
+                    <span className="hidden sm:inline">Print</span>
+                </button>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
