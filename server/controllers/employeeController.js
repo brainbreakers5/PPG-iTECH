@@ -141,9 +141,9 @@ exports.getEmployees = async (req, res) => {
 
         // Role-based filtering
         if (req.user.role === 'hod' || req.user.role === 'staff') {
-            // If ?all=true is passed, HOD/Staff can see all staff profiles (e.g. for replacement selection)
+            // If ?all=true is passed, HOD/Staff can see all staff/hod/principal profiles (e.g. for conversation participant selection)
             if (req.query.all === 'true') {
-                query += ` WHERE u.role NOT IN ('admin', 'principal')`;
+                query += ` WHERE u.role NOT IN ('admin')`;
             } else if (req.user.department_id) {
                 query += ` WHERE u.department_id = $1 AND u.role NOT IN ('admin', 'principal')`;
                 params.push(req.user.department_id);
