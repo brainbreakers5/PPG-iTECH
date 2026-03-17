@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FaTimes, FaCheckCircle, FaIdBadge, FaBuilding, FaPhone, FaEnvelope, FaUser, FaCalendarAlt, FaVenusMars, FaTint, FaGlobe, FaHandsHelping, FaWhatsapp, FaMapMarkerAlt, FaUsers, FaHeart, FaBriefcase, FaMoneyBillWave, FaUniversity, FaCreditCard, FaLock, FaUserCircle, FaSuitcase, FaCamera, FaEdit, FaSave, FaCertificate, FaDownload, FaEye, FaPlus, FaTrash, FaKey } from 'react-icons/fa';
+import { FaTimes, FaCheckCircle, FaIdBadge, FaBuilding, FaPhone, FaEnvelope, FaUser, FaCalendarAlt, FaVenusMars, FaTint, FaGlobe, FaHandsHelping, FaWhatsapp, FaMapMarkerAlt, FaUsers, FaHeart, FaBriefcase, FaMoneyBillWave, FaUniversity, FaCreditCard, FaLock, FaUserCircle, FaSuitcase, FaCamera, FaEdit, FaSave, FaCertificate, FaDownload, FaEye, FaPlus, FaTrash, FaKey, FaPrint } from 'react-icons/fa';
 import api from '../utils/api';
 import Swal from 'sweetalert2';
 import { useAuth } from '../context/AuthContext';
@@ -226,6 +226,200 @@ const ProfileViewer = ({ user, onClose }) => {
         }
     };
 
+    const handlePrintProfile = async () => {
+        const printWindow = window.open('', '_blank');
+        if (!printWindow) return;
+        const title = `Profile - ${user.name}`;
+        
+        const certDataPromises = certificates.map(async (cert) => {
+            try {
+                const { data } = await api.get(`/certificates/file/${cert.id}`);
+                return { ...cert, ...data };
+            } catch {
+                return cert;
+            }
+        });
+        
+        const fullCertificates = await Promise.all(certDataPromises);
+
+        const certsHtml = fullCertificates.map(cert => {
+            if (cert.file_data && (cert.file_type?.startsWith('image/') || cert.file_data?.startsWith('data:image/'))) {
+                return `
+                    <div style="margin-top: 30px; page-break-before: always; text-align: center;">
+                        <h2 style="font-size: 14pt; color: #0369a1; border-bottom: 2px solid #bae6fd; padding-bottom: 10px; margin-bottom: 20px;">${cert.certificate_name}</h2>
+                        <img src="${cert.file_data}" style="max-width: 100%; max-height: 800px; border: 1px solid #e2e8f0; padding: 10px; border-radius: 8px;" />
+                    </div>
+                `;
+            } else {
+                return `
+                    <div style="margin-top: 20px; border: 1px dashed #e2e8f0; padding: 15px; text-align: center; border-radius: 12px; background: #f8fafc;">
+                        <p style="font-size: 10pt; color: #64748b; margin: 0;">Certificate: <strong>${cert.certificate_name}</strong> (${cert.file_name})</p>
+                        <p style="font-size: 8pt; color: #94a3b8; margin: 4px 0 0;">[Attachment Type: ${cert.file_type || 'Unknown'}]</p>
+                    </div>
+                `;
+            }
+        }).join('');
+
+        const profilePic = picUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name)}&size=200&background=2563eb&color=fff&bold=true`;
+
+        printWindow.document.write(`
+            <html>
+                <head>
+                    <title>${title}</title>
+                    <style>
+                        body { font-family: 'Segoe UI', Arial, sans-serif; padding: 40px; color: #1e293b; background: #fff; line-height: 1.5; }
+                        .container { max-width: 800px; margin: 0 auto; }
+                        .header { display: flex; align-items: center; gap: 30px; margin-bottom: 40px; border-bottom: 2px solid #f1f5f9; padding-bottom: 30px; }
+                        .photo { width: 140px; height: 140px; border-radius: 24px; object-fit: cover; border: 4px solid #fff; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); background: #f8fafc; }
+                        .header-info h1 { margin: 0; font-size: 26pt; font-weight: 900; color: #0f172a; letter-spacing: -0.04em; line-height: 1; }
+                        .header-info p { margin: 8px 0 0; font-size: 11pt; color: #64748b; font-weight: 700; text-transform: uppercase; letter-spacing: 0.15em; }
+                        .emp-id { display: inline-block; background: #f0f9ff; color: #0369a1; padding: 6px 14px; border-radius: 10px; font-weight: 800; font-size: 9pt; margin-top: 12px; border: 1px solid #bae6fd; text-transform: uppercase; letter-spacing: 0.05em; }
+                        
+                        .section { margin-bottom: 35px; }
+                        .section-title { font-size: 9pt; font-weight: 900; color: #0284c7; text-transform: uppercase; letter-spacing: 0.25em; border-bottom: 1px solid #f1f5f9; padding-bottom: 10px; margin-bottom: 18px; display: flex; align-items: center; }
+                        
+                        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px 40px; }
+                        .info-item { display: flex; flex-direction: column; }
+                        .info-label { font-size: 7.5pt; font-weight: 800; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 3px; }
+                        .info-value { font-size: 10.5pt; font-weight: 700; color: #334155; border-bottom: 1px solid #f8fafc; padding-bottom: 2px; }
+                        
+                        .address-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+                        .address-box { background: #f8fafc; padding: 15px; border-radius: 16px; border: 1px solid #f1f5f9; }
+                        .address-box .info-value { border: none; font-size: 9.5pt; line-height: 1.4; color: #475569; }
+                        
+                        @media print {
+                            body { padding: 0; }
+                            .no-print { display: none; }
+                            .section { break-inside: avoid; }
+                        }
+                    </style>
+                </head>
+                <body>
+                    <div class="container">
+                        <div class="header">
+                            <img src="${profilePic}" class="photo" />
+                            <div class="header-info">
+                                <h1>${user.name}</h1>
+                                <p>${user.designation || user.role}</p>
+                                <div class="emp-id">EMP ID: ${user.emp_id}</div>
+                            </div>
+                        </div>
+
+                        <div class="section">
+                            <div class="section-title">Official Overview</div>
+                            <div class="grid">
+                                <div class="info-item"><span class="info-label">Current Department</span><span class="info-value">${user.department_name || '-'}</span></div>
+                                <div class="info-item"><span class="info-label">Official Email</span><span class="info-value" style="text-transform: lowercase;">${user.email || '-'}</span></div>
+                                <div class="info-item"><span class="info-label">Date of Joining</span><span class="info-value">${user.doj || '-'}</span></div>
+                                <div class="info-item"><span class="info-label">Total Experience</span><span class="info-value">${user.experience || '-'}</span></div>
+                            </div>
+                        </div>
+
+                        <div class="section">
+                            <div class="section-title">Personal Information</div>
+                            <div class="grid">
+                                <div class="info-item"><span class="info-label">Date of Birth</span><span class="info-value">${user.dob || '-'}</span></div>
+                                <div class="info-item"><span class="info-label">Gender / Blood Group</span><span class="info-value">${user.gender || '-'} / ${user.blood_group || '-'}</span></div>
+                                <div class="info-item"><span class="info-label">Mobile Contact</span><span class="info-value">${user.mobile || '-'}</span></div>
+                                <div class="info-item"><span class="info-label">WhatsApp Contact</span><span class="info-value">${user.whatsapp || '-'}</span></div>
+                                <div class="info-item"><span class="info-label">Nationality / Religion</span><span class="info-value">${user.nationality || '-'} / ${user.religion || '-'}</span></div>
+                                <div class="info-item"><span class="info-label">Community & Caste</span><span class="info-value">${user.community || '-'} ${user.caste ? `(${user.caste})` : ''}</span></div>
+                            </div>
+                        </div>
+
+                        <div class="section">
+                            <div class="section-title">Residency Details</div>
+                            <div class="address-grid">
+                                <div class="address-box">
+                                    <span class="info-label" style="color: #0284c7;">Communication Address</span>
+                                    <div class="info-value" style="margin-top: 8px; text-transform: uppercase;">${user.communication_address || 'NOT PROVIDED'}</div>
+                                </div>
+                                <div class="address-box">
+                                    <span class="info-label" style="color: #6366f1;">Permanent Address</span>
+                                    <div class="info-value" style="margin-top: 8px; text-transform: uppercase;">${user.permanent_address || 'NOT PROVIDED'}</div>
+                                </div>
+                            </div>
+                            <div style="margin-top: 12px; font-size: 8pt; font-weight: 900; color: #64748b; letter-spacing: 0.1em; text-align: right;">
+                                REGISTERED PIN CODE: ${user.pin_code || 'N/A'}
+                            </div>
+                        </div>
+
+                        <div class="section">
+                            <div class="section-title">Identification & Family</div>
+                            <div class="grid">
+                                <div class="info-item"><span class="info-label">Aadhar Number</span><span class="info-value">${user.aadhar || '-'}</span></div>
+                                <div class="info-item"><span class="info-label">PAN Number</span><span class="info-value">${user.pan || '-'}</span></div>
+                                <div class="info-item"><span class="info-label">Father's Name</span><span class="info-value">${user.father_name || '-'}</span></div>
+                                <div class="info-item"><span class="info-label">Mother's Name</span><span class="info-value">${user.mother_name || '-'}</span></div>
+                                <div class="info-item"><span class="info-label">Marital Status</span><span class="info-value">${user.marital_status || '-'}</span></div>
+                            </div>
+                        </div>
+                        
+                        <div class="section">
+                            <div class="section-title">Financial & Statutory Info</div>
+                            <div class="grid">
+                                <div class="info-item"><span class="info-label">Primary Bank</span><span class="info-value">${user.bank_name || '-'}</span></div>
+                                <div class="info-item"><span class="info-label">Account Details</span><span class="info-value">${user.account_no || '-'}</span></div>
+                                <div class="info-item"><span class="info-label">IFSC Code</span><span class="info-value">${user.ifsc || '-'}</span></div>
+                                <div class="info-item"><span class="info-label">PF & UAN Details</span><span class="info-value">${user.pf_number || '-'} / ${user.uan_number || '-'}</span></div>
+                            </div>
+                        </div>
+
+                        ${certsHtml}
+
+                        <div style="margin-top: 60px; border-top: 2px solid #f1f5f9; padding-top: 25px; display: flex; justify-content: space-between; align-items: flex-end;">
+                            <div style="font-size: 7.5pt; color: #94a3b8; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em;">
+                                System Generated Document<br/>
+                                PPG EMP HUB • ${new Date().toLocaleDateString('en-GB')}
+                            </div>
+                            <div style="text-align: center;">
+                                <div style="margin-bottom: 40px; font-size: 8pt; color: #cbd5e1; font-style: italic;">Seal & Signature</div>
+                                <div style="border-top: 1.5px solid #334155; width: 180px; padding-top: 6px; font-size: 8.5pt; font-weight: 900; color: #1e293b; text-transform: uppercase; letter-spacing: 0.05em;">
+                                    Authorized Authority
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </body>
+            </html>
+        `);
+        
+        printWindow.document.close();
+        
+        // Wait for images to load before printing
+        const images = printWindow.document.getElementsByTagName('img');
+        const totalImages = images.length;
+        let loadedImages = 0;
+        
+        const tryPrint = () => {
+            printWindow.focus();
+            printWindow.print();
+            printWindow.close();
+        };
+
+        if (totalImages === 0) {
+            tryPrint();
+        } else {
+            Array.from(images).forEach(img => {
+                if (img.complete) {
+                    loadedImages++;
+                    if (loadedImages === totalImages) tryPrint();
+                } else {
+                    img.onload = () => {
+                        loadedImages++;
+                        if (loadedImages === totalImages) tryPrint();
+                    };
+                    img.onerror = () => {
+                        loadedImages++;
+                        if (loadedImages === totalImages) tryPrint();
+                    };
+                }
+            });
+            // Force print after 3 seconds if images are slow
+            setTimeout(() => { if (printWindow && !printWindow.closed) tryPrint(); }, 3000);
+        }
+    };
+
     return (
         <div className="w-full max-w-7xl mx-auto">
             <motion.div
@@ -321,14 +515,23 @@ const ProfileViewer = ({ user, onClose }) => {
                             <h3 className="text-xl font-black text-gray-800 tracking-tight">Employee Profile</h3>
                             <p className="text-[10px] font-black text-sky-500 uppercase tracking-[0.3em] mt-1">Official Personnel Data</p>
                         </div>
-                        {isOwnProfile && !isEditingProfile && (
+                        <div className="flex items-center gap-2">
                             <button
-                                onClick={() => setIsEditingProfile(true)}
-                                className="flex items-center gap-2 px-5 py-2.5 bg-sky-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-sky-700 transition-all shadow-lg shadow-sky-200"
+                                onClick={handlePrintProfile}
+                                className="flex items-center gap-2 px-5 py-2.5 bg-white border border-gray-200 text-gray-600 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-gray-50 transition-all shadow-sm group"
+                                title="Print Profile & Certificates"
                             >
-                                <FaEdit size={12} /> Edit Profile
+                                <FaPrint size={12} className="group-hover:scale-110 transition-transform" /> Print
                             </button>
-                        )}
+                            {isOwnProfile && !isEditingProfile && (
+                                <button
+                                    onClick={() => setIsEditingProfile(true)}
+                                    className="flex items-center gap-2 px-5 py-2.5 bg-sky-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-sky-700 transition-all shadow-lg shadow-sky-200"
+                                >
+                                    <FaEdit size={12} /> Edit Profile
+                                </button>
+                            )}
+                        </div>
                         {isEditingProfile && (
                             <div className="flex items-center gap-2">
                                 <button
