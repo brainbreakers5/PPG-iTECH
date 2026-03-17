@@ -104,14 +104,13 @@ const Splash = ({ onFinish }) => {
                             />
                         </motion.div>
 
-                        {/* Subtitle */}
                         <motion.p
                             initial={{ opacity: 0, y: 15 }}
                             animate={phase >= 2 ? { opacity: 1, y: 0 } : {}}
                             transition={{ duration: 0.6, delay: 0.4, ease: 'easeOut' }}
-                            className="text-[10px] font-bold text-sky-300/70 uppercase tracking-[0.4em] mb-10"
+                            className="text-[10px] font-bold text-sky-300/70 uppercase tracking-[0.4em] mb-10 text-center max-w-[280px] sm:max-w-md px-4 mx-auto"
                         >
-                            Enterprise Attendance & Management System
+                            Enterprise & Attendance Management System
                         </motion.p>
 
                         {/* Loading indicator */}
