@@ -341,7 +341,7 @@ const Login = () => {
                         rel="noopener noreferrer"
                         className="text-[9px] font-black text-white/50 hover:text-sky-300 transition-colors uppercase tracking-widest whitespace-nowrap"
                     >
-                        Developed By ZORVIAN AGENCY
+                        Developed By ZORVIAN TECHNOLOGIES
                     </a>
                 </div>
             </motion.div>
