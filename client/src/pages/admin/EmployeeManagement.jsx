@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import Layout from '../../components/Layout';
 import api from '../../utils/api';
 import Swal from 'sweetalert2';
-import { FaEdit, FaTrash, FaUserPlus, FaSearch, FaFilter, FaUsers, FaIdBadge, FaEnvelope, FaPhone, FaTimes } from 'react-icons/fa';
+import { FaEdit, FaTrash, FaUserPlus, FaSearch, FaFilter, FaUsers, FaIdBadge, FaEnvelope, FaPhone, FaPrint } from 'react-icons/fa';
 import { motion, AnimatePresence } from 'framer-motion';
 
 
@@ -62,9 +62,8 @@ const EmployeeManagement = () => {
     };
 
     const handleDelete = async (e, id) => {
-        e.stopPropagation(); // Prevent row click
+        e.stopPropagation();
 
-        // Find the employee to check their role
         const emp = employees.find(x => x.id === id);
         const isHodOrStaff = emp && (emp.role === 'hod' || emp.role === 'staff');
 
@@ -125,6 +124,79 @@ const EmployeeManagement = () => {
         window.dispatchEvent(new CustomEvent('closeSidebar'));
     };
 
+    const handlePrint = () => {
+        if (!filteredEmployees || filteredEmployees.length === 0) {
+            Swal.fire({ icon: 'warning', title: 'No Data', text: 'No employees to print.' });
+            return;
+        }
+        const printWindow = window.open('', '_blank', 'width=1200,height=800');
+        if (!printWindow) return;
+
+        const roleColors = { admin: '#7c3aed', principal: '#2563eb', hod: '#0891b2', staff: '#16a34a' };
+        const escHtml = (v) => String(v ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+
+        const rowsHtml = filteredEmployees.map((emp, idx) => `
+            <tr style="border-bottom: 1px solid #f1f5f9; ${idx % 2 === 0 ? 'background:#fff;' : 'background:#f8fafc;'}">
+                <td style="padding:10px 12px; font-size:9pt; font-weight:900; color:#1e3a8a;">${escHtml(emp.emp_id)}</td>
+                <td style="padding:10px 12px; font-size:9pt; font-weight:700; color:#1e293b;">${escHtml(emp.name)}</td>
+                <td style="padding:10px 12px;">
+                    <span style="background:${roleColors[emp.role] || '#475569'}22; color:${roleColors[emp.role] || '#475569'}; border:1px solid ${roleColors[emp.role] || '#475569'}44; padding:2px 8px; border-radius:12px; font-size:8pt; font-weight:900; text-transform:uppercase; letter-spacing:0.05em;">${escHtml(emp.role)}</span>
+                </td>
+                <td style="padding:10px 12px; font-size:9pt; color:#334155;">${escHtml(emp.department_name || '—')}</td>
+                <td style="padding:10px 12px; font-size:9pt; color:#334155;">${escHtml(emp.designation || '—')}</td>
+                <td style="padding:10px 12px; font-size:8.5pt; color:#475569;">${escHtml(emp.email || '—')}</td>
+                <td style="padding:10px 12px; font-size:9pt; color:#475569;">${escHtml(emp.mobile || '—')}</td>
+            </tr>
+        `).join('');
+
+        const filterLabel = [
+            filterRole ? `Role: ${filterRole}` : '',
+            filterDept ? `Dept: ${departments.find(d => String(d.id) === filterDept)?.name || filterDept}` : '',
+            searchQuery ? `Search: "${searchQuery}"` : ''
+        ].filter(Boolean).join(' | ') || 'All Employees';
+
+        printWindow.document.write(`
+            <!doctype html><html><head><meta charset="UTF-8">
+            <title>Employee Management Report</title>
+            <style>
+                @page { size: landscape; margin: 0.7cm; }
+                body { font-family: 'Segoe UI', Arial, sans-serif; color: #1e293b; margin: 0; padding: 10px; }
+                .header { display:flex; justify-content:space-between; align-items:flex-end; margin-bottom:20px; border-bottom:3px solid #1e3a8a; padding-bottom:12px; }
+                .header h1 { margin:0; color:#1e3a8a; font-size:18pt; font-weight:900; letter-spacing:-0.5px; }
+                .meta { font-size:9pt; color:#64748b; font-weight:bold; margin-top:5px; }
+                .brand { font-weight:900; color:#1e3a8a; font-size:11pt; text-align:right; }
+                .gen-date { font-size:8pt; color:#94a3b8; text-align:right; }
+                .stat-bar { display:flex; gap:12px; margin-bottom:16px; }
+                .stat { background:#f8fafc; border:1px solid #e2e8f0; padding:8px 14px; border-radius:10px; font-size:9pt; }
+                .stat span { font-weight:900; color:#1e3a8a; }
+                table { width:100%; border-collapse:collapse; }
+                thead tr { background:#1e3a8a; }
+                thead th { padding:10px 12px; font-size:8pt; font-weight:900; color:#fff; text-transform:uppercase; letter-spacing:0.08em; text-align:left; border:none; }
+                tbody tr:last-child td { border-bottom:none; }
+            </style></head><body>
+            <div class="header">
+                <div>
+                    <h1>Employee Management Report</h1>
+                    <p class="meta">${escHtml(filterLabel)} &nbsp;|&nbsp; Total: ${filteredEmployees.length} employees</p>
+                </div>
+                <div>
+                    <div class="brand">PPG EMP HUB</div>
+                    <div class="gen-date">Generated: ${new Date().toLocaleString('en-GB')}</div>
+                </div>
+            </div>
+            <table>
+                <thead><tr>
+                    <th>Emp ID</th><th>Name</th><th>Role</th><th>Department</th><th>Designation</th><th>Email</th><th>Mobile</th>
+                </tr></thead>
+                <tbody>${rowsHtml}</tbody>
+            </table>
+            </body></html>
+        `);
+        printWindow.document.close();
+        printWindow.focus();
+        setTimeout(() => printWindow.print(), 250);
+    };
+
     return (
         <Layout>
             <motion.div
@@ -137,12 +209,22 @@ const EmployeeManagement = () => {
                         <h1 className="text-3xl font-black text-gray-800 tracking-tight">Employee Management</h1>
 
                     </div>
-                    <button
-                        onClick={handleAdd}
-                        className="bg-sky-600 text-white px-8 py-4 rounded-2xl shadow-xl shadow-sky-100 hover:bg-sky-700 transition-all flex items-center font-black uppercase tracking-widest text-xs active:scale-95 group"
-                    >
-                        <FaUserPlus className="mr-3 group-hover:scale-110 transition-transform" /> Add New Employee
-                    </button>
+                    <div className="flex items-center gap-3">
+                        <button
+                            onClick={handlePrint}
+                            className="p-4 bg-sky-600 text-white rounded-2xl shadow-lg shadow-sky-100 hover:bg-sky-700 transition-all flex items-center justify-center gap-2 group font-black uppercase tracking-widest text-[10px]"
+                            title="Print Employee Report"
+                        >
+                            <FaPrint className="group-hover:scale-110 transition-transform" />
+                            <span className="hidden sm:inline">Print</span>
+                        </button>
+                        <button
+                            onClick={handleAdd}
+                            className="bg-sky-600 text-white px-8 py-4 rounded-2xl shadow-xl shadow-sky-100 hover:bg-sky-700 transition-all flex items-center font-black uppercase tracking-widest text-xs active:scale-95 group"
+                        >
+                            <FaUserPlus className="mr-3 group-hover:scale-110 transition-transform" /> Add New Employee
+                        </button>
+                    </div>
                 </div>
 
                 {/* Search and Filters */}
@@ -304,8 +386,6 @@ const EmployeeManagement = () => {
                     </div>
                 </div>
             </motion.div>
-
-            {/* Removed EmployeeFormModal component */}
         </Layout>
     );
 };
