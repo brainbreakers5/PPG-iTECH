@@ -70,7 +70,8 @@ const HODDashboard = () => {
         if (!user) return;
         try {
             const date = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
-            const { data: summary } = await api.get(`/attendance/summary?date=${date}${user?.department_id ? `&department_id=${user.department_id}` : ''}`);
+            // Fetch overall summary (without department filter) to see all HODs
+            const { data: summary } = await api.get(`/attendance/summary?date=${date}`);
             const { data: bdays } = await api.get('/employees/birthdays/today');
             setBirthdays(bdays);
             const { data: emps } = await api.get('/employees');
@@ -96,33 +97,55 @@ const HODDashboard = () => {
             const map = {};
             (todayAtt || []).forEach(r => { map[r.emp_id] = r; });
             setAttendanceMap(map);
-            // Aggregate per-user rows into role-based stats
-            const agg = { present: 0, absent: 0, od: 0, cl: 0, ml: 0, comp_leave: 0, lop: 0, late_entry: 0, hod: { present: 0, absent: 0, od: 0, cl: 0, ml: 0, comp_leave: 0, lop: 0, late_entry: 0 }, staff: { present: 0, absent: 0, od: 0, cl: 0, ml: 0, comp_leave: 0, lop: 0, late_entry: 0 } };
+            // Aggregate rows into role-based stats: All HODs vs. Staff in THIS department
+            const agg = { 
+                present: 0, absent: 0, od: 0, cl: 0, ml: 0, comp_leave: 0, lop: 0, late_entry: 0, 
+                hod: { present: 0, absent: 0, od: 0, cl: 0, ml: 0, comp_leave: 0, lop: 0, late_entry: 0 }, 
+                staff: { present: 0, absent: 0, od: 0, cl: 0, ml: 0, comp_leave: 0, lop: 0, late_entry: 0 } 
+            };
+            
             (summary || []).forEach(r => {
                 const role = (r.role || '').toLowerCase();
-                const bucket = agg[role] || agg.staff;
+                const isHod = role === 'hod';
+                const isStaff = role === 'staff';
+                const isInDept = String(r.department_id) === String(user.department_id);
+
+                // We want: 
+                // 1. All HODs from all departments
+                // 2. Only staff from THIS HOD's department
+                if (!isHod && !isInDept) return; 
+
+                const bucket = isHod ? agg.hod : agg.staff;
                 const p = Number(r.total_present) || 0;
                 const l = Number(r.total_leave) || 0;
                 const o = Number(r.total_od) || 0;
                 const lp = Number(r.total_lop) || 0;
                 const late = Number(r.total_late) || 0;
+
                 bucket.present += p;
                 bucket.od += o;
                 bucket.lop += lp;
                 bucket.late_entry += late;
                 if (p === 0 && l === 0 && o === 0 && lp === 0) bucket.absent += 1;
+                
+                // Overall dashboard totals only for the filtered subset
                 agg.present += p;
                 agg.od += o;
                 agg.lop += lp;
                 agg.late_entry += late;
             });
-            // Count individual leave types from attendance map
+            // Count individual leave types from attendance map for the same subset
             (emps || []).forEach(emp => {
+                const role = (emp.role || '').toLowerCase();
+                const isHod = role === 'hod';
+                const isInDept = String(emp.department_id) === String(user.department_id);
+                
+                if (!isHod && !isInDept) return;
+
                 const rec = map[emp.emp_id] || {};
                 const s = (rec.status || '').toUpperCase();
                 const rem = (rec.remarks || '').toUpperCase();
-                const role = (emp.role || '').toLowerCase();
-                const bucket = agg[role] || agg.staff;
+                const bucket = isHod ? agg.hod : agg.staff;
                 
                 if ((s.includes('CL') || rem.includes('CL') || rem.includes('CASUAL')) && !s.includes('COMP') && !rem.includes('COMP')) { bucket.cl++; agg.cl++; }
                 if (s.includes('ML') || rem.includes('ML') || rem.includes('MEDICAL')) { bucket.ml++; agg.ml++; }
