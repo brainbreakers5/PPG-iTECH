@@ -270,9 +270,8 @@ const Notifications = () => {
                                             {/* Content */}
                                             <div className="flex-1 min-w-0">
                                                 <div className="flex items-center justify-between gap-4 mb-1">
-                                                    <h3 className={`text-sm font-black tracking-tight ${!n.is_read ? 'text-gray-800' : 'text-gray-500'}`}>
-                                                        {getTitle(n.type)}
-                                                    </h3>
+                                                     {/* Removed title as per request */}
+
                                                      {/* Removed date and time as per request */}
 
                                                 </div>
@@ -329,3 +328,4 @@ const Notifications = () => {
 };
 
 export default Notifications;
+
