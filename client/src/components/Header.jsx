@@ -47,7 +47,6 @@ const Header = ({ toggleSidebar, sidebarOpen }) => {
             { label: 'Timetable Setup', path: '/admin/timetable-setup' },
             { label: 'Calendar', path: '/admin/calendar' },
             { label: 'Purchase Requests', path: '/admin/purchase' },
-            { label: 'Notifications', path: '/admin/notifications' },
         ],
         principal: [
             { label: 'Dashboard', path: '/principal' },
@@ -59,7 +58,6 @@ const Header = ({ toggleSidebar, sidebarOpen }) => {
             { label: 'Conversation', path: '/principal/conversation' },
             { label: 'Purchase Requests', path: '/principal/purchase' },
             { label: 'Academic Calendar', path: '/principal/calendar' },
-            { label: 'Notifications', path: '/principal/notifications' },
         ],
         hod: [
             { label: 'Dashboard', path: '/hod' },
@@ -70,7 +68,6 @@ const Header = ({ toggleSidebar, sidebarOpen }) => {
             { label: 'Conversation', path: '/hod/conversation' },
             { label: 'Purchase Requests', path: '/hod/purchase' },
             { label: 'Academic Calendar', path: '/hod/calendar' },
-            { label: 'Notifications', path: '/hod/notifications' },
         ],
         staff: [
             { label: 'Dashboard', path: '/staff' },
@@ -80,13 +77,11 @@ const Header = ({ toggleSidebar, sidebarOpen }) => {
             { label: 'Messages', path: '/staff/conversation' },
             { label: 'Purchase Requests', path: '/staff/items' },
             { label: 'Academic Calendar', path: '/staff/calendar' },
-            { label: 'Notifications', path: '/staff/notifications' },
         ],
         management: [
             { label: 'Dashboard', path: '/management' },
             { label: 'Departments', path: '/management/departments' },
             { label: 'Salary Overview', path: '/management/payroll' },
-            { label: 'Notifications', path: '/management/notifications' },
         ],
     };
 
