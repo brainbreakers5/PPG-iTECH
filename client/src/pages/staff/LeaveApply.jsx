@@ -819,8 +819,8 @@ const LeaveApply = () => {
                                                                                 className="w-full h-full object-cover"
                                                                             />
                                                                         </div>
-                                                                        <div className="flex-1 min-w-0">
-                                                                            <p className="text-[10px] font-black text-gray-800 tracking-tight truncate">{member.name}</p>
+                                                                        <div className="flex-1 min-w-0 md:w-auto w-full">
+                                                                            <p className="text-[10px] font-black text-gray-800 tracking-tight word-break whitespace-normal break-words">{member.name}</p>
                                                                             <p className="text-[7px] font-bold text-gray-400 uppercase tracking-widest truncate">{member.designation || 'Staff'}</p>
                                                                         </div>
                                                                         {isSelected ? (
