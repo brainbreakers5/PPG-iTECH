@@ -7,18 +7,23 @@ import { motion } from 'framer-motion';
 
 const ManagementDepartment = () => {
     const [departments, setDepartments] = useState([]);
+    const [allEmployees, setAllEmployees] = useState([]);
     const navigate = useNavigate();
 
     useEffect(() => {
-        const fetchDepts = async () => {
+        const fetchData = async () => {
             try {
-                const { data } = await api.get('/departments');
-                setDepartments(data);
+                const [deptRes, empRes] = await Promise.all([
+                    api.get('/departments'),
+                    api.get('/employees')
+                ]);
+                setDepartments(deptRes.data);
+                setAllEmployees(empRes.data);
             } catch (error) {
-                console.error("Error fetching departments", error);
+                console.error("Error fetching data", error);
             }
         };
-        fetchDepts();
+        fetchData();
     }, []);
 
     const handleViewStaff = (dept) => {
@@ -31,35 +36,93 @@ const ManagementDepartment = () => {
         const printWindow = window.open('', '_blank', 'width=1200,height=800');
         if (!printWindow) return;
         const escHtml = (v) => String(v ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-        const rowsHtml = departments.map((dept, idx) => `
-            <tr style="${idx % 2 === 0 ? 'background:#fff;' : 'background:#f8fafc;'}">
-                <td style="padding:10px 14px; font-size:10pt; font-weight:900; color:#4c1d95;">${escHtml(dept.name)}</td>
-                <td style="padding:10px 14px; font-size:9pt; color:#475569; font-weight:700;">${escHtml(dept.code || '—')}</td>
-            </tr>
-        `).join('');
+        const roleColors = { hod: '#0891b2', staff: '#16a34a', admin: '#7c3aed', principal: '#2563eb' };
+
+        let contentHtml = '';
+
+        departments.forEach(dept => {
+            const deptStaff = allEmployees.filter(emp => String(emp.department_id) === String(dept.id));
+            if (deptStaff.length === 0) return;
+
+            deptStaff.sort((a, b) => {
+                if (a.role === 'hod' && b.role !== 'hod') return -1;
+                if (a.role !== 'hod' && b.role === 'hod') return 1;
+                return 0;
+            });
+
+            contentHtml += `
+                <div style="margin-bottom: 30px; page-break-inside: avoid;">
+                    <div style="background: #f8fafc; padding: 10px 15px; border-left: 4px solid #7c3aed; margin-bottom: 10px;">
+                        <h2 style="margin: 0; color: #4c1d95; font-size: 14pt; font-weight: 900;">${escHtml(dept.name)} <span style="font-size: 10pt; color: #64748b; font-weight: bold;">(Code: ${escHtml(dept.code || '—')})</span></h2>
+                    </div>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th style="width:50px; text-align:center;">Photo</th>
+                                <th style="width:100px;">Emp ID</th>
+                                <th>Name</th>
+                                <th style="width:80px;">Role</th>
+                                <th>Designation</th>
+                                <th>Email</th>
+                                <th style="width:110px;">Mobile</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${deptStaff.map((member, idx) => `
+                                <tr style="${idx % 2 === 0 ? 'background:#fff;' : 'background:#f8fafc;'}">
+                                    <td style="padding:8px 10px; text-align:center;">
+                                        <img src="${escHtml(member.profile_pic || `https://ui-avatars.com/api/?name=${encodeURIComponent(member.name)}&size=60&background=7c3aed&color=fff&bold=true`)}"
+                                            style="width:36px;height:36px;border-radius:8px;object-fit:cover;" onerror="this.style.display='none'" />
+                                    </td>
+                                    <td style="padding:8px 10px; font-size:9pt; font-weight:900; color:#4c1d95;">${escHtml(member.emp_id)}</td>
+                                    <td style="padding:8px 10px; font-size:9pt; font-weight:700; color:#1e293b;">${escHtml(member.name)}</td>
+                                    <td style="padding:8px 10px;">
+                                        <span style="background:${(roleColors[member.role] || '#475569')}22; color:${(roleColors[member.role] || '#475569')}; border:1px solid ${(roleColors[member.role] || '#475569')}44; padding:2px 6px; border-radius:10px; font-size:7.5pt; font-weight:900; text-transform:uppercase;">${escHtml(member.role)}</span>
+                                    </td>
+                                    <td style="padding:8px 10px; font-size:8.5pt; color:#334155;">${escHtml(member.designation || '—')}</td>
+                                    <td style="padding:8px 10px; font-size:8pt; color:#475569;">${escHtml(member.email || '—')}</td>
+                                    <td style="padding:8px 10px; font-size:8.5pt; color:#475569;">${escHtml(member.mobile || '—')}</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            `;
+        });
+
+        if (!contentHtml) {
+            contentHtml = '<p style="text-align:center; color:#64748b; font-style:italic; margin-top: 40px;">No personnel data available to print.</p>';
+        }
+
         printWindow.document.write(`
             <!doctype html><html><head><meta charset="UTF-8">
-            <title>Department Intelligence Report</title>
+            <title>Department Personnel Registry</title>
             <style>
-                @page { size: portrait; margin: 1cm; }
+                @page { size: landscape; margin: 1cm; }
                 body { font-family: 'Segoe UI', Arial, sans-serif; color: #1e293b; margin: 0; padding: 10px; }
                 .header { display:flex; justify-content:space-between; align-items:flex-end; margin-bottom:20px; border-bottom:3px solid #7c3aed; padding-bottom:12px; }
-                .header h1 { margin:0; color:#7c3aed; font-size:18pt; font-weight:900; } .meta { font-size:9pt; color:#64748b; font-weight:bold; margin-top:5px; }
-                .brand { font-weight:900; color:#7c3aed; font-size:11pt; text-align:right; } .gen-date { font-size:8pt; color:#94a3b8; text-align:right; }
-                table { width:100%; border-collapse:collapse; } thead tr { background:#7c3aed; }
-                thead th { padding:10px 14px; font-size:8pt; font-weight:900; color:#fff; text-transform:uppercase; letter-spacing:0.08em; text-align:left; }
-                tbody tr { border-bottom:1px solid #f1f5f9; }
+                .header h1 { margin:0; color:#7c3aed; font-size:18pt; font-weight:900; } 
+                .meta { font-size:9pt; color:#64748b; font-weight:bold; margin-top:5px; }
+                .brand { font-weight:900; color:#7c3aed; font-size:11pt; text-align:right; } 
+                .gen-date { font-size:8pt; color:#94a3b8; text-align:right; }
+                table { width:100%; border-collapse:collapse; background: #fff; border: 1px solid #e2e8f0; } 
+                thead tr { background:#7c3aed; }
+                thead th { padding:10px; font-size:8pt; font-weight:900; color:#fff; text-transform:uppercase; letter-spacing:0.05em; text-align:left; border-right: 1px solid #6d28d9; }
+                thead th:last-child { border-right: none; }
+                tbody tr { border-bottom:1px solid #e2e8f0; }
+                tbody td { border-right: 1px solid #e2e8f0; }
+                tbody td:last-child { border-right: none; }
             </style></head><body>
             <div class="header">
-                <div><h1>Department Intelligence Report</h1><p class="meta">Total Departments: ${departments.length}</p></div>
+                <div><h1>Institutional Personnel Registry</h1><p class="meta">Comprehensive Departmental Overview</p></div>
                 <div><div class="brand">PPG EMP HUB</div><div class="gen-date">Generated: ${new Date().toLocaleString('en-GB')}</div></div>
             </div>
-            <table><thead><tr><th>Department Name</th><th>Code</th></tr></thead><tbody>${rowsHtml}</tbody></table>
+            ${contentHtml}
             </body></html>
         `);
         printWindow.document.close();
         printWindow.focus();
-        setTimeout(() => printWindow.print(), 250);
+        setTimeout(() => printWindow.print(), 500);
     };
 
     return (
