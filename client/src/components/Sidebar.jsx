@@ -99,7 +99,7 @@ const Sidebar = ({ userRole = 'staff', isOpen, onClose }) => {
 
   return (
     <div
-      className={`fixed left-0 top-0 h-screen w-64 bg-white/60 backdrop-blur-2xl border-r border-white/50 shadow-2xl transform transition-all duration-300 ease-in-out z-40 flex flex-col ${isOpen ? 'translate-x-0' : '-translate-x-full'
+      className={`fixed left-0 top-0 h-screen w-64 bg-white/60 backdrop-blur-2xl border-r border-white/50 shadow-2xl transform transition-all duration-300 ease-in-out z-40 flex flex-col lg:translate-x-0 ${isOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
     >
       {/* Header */}
@@ -117,7 +117,7 @@ const Sidebar = ({ userRole = 'staff', isOpen, onClose }) => {
           <LiveStatus />
           <button
             onClick={onClose}
-            className="h-9 w-9 bg-white/50 text-sky-600 hover:bg-white hover:text-sky-800 rounded-xl flex items-center justify-center border border-white/50 shadow-sm transition-all active:scale-90"
+            className="lg:hidden h-9 w-9 bg-white/50 text-sky-600 hover:bg-white hover:text-sky-800 rounded-xl flex items-center justify-center border border-white/50 shadow-sm transition-all active:scale-90"
             title="Close Menu"
           >
             <FaChevronLeft size={14} />
