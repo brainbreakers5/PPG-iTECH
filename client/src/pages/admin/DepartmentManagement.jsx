@@ -91,6 +91,7 @@ const DepartmentManagement = () => {
         const roleColors = { hod: '#0891b2', staff: '#16a34a', admin: '#7c3aed', principal: '#2563eb' };
 
         let contentHtml = '';
+        let isFirstDepartment = true;
 
         departments.forEach(dept => {
             const deptStaff = allEmployees.filter(emp => String(emp.department_id) === String(dept.id));
@@ -102,8 +103,11 @@ const DepartmentManagement = () => {
                 return 0;
             });
 
+            const pageBreakStyle = isFirstDepartment ? '' : 'page-break-before: always;';
+            isFirstDepartment = false;
+
             contentHtml += `
-                <div style="margin-bottom: 30px; page-break-inside: avoid;">
+                <div style="margin-bottom: 30px; ${pageBreakStyle}">
                     <div style="background: #f8fafc; padding: 10px 15px; border-left: 4px solid #1e3a8a; margin-bottom: 10px;">
                         <h2 style="margin: 0; color: #1e3a8a; font-size: 14pt; font-weight: 900;">${escHtml(dept.name)} <span style="font-size: 10pt; color: #64748b; font-weight: bold;">(Code: ${escHtml(dept.code || '—')})</span></h2>
                     </div>
