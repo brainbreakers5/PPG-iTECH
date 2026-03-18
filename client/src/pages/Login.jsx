@@ -164,7 +164,7 @@ const Login = () => {
 
     const silentLogin = async (p) => {
         try {
-            await login(empId.trim(), p.trim());
+            await login(empId.trim(), p.trim(), userRole);
             // If it succeeds, call regular handleSubmit (it will show success etc)
             handleSubmit();
         } catch (err) {
