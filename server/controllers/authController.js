@@ -218,3 +218,30 @@ exports.updateProfile = async (req, res) => {
         res.status(500).json({ message: 'Server Error' });
     }
 };
+
+// @desc    Check if Employee ID exists
+// @route   POST /api/auth/check-id
+// @access  Public
+exports.checkEmployeeId = async (req, res) => {
+    const { emp_id } = req.body;
+
+    if (!emp_id) {
+        return res.status(400).json({ message: 'Please provide emp_id' });
+    }
+
+    try {
+        const { rows } = await pool.query(
+            'SELECT id, name FROM users WHERE LOWER(emp_id) = LOWER($1)',
+            [emp_id.trim()]
+        );
+
+        if (rows.length > 0) {
+            res.json({ exists: true, name: rows[0].name });
+        } else {
+            res.status(404).json({ exists: false, message: 'Employee ID not found' });
+        }
+    } catch (error) {
+        console.error('Check ID Error:', error);
+        res.status(500).json({ message: 'Server Error' });
+    }
+};
