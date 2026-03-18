@@ -305,6 +305,7 @@ const EmployeeFormPage = () => {
                                         <option value="staff">Staff</option>
                                         <option value="hod">HOD</option>
                                         <option value="principal">Principal</option>
+                                        <option value="management">Management</option>
                                         <option value="admin">Admin</option>
                                     </select>
                                 </div>
