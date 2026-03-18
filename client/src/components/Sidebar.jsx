@@ -53,7 +53,6 @@ const Sidebar = ({ userRole = 'staff', isOpen, onClose }) => {
       { label: 'Timetable Setup', path: '/admin/timetable-setup', icon: <FaCalendarAlt /> },
       { label: 'Security Logs', path: '/admin/activity-logs', icon: <FaShieldAlt /> },
       { label: 'Calendar', path: '/admin/calendar', icon: <FaCalendarDay /> },
-      { label: 'Biometric History', path: '/admin/biometric-history', icon: <FaFingerprint /> },
       { label: 'Purchase Requests', path: '/admin/purchase', icon: <FaShoppingBag /> },
     ],
     principal: [
