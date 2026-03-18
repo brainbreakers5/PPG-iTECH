@@ -80,14 +80,25 @@ exports.loginUser = async (req, res) => {
 // @route   POST /api/auth/management-login
 // @access  Public
 exports.managementLogin = async (req, res) => {
-    const { pin } = req.body;
-
-    if (pin !== '1234') {
-        return res.status(401).json({ message: 'Invalid management PIN' });
-    }
+    const { emp_id, pin } = req.body;
 
     try {
-        // Use the first admin user as the backing identity for API access
+        // Fetch management credentials from settings
+        const { rows: pinSetting } = await pool.query('SELECT value FROM app_settings WHERE key = \'management_pin\'');
+        const managementPin = pinSetting[0]?.value || '1234';
+
+        const { rows: idSetting } = await pool.query('SELECT value FROM app_settings WHERE key = \'management_emp_id\'');
+        const managementId = idSetting[0]?.value || 'Management';
+
+        if ((emp_id || '').toLowerCase().trim() !== (managementId || '').toLowerCase().trim()) {
+            return res.status(401).json({ message: 'Invalid management ID' });
+        }
+
+        if (pin !== managementPin) {
+            return res.status(401).json({ message: 'Invalid management PIN' });
+        }
+
+        // Use any admin user as the backing identity for API access
         const { rows } = await pool.query(
             "SELECT id FROM users WHERE role = 'admin' LIMIT 1"
         );
@@ -174,10 +185,15 @@ exports.updateProfile = async (req, res) => {
         mobile, whatsapp, email, blood_group, religion, nationality, caste, community,
         aadhar, pan, account_no, bank_name, branch, ifsc, pin_code,
         pf_number, uan_number, permanent_address, communication_address,
-        father_name, mother_name, marital_status, profile_pic, pin
+        father_name, mother_name, marital_status, profile_pic, pin, emp_id
     } = req.body;
 
     try {
+        if (emp_id) {
+            const { rows: existing } = await pool.query('SELECT id FROM users WHERE LOWER(emp_id) = LOWER($1) AND id != $2', [emp_id.trim(), req.user.id]);
+            if (existing.length > 0) return res.status(400).json({ message: 'Employee ID already taken' });
+        }
+
         let hashedPassword;
         if (pin) {
             hashedPassword = await bcrypt.hash(pin, 10);
@@ -192,7 +208,8 @@ exports.updateProfile = async (req, res) => {
                 permanent_address = $18, communication_address = $19,
                 father_name = $20, mother_name = $21, marital_status = $22,
                 profile_pic = COALESCE($23, profile_pic),
-                pin = COALESCE($24, pin), password = COALESCE($25, password)
+                pin = COALESCE($24, pin), password = COALESCE($25, password),
+                emp_id = COALESCE($27, emp_id)
             WHERE id = $26
             RETURNING id, emp_id, name, role, profile_pic, department_id
         `;
@@ -205,7 +222,7 @@ exports.updateProfile = async (req, res) => {
             permanent_address || null, communication_address || null,
             father_name || null, mother_name || null, marital_status || null,
             profile_pic || null, pin || null, hashedPassword || null,
-            req.user.id
+            req.user.id, emp_id || null
         ]);
 
         if (rows.length === 0) {
@@ -230,18 +247,69 @@ exports.checkEmployeeId = async (req, res) => {
     }
 
     try {
+        // First check for management account
+        const { rows: mgmtRows } = await pool.query('SELECT value FROM app_settings WHERE key = \'management_emp_id\'');
+        const managementId = mgmtRows[0]?.value || 'Management';
+        
+        if (emp_id.toLowerCase().trim() === managementId.toLowerCase().trim()) {
+            return res.json({ exists: true, name: 'Management', role: 'management', pin_length: 4 });
+        }
+
         const { rows } = await pool.query(
-            'SELECT id, name FROM users WHERE LOWER(emp_id) = LOWER($1)',
+            'SELECT id, name, pin, password FROM users WHERE LOWER(emp_id) = LOWER($1)',
             [emp_id.trim()]
         );
 
         if (rows.length > 0) {
-            res.json({ exists: true, name: rows[0].name });
+            const user = rows[0];
+            // If we have plain pin, use its length. If not, default to 4 but if its specifically configured, use that.
+            // For now, let's just return 4 or 6. We can try to guess or just return both? 
+            // Better to return the exact length if we can know it.
+            let pinLength = 4;
+            if (user.pin) {
+                pinLength = user.pin.trim().length;
+            } else {
+                // Determine if we should allow 6? 
+                // Let's just return 4 for now and let the frontend handle both if needed.
+                // Or better, return '4or6' to the frontend.
+                pinLength = '4or6';
+            }
+            res.json({ exists: true, name: user.name, pin_length: pinLength });
         } else {
             res.status(404).json({ exists: false, message: 'Employee ID not found' });
         }
     } catch (error) {
         console.error('Check ID Error:', error);
+        res.status(500).json({ message: 'Server Error' });
+    }
+};
+
+// @desc    Update management profile (only for management users)
+// @route   PUT /api/auth/management-profile
+// @access  Private (Management)
+exports.updateManagementProfile = async (req, res) => {
+    const { pin, emp_id } = req.body;
+    
+    try {
+        if (pin) {
+            await pool.query(`
+                INSERT INTO app_settings (key, value)
+                VALUES ($1, $2)
+                ON CONFLICT (key) DO UPDATE SET value = $2
+            `, ['management_pin', pin.trim()]);
+        }
+
+        if (emp_id) {
+            await pool.query(`
+                INSERT INTO app_settings (key, value)
+                VALUES ($1, $2)
+                ON CONFLICT (key) DO UPDATE SET value = $2
+            `, ['management_emp_id', emp_id.trim()]);
+        }
+
+        res.json({ message: 'Management profile updated successfully' });
+    } catch (error) {
+        console.error('Update Management Profile Error:', error);
         res.status(500).json({ message: 'Server Error' });
     }
 };
