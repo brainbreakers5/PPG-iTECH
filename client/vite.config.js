@@ -2,10 +2,57 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import fs from 'fs'
 import path from 'path'
+import { VitePWA } from 'vite-plugin-pwa'
 
 // https://vite.dev/config/
 export default defineConfig({
-  plugins: [react()],
+  plugins: [
+    react(),
+    VitePWA({
+      registerType: 'prompt',
+      manifestFilename: 'manifest.json',
+      includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'mask-icon.svg'],
+      manifest: {
+        name: 'PPG EMP HUB',
+        short_name: 'PPG HUB',
+        description: 'PPG Employee Management Hub',
+        theme_color: '#0ea5e9',
+        background_color: '#0ea5e9',
+        display: 'standalone',
+        start_url: '/',
+        icons: [
+          {
+            src: 'ppg-logo.png',
+            sizes: '192x192',
+            type: 'image/png'
+          },
+          {
+            src: 'ppg-logo.png',
+            sizes: '512x512',
+            type: 'image/png'
+          },
+          {
+            src: 'ppg-logo.png',
+            sizes: '512x512',
+            type: 'image/png',
+            purpose: 'any maskable'
+          }
+        ]
+      },
+      workbox: {
+        runtimeCaching: [
+          {
+            urlPattern: ({ url }) => url.pathname.includes('/api/'),
+            handler: 'NetworkOnly',
+          },
+          {
+            urlPattern: ({ url }) => !url.pathname.includes('/api/'),
+            handler: 'CacheFirst',
+          }
+        ]
+      }
+    })
+  ],
   server: {
     port: 5173,
     // Proxy /api calls to the HTTPS backend, ignoring self-signed cert errors
