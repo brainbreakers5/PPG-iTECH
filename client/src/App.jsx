@@ -98,15 +98,28 @@ const LoginRoute = () => {
 
 const AppContent = () => {
   const { user } = useAuth();
-  // Only show splash if the user has no stored session (first visit / logged out)
+
+  // Only show splash on first visit of each browser session, never on reopen
   const hasStoredSession =
     !!localStorage.getItem('token') ||
     localStorage.getItem('managementAccess') === 'true' ||
     sessionStorage.getItem('managementAccess') === 'true';
-  const [showSplash, setShowSplash] = useState(!hasStoredSession);
+
+  // splashShown persists for the current browser session (cleared on true tab close)
+  const splashAlreadyShown = sessionStorage.getItem('splashShown') === 'true';
+
+  // Skip splash if: already logged in OR splash was already shown this session
+  const [showSplash, setShowSplash] = useState(
+    !hasStoredSession && !splashAlreadyShown
+  );
+
+  const handleSplashFinish = () => {
+    sessionStorage.setItem('splashShown', 'true'); // mark so reopen skips it
+    setShowSplash(false);
+  };
 
   if (showSplash) {
-    return <Splash onFinish={() => setShowSplash(false)} />;
+    return <Splash onFinish={handleSplashFinish} />;
   }
 
   return (
