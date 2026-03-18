@@ -83,34 +83,25 @@ exports.managementLogin = async (req, res) => {
     const { emp_id, pin } = req.body;
 
     try {
-        // Fetch management credentials from settings
-        const { rows: pinSetting } = await pool.query('SELECT value FROM app_settings WHERE key = \'management_pin\'');
-        const managementPin = pinSetting[0]?.value || '1234';
+        const { rows: mgmtUsers } = await pool.query(
+            "SELECT id, name, pin, emp_id FROM users WHERE role = 'management' AND LOWER(emp_id) = LOWER($1)",
+            [(emp_id || '').trim()]
+        );
 
-        const { rows: idSetting } = await pool.query('SELECT value FROM app_settings WHERE key = \'management_emp_id\'');
-        const managementId = idSetting[0]?.value || 'Management';
-
-        if ((emp_id || '').toLowerCase().trim() !== (managementId || '').toLowerCase().trim()) {
+        if (mgmtUsers.length === 0) {
             return res.status(401).json({ message: 'Invalid management ID' });
         }
 
-        if (pin !== managementPin) {
+        const mgmt = mgmtUsers[0];
+
+        if (pin !== mgmt.pin) {
             return res.status(401).json({ message: 'Invalid management PIN' });
-        }
-
-        // Use any admin user as the backing identity for API access
-        const { rows } = await pool.query(
-            "SELECT id FROM users WHERE role = 'admin' LIMIT 1"
-        );
-
-        if (rows.length === 0) {
-            return res.status(500).json({ message: 'No admin user found for management access' });
         }
 
         res.json({
             role: 'management',
-            name: 'Management',
-            token: generateToken(rows[0].id),
+            name: mgmt.name,
+            token: generateToken(mgmt.id),
         });
     } catch (error) {
         console.error('Management Login Error:', error);
@@ -247,37 +238,29 @@ exports.checkEmployeeId = async (req, res) => {
     }
 
     try {
-        // First check for management account
-        const { rows: mgmtRows } = await pool.query('SELECT value FROM app_settings WHERE key = \'management_emp_id\'');
-        const managementId = mgmtRows[0]?.value || 'Management';
-        
-        if (emp_id.toLowerCase().trim() === managementId.toLowerCase().trim()) {
-            return res.json({ exists: true, name: 'Management', role: 'management', pin_length: 4 });
-        }
-
         const { rows } = await pool.query(
-            'SELECT id, name, pin, password FROM users WHERE LOWER(emp_id) = LOWER($1)',
+            'SELECT id, name, pin, password, role FROM users WHERE LOWER(emp_id) = LOWER($1)',
             [emp_id.trim()]
         );
 
         if (rows.length > 0) {
             const user = rows[0];
-            // If we have plain pin, use its length. If not, default to 4 but if its specifically configured, use that.
-            // For now, let's just return 4 or 6. We can try to guess or just return both? 
-            // Better to return the exact length if we can know it.
             let pinLength = 4;
             if (user.pin) {
                 pinLength = user.pin.trim().length;
             } else {
-                // Determine if we should allow 6? 
-                // Let's just return 4 for now and let the frontend handle both if needed.
-                // Or better, return '4or6' to the frontend.
                 pinLength = '4or6';
             }
-            res.json({ exists: true, name: user.name, pin_length: pinLength });
-        } else {
-            res.status(404).json({ exists: false, message: 'Employee ID not found' });
+
+            return res.json({ 
+                exists: true, 
+                name: user.name, 
+                role: user.role, 
+                pin_length: pinLength 
+            });
         }
+
+        res.json({ exists: false });
     } catch (error) {
         console.error('Check ID Error:', error);
         res.status(500).json({ message: 'Server Error' });
@@ -291,20 +274,28 @@ exports.updateManagementProfile = async (req, res) => {
     const { pin, emp_id } = req.body;
     
     try {
-        if (pin) {
-            await pool.query(`
-                INSERT INTO app_settings (key, value)
-                VALUES ($1, $2)
-                ON CONFLICT (key) DO UPDATE SET value = $2
-            `, ['management_pin', pin.trim()]);
+        // Find the management user ID
+        const { rows } = await pool.query("SELECT id FROM users WHERE role = 'management' LIMIT 1");
+        if (rows.length === 0) {
+            return res.status(404).json({ message: 'Management user not found' });
         }
+        const mgmtId = rows[0].id;
 
-        if (emp_id) {
-            await pool.query(`
-                INSERT INTO app_settings (key, value)
-                VALUES ($1, $2)
-                ON CONFLICT (key) DO UPDATE SET value = $2
-            `, ['management_emp_id', emp_id.trim()]);
+        if (pin && emp_id) {
+             await pool.query(
+                "UPDATE users SET pin = $1, emp_id = $2 WHERE id = $3",
+                [pin.trim(), emp_id.trim(), mgmtId]
+            );
+        } else if (pin) {
+            await pool.query(
+                "UPDATE users SET pin = $1 WHERE id = $3",
+                [pin.trim(), mgmtId]
+            );
+        } else if (emp_id) {
+            await pool.query(
+                "UPDATE users SET emp_id = $1 WHERE id = $3",
+                [emp_id.trim(), mgmtId]
+            );
         }
 
         res.json({ message: 'Management profile updated successfully' });
