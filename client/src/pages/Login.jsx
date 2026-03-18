@@ -37,6 +37,8 @@ const Login = () => {
     const [userName, setUserName] = useState('');
     const { login } = useAuth();
     const navigate = useNavigate();
+    const [userRole, setUserRole] = useState('');
+    const [expectedPinLength, setExpectedPinLength] = useState(4); // Default to 4
 
     const handleCheckId = async (e) => {
         if (e) e.preventDefault();
@@ -47,7 +49,9 @@ const Login = () => {
             const { data } = await api.post('/auth/check-id', { emp_id: empId.trim() });
             if (data.exists) {
                 setUserName(data.name);
+                setUserRole(data.role || '');
                 setStep('pin');
+                setExpectedPinLength(data.pin_length || 4);
             }
         } catch (error) {
             console.error('❌ Check ID error:', error);
@@ -66,10 +70,17 @@ const Login = () => {
         if (e) e.preventDefault();
         if (!pin.trim()) return;
 
+        // Validation for length
+        if (expectedPinLength === '4or6') {
+            if (pin.length !== 4 && pin.length !== 6) return;
+        } else if (pin.length < expectedPinLength) {
+            return;
+        }
+
         setLoading(true);
         try {
-            console.log('🔐 Attempting login with:', { emp_id: empId, pin: '***' });
-            const data = await login(empId.trim(), pin.trim());
+            console.log('🔐 Attempting login with:', { emp_id: empId, pin: '***', role: userRole });
+            const data = await login(empId.trim(), pin.trim(), userRole);
             console.log('✅ Login successful:', data);
             
             // Show success message
@@ -125,13 +136,41 @@ const Login = () => {
         }
     };
 
-    // Auto-submit pin when it reaches 4 digits (common PIN length)
-    // Or we can just let them press enter, but the user said "automatically open"
+    // Auto-submit pin when it reaches the expected length
     const handlePinChange = (e) => {
         const val = e.target.value;
-        setPin(val);
-        if (val.length === 4) {
+        const onlyNums = val.replace(/[^0-9]/g, '');
+        setPin(onlyNums);
+        
+        if (expectedPinLength === '4or6') {
+             if (onlyNums.length === 4 || onlyNums.length === 6) {
+                 // But wait... if they are typing 6, and I trigger at 4...
+                 // I should only trigger at 4 if it works? No, that's impossible.
+                 // The user specified "wait the pin 4digit or 6digit after automatically login".
+                 // This implies that if it's 4, it should login. If it's 6, it should login.
+                 // One way to do this is to call handleSubmit at 4, if it fails, don't show error, 
+                 // and keep waiting for 6.
+                 if (onlyNums.length === 4) {
+                     // Attempt silent login
+                     silentLogin(onlyNums);
+                 } else if (onlyNums.length === 6) {
+                     handleSubmit();
+                 }
+             }
+        } else if (onlyNums.length === Number(expectedPinLength)) {
             handleSubmit();
+        }
+    };
+
+    const silentLogin = async (p) => {
+        try {
+            await login(empId.trim(), p.trim());
+            // If it succeeds, call regular handleSubmit (it will show success etc)
+            handleSubmit();
+        } catch (err) {
+            // Silently fail at 4 digits if it's not the right PIN
+            // This allows the user to continue typing if their PIN is 6 digits
+            console.log('Silent login failed at 4 digits, waiting for more if any...');
         }
     };
 
@@ -257,10 +296,10 @@ const Login = () => {
                                         type="password"
                                         value={pin}
                                         onChange={handlePinChange}
-                                        placeholder="Enter 4-digit PIN"
+                                        placeholder={`Enter ${expectedPinLength === '4or6' ? '4/6' : expectedPinLength}-digit PIN`}
                                         required
                                         autoFocus
-                                        maxLength={4}
+                                        maxLength={6}
                                         className="w-full pl-11 pr-5 py-[14px] rounded-xl text-sm font-semibold text-gray-700 outline-none transition-all duration-200 placeholder:text-gray-300 placeholder:font-normal text-center tracking-[1em]"
                                         style={{ background: 'rgba(255,255,255,0.7)', border: '1.5px solid #e2e8f0' }}
                                     />
