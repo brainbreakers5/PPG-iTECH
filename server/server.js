@@ -17,6 +17,28 @@ const { pool, connectDB } = require('./config/db');
 // Connect to Database
 connectDB();
 
+// Initialize Database Records (Seeding)
+const initDB = async () => {
+    try {
+        const { rows } = await pool.query("SELECT id FROM users WHERE role = 'management' LIMIT 1");
+        if (rows.length === 0) {
+            console.log('--- Initializing Management User ---');
+            const bcrypt = require('bcryptjs');
+            const defaultPin = '1234';
+            const hashedPin = await bcrypt.hash(defaultPin, 10);
+            
+            await pool.query(
+                "INSERT INTO users (emp_id, name, role, pin, password) VALUES ($1, $2, $3, $4, $5)",
+                ['Management', 'Management', 'management', defaultPin, hashedPin]
+            );
+            console.log('--- Management User Created (ID: Management, PIN: 1234) ---');
+        }
+    } catch (err) {
+        console.error('Database Initialization Error:', err);
+    }
+};
+initDB();
+
 // Routes
 const authRoutes = require('./routes/authRoutes');
 const employeeRoutes = require('./routes/employeeRoutes');
