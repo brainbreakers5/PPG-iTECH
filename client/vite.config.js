@@ -40,19 +40,29 @@ export default defineConfig({
         ]
       },
       workbox: {
+        globPatterns: ['**/*.{js,css,html,png,jpg,jpeg,svg,woff2}'],
         runtimeCaching: [
           {
-            urlPattern: ({ url }) => url.pathname.includes('/api/'),
+            urlPattern: /^https:\/\/.*\/api\/.*/i,
             handler: 'NetworkOnly',
-          },
-          {
-            urlPattern: ({ url }) => !url.pathname.includes('/api/'),
-            handler: 'CacheFirst',
           }
-        ]
+        ],
+        cleanupOutdatedCaches: true,
+        clientsClaim: true,
+        skipWaiting: false, // Important for 'prompt' type
       }
     })
   ],
+  build: {
+    chunkSizeWarningLimit: 2000, // Increase limit for larger chunks
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          vendor: ['react', 'react-dom', 'react-router-dom', 'framer-motion'],
+        },
+      },
+    },
+  },
   server: {
     port: 5173,
     // Proxy /api calls to the HTTPS backend, ignoring self-signed cert errors
