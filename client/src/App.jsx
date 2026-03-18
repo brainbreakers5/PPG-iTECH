@@ -226,6 +226,7 @@ const AppContent = () => {
             <Route path="profile/:id" element={<ProfilePage />} />
             <Route path="notifications" element={<Notifications />} />
             <Route path="biometric-history" element={<BiometricHistory />} />
+            <Route path="calendar" element={<InstitutionalCalendar />} />
           </Routes>
         </ManagementRoute>
       } />
