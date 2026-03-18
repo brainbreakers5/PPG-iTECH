@@ -99,22 +99,10 @@ const LoginRoute = () => {
 const AppContent = () => {
   const { user } = useAuth();
 
-  // Only show splash on first visit of each browser session, never on reopen
-  const hasStoredSession =
-    !!localStorage.getItem('token') ||
-    localStorage.getItem('managementAccess') === 'true' ||
-    sessionStorage.getItem('managementAccess') === 'true';
-
-  // splashShown persists for the current browser session (cleared on true tab close)
-  const splashAlreadyShown = sessionStorage.getItem('splashShown') === 'true';
-
-  // Skip splash if: already logged in OR splash was already shown this session
-  const [showSplash, setShowSplash] = useState(
-    !hasStoredSession && !splashAlreadyShown
-  );
+  // Always show splash on every refresh
+  const [showSplash, setShowSplash] = useState(true);
 
   const handleSplashFinish = () => {
-    sessionStorage.setItem('splashShown', 'true'); // mark so reopen skips it
     setShowSplash(false);
   };
 
