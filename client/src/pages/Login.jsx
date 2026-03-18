@@ -33,11 +33,39 @@ const Login = () => {
     const [empId, setEmpId] = useState('');
     const [pin, setPin] = useState('');
     const [loading, setLoading] = useState(false);
+    const [step, setStep] = useState('id'); // 'id' or 'pin'
+    const [userName, setUserName] = useState('');
     const { login } = useAuth();
     const navigate = useNavigate();
 
+    const handleCheckId = async (e) => {
+        if (e) e.preventDefault();
+        if (!empId.trim()) return;
+
+        setLoading(true);
+        try {
+            const { data } = await api.post('/auth/check-id', { emp_id: empId.trim() });
+            if (data.exists) {
+                setUserName(data.name);
+                setStep('pin');
+            }
+        } catch (error) {
+            console.error('❌ Check ID error:', error);
+            Swal.fire({
+                icon: 'error',
+                title: 'Invalid ID',
+                text: error.response?.data?.message || 'Employee ID not found',
+                confirmButtonColor: '#2563eb'
+            });
+        } finally {
+            setLoading(false);
+        }
+    };
+
     const handleSubmit = async (e) => {
-        e.preventDefault();
+        if (e) e.preventDefault();
+        if (!pin.trim()) return;
+
         setLoading(true);
         try {
             console.log('🔐 Attempting login with:', { emp_id: empId, pin: '***' });
@@ -77,26 +105,13 @@ const Login = () => {
             
         } catch (error) {
             console.error('❌ Login error:', error);
-            console.error('Error details:', {
-                message: error.message,
-                response: error.response?.data,
-                status: error.response?.status,
-                url: error.config?.url
-            });
             setLoading(false);
             
-            // Determine error message
             let errorMessage = 'Invalid credentials';
-            if (error.message === 'Network Error') {
-                errorMessage = 'Network error - Please check your connection. Is the server running?';
-            } else if (error.response?.status === 401) {
-                errorMessage = 'Invalid Employee ID or PIN';
-            } else if (error.response?.status === 500) {
-                errorMessage = 'Server error - Please try again later';
+            if (error.response?.status === 401) {
+                errorMessage = 'Invalid Security PIN';
             } else if (error.response?.data?.message) {
                 errorMessage = error.response.data.message;
-            } else if (error.message) {
-                errorMessage = error.message;
             }
             
             Swal.fire({
@@ -105,6 +120,18 @@ const Login = () => {
                 text: errorMessage,
                 confirmButtonColor: '#2563eb'
             });
+            // Reset pin on failure
+            setPin('');
+        }
+    };
+
+    // Auto-submit pin when it reaches 4 digits (common PIN length)
+    // Or we can just let them press enter, but the user said "automatically open"
+    const handlePinChange = (e) => {
+        const val = e.target.value;
+        setPin(val);
+        if (val.length === 4) {
+            handleSubmit();
         }
     };
 
@@ -166,111 +193,100 @@ const Login = () => {
                 {/* Divider */}
                 <div className="flex items-center gap-3 mb-8">
                     <div className="h-px flex-1 bg-gradient-to-r from-transparent via-white/30 to-transparent" />
-                    <span className="text-[9px] font-black text-sky-300 uppercase tracking-widest">Sign In</span>
+                    <span className="text-[9px] font-black text-sky-300 uppercase tracking-widest">
+                        {step === 'id' ? 'Employee Verification' : 'Security Access'}
+                    </span>
                     <div className="h-px flex-1 bg-gradient-to-r from-transparent via-white/30 to-transparent" />
                 </div>
 
                 {/* Form */}
-                <form onSubmit={handleSubmit} className="space-y-5">
-
-                    {/* Employee ID */}
-                    <div className="space-y-1.5">
-                        <label className="text-[10px] font-black text-sky-200 uppercase tracking-widest block">
-                            Employee ID
-                        </label>
-                        <div className="relative group">
-                            <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                                <User
-                                    size={16}
-                                    className="text-gray-300 group-focus-within:text-blue-500 transition-colors duration-200"
+                <form onSubmit={step === 'id' ? handleCheckId : handleSubmit} className="space-y-5">
+                    
+                    {step === 'id' ? (
+                        <motion.div 
+                            initial={{ opacity: 0, x: -20 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            className="space-y-1.5"
+                        >
+                            <label className="text-[10px] font-black text-sky-200 uppercase tracking-widest block">
+                                Employee ID
+                            </label>
+                            <div className="relative group">
+                                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                                    <User
+                                        size={16}
+                                        className="text-gray-300 group-focus-within:text-blue-500 transition-colors duration-200"
+                                    />
+                                </div>
+                                <input
+                                    type="text"
+                                    value={empId}
+                                    onChange={(e) => setEmpId(e.target.value)}
+                                    placeholder="Enter your Employee ID"
+                                    required
+                                    autoFocus
+                                    className="w-full pl-11 pr-5 py-[14px] rounded-xl text-sm font-semibold text-gray-700 outline-none transition-all duration-200 placeholder:text-gray-300 placeholder:font-normal"
+                                    style={{ background: 'rgba(255,255,255,0.7)', border: '1.5px solid #e2e8f0' }}
                                 />
                             </div>
-                            <input
-                                type="text"
-                                value={empId}
-                                onChange={(e) => setEmpId(e.target.value)}
-                                placeholder="Enter your Employee ID"
-                                required
-                                className="w-full pl-11 pr-5 py-[14px] rounded-xl text-sm font-semibold text-gray-700 outline-none transition-all duration-200 placeholder:text-gray-300 placeholder:font-normal"
-                                style={{ background: 'rgba(255,255,255,0.7)', border: '1.5px solid #e2e8f0' }}
-                                onFocus={e => {
-                                    e.target.style.borderColor = '#2563eb';
-                                    e.target.style.boxShadow = '0 0 0 4px rgba(37,99,235,0.08)';
-                                    e.target.style.background = '#ffffff';
-                                }}
-                                onBlur={e => {
-                                    e.target.style.borderColor = '#e2e8f0';
-                                    e.target.style.boxShadow = 'none';
-                                    e.target.style.background = 'rgba(255,255,255,0.7)';
-                                }}
-                            />
-                        </div>
-                    </div>
-
-                    {/* Security PIN */}
-                    <div className="space-y-1.5">
-                        <label className="text-[10px] font-black text-sky-200 uppercase tracking-widest block">
-                            Security PIN
-                        </label>
-                        <div className="relative group">
-                            <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                                <Lock
-                                    size={16}
-                                    className="text-gray-300 group-focus-within:text-blue-500 transition-colors duration-200"
-                                />
+                            <p className="text-[9px] text-sky-300/70 italic text-center mt-2">Press Enter to continue</p>
+                        </motion.div>
+                    ) : (
+                        <motion.div 
+                            initial={{ opacity: 0, x: 20 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            className="space-y-4"
+                        >
+                            <div className="text-center">
+                                <p className="text-white/60 text-[10px] uppercase tracking-widest font-bold mb-1">Welcome back,</p>
+                                <p className="text-white text-lg font-black">{userName}</p>
                             </div>
-                            <input
-                                type="password"
-                                value={pin}
-                                onChange={(e) => setPin(e.target.value)}
-                                placeholder="Enter your Security PIN"
-                                required
-                                className="w-full pl-11 pr-5 py-[14px] rounded-xl text-sm font-semibold text-gray-700 outline-none transition-all duration-200 placeholder:text-gray-300 placeholder:font-normal"
-                                style={{ background: 'rgba(255,255,255,0.7)', border: '1.5px solid #e2e8f0' }}
-                                onFocus={e => {
-                                    e.target.style.borderColor = '#2563eb';
-                                    e.target.style.boxShadow = '0 0 0 4px rgba(37,99,235,0.08)';
-                                    e.target.style.background = '#ffffff';
-                                }}
-                                onBlur={e => {
-                                    e.target.style.borderColor = '#e2e8f0';
-                                    e.target.style.boxShadow = 'none';
-                                    e.target.style.background = 'rgba(255,255,255,0.7)';
-                                }}
-                            />
-                        </div>
-                    </div>
 
-                    {/* Login Button */}
-                    <motion.button
-                        type="submit"
-                        disabled={loading}
-                        whileHover={!loading ? { scale: 1.02, boxShadow: '0 16px 40px -8px rgba(37,99,235,0.45)' } : {}}
-                        whileTap={!loading ? { scale: 0.98 } : {}}
-                        className="w-full mt-2 flex items-center justify-center gap-3 py-4 rounded-xl text-white font-black text-xs tracking-widest uppercase transition-all duration-300 cursor-pointer"
-                        style={{
-                            background: loading
-                                ? '#94a3b8'
-                                : 'linear-gradient(135deg, #2563eb 0%, #0284c7 55%, #06b6d4 100%)',
-                            boxShadow: loading ? 'none' : '0 8px 24px -4px rgba(37,99,235,0.35)',
-                        }}
-                    >
-                        {loading ? (
-                            <>
-                                <span className="h-4 w-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                                <span>Authenticating...</span>
-                            </>
-                        ) : (
-                            <>
-                                <span>Sign In</span>
-                                <LogIn size={16} />
-                            </>
-                        )}
-                    </motion.button>
+                            <div className="space-y-1.5">
+                                <label className="text-[10px] font-black text-sky-200 uppercase tracking-widest block">
+                                    Security PIN
+                                </label>
+                                <div className="relative group">
+                                    <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                                        <Lock
+                                            size={16}
+                                            className="text-gray-300 group-focus-within:text-blue-500 transition-colors duration-200"
+                                        />
+                                    </div>
+                                    <input
+                                        type="password"
+                                        value={pin}
+                                        onChange={handlePinChange}
+                                        placeholder="Enter 4-digit PIN"
+                                        required
+                                        autoFocus
+                                        maxLength={4}
+                                        className="w-full pl-11 pr-5 py-[14px] rounded-xl text-sm font-semibold text-gray-700 outline-none transition-all duration-200 placeholder:text-gray-300 placeholder:font-normal text-center tracking-[1em]"
+                                        style={{ background: 'rgba(255,255,255,0.7)', border: '1.5px solid #e2e8f0' }}
+                                    />
+                                </div>
+                            </div>
+
+                            <button 
+                                type="button" 
+                                onClick={() => { setStep('id'); setPin(''); }}
+                                className="w-full text-[9px] font-black text-sky-400 hover:text-sky-300 uppercase tracking-widest"
+                            >
+                                Not you? Use another ID
+                            </button>
+                        </motion.div>
+                    )}
+
+                    {loading && (
+                        <div className="flex justify-center pt-2">
+                            <span className="h-5 w-5 border-2 border-sky-400/30 border-t-sky-400 rounded-full animate-spin" />
+                        </div>
+                    )}
                 </form>
 
                 {/* Management Access */}
-                <div className="mt-6 text-center">
+                <div className="mt-8 text-center">
+                    <div className="h-px w-12 bg-white/20 mx-auto mb-4" />
                     <motion.button
                         type="button"
                         whileHover={{ scale: 1.05 }}
@@ -327,7 +343,7 @@ const Login = () => {
                                 }
                             });
                         }}
-                        className="text-[10px] font-black text-orange-400 hover:text-orange-300 transition-colors uppercase tracking-[0.3em] cursor-pointer"
+                        className="text-[10px] font-black text-orange-400/60 hover:text-orange-400 transition-colors uppercase tracking-[0.3em] cursor-pointer"
                     >
                         MANAGEMENT
                     </motion.button>
@@ -339,7 +355,7 @@ const Login = () => {
                         href="https://zorvian-agency.vercel.app"
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-[9px] font-black text-white/50 hover:text-sky-300 transition-colors uppercase tracking-widest whitespace-nowrap"
+                        className="text-[9px] font-black text-white/30 hover:text-sky-300/50 transition-colors uppercase tracking-widest whitespace-nowrap"
                     >
                         Developed By ZORVIAN TECHNOLOGIES
                     </a>
