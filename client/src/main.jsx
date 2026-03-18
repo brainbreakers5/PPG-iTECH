@@ -9,15 +9,4 @@ createRoot(document.getElementById('root')).render(
   </StrictMode>,
 )
 
-// Register Service Worker for PWA install
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/service-worker.js')
-      .then(() => {
-        console.log('Service Worker registered')
-      })
-      .catch((error) => {
-        console.log('Service Worker registration failed:', error)
-      })
-  })
-}
+// Service Worker registration is now handled by vite-plugin-pwa in components/ReloadPrompt.jsx
