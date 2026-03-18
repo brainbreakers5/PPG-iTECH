@@ -5,6 +5,7 @@ import { SocketProvider } from './context/SocketContext';
 import Splash from './pages/Splash';
 import Login from './pages/Login';
 import InstallApp from "./components/InstallApp";
+import ReloadPrompt from "./components/ReloadPrompt";
 
 // Principal Pages
 import PrincipalDashboard from './pages/principal/Dashboard';
@@ -238,6 +239,7 @@ function App() {
     <Router>
 
       <InstallApp />
+      <ReloadPrompt />
 
       <AuthProvider>
         <SocketProvider>
