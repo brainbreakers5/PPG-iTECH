@@ -43,6 +43,7 @@ export const AuthProvider = ({ children }) => {
         localStorage.removeItem('lastRole');
         localStorage.removeItem('managementAccess');
         sessionStorage.removeItem('managementAccess');
+        sessionStorage.removeItem('splashShown'); // allow splash to show on next login
         setUser(null);
     };
 
