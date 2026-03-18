@@ -78,6 +78,7 @@ const Header = ({ toggleSidebar, sidebarOpen }) => {
             { label: 'Dashboard', path: '/management' },
             { label: 'Departments', path: '/management/departments' },
             { label: 'Salary Overview', path: '/management/payroll' },
+            { label: 'Calendar', path: '/management/calendar' },
         ],
     };
 
@@ -464,73 +465,75 @@ const Header = ({ toggleSidebar, sidebarOpen }) => {
                         )}
                     </div>
 
-                    <div className="relative" ref={notifRef}>
-                        <button
-                            onClick={() => setShowNotifs(!showNotifs)}
-                            className="text-gray-400 hover:text-sky-600 transition-all relative p-2.5 rounded-xl hover:bg-sky-50 shadow-sm border border-transparent hover:border-sky-100"
-                        >
-                            <FaBell className="text-lg" />
-                            {unreadCount > 0 && (
-                                <span className="absolute top-2 right-2 flex h-3 w-3">
-                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
-                                    <span className="relative inline-flex rounded-full h-3 w-3 bg-rose-500"></span>
-                                </span>
-                            )}
-                        </button>
+                    {!isManagement && (
+                        <div className="relative" ref={notifRef}>
+                            <button
+                                onClick={() => setShowNotifs(!showNotifs)}
+                                className="text-gray-400 hover:text-sky-600 transition-all relative p-2.5 rounded-xl hover:bg-sky-50 shadow-sm border border-transparent hover:border-sky-100"
+                            >
+                                <FaBell className="text-lg" />
+                                {unreadCount > 0 && (
+                                    <span className="absolute top-2 right-2 flex h-3 w-3">
+                                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
+                                        <span className="relative inline-flex rounded-full h-3 w-3 bg-rose-500"></span>
+                                    </span>
+                                )}
+                            </button>
 
-                        {/* Notification Dropdown */}
-                        {showNotifs && (
-                            <div className="absolute right-0 mt-4 w-80 bg-white/95 backdrop-blur-xl rounded-[32px] shadow-2xl border border-gray-100 overflow-hidden animate-slide-up ring-1 ring-black/5">
-                                <div className="p-6 border-b border-gray-50 flex justify-between items-center">
-                                    <h3 className="font-black text-gray-800 text-xs uppercase tracking-widest">Notifications</h3>
-                                    <button onClick={markAllRead} className="text-[9px] font-black text-sky-600 hover:text-sky-800 uppercase tracking-widest transition-colors">Clear All</button>
-                                </div>
-                                <div className="max-h-[400px] overflow-y-auto custom-scrollbar">
-                                    {notifications.length > 0 ? (
-                                        notifications.map(n => (
-                                            <div
-                                                key={n.id}
-                                                onClick={() => handleNotificationClick(n)}
-                                                className={`p-5 hover:bg-sky-50/30 cursor-pointer transition-all border-b border-gray-50/50 flex items-start gap-4 ${!n.is_read ? 'bg-sky-50/10' : ''}`}
-                                            >
-                                                <div className="mt-1">
-                                                    {n.type === 'leave' ? <FaCalendarCheck className="text-sky-500" size={14} /> :
-                                                        n.type === 'permission' ? <FaFileAlt className="text-teal-500" size={14} /> :
-                                                            n.type === 'purchase' ? <FaBuilding className="text-purple-500" size={14} /> :
-                                                                n.type === 'birthday' ? <FaBirthdayCake className="text-pink-500" size={14} /> :
-                                                                    n.type === 'conversation' ? <FaInfoCircle className="text-blue-500" size={14} /> :
-                                                                        <FaInfoCircle className="text-sky-500" size={14} />}
+                            {/* Notification Dropdown */}
+                            {showNotifs && (
+                                <div className="absolute right-0 mt-4 w-80 bg-white/95 backdrop-blur-xl rounded-[32px] shadow-2xl border border-gray-100 overflow-hidden animate-slide-up ring-1 ring-black/5">
+                                    <div className="p-6 border-b border-gray-50 flex justify-between items-center">
+                                        <h3 className="font-black text-gray-800 text-xs uppercase tracking-widest">Notifications</h3>
+                                        <button onClick={markAllRead} className="text-[9px] font-black text-sky-600 hover:text-sky-800 uppercase tracking-widest transition-colors">Clear All</button>
+                                    </div>
+                                    <div className="max-h-[400px] overflow-y-auto custom-scrollbar">
+                                        {notifications.length > 0 ? (
+                                            notifications.map(n => (
+                                                <div
+                                                    key={n.id}
+                                                    onClick={() => handleNotificationClick(n)}
+                                                    className={`p-5 hover:bg-sky-50/30 cursor-pointer transition-all border-b border-gray-50/50 flex items-start gap-4 ${!n.is_read ? 'bg-sky-50/10' : ''}`}
+                                                >
+                                                    <div className="mt-1">
+                                                        {n.type === 'leave' ? <FaCalendarCheck className="text-sky-500" size={14} /> :
+                                                            n.type === 'permission' ? <FaFileAlt className="text-teal-500" size={14} /> :
+                                                                n.type === 'purchase' ? <FaBuilding className="text-purple-500" size={14} /> :
+                                                                    n.type === 'birthday' ? <FaBirthdayCake className="text-pink-500" size={14} /> :
+                                                                        n.type === 'conversation' ? <FaInfoCircle className="text-blue-500" size={14} /> :
+                                                                            <FaInfoCircle className="text-sky-500" size={14} />}
+                                                    </div>
+                                                    <div className="flex-1">
+                                                        {/* Removed title as per request */}
+
+                                                        <p className="text-[10px] text-gray-500 leading-relaxed mt-1">{n.message}</p>
+                                                        {/* Removed timestamp as per request */}
+
+                                                    </div>
                                                 </div>
-                                                <div className="flex-1">
-                                                     {/* Removed title as per request */}
-
-                                                    <p className="text-[10px] text-gray-500 leading-relaxed mt-1">{n.message}</p>
-                                                     {/* Removed timestamp as per request */}
-
-                                                </div>
+                                            ))
+                                        ) : (
+                                            <div className="py-12 text-center">
+                                                <p className="text-[10px] font-black text-gray-300 uppercase tracking-widest italic">All clear</p>
                                             </div>
-                                        ))
-                                    ) : (
-                                        <div className="py-12 text-center">
-                                            <p className="text-[10px] font-black text-gray-300 uppercase tracking-widest italic">All clear</p>
-                                        </div>
-                                    )}
+                                        )}
+                                    </div>
+                                    <div className="p-4 bg-gray-50/50 border-t border-gray-50 text-center">
+                                        <button
+                                            onClick={() => {
+                                                navigate(`/${effectiveRole}/notifications`);
+                                                setShowNotifs(false);
+                                            }}
+                                            className="text-[10px] font-black text-sky-600 hover:text-sky-800 uppercase tracking-widest transition-colors flex items-center justify-center gap-2 mx-auto"
+                                        >
+                                            View All Notifications
+                                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M9 5l7 7-7 7"></path></svg>
+                                        </button>
+                                    </div>
                                 </div>
-                                <div className="p-4 bg-gray-50/50 border-t border-gray-50 text-center">
-                                    <button 
-                                        onClick={() => {
-                                            navigate(`/${effectiveRole}/notifications`);
-                                            setShowNotifs(false);
-                                        }}
-                                        className="text-[10px] font-black text-sky-600 hover:text-sky-800 uppercase tracking-widest transition-colors flex items-center justify-center gap-2 mx-auto"
-                                    >
-                                        View All Notifications
-                                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M9 5l7 7-7 7"></path></svg>
-                                    </button>
-                                </div>
-                            </div>
-                        )}
-                    </div>
+                            )}
+                        </div>
+                    )}
 
                     <div
                         className="flex items-center space-x-3 cursor-pointer hover:bg-gray-50 transition-all px-2 py-1 rounded-2xl group"
