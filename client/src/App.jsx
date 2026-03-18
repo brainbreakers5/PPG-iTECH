@@ -4,8 +4,8 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import { SocketProvider } from './context/SocketContext';
 import Splash from './pages/Splash';
 import Login from './pages/Login';
-import InstallApp from "./components/InstallApp";
-import ReloadPrompt from "./components/ReloadPrompt";
+import InstallApp from './components/InstallApp.jsx';
+import ReloadPrompt from './components/ReloadPrompt.jsx';
 
 // Principal Pages
 import PrincipalDashboard from './pages/principal/Dashboard';
