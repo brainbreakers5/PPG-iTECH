@@ -11,7 +11,7 @@ export default defineConfig({
     VitePWA({
       registerType: 'prompt',
       manifestFilename: 'manifest.json',
-      includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'mask-icon.svg'],
+      includeAssets: ['ppg-logo.png', 'ppg-bg.jpg', 'ppg-splash.mp4'],
       manifest: {
         name: 'PPG EMP HUB',
         short_name: 'PPG HUB',
@@ -22,17 +22,17 @@ export default defineConfig({
         start_url: '/',
         icons: [
           {
-            src: 'ppg-logo.png',
+            src: '/ppg-logo.png',
             sizes: '192x192',
             type: 'image/png'
           },
           {
-            src: 'ppg-logo.png',
+            src: '/ppg-logo.png',
             sizes: '512x512',
             type: 'image/png'
           },
           {
-            src: 'ppg-logo.png',
+            src: '/ppg-logo.png',
             sizes: '512x512',
             type: 'image/png',
             purpose: 'any maskable'
