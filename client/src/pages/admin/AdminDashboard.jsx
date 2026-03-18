@@ -206,54 +206,6 @@ const AdminDashboard = () => {
 
 
 
-    const handleUpdateManagementPin = async () => {
-        const { value: pin } = await Swal.fire({
-            title: 'Update Management PIN',
-            icon: 'lock',
-            input: 'password',
-            inputLabel: 'Enter New 4-digit PIN',
-            inputPlaceholder: 'Enter new PIN',
-            inputAttributes: {
-                maxlength: 4,
-                autocapitalize: 'off',
-                autocorrect: 'off'
-            },
-            showCancelButton: true,
-            confirmButtonColor: '#0EA5E9',
-            cancelButtonColor: '#64748b',
-            background: '#fff',
-            customClass: {
-                popup: 'rounded-3xl',
-                title: 'font-black text-gray-800',
-                input: 'rounded-2xl font-black tracking-[0.5em] text-center'
-            },
-            inputValidator: (value) => {
-                if (!value) return 'You need to write something!';
-                if (value.length < 4) return 'PIN must be 4 digits!';
-                if (!/^\d+$/.test(value)) return 'PIN must be numeric!';
-            }
-        });
-
-        if (pin) {
-            try {
-                await api.put('/auth/management-profile', { pin });
-                Swal.fire({
-                    icon: 'success',
-                    title: 'Updated!',
-                    text: 'Management PIN has been successfully updated.',
-                    timer: 2000,
-                    showConfirmButton: false
-                });
-            } catch (error) {
-                Swal.fire({
-                    icon: 'error',
-                    title: 'Update Failed',
-                    text: error.response?.data?.message || 'Failed to update management PIN',
-                    confirmButtonColor: '#0EA5E9'
-                });
-            }
-        }
-    };
 
     return (
         <Layout>
@@ -267,13 +219,6 @@ const AdminDashboard = () => {
                     </div>
 
                     <div className="flex items-center gap-6">
-                        <button
-                            onClick={handleUpdateManagementPin}
-                            className="bg-indigo-600/10 text-indigo-600 px-6 py-3 rounded-2xl border border-indigo-100 flex items-center gap-3 font-black uppercase tracking-widest text-[10px] hover:bg-indigo-600 hover:text-white transition-all group"
-                        >
-                            <FaBriefcase className="group-hover:rotate-12 transition-transform" />
-                            Update Management PIN
-                        </button>
                         {birthdays.length > 0 && (
                             <motion.div
                                 whileHover={{ scale: 1.05 }}
