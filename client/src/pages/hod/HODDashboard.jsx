@@ -200,10 +200,17 @@ const HODDashboard = () => {
     }, [socket, fetchDashboardData]);
 
     const hodList = allEmployees.filter(e => (e.role || '').toLowerCase() === 'hod');
-    const staffList = allEmployees.filter(e => (e.role || '').toLowerCase() === 'staff');
+    const staffList = allEmployees.filter(e => (e.role || '').toLowerCase() === 'staff' && String(e.department_id) === String(user.department_id));
 
     const getFilteredEmployees = (roleKey, statusLabel) => {
-        const roleEmps = allEmployees.filter(e => (e.role || '').toLowerCase() === roleKey);
+        // Only return employees matching the role AND (if staff) in the correct department
+        const roleEmps = allEmployees.filter(e => {
+            const r = (e.role || '').toLowerCase();
+            if (r !== roleKey) return false;
+            if (r === 'staff') return String(e.department_id) === String(user.department_id);
+            return true;
+        });
+
         return roleEmps.filter(emp => {
             const rec = attendanceMap[emp.emp_id] || {};
             const s = rec.status || '';
