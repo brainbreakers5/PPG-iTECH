@@ -252,6 +252,7 @@ const EmployeeManagement = () => {
                             >
                                 <option value="">Global Roles</option>
                                 <option value="admin">Executive (Admin)</option>
+                                <option value="management">Directorship (Management)</option>
                                 <option value="principal">Management (Principal)</option>
                                 <option value="hod">Supervisory (HOD)</option>
                                 <option value="staff">Operations (Staff)</option>
