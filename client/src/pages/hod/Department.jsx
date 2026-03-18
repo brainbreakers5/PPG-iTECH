@@ -109,6 +109,9 @@ const Department = () => {
                         {deptInfo?.code && (
                             <span className="px-2 py-1 bg-sky-50 border border-sky-100 rounded-lg text-[9px] font-black text-sky-600 tracking-widest">{deptInfo.code}</span>
                         )}
+                        <span className="px-2 py-1 bg-gray-50 border border-gray-100 rounded-lg text-[9px] font-black text-gray-500 tracking-widest uppercase shadow-sm">
+                            Total Staff: {staff.length}
+                        </span>
                     </div>
                 </div>
                 <button
@@ -121,82 +124,104 @@ const Department = () => {
                 </button>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                {staff.map((member, idx) => (
-                    <motion.div
-                        key={member.id}
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: idx * 0.1 }}
-                        className="modern-card group relative overflow-hidden"
-                    >
-                        <div className="absolute top-0 left-0 w-full h-2 bg-sky-600"></div>
-                        <div className="flex flex-col items-center p-2">
-                            <div className="relative mb-6">
-                                <div className="h-24 w-24 rounded-3xl overflow-hidden border-4 border-white shadow-xl group-hover:scale-105 transition-transform">
-                                    <img
-                                        src={member.profile_pic || `https://ui-avatars.com/api/?name=${member.name}&background=3b82f6&color=fff&bold=true`}
-                                        alt={member.name}
-                                        className="w-full h-full object-cover"
-                                    />
-                                </div>
-                                <div className="absolute -bottom-2 -right-2 h-8 w-8 bg-sky-600 rounded-xl flex items-center justify-center text-white shadow-lg">
-                                    <FaUserTie size={14} />
-                                </div>
-                            </div>
+            <div className="bg-white rounded-[32px] border border-gray-100 shadow-sm overflow-hidden">
+                <div className="overflow-x-auto custom-scrollbar">
+                    <table className="w-full text-left border-collapse">
+                        <thead>
+                            <tr className="bg-gray-50/50">
+                                <th className="p-6 text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-100 text-center">Profile</th>
+                                <th className="p-6 text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-100">Emp ID</th>
+                                <th className="p-6 text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-100">Name & Designation</th>
+                                <th className="p-6 text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-100">Contact Info</th>
+                                <th className="p-6 text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-100 text-center">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100/50">
+                            {staff.map((member, idx) => (
+                                <motion.tr 
+                                    key={member.id || member.emp_id || idx}
+                                    initial={{ opacity: 0, y: 10 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    transition={{ delay: idx * 0.05 }}
+                                    className="hover:bg-sky-50/30 transition-all group"
+                                >
+                                    <td className="p-5 w-24">
+                                        <div className="h-14 w-14 rounded-2xl mx-auto overflow-hidden border-2 border-white shadow-md group-hover:scale-110 transition-transform">
+                                            <img
+                                                src={member.profile_pic || `https://ui-avatars.com/api/?name=${encodeURIComponent(member.name)}&background=3b82f6&color=fff&bold=true`}
+                                                alt={member.name}
+                                                className="w-full h-full object-cover"
+                                            />
+                                        </div>
+                                    </td>
+                                    <td className="p-5">
+                                        <span className="text-xs font-black text-sky-600 bg-sky-100 px-3 py-1.5 rounded-xl shadow-sm border border-sky-100">{member.emp_id}</span>
+                                    </td>
+                                    <td className="p-5">
+                                        <div className="flex flex-col">
+                                            <span className="text-base font-black text-gray-800 tracking-tight">{member.name}</span>
+                                            <div className="flex flex-wrap items-center gap-2 mt-1">
+                                                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{member.designation}</span>
+                                                {member.role === 'hod' && (
+                                                    <span className="text-[8px] font-black text-fuchsia-600 bg-fuchsia-50 px-2 py-0.5 rounded-lg border border-fuchsia-100 uppercase tracking-widest">HOD</span>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td className="p-5">
+                                        <div className="flex flex-col gap-2">
+                                            <div className="flex items-center gap-3 text-xs text-gray-500 font-bold tracking-tight">
+                                                <div className="h-6 w-6 rounded-lg bg-sky-50 flex items-center justify-center text-sky-500">
+                                                    <FaEnvelope size={10} />
+                                                </div>
+                                                <span className="truncate">{member.email || 'N/A'}</span>
+                                            </div>
+                                            <div className="flex items-center gap-3 text-xs text-gray-500 font-bold tracking-tight">
+                                                <div className="h-6 w-6 rounded-lg bg-emerald-50 flex items-center justify-center text-emerald-500">
+                                                    <FaPhone size={10} />
+                                                </div>
+                                                <span>{member.mobile || 'N/A'}</span>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td className="p-5">
+                                        <div className="flex items-center justify-center gap-3">
+                                            <button
+                                                onClick={() => {
+                                                    navigate(`/hod/profile/${member.emp_id}`);
+                                                    window.dispatchEvent(new CustomEvent('closeSidebar'));
+                                                }}
+                                                className="h-12 w-12 bg-white text-sky-600 rounded-xl border border-gray-100 flex items-center justify-center hover:bg-sky-600 hover:text-white transition-all shadow-sm active:scale-90"
+                                                title="View Profile"
+                                            >
+                                                <FaEye size={16} />
+                                            </button>
+                                            <button
+                                                onClick={() => {
+                                                    navigate(`/hod/timetable/${member.emp_id}`);
+                                                    window.dispatchEvent(new CustomEvent('closeSidebar'));
+                                                }}
+                                                className="h-12 w-12 bg-white text-gray-500 rounded-xl border border-gray-100 flex items-center justify-center hover:bg-gray-800 hover:text-white transition-all shadow-sm active:scale-90"
+                                                title="View Timetable"
+                                            >
+                                                <FaCalendarAlt size={16} />
+                                            </button>
+                                        </div>
+                                    </td>
+                                </motion.tr>
+                            ))}
 
-                            <div className="text-center w-full">
-                                <h3 className="text-xl font-black text-gray-800 tracking-tight">{member.name}</h3>
-                                <p className="text-[10px] font-black text-sky-500 uppercase tracking-widest mt-1 mb-4">{member.designation}</p>
-
-                                <div className="space-y-3 mb-6 bg-gray-50/50 p-4 rounded-2xl border border-gray-100">
-                                    <div className="flex items-center gap-3 text-gray-500 text-xs">
-                                        <FaIdBadge className="text-sky-400" />
-                                        <span className="font-bold">{member.emp_id}</span>
-                                    </div>
-                                    <div className="flex items-center gap-3 text-gray-500 text-xs text-left truncate">
-                                        <FaEnvelope className="text-sky-400" />
-                                        <span className="font-medium truncate">{member.email}</span>
-                                    </div>
-                                    <div className="flex items-center gap-3 text-gray-500 text-xs">
-                                        <FaPhone className="text-sky-400" />
-                                        <span className="font-medium">{member.mobile}</span>
-                                    </div>
-                                </div>
-
-                                <div className="grid grid-cols-2 gap-3">
-                                    <button
-                                        onClick={() => {
-                                            navigate(`/hod/profile/${member.emp_id}`);
-                                            window.dispatchEvent(new CustomEvent('closeSidebar'));
-                                        }}
-                                        className="flex items-center justify-center gap-2 py-3 px-4 bg-sky-50 text-sky-600 rounded-xl font-black uppercase tracking-widest text-[9px] hover:bg-sky-600 hover:text-white transition-all shadow-sm"
-                                    >
-                                        <FaEye size={12} /> View Profile
-                                    </button>
-                                    <button
-                                        onClick={() => {
-                                            navigate(`/hod/timetable/${member.emp_id}`);
-                                            window.dispatchEvent(new CustomEvent('closeSidebar'));
-                                        }}
-                                        className="flex items-center justify-center gap-2 py-3 px-4 bg-gray-100 text-gray-600 rounded-xl font-black uppercase tracking-widest text-[9px] hover:bg-gray-800 hover:text-white transition-all shadow-sm"
-                                    >
-                                        <FaCalendarAlt size={12} /> Timetable
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    </motion.div>
-                ))}
-
-                {staff.length === 0 && (
-                    <div className="col-span-full text-center py-20 bg-white rounded-3xl border border-dashed border-gray-200 shadow-sm">
-                        <div className="flex flex-col items-center gap-4 text-gray-300">
-                            <FaUserTie size={48} className="opacity-20" />
-                            <p className="font-bold italic">No staff found in your department.</p>
-                        </div>
-                    </div>
-                )}
+                            {staff.length === 0 && (
+                                <tr>
+                                    <td colSpan="5" className="p-16 text-center text-gray-400">
+                                        <FaUserTie size={48} className="mx-auto mb-4 opacity-20" />
+                                        <div className="font-black text-sm uppercase tracking-widest text-gray-400">No staff found in your department.</div>
+                                    </td>
+                                </tr>
+                            )}
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </Layout>
     );
