@@ -30,8 +30,17 @@ export const AuthProvider = ({ children }) => {
         checkUser();
     }, []);
 
-    const login = async (emp_id, pin) => {
-        const { data } = await api.post('/auth/login', { emp_id, pin });
+    const login = async (emp_id, pin, role = '') => {
+        let response;
+        if (role === 'management') {
+            response = await api.post('/auth/management-login', { emp_id, pin });
+            localStorage.setItem('managementAccess', 'true');
+        } else {
+            response = await api.post('/auth/login', { emp_id, pin });
+            localStorage.removeItem('managementAccess');
+        }
+        
+        const { data } = response;
         localStorage.setItem('token', data.token);
         localStorage.setItem('lastRole', data.role);
         setUser(data);
