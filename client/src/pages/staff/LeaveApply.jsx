@@ -57,6 +57,7 @@ const LeaveApply = () => {
     const [staffSearch, setStaffSearch] = useState('');
     const [conflicts, setConflicts] = useState([]);
     const [showStaffPicker, setShowStaffPicker] = useState(null); // { type: 'leave' | 'permission', index?: number }
+    const [manageReplacements, setManageReplacements] = useState(null); // idx of the date in currentDate or formData.dates? Let's use it for the one being added.
 
     // Helper function to get full leave type name
     const getLeaveTypeName = (type) => {
@@ -669,158 +670,94 @@ const LeaveApply = () => {
                                 </div>
                                 <div>
                                     <h2 className="text-xl font-black text-gray-800 tracking-tight">Apply for Leave</h2>
-                                    <p className="text-xs text-gray-400 font-bold uppercase tracking-widest mt-1">Submit your leave request</p>
+                                    <p className="text-xs text-gray-400 font-bold uppercase tracking-widest mt-1">Submit your leave request details below</p>
                                 </div>
                             </div>
 
                             <form onSubmit={handleSubmit} className="space-y-8">
-                                {/* Date-by-Date Selector */}
-                                <div className="bg-gradient-to-br from-sky-50/80 to-blue-50/50 p-8 rounded-[32px] border border-sky-100/50 relative overflow-hidden">
-                                    <div className="absolute top-0 right-0 w-32 h-32 bg-sky-200/20 rounded-full blur-3xl"></div>
-                                    <div className="flex items-center gap-4 mb-6">
-                                        <div className="h-10 w-10 rounded-xl bg-white flex items-center justify-center text-sky-600 shadow-sm border border-sky-100">
-                                            <FaCalendarDay size={18} />
+                                {/* Date Selection Section */}
+                                <div className="space-y-6">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                        <div>
+                                            <label className="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-3 ml-1">Select Date *</label>
+                                            <input
+                                                type="date"
+                                                value={currentDate.date}
+                                                onChange={(e) => handleCurrentDateChange('date', e.target.value)}
+                                                className="w-full px-6 py-5 bg-gray-50 border-2 border-gray-100 rounded-3xl font-bold text-sm text-gray-800 focus:ring-8 focus:ring-sky-50 focus:border-sky-500 transition-all outline-none shadow-sm"
+                                            />
                                         </div>
                                         <div>
-                                            <h3 className="text-base font-black text-gray-800 tracking-tight uppercase">Add Leave Dates</h3>
-                                            <p className="text-[9px] font-black text-sky-500 uppercase tracking-widest mt-0.5">Configure each date individually</p>
-                                        </div>
-                                    </div>
-
-                                    {/* Current Date Entry Form */}
-                                    <div className="bg-white/80 backdrop-blur p-6 rounded-2xl border border-white shadow-sm mb-6">
-                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-                                            <div>
-                                                <label className={labelClass}>Select Date *</label>
-                                                <input
-                                                    type="date"
-                                                    value={currentDate.date}
-                                                    onChange={(e) => handleCurrentDateChange('date', e.target.value)}
-                                                    className={inputClass}
-                                                />
-                                            </div>
-                                            <div className="md:col-span-2">
-                                                <label className={labelClass}>Leave Option *</label>
-                                                <div className="flex gap-4 mt-2 bg-white/50 p-2 rounded-2xl border border-gray-100">
-                                                    {['Full Day', 'Half Day AM', 'Half Day PM'].map(type => (
-                                                        <button
-                                                            key={type}
-                                                            type="button"
-                                                            onClick={() => handleCurrentDateChange('day_type', type)}
-                                                            className={`flex-1 py-3 px-4 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
-                                                                currentDate.day_type === type 
-                                                                ? 'bg-sky-600 text-white shadow-lg' 
-                                                                : 'bg-white text-gray-400 hover:bg-gray-50'
-                                                            }`}
-                                                        >
-                                                            {type}
-                                                        </button>
-                                                    ))}
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                        {/* Replacement Staff for Current Date */}
-                                        <div className="bg-blue-50/50 p-6 rounded-2xl border border-blue-100/50">
-                                            <div className="flex items-center justify-between mb-4">
-                                                <div className="flex items-center gap-3">
-                                                    <div className="h-8 w-8 rounded-lg bg-white flex items-center justify-center text-blue-600 shadow-sm border border-blue-100">
-                                                        <FaUserFriends size={14} />
-                                                    </div>
-                                                    <h4 className="text-xs font-black text-gray-800 tracking-tight uppercase">Replacement Staff for this Date</h4>
-                                                </div>
-                                                {currentDate.replacements.length < 5 && (
+                                            <label className="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-3 ml-1">Day Configuration *</label>
+                                            <div className="flex gap-3 p-2 bg-gray-50 border-2 border-gray-100 rounded-[28px]">
+                                                {['Full Day', 'Half Day AM', 'Half Day PM'].map(type => (
                                                     <button
+                                                        key={type}
                                                         type="button"
-                                                        onClick={addReplacementToCurrentDate}
-                                                        className="px-3 py-2 bg-blue-600 text-white rounded-lg text-[9px] font-black uppercase tracking-widest hover:bg-blue-700 transition-all active:scale-95 shadow-sm flex items-center gap-2"
+                                                        onClick={() => handleCurrentDateChange('day_type', type)}
+                                                        className={`flex-1 py-4 px-2 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all ${
+                                                            currentDate.day_type === type 
+                                                            ? 'bg-sky-600 text-white shadow-lg shadow-sky-100' 
+                                                            : 'text-gray-400 hover:text-gray-600 hover:bg-white/50'
+                                                        }`}
                                                     >
-                                                        <FaPlusCircle size={10} /> Add More
+                                                        {type}
                                                     </button>
-                                                )}
-                                            </div>
-
-                                            <div className="space-y-4">
-                                                {currentDate.replacements.map((rep, idx) => {
-                                                    const member = staffList.find(s => s.emp_id === rep.staff_id);
-                                                    return (
-                                                        <div key={idx} className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm transition-all hover:border-sky-200">
-                                                            {!rep.staff_id ? (
-                                                                <button
-                                                                    type="button"
-                                                                    onClick={() => setShowStaffPicker({ type: 'leave', index: idx })}
-                                                                    className="w-full py-6 border-2 border-dashed border-gray-100 rounded-xl text-gray-400 font-black text-[10px] uppercase tracking-[0.2em] hover:border-sky-300 hover:text-sky-600 hover:bg-sky-50/30 transition-all flex flex-col items-center justify-center gap-3 active:scale-[0.98]"
-                                                                >
-                                                                    <div className="h-10 w-10 rounded-full bg-gray-50 flex items-center justify-center text-gray-300">
-                                                                        <FaPlusCircle size={20} />
-                                                                    </div>
-                                                                    Select Alternative Staff
-                                                                </button>
-                                                            ) : (
-                                                                <div className="space-y-5">
-                                                                    <div className="flex items-center gap-4">
-                                                                        <div className="h-14 w-14 rounded-2xl overflow-hidden border-2 border-sky-50 shadow-md shrink-0">
-                                                                            <img
-                                                                                src={member?.profile_pic || `https://ui-avatars.com/api/?name=${encodeURIComponent(member?.name || 'User')}&background=3b82f6&color=fff&bold=true`}
-                                                                                alt=""
-                                                                                className="w-full h-full object-cover"
-                                                                            />
-                                                                        </div>
-                                                                        <div className="flex-1 min-w-0">
-                                                                            <p className="text-sm font-black text-gray-800 tracking-tight truncate">{member?.name || 'Unknown'}</p>
-                                                                            <p className="text-[9px] font-black text-sky-500 uppercase tracking-widest truncate mt-0.5">
-                                                                                {member?.designation || 'Staff'} • <span className="text-gray-400">{member?.department_name || 'N/A'}</span>
-                                                                            </p>
-                                                                        </div>
-                                                                        <div className="flex gap-2">
-                                                                            <button
-                                                                                type="button"
-                                                                                onClick={() => setShowStaffPicker({ type: 'leave', index: idx })}
-                                                                                className="h-9 w-9 rounded-xl bg-sky-50 text-sky-600 hover:bg-sky-600 hover:text-white transition-all flex items-center justify-center active:scale-95 shadow-sm"
-                                                                                title="Change Staff"
-                                                                            >
-                                                                                <FaExchangeAlt size={12} />
-                                                                            </button>
-                                                                            <button
-                                                                                type="button"
-                                                                                onClick={() => removeReplacementFromCurrentDate(idx)}
-                                                                                className="h-9 w-9 rounded-xl bg-rose-50 text-rose-400 hover:bg-rose-500 hover:text-white transition-all flex items-center justify-center active:scale-95 shadow-sm"
-                                                                                title="Remove"
-                                                                            >
-                                                                                <FaTimes size={12} />
-                                                                            </button>
-                                                                        </div>
-                                                                    </div>
-                                                                    <div className="relative group">
-                                                                        <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300 group-focus-within:text-sky-400 transition-colors">
-                                                                            <FaClock size={12} />
-                                                                        </div>
-                                                                        <input
-                                                                            placeholder="Mention Periods (e.g. 1, 2, 5)"
-                                                                            value={rep.periods}
-                                                                            onChange={(e) => handleCurrentReplacementChange(idx, 'periods', e.target.value)}
-                                                                            required={!!rep.staff_id}
-                                                                            className="w-full bg-gray-50 border border-gray-100 rounded-xl py-3.5 pl-10 pr-4 outline-none focus:ring-4 focus:ring-sky-100 focus:border-sky-400 transition-all font-bold text-gray-700 text-[11px]"
-                                                                        />
-                                                                    </div>
-                                                                </div>
-                                                            )}
-                                                        </div>
-                                                    );
-                                                })}
+                                                ))}
                                             </div>
                                         </div>
-
-                                        {/* Add Date Button */}
-                                        <button
-                                            type="button"
-                                            onClick={addDateToForm}
-                                            className="w-full mt-6 bg-sky-600 text-white font-black py-4 rounded-2xl hover:bg-sky-700 transition-all flex items-center justify-center gap-3 uppercase tracking-widest text-xs active:scale-[0.98] shadow-xl shadow-sky-100 group"
-                                        >
-                                            <FaPlusCircle className="group-hover:rotate-90 transition-transform" />
-                                            Add This Date to Leave Request
-                                        </button>
                                     </div>
+
+                                    {/* Alternative Staff Summary Card (Triggers Full Screen Modal) */}
+                                    <div>
+                                        <label className="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-3 ml-1">Alternative Staff Arrangement</label>
+                                        <div 
+                                            onClick={() => setManageReplacements('current')}
+                                            className="w-full px-6 py-5 bg-white border-2 border-dashed border-gray-100 rounded-3xl cursor-pointer hover:border-sky-300 hover:bg-sky-50/20 transition-all flex items-center justify-between group shadow-sm"
+                                        >
+                                            <div className="flex items-center gap-4">
+                                                <div className="h-12 w-12 rounded-2xl bg-sky-50 flex items-center justify-center text-sky-600 group-hover:bg-sky-600 group-hover:text-white transition-all shadow-sm">
+                                                    <FaUserFriends size={20} />
+                                                </div>
+                                                <div>
+                                                    <p className="text-sm font-black text-gray-800 tracking-tight">
+                                                        {currentDate.replacements.filter(r => r.staff_id).length > 0 
+                                                            ? `${currentDate.replacements.filter(r => r.staff_id).length} Staff Members Assigned` 
+                                                            : 'Click to Add Alternative Staff'}
+                                                    </p>
+                                                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mt-1">
+                                                        Assign colleagues to cover your duties for this date
+                                                    </p>
+                                                </div>
+                                            </div>
+                                            <div className="flex items-center gap-3">
+                                                <div className="flex -space-x-3 overflow-hidden">
+                                                    {currentDate.replacements.filter(r => r.staff_id).slice(0, 3).map((rep, i) => {
+                                                        const m = staffList.find(s => s.emp_id === rep.staff_id);
+                                                        return (
+                                                            <img 
+                                                                key={i} 
+                                                                className="inline-block h-8 w-8 rounded-full ring-2 ring-white" 
+                                                                src={m?.profile_pic || `https://ui-avatars.com/api/?name=${encodeURIComponent(m?.name || '?')}&background=0ea5e9&color=fff&bold=true`} 
+                                                                alt="" 
+                                                            />
+                                                        );
+                                                    })}
+                                                </div>
+                                                <FaChevronRight className="text-gray-300 group-hover:translate-x-1 transition-transform" />
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <button
+                                        type="button"
+                                        onClick={addDateToForm}
+                                        className="w-full bg-sky-600 text-white font-black py-5 rounded-3xl hover:bg-sky-700 transition-all flex items-center justify-center gap-3 uppercase tracking-[0.2em] text-[10px] active:scale-[0.98] shadow-2xl shadow-sky-100 group"
+                                    >
+                                        <FaPlusCircle className="group-hover:rotate-90 transition-transform" />
+                                        Confirm & Add This Date
+                                    </button>
+                                </div>
 
                                     {/* Display Added Dates */}
                                     {formData.dates.length > 0 && (
@@ -916,7 +853,6 @@ const LeaveApply = () => {
                                             </div>
                                         </div>
                                     )}
-                                </div>
 
                                 {/* Leave Type Selector - Always Visible */}
                                 <motion.div
@@ -2056,6 +1992,132 @@ const LeaveApply = () => {
                                     )}
                                 </div>
                             </motion.div>
+                        </motion.div>
+                    )}
+                </AnimatePresence>
+                
+                {/* Full Screen Alternative Staff Manager for Leave Dates */}
+                <AnimatePresence>
+                    {manageReplacements && (
+                        <motion.div
+                            initial={{ opacity: 0, scale: 1.1 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            exit={{ opacity: 0, scale: 0.9 }}
+                            className="fixed inset-0 z-[1001] bg-white flex flex-col"
+                        >
+                            {/* Sticky Header */}
+                            <div className="p-8 border-b border-gray-100 bg-gray-50/50 shrink-0 flex items-center justify-between">
+                                <div className="flex items-center gap-5">
+                                    <div className="h-14 w-14 rounded-3xl bg-sky-600 text-white flex items-center justify-center shadow-2xl shadow-sky-100">
+                                        <FaUserFriends size={24} />
+                                    </div>
+                                    <div>
+                                        <h3 className="text-2xl font-black text-gray-800 tracking-tight uppercase">Alternative Staff Arrangement</h3>
+                                        <p className="text-[10px] font-black text-sky-500 uppercase tracking-widest mt-1">
+                                            Assign colleagues for: <span className="text-gray-800">{new Date(currentDate.date).toLocaleDateString(undefined, { day: '2-digit', month: 'short', year: 'numeric' })}</span>
+                                        </p>
+                                    </div>
+                                </div>
+                                <button 
+                                    onClick={() => setManageReplacements(null)}
+                                    className="h-14 w-14 rounded-3xl bg-white shadow-2xl shadow-gray-200 border border-gray-100 flex items-center justify-center text-gray-400 hover:text-gray-800 transition-all active:scale-95"
+                                >
+                                    <FaCheck size={20} className="text-emerald-500" />
+                                </button>
+                            </div>
+
+                            <div className="flex-1 overflow-y-auto p-8 max-w-4xl mx-auto w-full space-y-8">
+                                <div className="space-y-6">
+                                    {currentDate.replacements.map((rep, idx) => {
+                                        const member = staffList.find(s => s.emp_id === rep.staff_id);
+                                        return (
+                                            <motion.div 
+                                                key={idx} 
+                                                layout
+                                                className="bg-gray-50 p-6 rounded-[32px] border-2 border-gray-100 transition-all hover:bg-white hover:border-sky-300 hover:shadow-2xl hover:shadow-sky-50"
+                                            >
+                                                {!rep.staff_id ? (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setShowStaffPicker({ type: 'leave', index: idx })}
+                                                        className="w-full py-12 border-2 border-dashed border-gray-200 rounded-3xl text-gray-400 font-black text-xs uppercase tracking-[0.3em] hover:text-sky-600 hover:border-sky-300 hover:bg-sky-50/50 transition-all flex flex-col items-center gap-4"
+                                                    >
+                                                        <div className="h-12 w-12 rounded-full bg-white flex items-center justify-center shadow-sm">
+                                                            <FaPlusCircle size={24} />
+                                                        </div>
+                                                        Pick Alternative Staff Member
+                                                    </button>
+                                                ) : (
+                                                    <div className="space-y-6">
+                                                        <div className="flex items-center gap-5">
+                                                            <div className="h-20 w-20 rounded-[28px] overflow-hidden border-4 border-white shadow-xl">
+                                                                <img
+                                                                    src={member?.profile_pic || `https://ui-avatars.com/api/?name=${encodeURIComponent(member?.name || 'User')}&background=0ea5e9&color=fff&bold=true`}
+                                                                    alt=""
+                                                                    className="w-full h-full object-cover"
+                                                                />
+                                                            </div>
+                                                            <div className="flex-1 min-w-0">
+                                                                <p className="text-xl font-black text-gray-800 tracking-tight">{member?.name}</p>
+                                                                <p className="text-xs font-black text-sky-500 uppercase tracking-widest mt-1">
+                                                                    {member?.designation} • {member?.department_name}
+                                                                </p>
+                                                            </div>
+                                                            <div className="flex gap-3">
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => setShowStaffPicker({ type: 'leave', index: idx })}
+                                                                    className="h-12 w-12 rounded-2xl bg-white text-sky-600 shadow-sm border border-gray-100 flex items-center justify-center hover:bg-sky-600 hover:text-white transition-all active:scale-90"
+                                                                >
+                                                                    <FaExchangeAlt size={16} />
+                                                                </button>
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => removeReplacementFromCurrentDate(idx)}
+                                                                    className="h-12 w-12 rounded-2xl bg-white text-rose-500 shadow-sm border border-gray-100 flex items-center justify-center hover:bg-rose-500 hover:text-white transition-all active:scale-90"
+                                                                >
+                                                                    <FaTimes size={16} />
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                        <div className="relative group">
+                                                            <div className="absolute left-6 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-sky-500 transition-colors">
+                                                                <FaClock size={16} />
+                                                            </div>
+                                                            <input
+                                                                placeholder="Mention Periods (e.g. 1st, 2nd, 5th)"
+                                                                value={rep.periods}
+                                                                onChange={(e) => handleCurrentReplacementChange(idx, 'periods', e.target.value)}
+                                                                className="w-full bg-white border-2 border-gray-100 rounded-2xl py-5 pl-16 pr-8 outline-none focus:ring-8 focus:ring-sky-50 focus:border-sky-500 transition-all font-bold text-gray-700 text-sm shadow-sm"
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </motion.div>
+                                        );
+                                    })}
+
+                                    {currentDate.replacements.length < 5 && (
+                                        <button
+                                            type="button"
+                                            onClick={addReplacementToCurrentDate}
+                                            className="w-full py-6 border-2 border-dashed border-gray-200 rounded-[32px] text-gray-400 font-black text-[10px] uppercase tracking-[0.2em] hover:text-sky-600 hover:border-sky-200 hover:bg-sky-50/30 transition-all flex items-center justify-center gap-3"
+                                        >
+                                            <FaPlusCircle /> Add Another Replacement Member
+                                        </button>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Sticky Footer */}
+                            <div className="p-8 border-t border-gray-100 bg-gray-50/50 shrink-0">
+                                <button
+                                    onClick={() => setManageReplacements(null)}
+                                    className="w-full bg-sky-600 text-white font-black py-6 rounded-[32px] shadow-2xl shadow-sky-100 hover:bg-sky-700 transition-all uppercase tracking-[0.2em] text-xs"
+                                >
+                                    Done & Return to Application
+                                </button>
+                            </div>
                         </motion.div>
                     )}
                 </AnimatePresence>
