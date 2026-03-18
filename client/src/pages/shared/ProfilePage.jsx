@@ -15,6 +15,11 @@ const ProfilePage = () => {
 
     useEffect(() => {
         const fetchUser = async () => {
+            if (authUser?.role === 'management') {
+                setTargetUser({ id: 'management', name: 'Management', role: 'management', emp_id: 'Management' });
+                setLoading(false);
+                return;
+            }
             if (!id && !authUser?.emp_id) return;
 
             setLoading(true);
@@ -31,7 +36,7 @@ const ProfilePage = () => {
             }
         };
         fetchUser();
-    }, [id, authUser?.emp_id]);
+    }, [id, authUser?.emp_id, authUser?.role]);
 
     if (loading) return (
         <Layout>
