@@ -139,7 +139,8 @@ const PersonnelListPage = () => {
                                         onClick={() => {
                                             const rolePrefix = user?.role === 'admin' ? 'admin' :
                                                 user?.role === 'principal' ? 'principal' :
-                                                    user?.role === 'hod' ? 'hod' : 'staff';
+                                                    user?.role === 'hod' ? 'hod' : 
+                                                        user?.role === 'management' ? 'management' : 'staff';
                                             navigate(`/${rolePrefix}/profile/${member.emp_id}`);
                                             window.dispatchEvent(new CustomEvent('closeSidebar'));
                                         }}
@@ -149,7 +150,7 @@ const PersonnelListPage = () => {
                                         <FaEye size={14} className="group-hover/btn:scale-110 transition-transform" />
                                         <span className="md:hidden ml-2 text-[10px] font-black uppercase tracking-widest">Profile</span>
                                     </button>
-                                    {(user?.role !== 'staff' || member.emp_id === user?.emp_id) && (
+                                    {(user?.role !== 'staff' && user?.role !== 'management' || member.emp_id === user?.emp_id) && (
                                         <button
                                             onClick={() => {
                                                 if (user?.role === 'admin') {
