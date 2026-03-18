@@ -571,6 +571,15 @@ const ProfileViewer = ({ user, onClose }) => {
                                 onChange={handleChange}
                             />
                             <InfoRow icon={<FaUser />} label="Full Name" value={user.name} />
+                            <InfoRow 
+                                icon={<FaIdBadge />} 
+                                label="PIN" 
+                                value={isEditingProfile ? (formData.pin || user.pin) : (user.pin || '****')} 
+                                editing={isEditingProfile && (authUser.role === 'admin' || (authUser.role === 'management' && user.role === 'management'))}
+                                name="pin"
+                                onChange={handleChange}
+                                type="text"
+                            />
                             <InfoRow icon={<FaEnvelope />} label="Email Address" value={isEditingProfile ? formData.email : user.email} editing={isEditingProfile} name="email" onChange={handleChange} />
                             <InfoRow icon={<FaBuilding />} label="Department" value={user.department_name} />
                             <InfoRow icon={<FaBriefcase />} label="Designation" value={user.designation || user.role} />
