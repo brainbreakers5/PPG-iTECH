@@ -227,8 +227,6 @@ const ProfileViewer = ({ user, onClose }) => {
     };
 
     const handlePrintProfile = async () => {
-        const printWindow = window.open('', '_blank');
-        if (!printWindow) return;
         const title = `Profile - ${user.name}`;
         
         const certDataPromises = certificates.map(async (cert) => {
@@ -262,7 +260,7 @@ const ProfileViewer = ({ user, onClose }) => {
 
         const profilePic = picUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name)}&size=200&background=2563eb&color=fff&bold=true`;
 
-        printWindow.document.write(`
+        const htmlContent = `
             <html>
                 <head>
                     <title>${title}</title>
@@ -274,24 +272,16 @@ const ProfileViewer = ({ user, onClose }) => {
                         .header-info h1 { margin: 0; font-size: 26pt; font-weight: 900; color: #0f172a; letter-spacing: -0.04em; line-height: 1; }
                         .header-info p { margin: 8px 0 0; font-size: 11pt; color: #64748b; font-weight: 700; text-transform: uppercase; letter-spacing: 0.15em; }
                         .emp-id { display: inline-block; background: #f0f9ff; color: #0369a1; padding: 6px 14px; border-radius: 10px; font-weight: 800; font-size: 9pt; margin-top: 12px; border: 1px solid #bae6fd; text-transform: uppercase; letter-spacing: 0.05em; }
-                        
                         .section { margin-bottom: 35px; }
-                        .section-title { font-size: 9pt; font-weight: 900; color: #0284c7; text-transform: uppercase; letter-spacing: 0.25em; border-bottom: 1px solid #f1f5f9; padding-bottom: 10px; margin-bottom: 18px; display: flex; align-items: center; }
-                        
+                        .section-title { font-size: 9pt; font-weight: 900; color: #0284c7; text-transform: uppercase; letter-spacing: 0.25em; border-bottom: 1px solid #f1f5f9; padding-bottom: 10px; margin-bottom: 18px; }
                         .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px 40px; }
                         .info-item { display: flex; flex-direction: column; }
                         .info-label { font-size: 7.5pt; font-weight: 800; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 3px; }
                         .info-value { font-size: 10.5pt; font-weight: 700; color: #334155; border-bottom: 1px solid #f8fafc; padding-bottom: 2px; }
-                        
                         .address-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
                         .address-box { background: #f8fafc; padding: 15px; border-radius: 16px; border: 1px solid #f1f5f9; }
                         .address-box .info-value { border: none; font-size: 9.5pt; line-height: 1.4; color: #475569; }
-                        
-                        @media print {
-                            body { padding: 0; }
-                            .no-print { display: none; }
-                            .section { break-inside: avoid; }
-                        }
+                        @media print { body { padding: 0; } .no-print { display: none; } .section { break-inside: avoid; } }
                     </style>
                 </head>
                 <body>
@@ -304,7 +294,6 @@ const ProfileViewer = ({ user, onClose }) => {
                                 <div class="emp-id">EMP ID: ${user.emp_id}</div>
                             </div>
                         </div>
-
                         <div class="section">
                             <div class="section-title">Official Overview</div>
                             <div class="grid">
@@ -314,7 +303,6 @@ const ProfileViewer = ({ user, onClose }) => {
                                 <div class="info-item"><span class="info-label">Total Experience</span><span class="info-value">${user.experience || '-'}</span></div>
                             </div>
                         </div>
-
                         <div class="section">
                             <div class="section-title">Personal Information</div>
                             <div class="grid">
@@ -323,29 +311,18 @@ const ProfileViewer = ({ user, onClose }) => {
                                 <div class="info-item"><span class="info-label">Mobile Contact</span><span class="info-value">${user.mobile || '-'}</span></div>
                                 <div class="info-item"><span class="info-label">WhatsApp Contact</span><span class="info-value">${user.whatsapp || '-'}</span></div>
                                 <div class="info-item"><span class="info-label">Nationality / Religion</span><span class="info-value">${user.nationality || '-'} / ${user.religion || '-'}</span></div>
-                                <div class="info-item"><span class="info-label">Community & Caste</span><span class="info-value">${user.community || '-'} ${user.caste ? `(${user.caste})` : ''}</span></div>
+                                <div class="info-item"><span class="info-label">Community &amp; Caste</span><span class="info-value">${user.community || '-'} ${user.caste ? `(${user.caste})` : ''}</span></div>
                             </div>
                         </div>
-
                         <div class="section">
                             <div class="section-title">Residency Details</div>
                             <div class="address-grid">
-                                <div class="address-box">
-                                    <span class="info-label" style="color: #0284c7;">Communication Address</span>
-                                    <div class="info-value" style="margin-top: 8px; text-transform: uppercase;">${user.communication_address || 'NOT PROVIDED'}</div>
-                                </div>
-                                <div class="address-box">
-                                    <span class="info-label" style="color: #6366f1;">Permanent Address</span>
-                                    <div class="info-value" style="margin-top: 8px; text-transform: uppercase;">${user.permanent_address || 'NOT PROVIDED'}</div>
-                                </div>
-                            </div>
-                            <div style="margin-top: 12px; font-size: 8pt; font-weight: 900; color: #64748b; letter-spacing: 0.1em; text-align: right;">
-                                REGISTERED PIN CODE: ${user.pin_code || 'N/A'}
+                                <div class="address-box"><span class="info-label" style="color:#0284c7;">Communication Address</span><div class="info-value" style="margin-top:8px;text-transform:uppercase;">${user.communication_address || 'NOT PROVIDED'}</div></div>
+                                <div class="address-box"><span class="info-label" style="color:#6366f1;">Permanent Address</span><div class="info-value" style="margin-top:8px;text-transform:uppercase;">${user.permanent_address || 'NOT PROVIDED'}</div></div>
                             </div>
                         </div>
-
                         <div class="section">
-                            <div class="section-title">Identification & Family</div>
+                            <div class="section-title">Identification &amp; Family</div>
                             <div class="grid">
                                 <div class="info-item"><span class="info-label">Aadhar Number</span><span class="info-value">${user.aadhar || '-'}</span></div>
                                 <div class="info-item"><span class="info-label">PAN Number</span><span class="info-value">${user.pan || '-'}</span></div>
@@ -354,69 +331,72 @@ const ProfileViewer = ({ user, onClose }) => {
                                 <div class="info-item"><span class="info-label">Marital Status</span><span class="info-value">${user.marital_status || '-'}</span></div>
                             </div>
                         </div>
-                        
                         <div class="section">
-                            <div class="section-title">Financial & Statutory Info</div>
+                            <div class="section-title">Financial &amp; Statutory Info</div>
                             <div class="grid">
                                 <div class="info-item"><span class="info-label">Primary Bank</span><span class="info-value">${user.bank_name || '-'}</span></div>
                                 <div class="info-item"><span class="info-label">Account Details</span><span class="info-value">${user.account_no || '-'}</span></div>
                                 <div class="info-item"><span class="info-label">IFSC Code</span><span class="info-value">${user.ifsc || '-'}</span></div>
-                                <div class="info-item"><span class="info-label">PF & UAN Details</span><span class="info-value">${user.pf_number || '-'} / ${user.uan_number || '-'}</span></div>
+                                <div class="info-item"><span class="info-label">PF &amp; UAN Details</span><span class="info-value">${user.pf_number || '-'} / ${user.uan_number || '-'}</span></div>
                             </div>
                         </div>
-
                         ${certsHtml}
-
                         <div style="margin-top: 60px; border-top: 2px solid #f1f5f9; padding-top: 25px; display: flex; justify-content: space-between; align-items: flex-end;">
                             <div style="font-size: 7.5pt; color: #94a3b8; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em;">
-                                System Generated Document<br/>
-                                PPG EMP HUB • ${new Date().toLocaleDateString('en-GB')}
+                                System Generated Document<br/>PPG EMP HUB &bull; ${new Date().toLocaleDateString('en-GB')}
                             </div>
                             <div style="text-align: center;">
-                                <div style="margin-bottom: 40px; font-size: 8pt; color: #cbd5e1; font-style: italic;">Seal & Signature</div>
-                                <div style="border-top: 1.5px solid #334155; width: 180px; padding-top: 6px; font-size: 8.5pt; font-weight: 900; color: #1e293b; text-transform: uppercase; letter-spacing: 0.05em;">
-                                    Authorized Authority
-                                </div>
+                                <div style="margin-bottom: 40px; font-size: 8pt; color: #cbd5e1; font-style: italic;">Seal &amp; Signature</div>
+                                <div style="border-top: 1.5px solid #334155; width: 180px; padding-top: 6px; font-size: 8.5pt; font-weight: 900; color: #1e293b; text-transform: uppercase; letter-spacing: 0.05em;">Authorized Authority</div>
                             </div>
                         </div>
                     </div>
                 </body>
             </html>
-        `);
-        
-        printWindow.document.close();
-        
-        // Wait for images to load before printing
-        const images = printWindow.document.getElementsByTagName('img');
-        const totalImages = images.length;
-        let loadedImages = 0;
-        
+        `;
+
+        // Use a hidden iframe for mobile compatibility (window.open is blocked by mobile browsers)
+        const existingFrame = document.getElementById('profile-print-frame');
+        if (existingFrame) existingFrame.remove();
+
+        const iframe = document.createElement('iframe');
+        iframe.id = 'profile-print-frame';
+        iframe.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:1px;height:1px;border:none;';
+        document.body.appendChild(iframe);
+
+        const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
+        if (!iframeDoc) return;
+
+        iframeDoc.open();
+        iframeDoc.write(htmlContent);
+        iframeDoc.close();
+
+        // Wait for content + images to load, then print
         const tryPrint = () => {
-            printWindow.focus();
-            printWindow.print();
-            printWindow.close();
+            iframe.contentWindow?.focus();
+            iframe.contentWindow?.print();
+            // Clean up after a short delay
+            setTimeout(() => {
+                if (iframe.parentNode) iframe.parentNode.removeChild(iframe);
+            }, 2000);
         };
 
+        const images = iframeDoc.getElementsByTagName('img');
+        const totalImages = images.length;
+
         if (totalImages === 0) {
-            tryPrint();
+            setTimeout(tryPrint, 300);
         } else {
+            let loadedImages = 0;
+            const checkDone = () => {
+                loadedImages++;
+                if (loadedImages >= totalImages) setTimeout(tryPrint, 300);
+            };
             Array.from(images).forEach(img => {
-                if (img.complete) {
-                    loadedImages++;
-                    if (loadedImages === totalImages) tryPrint();
-                } else {
-                    img.onload = () => {
-                        loadedImages++;
-                        if (loadedImages === totalImages) tryPrint();
-                    };
-                    img.onerror = () => {
-                        loadedImages++;
-                        if (loadedImages === totalImages) tryPrint();
-                    };
-                }
+                if (img.complete) checkDone();
+                else { img.onload = checkDone; img.onerror = checkDone; }
             });
-            // Force print after 3 seconds if images are slow
-            setTimeout(() => { if (printWindow && !printWindow.closed) tryPrint(); }, 3000);
+            setTimeout(tryPrint, 3000); // fallback
         }
     };
 
