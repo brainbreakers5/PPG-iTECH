@@ -9,7 +9,7 @@ import {
     FaPaperPlane, FaUserFriends, FaHistory, FaCalendarCheck,
     FaClock, FaInfoCircle, FaCheckCircle, FaTimesCircle,
     FaHourglassHalf, FaPlusCircle, FaInbox, FaCheck,
-    FaTimes, FaUserTag, FaCalendarAlt, FaSearch, FaGift, FaFileAlt, FaCalendarDay
+    FaTimes, FaUserTag, FaCalendarAlt, FaSearch, FaGift, FaFileAlt, FaCalendarDay, FaChevronRight, FaExchangeAlt
 } from 'react-icons/fa';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -56,6 +56,7 @@ const LeaveApply = () => {
     const [staffList, setStaffList] = useState([]);
     const [staffSearch, setStaffSearch] = useState('');
     const [conflicts, setConflicts] = useState([]);
+    const [showStaffPicker, setShowStaffPicker] = useState(null); // { type: 'leave' | 'permission', index?: number }
 
     // Helper function to get full leave type name
     const getLeaveTypeName = (type) => {
@@ -739,16 +740,26 @@ const LeaveApply = () => {
                                                 )}
                                             </div>
 
-                                            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-                                                {/* Selected Replacements */}
-                                                <div className="lg:col-span-5 space-y-3">
-                                                    {currentDate.replacements.map((rep, idx) => (
-                                                        <div key={idx} className="bg-white p-4 rounded-xl border border-gray-100 shadow-sm">
-                                                            {rep.staff_id ? (() => {
-                                                                const member = staffList.find(s => s.emp_id === rep.staff_id);
-                                                                return (
-                                                                    <div className="flex items-center gap-3 mb-3">
-                                                                        <div className="h-8 w-8 rounded-lg overflow-hidden border border-gray-100 shrink-0">
+                                            <div className="space-y-4">
+                                                {currentDate.replacements.map((rep, idx) => {
+                                                    const member = staffList.find(s => s.emp_id === rep.staff_id);
+                                                    return (
+                                                        <div key={idx} className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm transition-all hover:border-sky-200">
+                                                            {!rep.staff_id ? (
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => setShowStaffPicker({ type: 'leave', index: idx })}
+                                                                    className="w-full py-6 border-2 border-dashed border-gray-100 rounded-xl text-gray-400 font-black text-[10px] uppercase tracking-[0.2em] hover:border-sky-300 hover:text-sky-600 hover:bg-sky-50/30 transition-all flex flex-col items-center justify-center gap-3 active:scale-[0.98]"
+                                                                >
+                                                                    <div className="h-10 w-10 rounded-full bg-gray-50 flex items-center justify-center text-gray-300">
+                                                                        <FaPlusCircle size={20} />
+                                                                    </div>
+                                                                    Select Alternative Staff
+                                                                </button>
+                                                            ) : (
+                                                                <div className="space-y-5">
+                                                                    <div className="flex items-center gap-4">
+                                                                        <div className="h-14 w-14 rounded-2xl overflow-hidden border-2 border-sky-50 shadow-md shrink-0">
                                                                             <img
                                                                                 src={member?.profile_pic || `https://ui-avatars.com/api/?name=${encodeURIComponent(member?.name || 'User')}&background=3b82f6&color=fff&bold=true`}
                                                                                 alt=""
@@ -756,105 +767,47 @@ const LeaveApply = () => {
                                                                             />
                                                                         </div>
                                                                         <div className="flex-1 min-w-0">
-                                                                            <p className="text-[10px] font-black text-gray-800 tracking-tight truncate">{member?.name || 'Unknown'}</p>
-                                                                            <p className="text-[7px] font-black text-sky-500 uppercase tracking-widest truncate">{member?.designation || 'Staff'}</p>
+                                                                            <p className="text-sm font-black text-gray-800 tracking-tight truncate">{member?.name || 'Unknown'}</p>
+                                                                            <p className="text-[9px] font-black text-sky-500 uppercase tracking-widest truncate mt-0.5">
+                                                                                {member?.designation || 'Staff'} • <span className="text-gray-400">{member?.department_name || 'N/A'}</span>
+                                                                            </p>
                                                                         </div>
-                                                                        <button
-                                                                            type="button"
-                                                                            onClick={() => removeReplacementFromCurrentDate(idx)}
-                                                                            className="h-6 w-6 rounded-lg bg-rose-50 text-rose-400 hover:bg-rose-500 hover:text-white transition-all flex items-center justify-center shrink-0 active:scale-90"
-                                                                            title="Remove"
-                                                                        >
-                                                                            <FaTimes size={8} />
-                                                                        </button>
-                                                                    </div>
-                                                                );
-                                                            })() : (
-                                                                <div className="flex items-center gap-2 mb-3 text-gray-300">
-                                                                    <div className="h-8 w-8 rounded-lg border border-dashed border-gray-200 flex items-center justify-center shrink-0">
-                                                                        <FaUserTag size={12} />
-                                                                    </div>
-                                                                    <p className="text-[8px] font-black uppercase tracking-widest">Select staff →</p>
-                                                                </div>
-                                                            )}
-                                                            <input
-                                                                placeholder="Periods (e.g. 1, 2, 5)"
-                                                                value={rep.periods}
-                                                                onChange={(e) => handleCurrentReplacementChange(idx, 'periods', e.target.value)}
-                                                                required={!!rep.staff_id}
-                                                                className="w-full bg-gray-50 border border-gray-100 rounded-lg p-2.5 outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400 transition-all font-bold text-gray-700 text-[11px]"
-                                                            />
-                                                        </div>
-                                                    ))}
-                                                </div>
-
-                                                {/* Staff Browser */}
-                                                <div className="lg:col-span-7 bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden flex flex-col" style={{ maxHeight: '320px' }}>
-                                                    <div className="p-3 border-b border-gray-100 bg-gray-50/50 shrink-0">
-                                                        <div className="relative">
-                                                            <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-300" size={10} />
-                                                            <input
-                                                                type="text"
-                                                                placeholder="Search staff..."
-                                                                className="w-full pl-8 pr-3 py-2.5 bg-white border border-gray-100 rounded-xl outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400 transition-all font-bold text-gray-700 text-[11px]"
-                                                                value={staffSearch}
-                                                                onChange={(e) => setStaffSearch(e.target.value)}
-                                                            />
-                                                        </div>
-                                                    </div>
-                                                    <div className="flex-1 overflow-y-auto p-2 space-y-2 custom-scrollbar">
-                                                        {staffList
-                                                            .filter(s => s.emp_id !== user.emp_id)
-                                                            .filter(s =>
-                                                                s.name.toLowerCase().includes(staffSearch.toLowerCase()) ||
-                                                                (s.designation || '').toLowerCase().includes(staffSearch.toLowerCase())
-                                                            )
-                                                            .map((member) => {
-                                                                const isSelected = currentDate.replacements.some(r => r.staff_id === member.emp_id);
-                                                                return (
-                                                                    <div
-                                                                        key={member.emp_id}
-                                                                        className={`flex items-center gap-2 px-3 py-2 rounded-xl border transition-all ${isSelected ? 'bg-sky-50 border-sky-200' : 'bg-white border-gray-100 hover:bg-gray-50'}`}
-                                                                    >
-                                                                        <div className="h-7 w-7 rounded-lg overflow-hidden border border-gray-100 shrink-0">
-                                                                            <img
-                                                                                src={member.profile_pic || `https://ui-avatars.com/api/?name=${encodeURIComponent(member.name)}&background=3b82f6&color=fff&bold=true`}
-                                                                                alt=""
-                                                                                className="w-full h-full object-cover"
-                                                                            />
-                                                                        </div>
-                                                                        <div className="flex-1 min-w-0 md:w-auto w-full">
-                                                                            <p className="text-[10px] font-black text-gray-800 tracking-tight word-break whitespace-normal break-words">{member.name}</p>
-                                                                            <p className="text-[7px] font-bold text-gray-400 uppercase tracking-widest truncate">{member.designation || 'Staff'}</p>
-                                                                        </div>
-                                                                        {isSelected ? (
-                                                                            <span className="shrink-0 px-2 py-1 bg-sky-100 text-sky-600 rounded-lg text-[7px] font-black uppercase tracking-widest">
-                                                                                Selected
-                                                                            </span>
-                                                                        ) : (
+                                                                        <div className="flex gap-2">
                                                                             <button
                                                                                 type="button"
-                                                                                onClick={() => {
-                                                                                    const emptyIdx = currentDate.replacements.findIndex(r => !r.staff_id);
-                                                                                    if (emptyIdx !== -1) {
-                                                                                        handleCurrentReplacementChange(emptyIdx, 'staff_id', member.emp_id);
-                                                                                    } else if (currentDate.replacements.length < 5) {
-                                                                                        setCurrentDate(prev => ({
-                                                                                            ...prev,
-                                                                                            replacements: [...prev.replacements, { staff_id: member.emp_id, periods: '' }]
-                                                                                        }));
-                                                                                    }
-                                                                                }}
-                                                                                className="shrink-0 px-2 py-1 bg-sky-600 text-white rounded-lg text-[7px] font-black uppercase tracking-widest hover:bg-sky-700 transition-all active:scale-95 shadow-sm"
+                                                                                onClick={() => setShowStaffPicker({ type: 'leave', index: idx })}
+                                                                                className="h-9 w-9 rounded-xl bg-sky-50 text-sky-600 hover:bg-sky-600 hover:text-white transition-all flex items-center justify-center active:scale-95 shadow-sm"
+                                                                                title="Change Staff"
                                                                             >
-                                                                                Select
+                                                                                <FaExchangeAlt size={12} />
                                                                             </button>
-                                                                        )}
+                                                                            <button
+                                                                                type="button"
+                                                                                onClick={() => removeReplacementFromCurrentDate(idx)}
+                                                                                className="h-9 w-9 rounded-xl bg-rose-50 text-rose-400 hover:bg-rose-500 hover:text-white transition-all flex items-center justify-center active:scale-95 shadow-sm"
+                                                                                title="Remove"
+                                                                            >
+                                                                                <FaTimes size={12} />
+                                                                            </button>
+                                                                        </div>
                                                                     </div>
-                                                                );
-                                                            })}
-                                                    </div>
-                                                </div>
+                                                                    <div className="relative group">
+                                                                        <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300 group-focus-within:text-sky-400 transition-colors">
+                                                                            <FaClock size={12} />
+                                                                        </div>
+                                                                        <input
+                                                                            placeholder="Mention Periods (e.g. 1, 2, 5)"
+                                                                            value={rep.periods}
+                                                                            onChange={(e) => handleCurrentReplacementChange(idx, 'periods', e.target.value)}
+                                                                            required={!!rep.staff_id}
+                                                                            className="w-full bg-gray-50 border border-gray-100 rounded-xl py-3.5 pl-10 pr-4 outline-none focus:ring-4 focus:ring-sky-100 focus:border-sky-400 transition-all font-bold text-gray-700 text-[11px]"
+                                                                        />
+                                                                    </div>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    );
+                                                })}
                                             </div>
                                         </div>
 
@@ -1200,16 +1153,38 @@ const LeaveApply = () => {
 
                                     <div>
                                         <label className="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2">Alternative Staff (Optional)</label>
-                                        <select
-                                            value={permForm.replacement_staff_id}
-                                            onChange={e => setPermForm(p => ({ ...p, replacement_staff_id: e.target.value }))}
-                                            className="w-full px-5 py-4 bg-gray-50 border-2 border-gray-100 rounded-2xl font-bold text-sm text-gray-800 focus:ring-4 focus:ring-teal-100 focus:border-teal-300 transition-all outline-none appearance-none"
+                                        <div 
+                                            onClick={() => setShowStaffPicker({ type: 'permission' })}
+                                            className="w-full px-5 py-4 bg-gray-50 border-2 border-gray-100 rounded-2xl cursor-pointer hover:border-teal-200 transition-all flex items-center justify-between group"
                                         >
-                                            <option value="">-- No Alternative Staff --</option>
-                                            {staffList.filter(s => s.emp_id !== user.emp_id).map(staff => (
-                                                <option key={staff.emp_id} value={staff.emp_id}>{staff.name} ({staff.designation || 'Staff'})</option>
-                                            ))}
-                                        </select>
+                                            {permForm.replacement_staff_id ? (() => {
+                                                const staff = staffList.find(s => s.emp_id === permForm.replacement_staff_id);
+                                                return (
+                                                    <div className="flex items-center gap-4">
+                                                        <div className="h-10 w-10 rounded-xl overflow-hidden border-2 border-teal-50 shadow-sm">
+                                                            <img
+                                                                src={staff?.profile_pic || `https://ui-avatars.com/api/?name=${encodeURIComponent(staff?.name || 'User')}&background=14b8a6&color=fff&bold=true`}
+                                                                alt=""
+                                                                className="w-full h-full object-cover"
+                                                            />
+                                                        </div>
+                                                        <div className="flex-1 min-w-0">
+                                                            <p className="text-sm font-black text-gray-800 tracking-tight">{staff?.name}</p>
+                                                            <p className="text-[9px] font-black text-teal-600 uppercase tracking-widest mt-0.5">
+                                                                {staff?.designation || 'Staff'} • <span className="text-gray-400">{staff?.department_name || 'N/A'}</span>
+                                                            </p>
+                                                        </div>
+                                                        <FaExchangeAlt className="text-gray-300 group-hover:text-teal-500 transition-colors ml-4" size={12} />
+                                                    </div>
+                                                );
+                                            })() : (
+                                                <div className="flex items-center gap-3 text-gray-400">
+                                                    <FaUserTag size={16} />
+                                                    <span className="font-bold text-sm">-- No Alternative Staff --</span>
+                                                </div>
+                                            )}
+                                            {!permForm.replacement_staff_id && <FaChevronRight className="text-gray-300 group-hover:translate-x-1 transition-transform" size={12} />}
+                                        </div>
                                     </div>
 
                                     <div>
@@ -1943,6 +1918,144 @@ const LeaveApply = () => {
                                     Remaining balance represents your current eligibility. Applications exceeding these limits will be automatically rejected by the system.
                                 </p>
                             </div>
+                        </motion.div>
+                    )}
+                </AnimatePresence>
+
+                {/* Staff Selection Modal */}
+                <AnimatePresence>
+                    {showStaffPicker && (
+                        <motion.div
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            className="fixed inset-0 z-[1000] bg-gray-900/60 backdrop-blur-sm flex items-center justify-center p-4 md:p-10"
+                            onClick={() => setShowStaffPicker(null)}
+                        >
+                            <motion.div
+                                initial={{ scale: 0.9, y: 30 }}
+                                animate={{ scale: 1, y: 0 }}
+                                exit={{ scale: 0.9, y: 30 }}
+                                className="bg-white w-full max-w-2xl h-[85vh] md:h-[75vh] rounded-[40px] shadow-2xl overflow-hidden flex flex-col"
+                                onClick={e => e.stopPropagation()}
+                            >
+                                {/* Modal Header */}
+                                <div className="p-8 border-b border-gray-100 bg-gray-50/50">
+                                    <div className="flex items-center justify-between mb-6">
+                                        <div>
+                                            <h3 className="text-xl font-black text-gray-800 tracking-tight uppercase">Select Alternative Staff</h3>
+                                            <p className="text-[10px] font-black text-sky-500 uppercase tracking-widest mt-1">Pick a colleague for duty substitution</p>
+                                        </div>
+                                        <button 
+                                            onClick={() => setShowStaffPicker(null)}
+                                            className="h-12 w-12 rounded-2xl bg-white shadow-xl shadow-gray-100 border border-gray-100 flex items-center justify-center text-gray-400 hover:text-gray-800 transition-all hover:rotate-90"
+                                        >
+                                            <FaTimes size={18} />
+                                        </button>
+                                    </div>
+                                    <div className="relative group">
+                                        <FaSearch className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-300 group-focus-within:text-sky-500 transition-colors" size={16} />
+                                        <input
+                                            type="text"
+                                            placeholder="Search by name, department, or role..."
+                                            className="w-full pl-14 pr-6 py-5 bg-white border-2 border-gray-100 rounded-[24px] outline-none focus:ring-8 focus:ring-sky-50 focus:border-sky-500 transition-all font-bold text-gray-700 text-sm shadow-sm"
+                                            value={staffSearch}
+                                            onChange={(e) => setStaffSearch(e.target.value)}
+                                            autoFocus
+                                        />
+                                    </div>
+                                </div>
+
+                                {/* Staff List */}
+                                <div className="flex-1 overflow-y-auto p-6 space-y-4 custom-scrollbar bg-white">
+                                    {showStaffPicker.type === 'permission' && !staffSearch && (
+                                        <div
+                                            onClick={() => {
+                                                setPermForm(p => ({ ...p, replacement_staff_id: '' }));
+                                                setShowStaffPicker(null);
+                                            }}
+                                            className="flex items-center gap-4 p-5 rounded-3xl border-2 border-dashed border-gray-100 hover:border-gray-200 hover:bg-gray-50 cursor-pointer transition-all group"
+                                        >
+                                            <div className="h-14 w-14 rounded-2xl bg-gray-100 flex items-center justify-center text-gray-400">
+                                                <FaUserTag size={24} />
+                                            </div>
+                                            <div className="flex-1">
+                                                <p className="font-black text-gray-500 uppercase tracking-widest text-xs">No Alternative Staff</p>
+                                                <p className="text-[10px] font-bold text-gray-300 mt-1">Click to clear current selection</p>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {staffList
+                                        .filter(s => s.emp_id !== user.emp_id)
+                                        .filter(s =>
+                                            s.name.toLowerCase().includes(staffSearch.toLowerCase()) ||
+                                            (s.designation || '').toLowerCase().includes(staffSearch.toLowerCase()) ||
+                                            (s.department_name || '').toLowerCase().includes(staffSearch.toLowerCase())
+                                        )
+                                        .map((member) => {
+                                            const isSelected = showStaffPicker.type === 'leave' 
+                                                ? currentDate.replacements[showStaffPicker.index]?.staff_id === member.emp_id
+                                                : permForm.replacement_staff_id === member.emp_id;
+
+                                            return (
+                                                <div
+                                                    key={member.emp_id}
+                                                    onClick={() => {
+                                                        if (showStaffPicker.type === 'leave') {
+                                                            handleCurrentReplacementChange(showStaffPicker.index, 'staff_id', member.emp_id);
+                                                        } else {
+                                                            setPermForm(p => ({ ...p, replacement_staff_id: member.emp_id }));
+                                                        }
+                                                        setShowStaffPicker(null);
+                                                        setStaffSearch('');
+                                                    }}
+                                                    className={`group flex items-center gap-5 p-5 rounded-[32px] border-2 transition-all cursor-pointer ${
+                                                        isSelected 
+                                                        ? 'bg-sky-50 border-sky-400 shadow-lg shadow-sky-50' 
+                                                        : 'bg-white border-gray-50 hover:border-sky-200 hover:bg-sky-50/20'
+                                                    }`}
+                                                >
+                                                    <div className="h-16 w-16 rounded-[24px] overflow-hidden border-2 border-white shadow-md group-hover:scale-110 transition-transform shrink-0">
+                                                        <img
+                                                            src={member.profile_pic || `https://ui-avatars.com/api/?name=${encodeURIComponent(member.name)}&background=3b82f6&color=fff&bold=true`}
+                                                            alt=""
+                                                            className="w-full h-full object-cover"
+                                                        />
+                                                    </div>
+                                                    <div className="flex-1 min-w-0">
+                                                        <div className="flex items-center gap-3">
+                                                            <p className={`font-black tracking-tight transition-colors ${isSelected ? 'text-sky-700 text-lg' : 'text-gray-800'}`}>
+                                                                {member.name}
+                                                            </p>
+                                                            {isSelected && <FaCheckCircle className="text-sky-500 shrink-0" size={16} />}
+                                                        </div>
+                                                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mt-1 group-hover:text-sky-500 transition-colors">
+                                                            {member.designation || 'Staff'} <span className="mx-1 text-gray-200">•</span> {member.department_name || 'N/A'}
+                                                        </p>
+                                                    </div>
+                                                    <div className={`h-10 w-10 rounded-2xl flex items-center justify-center transition-all ${
+                                                        isSelected ? 'bg-sky-500 text-white' : 'bg-gray-50 text-gray-300 group-hover:bg-sky-100 group-hover:text-sky-600'
+                                                    }`}>
+                                                        <FaChevronRight size={14} />
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    
+                                    {staffList.length > 0 && staffList.filter(s => s.emp_id !== user.emp_id).filter(s =>
+                                            s.name.toLowerCase().includes(staffSearch.toLowerCase()) ||
+                                            (s.designation || '').toLowerCase().includes(staffSearch.toLowerCase()) ||
+                                            (s.department_name || '').toLowerCase().includes(staffSearch.toLowerCase())
+                                        ).length === 0 && (
+                                        <div className="py-20 text-center opacity-30">
+                                            <FaSearch size={48} className="mx-auto mb-4" />
+                                            <p className="text-lg font-black tracking-tight uppercase">No Staff Found</p>
+                                            <p className="text-xs font-bold uppercase tracking-widest mt-1">Try a different name or department</p>
+                                        </div>
+                                    )}
+                                </div>
+                            </motion.div>
                         </motion.div>
                     )}
                 </AnimatePresence>
