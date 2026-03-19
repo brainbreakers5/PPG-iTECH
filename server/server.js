@@ -55,6 +55,16 @@ const initDB = async () => {
                 console.error('--- Salary constraint check error:', e.message);
             }
         }
+        // Ensure push_subscriptions table exists
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS push_subscriptions (
+                id SERIAL PRIMARY KEY,
+                user_id VARCHAR(50) NOT NULL,
+                subscription JSONB NOT NULL UNIQUE,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        `);
+        console.log('--- Push Subscriptions Table Verified ---');
     } catch (err) {
         console.error('Database Initialization Error:', err);
     }
