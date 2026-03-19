@@ -82,11 +82,24 @@ exports.loginUser = async (req, res) => {
 exports.managementLogin = async (req, res) => {
     const { emp_id, pin } = req.body;
 
+    if (!pin) {
+        return res.status(400).json({ message: 'Please provide a PIN' });
+    }
+
     try {
-        const { rows: mgmtUsers } = await pool.query(
-            "SELECT id, name, pin, emp_id FROM users WHERE role = 'management' AND LOWER(emp_id) = LOWER($1)",
-            [(emp_id || '').trim()]
-        );
+        let query, params;
+
+        if (emp_id) {
+            // If emp_id provided, find that specific management user
+            query = "SELECT id, name, pin, emp_id FROM users WHERE role = 'management' AND LOWER(emp_id) = LOWER($1)";
+            params = [emp_id.trim()];
+        } else {
+            // Fallback: find any management user (supports the old button flow)
+            query = "SELECT id, name, pin, emp_id FROM users WHERE role = 'management' LIMIT 1";
+            params = [];
+        }
+
+        const { rows: mgmtUsers } = await pool.query(query, params);
 
         if (mgmtUsers.length === 0) {
             return res.status(401).json({ message: 'Invalid management ID' });
@@ -94,13 +107,14 @@ exports.managementLogin = async (req, res) => {
 
         const mgmt = mgmtUsers[0];
 
-        if (pin !== mgmt.pin) {
+        if (pin.trim() !== mgmt.pin) {
             return res.status(401).json({ message: 'Invalid management PIN' });
         }
 
         res.json({
             role: 'management',
             name: mgmt.name,
+            emp_id: mgmt.emp_id,
             token: generateToken(mgmt.id),
         });
     } catch (error) {
