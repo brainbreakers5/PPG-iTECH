@@ -8,6 +8,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import AttendanceHistory from '../../components/AttendanceHistory';
 import BiometricMonitor from '../../components/biometric/BiometricMonitor';
+import { formatTo12Hr, formatTimestamp } from '../../utils/timeFormatter';
 
 const AttendanceRecord = () => {
     const { user } = useAuth();
@@ -282,12 +283,12 @@ const AttendanceRecord = () => {
 
                 const inRow = uniqueDates.map(date => {
                     const rec = emp.records[date];
-                    return `<td style="border: 1px solid #e2e8f0; padding: 4px; text-align: center; font-size: 7pt; color: #475569;">${rec?.in_time ? rec.in_time.slice(0, 5) : '-'}</td>`;
+                    return `<td style="border: 1px solid #e2e8f0; padding: 4px; text-align: center; font-size: 7pt; color: #475569;">${rec?.in_time ? formatTo12Hr(rec.in_time) : '-'}</td>`;
                 }).join('');
 
                 const outRow = uniqueDates.map(date => {
                     const rec = emp.records[date];
-                    return `<td style="border: 1px solid #e2e8f0; padding: 4px; text-align: center; font-size: 7pt; color: #475569;">${rec?.out_time ? rec.out_time.slice(0, 5) : '-'}</td>`;
+                    return `<td style="border: 1px solid #e2e8f0; padding: 4px; text-align: center; font-size: 7pt; color: #475569;">${rec?.out_time ? formatTo12Hr(rec.out_time) : '-'}</td>`;
                 }).join('');
 
                 const totalRow = uniqueDates.map(date => {
@@ -343,7 +344,7 @@ const AttendanceRecord = () => {
                 title = 'Biometric Activity report';
                 listItems = biometricRecords;
                 listHeadings = ['#', 'ID', 'Name', 'Date', 'In', 'Out', 'Hrs', 'Status'];
-                getListRowData = (log, idx) => [idx + 1, log.user_id, log.name || log.user_id, new Date(String(log.date).slice(0, 10)).toLocaleDateString('en-GB'), log.intime, log.outtime, calculateBiometricHours(log.intime, log.outtime), log.outtime ? 'Comp' : 'Active'];
+                getListRowData = (log, idx) => [idx + 1, log.user_id, log.name || log.user_id, new Date(String(log.date).slice(0, 10)).toLocaleDateString('en-GB'), formatTo12Hr(log.intime), formatTo12Hr(log.outtime), calculateBiometricHours(log.intime, log.outtime), log.outtime ? 'Comp' : 'Active'];
             }
 
             const rowsHtml = listItems.map((item, idx) => `<tr>${getListRowData(item, idx).map(v => `<td>${escapeHtml(String(v ?? ''))}</td>`).join('')}</tr>`).join('');
@@ -389,7 +390,7 @@ const AttendanceRecord = () => {
                     </div>
                     <div class="print-time">
                         <div class="brand">PPG EMP HUB</div>
-                        <div class="gen-date">Generated: ${new Date().toLocaleString('en-GB')}</div>
+                        <div class="gen-date">Generated: ${formatTimestamp(new Date())}</div>
                     </div>
                 </div>
                 ${mainContentHtml}
@@ -424,7 +425,7 @@ const AttendanceRecord = () => {
                   !String(status).startsWith('Present')
                 ) && (
                     <span className="ml-1 opacity-70">
-                        ({inTime.slice(0, 5)} - {outTime.slice(0, 5)})
+                        ({formatTo12Hr(inTime)} - {formatTo12Hr(outTime)})
                     </span>
                 )}
             </span>
@@ -782,7 +783,7 @@ const AttendanceRecord = () => {
                                                         const rec = emp.records[date];
                                                         return (
                                                             <td key={date} className="border border-dotted border-gray-300 px-0.5 py-1.5 text-center text-[10px] font-semibold text-gray-600">
-                                                                {rec?.in_time || <span className="text-gray-300">&mdash;</span>}
+                                                                {rec?.in_time ? formatTo12Hr(rec.in_time) : <span className="text-gray-300">&mdash;</span>}
                                                             </td>
                                                         );
                                                     })}
@@ -796,7 +797,7 @@ const AttendanceRecord = () => {
                                                         const rec = emp.records[date];
                                                         return (
                                                             <td key={date} className="border border-dotted border-gray-300 px-0.5 py-1.5 text-center text-[10px] font-semibold text-gray-600">
-                                                                {rec?.out_time || <span className="text-gray-300">&mdash;</span>}
+                                                                {rec?.out_time ? formatTo12Hr(rec.out_time) : <span className="text-gray-300">&mdash;</span>}
                                                             </td>
                                                         );
                                                     })}
@@ -971,8 +972,8 @@ const AttendanceRecord = () => {
                                                         <td className="px-5 py-4">
                                                             <StatusBadge status={log.status} inTime={log.in_time} outTime={log.out_time} />
                                                         </td>
-                                                        <td className="px-5 py-4 text-sm font-black text-gray-700 text-center">{log.in_time || '—'}</td>
-                                                        <td className="px-5 py-4 text-sm font-black text-gray-700 text-center">{log.out_time || '—'}</td>
+                                                        <td className="px-5 py-4 text-sm font-black text-gray-700 text-center">{formatTo12Hr(log.in_time) || '—'}</td>
+                                                        <td className="px-5 py-4 text-sm font-black text-gray-700 text-center">{formatTo12Hr(log.out_time) || '—'}</td>
                                                         <td className="px-5 py-4 text-sm font-black text-sky-600 text-center">{calculateHours(log.in_time, log.out_time)}</td>
                                                         <td className="px-5 py-4 text-[10px] font-bold text-gray-500 italic text-center max-w-[300px] truncate" title={log.remarks}>
                                                             {log.remarks || '—'}
