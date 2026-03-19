@@ -33,6 +33,18 @@ const initDB = async () => {
             );
             console.log('--- Management User Created (ID: Management, PIN: 1234) ---');
         }
+
+        // Ensure salary_records unique constraint for ON CONFLICT
+        console.log('--- Checking salary_records constraint ---');
+        try {
+            await pool.query('ALTER TABLE salary_records ADD CONSTRAINT unique_salary_record UNIQUE (emp_id, month, year)');
+            console.log('--- Added unique constraint to salary_records ---');
+        } catch (e) {
+            // Log only if it's not a "already exists" error
+            if (!e.message.includes('already exists')) {
+                console.error('--- Salary constraint check error:', e.message);
+            }
+        }
     } catch (err) {
         console.error('Database Initialization Error:', err);
     }
