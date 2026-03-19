@@ -17,6 +17,7 @@ import {
 import api from '../../utils/api';
 import Layout from '../../components/Layout';
 import Swal from 'sweetalert2';
+import { formatTimestamp } from '../../utils/timeFormatter';
 
 const ActivityLogs = () => {
     const [logs, setLogs] = useState([]);
@@ -241,7 +242,7 @@ const ActivityLogs = () => {
                                                         </span>
                                                         <span className="text-slate-400 font-medium text-[11px] flex items-center gap-1">
                                                             <Clock size={10} />
-                                                            {new Date(log.created_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                                                            {formatTimestamp(log.created_at)}
                                                         </span>
                                                     </div>
                                                 </td>
