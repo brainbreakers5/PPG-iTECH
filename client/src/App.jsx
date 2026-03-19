@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { SocketProvider } from './context/SocketContext';
@@ -6,6 +6,7 @@ import Splash from './pages/Splash';
 import Login from './pages/Login';
 import InstallApp from './components/InstallApp.jsx';
 import ReloadPrompt from './components/ReloadPrompt.jsx';
+import Swal from 'sweetalert2';
 
 // Principal Pages
 import PrincipalDashboard from './pages/principal/Dashboard';
@@ -108,30 +109,25 @@ const AppContent = () => {
   const forceFullSplash = localStorage.getItem('force_full_splash') === 'true';
 
   useEffect(() => {
-    // Persistent Notification Permission Prompt
     const checkNotificationPermission = async () => {
-      // Small delay to ensure UI is ready after splash
-      if (!showSplash) {
-        if ('Notification' in window) {
-          if (Notification.permission === 'default') {
-            await Notification.requestPermission();
-          }
-          
-          if (Notification.permission !== 'granted') {
-            const Swal = (await import('sweetalert2')).default;
-            Swal.fire({
-              title: 'Mandatory Notification Sync',
-              text: Notification.permission === 'denied'
-                ? 'Your notifications are currently BLOCKED. To receive mandatory updates for punches, leaves, and system alerts, you MUST manually enable them in your browser/app settings.'
-                : 'To ensure your biometric punches and system updates are synchronized in real-time, please click ALLOW when prompted for notifications.',
-              icon: 'warning',
-              confirmButtonText: 'I Understand',
-              confirmButtonColor: '#0ea5e9',
-              allowOutsideClick: false,
-              allowEscapeKey: false,
-              footer: '<p style="font-size: 10px; color: #64748b; font-weight: bold; text-transform: uppercase;">Required for System Synchronization</p>'
-            });
-          }
+      if (!showSplash && 'Notification' in window) {
+        if (Notification.permission === 'default') {
+          await Notification.requestPermission();
+        }
+        
+        if (Notification.permission !== 'granted') {
+          Swal.fire({
+            title: 'Mandatory Notification Sync',
+            text: Notification.permission === 'denied'
+              ? 'Your notifications are currently BLOCKED. To receive mandatory updates for punches, leaves, and system alerts, you MUST manually enable them in your browser/app settings.'
+              : 'To ensure your biometric punches and system updates are synchronized in real-time, please click ALLOW when prompted for notifications.',
+            icon: 'warning',
+            confirmButtonText: 'I Understand',
+            confirmButtonColor: '#0ea5e9',
+            allowOutsideClick: false,
+            allowEscapeKey: false,
+            footer: '<p style="font-size: 10px; color: #64748b; font-weight: bold; text-transform: uppercase;">Required for System Synchronization</p>'
+          });
         }
       }
     };
