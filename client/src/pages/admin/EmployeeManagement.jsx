@@ -132,7 +132,7 @@ const EmployeeManagement = () => {
         const printWindow = window.open('', '_blank', 'width=1200,height=800');
         if (!printWindow) return;
 
-        const roleColors = { admin: '#7c3aed', principal: '#2563eb', hod: '#0891b2', staff: '#16a34a' };
+        const roleColors = { admin: '#7c3aed', management: '#db2777', principal: '#2563eb', hod: '#0891b2', staff: '#16a34a' };
         const escHtml = (v) => String(v ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 
         const rowsHtml = filteredEmployees.map((emp, idx) => `
@@ -327,7 +327,8 @@ const EmployeeManagement = () => {
                                             <td className="p-6">
                                                 <p className="text-sm text-gray-800 font-black tracking-tight">{emp.department_name}</p>
                                                 <div className="flex items-center gap-2 mt-1">
-                                                    <span className={`text-[8px] font-black uppercase px-2 py-0.5 rounded-md tracking-[0.1em] ${emp.role === 'admin' ? 'bg-violet-100 text-violet-600' :
+                                                     <span className={`text-[8px] font-black uppercase px-2 py-0.5 rounded-md tracking-[0.1em] ${emp.role === 'admin' ? 'bg-violet-100 text-violet-600' :
+                                                        emp.role === 'management' ? 'bg-pink-100 text-pink-600' :
                                                         emp.role === 'principal' ? 'bg-indigo-100 text-indigo-600' :
                                                             emp.role === 'hod' ? 'bg-sky-100 text-sky-600' : 'bg-gray-100 text-gray-500'
                                                         }`}>
