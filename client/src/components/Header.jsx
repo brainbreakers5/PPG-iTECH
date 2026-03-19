@@ -5,6 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import { useSocket } from '../context/SocketContext';
 import api from '../utils/api';
 import { motion, AnimatePresence } from 'framer-motion';
+import { Sparkles } from 'lucide-react';
 
 const Header = ({ toggleSidebar, sidebarOpen }) => {
     const navigate = useNavigate();
@@ -499,6 +500,17 @@ const Header = ({ toggleSidebar, sidebarOpen }) => {
                             </div>
                         )}
                     </div>
+
+                    {/* AI Assistant Trigger */}
+                    {!isManagement && (
+                        <button
+                            onClick={() => window.dispatchEvent(new CustomEvent('TOGGLE_AI_ASSISTANT'))}
+                            className="bg-white hover:bg-sky-50 text-sky-600 p-2.5 rounded-xl border border-sky-100 hover:border-sky-300 transition-all shadow-sm flex items-center justify-center group active:scale-95"
+                            title="AI Assistant"
+                        >
+                            <Sparkles className="text-lg group-hover:rotate-12 transition-transform h-5 w-5" />
+                        </button>
+                    )}
 
                     {!isManagement && (
                         <div className="relative" ref={notifRef}>
