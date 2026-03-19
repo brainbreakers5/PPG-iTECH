@@ -86,7 +86,7 @@ exports.getSalaryRecords = async (req, res) => {
         if (month) { query += ' AND s.month = $' + (params.push(month)); }
         if (year) { query += ' AND s.year = $' + (params.push(year)); }
 
-        if (req.user.role === 'staff') {
+        if (req.user.role === 'staff' || req.user.role === 'principal') {
             query += ' AND s.emp_id = $' + (params.push(req.user.emp_id));
         } else if (req.user.role === 'hod') {
             query += ' AND u.department_id = $' + (params.push(req.user.department_id));
