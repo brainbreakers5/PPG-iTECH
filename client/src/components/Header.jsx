@@ -346,13 +346,20 @@ const Header = ({ toggleSidebar, sidebarOpen }) => {
                     navigate(`/${role}/conversation`);
                 }
                 break;
+            case 'attendance':
+                if (role === 'admin') navigate('/admin/attendance');
+                else if (role === 'principal') navigate('/principal/attendance');
+                else if (role === 'hod') navigate('/hod/attendance');
+                else navigate('/staff/timetables');
+                break;
+            case 'login':
             case 'birthday':
+            case 'system':
                 if (metadata && metadata.emp_id) {
                     navigate(`/${role}/profile/${metadata.emp_id}`);
                 }
                 break;
             default:
-                // No navigation for system/biometric
                 break;
         }
     };
