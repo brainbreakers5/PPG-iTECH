@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { FaCalendarAlt, FaClock, FaHistory, FaCheckCircle, FaTimesCircle, FaBus } from 'react-icons/fa';
 import api from '../utils/api';
 import { useSocket } from '../context/SocketContext';
+import { formatTo12Hr } from '../utils/timeFormatter';
 
 const AttendanceHistory = ({ empId, month: propMonth, startDate, endDate, recentOnly = true, statusFilter = null, onLoadSummary = null }) => {
     const [records, setRecords] = useState([]);
@@ -286,7 +287,7 @@ const AttendanceHistory = ({ empId, month: propMonth, startDate, endDate, recent
                                                   !String(record.status).startsWith('Present +')
                                                 ) && (
                                                     <span className="ml-1 opacity-70">
-                                                        ({record.in_time.slice(0, 5)} - {record.out_time.slice(0, 5)})
+                                                        ({formatTo12Hr(record.in_time.slice(0, 5))} - {formatTo12Hr(record.out_time.slice(0, 5))})
                                                     </span>
                                                 )}
                                             </span>
@@ -295,13 +296,13 @@ const AttendanceHistory = ({ empId, month: propMonth, startDate, endDate, recent
                                     <td className="px-8 py-5">
                                         <div className="flex items-center gap-2">
                                             <FaClock className="text-gray-300 text-[10px]" />
-                                            <span className="text-[11px] font-black text-gray-600">{record.in_time || '—'}</span>
+                                            <span className="text-[11px] font-black text-gray-600">{formatTo12Hr(record.in_time)}</span>
                                         </div>
                                     </td>
                                     <td className="px-8 py-5">
                                         <div className="flex items-center gap-2">
                                             <FaClock className="text-gray-300 text-[10px]" />
-                                            <span className="text-[11px] font-black text-gray-600">{record.out_time || '—'}</span>
+                                            <span className="text-[11px] font-black text-gray-600">{formatTo12Hr(record.out_time)}</span>
                                         </div>
                                     </td>
                                     <td className="px-8 py-5">
