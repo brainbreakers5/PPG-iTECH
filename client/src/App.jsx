@@ -107,6 +107,38 @@ const AppContent = () => {
   const isAlreadyLogged = !!localStorage.getItem('token') || !!localStorage.getItem('managementAccess');
   const forceFullSplash = localStorage.getItem('force_full_splash') === 'true';
 
+  useEffect(() => {
+    // Persistent Notification Permission Prompt
+    const checkNotificationPermission = async () => {
+      // Small delay to ensure UI is ready after splash
+      if (!showSplash) {
+        if ('Notification' in window) {
+          if (Notification.permission === 'default') {
+            await Notification.requestPermission();
+          }
+          
+          if (Notification.permission !== 'granted') {
+            const Swal = (await import('sweetalert2')).default;
+            Swal.fire({
+              title: 'Mandatory Notification Sync',
+              text: Notification.permission === 'denied'
+                ? 'Your notifications are currently BLOCKED. To receive mandatory updates for punches, leaves, and system alerts, you MUST manually enable them in your browser/app settings.'
+                : 'To ensure your biometric punches and system updates are synchronized in real-time, please click ALLOW when prompted for notifications.',
+              icon: 'warning',
+              confirmButtonText: 'I Understand',
+              confirmButtonColor: '#0ea5e9',
+              allowOutsideClick: false,
+              allowEscapeKey: false,
+              footer: '<p style="font-size: 10px; color: #64748b; font-weight: bold; text-transform: uppercase;">Required for System Synchronization</p>'
+            });
+          }
+        }
+      }
+    };
+
+    checkNotificationPermission();
+  }, [showSplash]);
+
   if (showSplash) {
     if (forceFullSplash) {
       localStorage.removeItem('force_full_splash');
