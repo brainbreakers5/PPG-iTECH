@@ -9,6 +9,9 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
+      strategies: 'injectManifest',
+      srcDir: 'src',
+      filename: 'sw.js',
       registerType: 'prompt',
       manifestFilename: 'manifest.json',
       includeAssets: ['ppg-logo.png', 'ppg-bg.jpg'],
@@ -39,17 +42,9 @@ export default defineConfig({
           }
         ]
       },
-      workbox: {
+      injectManifest: {
         globPatterns: ['**/*.{js,css,html,png,jpg,jpeg,svg,woff2}'],
-        runtimeCaching: [
-          {
-            urlPattern: /^https:\/\/.*\/api\/.*/i,
-            handler: 'NetworkOnly',
-          }
-        ],
         cleanupOutdatedCaches: true,
-        clientsClaim: true,
-        skipWaiting: false, // Wait for manual reload
       }
     })
   ],
