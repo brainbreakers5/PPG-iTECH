@@ -9,6 +9,7 @@ import { useNavigate } from 'react-router-dom';
 import AttendanceHistory from '../../components/AttendanceHistory';
 import MonthlyDetailsModal from '../../components/MonthlyDetailsModal';
 import PersonalAttendanceChart from '../../components/PersonalAttendanceChart';
+import { formatTo12Hr } from '../../utils/timeFormatter';
 
 // ── Small helper components ─────────────────────────────────────────────────
 // InfoCard removed ... (it was already redundant or small)
@@ -548,7 +549,7 @@ const Dashboard = () => {
                                                               !String(attendanceMap[emp.emp_id]?.status).startsWith('Present')
                                                             ) && (
                                                                 <span className="ml-1 opacity-70">
-                                                                    ({attendanceMap[emp.emp_id].in_time.slice(0, 5)} - {attendanceMap[emp.emp_id].out_time.slice(0, 5)})
+                                                                    ({formatTo12Hr(attendanceMap[emp.emp_id].in_time)} - {formatTo12Hr(attendanceMap[emp.emp_id].out_time)})
                                                                 </span>
                                                             )}
                                                         </span>
