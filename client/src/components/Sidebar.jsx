@@ -102,11 +102,11 @@ const Sidebar = ({ userRole = 'staff', isOpen, onClose }) => {
 
   return (
     <div
-      className={`fixed left-0 top-0 h-screen w-20 bg-white/60 backdrop-blur-2xl border-r border-white/50 shadow-2xl z-40 flex flex-col overflow-hidden transition-transform duration-300 ease-in-out lg:translate-x-0 ${isOpen ? 'translate-x-0' : '-translate-x-full'
+      className={`fixed left-0 top-0 lg:top-[73px] h-screen lg:h-[calc(100vh-73px)] w-20 bg-white/60 backdrop-blur-2xl border-r border-white/50 shadow-2xl z-40 flex flex-col overflow-hidden transition-all duration-300 ease-in-out lg:translate-x-0 ${isOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
     >
-      {/* Header */}
-      <div className="p-4 border-b border-white/40 shrink-0">
+      {/* Header - No top border, below Header line */}
+      <div className="p-4 lg:p-3 bg-white/40 shrink-0">
         {/* User Role Portal */}
         <div className="flex flex-col items-center justify-center bg-gradient-to-br from-sky-50 to-blue-50 border border-sky-100 rounded-xl shadow-sm py-2">
           <div className="h-1.5 w-1.5 rounded-full bg-sky-600 animate-pulse mb-1" />
