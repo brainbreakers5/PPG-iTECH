@@ -185,7 +185,35 @@ const ActivityLogs = () => {
                                                 initial={{ opacity: 0, y: 10 }}
                                                 animate={{ opacity: 1, y: 0 }}
                                                 transition={{ delay: index * 0.02 }}
-                                                className="hover:bg-slate-50/50 transition-colors group cursor-default"
+                                                onClick={() => {
+                                                    if (log.details && Object.keys(log.details).length > 0) {
+                                                        const detailsList = Object.entries(log.details)
+                                                            .map(([key, value]) => `
+                                                                <div style="display: flex; justify-content: space-between; border-bottom: 1px solid #f1f5f9; padding: 6px 0;">
+                                                                    <span style="font-weight: 800; text-transform: uppercase; font-size: 10px; color: #64748b;">${key.replace(/_/g, ' ')}:</span>
+                                                                    <span style="font-weight: 500; font-size: 12px; color: #1e293b;">${value || '—'}</span>
+                                                                </div>
+                                                            `).join('');
+
+                                                        Swal.fire({
+                                                            title: `${log.action?.replace(/_/g, ' ')} Details`,
+                                                            html: `
+                                                                <div style="text-align: left; background: #f8fafc; border-radius: 12px; padding: 15px; margin-top: 10px;">
+                                                                    ${detailsList}
+                                                                </div>
+                                                            `,
+                                                            showConfirmButton: false,
+                                                            showCloseButton: true,
+                                                            width: '450px',
+                                                            background: '#ffffff',
+                                                            customClass: {
+                                                                popup: 'rounded-[30px] border-4 border-blue-50/50 shadow-2xl',
+                                                                title: 'text-2xl font-black text-slate-800 tracking-tight pt-5'
+                                                            }
+                                                        });
+                                                    }
+                                                }}
+                                                className={`hover:bg-slate-50/50 transition-colors group cursor-default ${log.details && Object.keys(log.details).length > 0 ? 'cursor-pointer' : ''}`}
                                             >
                                                 <td className="px-8 py-5">
                                                     <div className="flex flex-col">
