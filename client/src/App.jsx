@@ -98,16 +98,16 @@ const LoginRoute = () => {
 
 const AppContent = () => {
   const { user } = useAuth();
-
-  // Always show splash on every refresh
   const [showSplash, setShowSplash] = useState(true);
 
   const handleSplashFinish = () => {
     setShowSplash(false);
   };
 
+  const isAlreadyLogged = !!localStorage.getItem('token') || !!localStorage.getItem('managementAccess');
+
   if (showSplash) {
-    return <Splash onFinish={handleSplashFinish} />;
+    return <Splash onFinish={handleSplashFinish} isFast={isAlreadyLogged} />;
   }
 
   return (
