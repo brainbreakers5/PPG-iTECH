@@ -15,20 +15,21 @@ const ProfilePage = () => {
 
     useEffect(() => {
         const fetchUser = async () => {
-            if (authUser?.role === 'management') {
-                setTargetUser({ id: 'management', name: 'Management', role: 'management', emp_id: 'Management' });
-                setLoading(false);
-                return;
-            }
-            if (!id && !authUser?.emp_id) return;
-
             setLoading(true);
             try {
-                // Always fetch fresh data to get full details (DOB, address, etc.)
-                // since authUser state might be limited.
-                const targetId = id || authUser?.emp_id;
-                const { data } = await api.get(`/employees/${targetId}`);
-                setTargetUser(data);
+                if (id) {
+                    // Viewing another employee's profile by emp_id (management visiting dept staff profile)
+                    const { data } = await api.get(`/employees/${id}`);
+                    setTargetUser(data);
+                } else if (authUser?.role === 'management') {
+                    // Management viewing their OWN profile (no id in URL = header profile icon click)
+                    setTargetUser({ id: 'management', name: 'Management', role: 'management', emp_id: 'Management' });
+                } else {
+                    // Other roles viewing own profile
+                    if (!authUser?.emp_id) return;
+                    const { data } = await api.get(`/employees/${authUser.emp_id}`);
+                    setTargetUser(data);
+                }
             } catch (error) {
                 console.error("Error fetching profile", error);
             } finally {
@@ -58,8 +59,6 @@ const ProfilePage = () => {
                 <h1 className="text-xl font-black text-gray-800 tracking-tight uppercase tracking-widest">Personnel Profile</h1>
             </div>
 
-            {/* Reuse ProfileViewer but without the modal wrapper if possible, 
-                or just let it be the 'page content' */}
             <div className="relative">
                 <ProfileViewer user={targetUser} onClose={() => navigate(-1)} />
             </div>
