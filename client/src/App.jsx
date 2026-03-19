@@ -7,6 +7,7 @@ import Login from './pages/Login';
 import InstallApp from './components/InstallApp.jsx';
 import ReloadPrompt from './components/ReloadPrompt.jsx';
 import Swal from 'sweetalert2';
+import AiAssistant from './components/AiAssistant.jsx';
 
 // Principal Pages
 import PrincipalDashboard from './pages/principal/Dashboard';
@@ -323,6 +324,7 @@ function App() {
       <AuthProvider>
         <SocketProvider>
           <AppContent />
+          <AiAssistant />
         </SocketProvider>
       </AuthProvider>
 
