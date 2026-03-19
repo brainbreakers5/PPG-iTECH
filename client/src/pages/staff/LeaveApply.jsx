@@ -4,6 +4,7 @@ import Layout from '../../components/Layout';
 import api from '../../utils/api';
 import Swal from 'sweetalert2';
 import { useAuth } from '../../context/AuthContext';
+import { formatTo12Hr } from '../../utils/timeFormatter';
 import { useSocket } from '../../context/SocketContext';
 import {
     FaPaperPlane, FaUserFriends, FaHistory, FaCalendarCheck,
@@ -1241,11 +1242,7 @@ const LeaveApply = () => {
                                                             <FaClock size={10} className="text-teal-400" /> 
                                                             {perm.from_time === '09:00:00' ? 'Half Day AM' : perm.from_time === '13:30:00' || perm.from_time === '13:00:00' ? 'Half Day PM' : 'Permission'}
                                                             {' ('}
-                                                            {(() => {
-                                                                const f = new Date('2000-01-01T' + perm.from_time).toLocaleTimeString('en-US', {hour:'2-digit', minute:'2-digit', hour12: true});
-                                                                const t = new Date('2000-01-01T' + perm.to_time).toLocaleTimeString('en-US', {hour:'2-digit', minute:'2-digit', hour12: true});
-                                                                return `${f} - ${t}`;
-                                                            })()}
+                                                            {formatTo12Hr(perm.from_time)} - {formatTo12Hr(perm.to_time)}
                                                             {')'}
                                                         </span>
                                                     </div>
@@ -1325,8 +1322,8 @@ const LeaveApply = () => {
                                                         <span className="text-[8px] font-black uppercase tracking-widest px-2 py-1 rounded-lg bg-purple-50 text-purple-600">Holiday</span>
                                                     </div>
                                                     <div className="flex items-center gap-4 mb-5 text-[10px] font-bold text-gray-500">
-                                                        <span className="flex items-center gap-1"><FaClock size={10} className="text-emerald-400" /> In: {inTime}</span>
-                                                        <span className="flex items-center gap-1"><FaClock size={10} className="text-rose-400" /> Out: {outTime}</span>
+                                                        <span className="flex items-center gap-1"><FaClock size={10} className="text-emerald-400" /> In: {formatTo12Hr(d.in_time)}</span>
+                                                        <span className="flex items-center gap-1"><FaClock size={10} className="text-rose-400" /> Out: {formatTo12Hr(d.out_time)}</span>
                                                     </div>
                                                     <button
                                                         onClick={() => handleCompRequest(d.date)}
@@ -1506,7 +1503,7 @@ const LeaveApply = () => {
                                                                     try {
                                                                         const details = typeof leave.dates_detail === 'string' ? JSON.parse(leave.dates_detail) : leave.dates_detail;
                                                                         if (details && details.length === 1 && !details[0].is_full_day) {
-                                                                            return ` (${details[0].from_time} - ${details[0].to_time})`;
+                                                                            return ` (${formatTo12Hr(details[0].from_time)} - ${formatTo12Hr(details[0].to_time)})`;
                                                                         }
                                                                     } catch (e) { }
                                                                     return '';
@@ -1520,7 +1517,7 @@ const LeaveApply = () => {
                                                                 try {
                                                                     const details = typeof leave.dates_detail === 'string' ? JSON.parse(leave.dates_detail) : leave.dates_detail;
                                                                     if (details && details.length === 1 && !details[0].is_full_day) {
-                                                                        return ` | ${details[0].from_time} - ${details[0].to_time}`;
+                                                                        return ` | ${formatTo12Hr(details[0].from_time)} - ${formatTo12Hr(details[0].to_time)}`;
                                                                     }
                                                                 } catch (e) { }
                                                                 return '';
@@ -1619,7 +1616,7 @@ const LeaveApply = () => {
                                                                             try {
                                                                                 const details = typeof leave.dates_detail === 'string' ? JSON.parse(leave.dates_detail) : leave.dates_detail;
                                                                                 if (details && details.length === 1 && !details[0].is_full_day) {
-                                                                                    return ` (${details[0].from_time} - ${details[0].to_time})`;
+                                                                                    return ` (${formatTo12Hr(details[0].from_time)} - ${formatTo12Hr(details[0].to_time)})`;
                                                                                 }
                                                                             } catch (e) { }
                                                                             return '';
@@ -1725,9 +1722,7 @@ const LeaveApply = () => {
                                                     try {
                                                         const details = typeof leave.dates_detail === 'string' ? JSON.parse(leave.dates_detail) : leave.dates_detail;
                                                         if (details && details.length === 1 && !details[0].is_full_day) {
-                                                            return new Date(leave.from_date).toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'Asia/Kolkata' });
-                                                        } else if (details && details.length === 1 && !details[0].is_full_day) {
-                                                            return `${new Date(leave.from_date).toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'Asia/Kolkata' })} | ${details[0].from_time} - ${details[0].to_time}`;
+                                                            return `${new Date(leave.from_date).toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'Asia/Kolkata' })} | ${formatTo12Hr(details[0].from_time)} - ${formatTo12Hr(details[0].to_time)}`;
                                                         }
                                                     } catch (e) { }
                                                     return new Date(leave.from_date).toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'Asia/Kolkata' });
