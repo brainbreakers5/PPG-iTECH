@@ -104,38 +104,6 @@ const Header = ({ toggleSidebar, sidebarOpen }) => {
     }, []);
 
     useEffect(() => {
-        // Mandatory and Persistent Notification Permission Request
-        const requestNotificationPermission = async () => {
-            if (!('Notification' in window)) return;
-
-            if (Notification.permission === 'default') {
-                const permission = await Notification.requestPermission();
-                if (permission !== 'granted') {
-                    showMandatoryModal();
-                }
-            } else if (Notification.permission === 'denied') {
-                showMandatoryModal(true);
-            }
-        };
-
-        const showMandatoryModal = (isDenied = false) => {
-            Swal.fire({
-                title: 'System Notification Required',
-                text: isDenied 
-                    ? 'Your notifications are blocked. To receive mandatory updates for Biometric Punches and Leave Status, you MUST manually enable notifications in your browser/app settings.'
-                    : 'To ensure synchronization and receive mandatory live alerts for your punches and system updates, please click ALLOW when prompted for notifications.',
-                icon: 'warning',
-                showCancelButton: false,
-                confirmButtonText: 'I Understood, I will enable it',
-                confirmButtonColor: '#0ea5e9',
-                allowOutsideClick: false,
-                allowEscapeKey: false,
-                footer: '<p style="font-size: 10px; color: #64748b; font-weight: bold;">MANDATORY SYSTEM SYNC</p>'
-            });
-        };
-
-        requestNotificationPermission();
-
         if (user?.dob) {
             const today = new Date();
             const dob = new Date(user.dob);
