@@ -4,6 +4,7 @@ import api from '../../utils/api';
 import { FaFileDownload, FaSearch, FaFingerprint, FaClock, FaIdBadge, FaCalendarDay, FaSync } from 'react-icons/fa';
 import { motion, AnimatePresence } from 'framer-motion';
 import Swal from 'sweetalert2';
+import { formatTo12Hr } from '../../utils/timeFormatter';
 
 const BiometricHistory = () => {
     const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
@@ -77,8 +78,8 @@ const BiometricHistory = () => {
                 <td>${log.name || log.user_id}</td>
                 <td>${log.department_name || '-'}</td>
                 <td>${new Date(log.date).toLocaleDateString('en-GB')}</td>
-                <td>${log.intime || '--:--'}</td>
-                <td>${log.outtime || '--:--'}</td>
+                <td>${formatTo12Hr(log.intime)}</td>
+                <td>${formatTo12Hr(log.outtime)}</td>
                 <td>${calculateHours(log.intime, log.outtime)}</td>
                 <td>${log.outtime ? 'Completed' : 'Active'}</td>
             </tr>
@@ -266,12 +267,12 @@ const BiometricHistory = () => {
                                                 <div className="flex justify-center gap-3">
                                                     <div className="text-center group">
                                                         <p className="text-[8px] font-black text-emerald-500 uppercase mb-0.5 group-hover:scale-110 transition-transform">In</p>
-                                                        <p className="text-[10px] font-black text-gray-700">{log.intime || '--:--'}</p>
+                                                        <p className="text-[10px] font-black text-gray-700">{formatTo12Hr(log.intime)}</p>
                                                     </div>
                                                     <div className="w-px h-8 bg-gray-100 self-center" />
                                                     <div className="text-center group">
                                                         <p className="text-[8px] font-black text-rose-500 uppercase mb-0.5 group-hover:scale-110 transition-transform">Out</p>
-                                                        <p className="text-[10px] font-black text-gray-700">{log.outtime || '--:--'}</p>
+                                                        <p className="text-[10px] font-black text-gray-700">{formatTo12Hr(log.outtime)}</p>
                                                     </div>
                                                 </div>
                                             </td>
