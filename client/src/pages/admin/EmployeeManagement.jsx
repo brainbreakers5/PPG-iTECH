@@ -252,8 +252,7 @@ const EmployeeManagement = () => {
                             >
                                 <option value="">Global Roles</option>
                                 <option value="admin">Executive (Admin)</option>
-                                <option value="management">Directorship (Management)</option>
-                                <option value="principal">Management (Principal)</option>
+                                <option value="principal">Principal</option>
                                 <option value="hod">Supervisory (HOD)</option>
                                 <option value="staff">Operations (Staff)</option>
                             </select>
@@ -328,12 +327,14 @@ const EmployeeManagement = () => {
                                                 <p className="text-sm text-gray-800 font-black tracking-tight">{emp.department_name}</p>
                                                 <div className="flex items-center gap-2 mt-1">
                                                      <span className={`text-[8px] font-black uppercase px-2 py-0.5 rounded-md tracking-[0.1em] ${emp.role === 'admin' ? 'bg-violet-100 text-violet-600' :
-                                                        emp.role === 'management' ? 'bg-pink-100 text-pink-600' :
                                                         emp.role === 'principal' ? 'bg-indigo-100 text-indigo-600' :
                                                             emp.role === 'hod' ? 'bg-sky-100 text-sky-600' : 'bg-gray-100 text-gray-500'
                                                         }`}>
-                                                        {emp.role}
-                                                    </span>
+                                                        {emp.role === 'admin' ? 'Admin' :
+                                                         emp.role === 'principal' ? 'Principal' :
+                                                         emp.role === 'hod' ? 'HOD' :
+                                                         emp.role === 'staff' ? 'Staff' : emp.role}
+                                                     </span>
                                                     <span className="text-[9px] text-gray-400 font-bold uppercase tracking-widest">• {emp.designation}</span>
                                                 </div>
                                             </td>
