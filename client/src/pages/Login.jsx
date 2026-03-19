@@ -40,9 +40,43 @@ const Login = () => {
     const [userRole, setUserRole] = useState('');
     const [expectedPinLength, setExpectedPinLength] = useState(4); // Default to 4
 
+    const [idAttempts, setIdAttempts] = useState(() => Number(localStorage.getItem('id_attempts')) || 0);
+    const [pinAttempts, setPinAttempts] = useState(() => Number(localStorage.getItem('pin_attempts')) || 0);
+    const [mgmtAttempts, setMgmtAttempts] = useState(() => Number(localStorage.getItem('mgmt_attempts')) || 0);
+
+    const checkLockout = (type) => {
+        const lockKey = `${type}_lock_until`;
+        const lockUntil = localStorage.getItem(lockKey);
+        if (lockUntil) {
+            const timeLeft = Number(lockUntil) - Date.now();
+            if (timeLeft > 0) {
+                const minutes = Math.ceil(timeLeft / 60000);
+                const hours = Math.floor(timeLeft / 3600000);
+                let message = `System locked due to multiple failed attempts. Try again in ${minutes} minute(s).`;
+                if (hours > 0) message = `System locked. Try again in ${hours} hour(s) and ${minutes % 60} minute(s).`;
+                
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'Security Lockout',
+                    text: message,
+                    confirmButtonColor: '#2563eb'
+                });
+                return true;
+            } else {
+                localStorage.removeItem(lockKey);
+                localStorage.setItem(`${type}_attempts`, '0');
+                if (type === 'id') setIdAttempts(0);
+                if (type === 'pin') setPinAttempts(0);
+                if (type === 'mgmt') setMgmtAttempts(0);
+            }
+        }
+        return false;
+    };
+
     const handleCheckId = async (e) => {
         if (e) e.preventDefault();
         if (!empId.trim()) return;
+        if (checkLockout('id')) return;
 
         setLoading(true);
         try {
@@ -52,15 +86,33 @@ const Login = () => {
                 setUserRole(data.role || '');
                 setStep('pin');
                 setExpectedPinLength(data.pin_length || 4);
+                // Clear ID attempts on successful ID find
+                localStorage.setItem('id_attempts', '0');
+                setIdAttempts(0);
             }
         } catch (error) {
             console.error('❌ Check ID error:', error);
-            Swal.fire({
-                icon: 'error',
-                title: 'Invalid ID',
-                text: error.response?.data?.message || 'Employee ID not found',
-                confirmButtonColor: '#2563eb'
-            });
+            const newAttempts = idAttempts + 1;
+            setIdAttempts(newAttempts);
+            localStorage.setItem('id_attempts', String(newAttempts));
+
+            if (newAttempts >= 3) {
+                const lockUntil = Date.now() + 30 * 60 * 1000; // 30 mins
+                localStorage.setItem('id_lock_until', String(lockUntil));
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Too Many Attempts',
+                    text: 'Employee ID identification failed 3 times. Access locked for 30 minutes.',
+                    confirmButtonColor: '#2563eb'
+                });
+            } else {
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Invalid ID',
+                    text: `Employee ID not found. ${3 - newAttempts} attempts remaining.`,
+                    confirmButtonColor: '#2563eb'
+                });
+            }
         } finally {
             setLoading(false);
         }
@@ -70,6 +122,7 @@ const Login = () => {
         if (e) e.preventDefault();
         const finalPin = manualPin !== null ? manualPin : pin;
         if (!finalPin.trim()) return;
+        if (checkLockout('pin')) return;
 
         // Validation for length
         if (expectedPinLength === '4or6') {
@@ -84,6 +137,10 @@ const Login = () => {
             const data = await login(empId.trim(), finalPin.trim(), userRole);
             console.log('✅ Login successful:', data);
             
+            // Clear PIN attempts on success
+            localStorage.setItem('pin_attempts', '0');
+            setPinAttempts(0);
+
             // Show success message
             Swal.fire({
                 icon: 'success',
@@ -120,11 +177,18 @@ const Login = () => {
             console.error('❌ Login error:', error);
             setLoading(false);
             
-            let errorMessage = 'Invalid credentials';
-            if (error.response?.status === 401) {
-                errorMessage = 'Invalid Security PIN';
+            const newAttempts = pinAttempts + 1;
+            setPinAttempts(newAttempts);
+            localStorage.setItem('pin_attempts', String(newAttempts));
+
+            let errorMessage = `Invalid Security PIN. ${3 - newAttempts} attempts remaining.`;
+            
+            if (newAttempts >= 3) {
+                const lockUntil = Date.now() + 60 * 60 * 1000; // 1 hour
+                localStorage.setItem('pin_lock_until', String(lockUntil));
+                errorMessage = 'Too many failed attempts. Security PIN access locked for 1 hour.';
             } else if (error.response?.data?.message) {
-                errorMessage = error.response.data.message;
+                errorMessage = `${error.response.data.message}. ${3 - newAttempts} attempts remaining.`;
             }
             
             Swal.fire({
@@ -314,6 +378,8 @@ const Login = () => {
                         whileHover={{ scale: 1.05 }}
                         whileTap={{ scale: 0.95 }}
                         onClick={() => {
+                            if (checkLockout('mgmt')) return;
+                            
                             Swal.fire({
                                 title: 'Management Access',
                                 input: 'password',
@@ -340,8 +406,17 @@ const Login = () => {
                                         const { data } = await api.post('/auth/management-login', { emp_id: 'Management', pin: String(value) });
                                         return data;
                                     } catch (err) {
+                                        const curAcc = Number(localStorage.getItem('mgmt_attempts')) || 0;
+                                        const nextAcc = curAcc + 1;
+                                        localStorage.setItem('mgmt_attempts', String(nextAcc));
+                                        
+                                        if (nextAcc >= 3) {
+                                            const lockUntil = Date.now() + 60 * 1000; // 1 min
+                                            localStorage.setItem('mgmt_lock_until', String(lockUntil));
+                                        }
+
                                         Swal.showValidationMessage(
-                                            err.response?.data?.message || 'Connection failed. Is the server running?'
+                                            `${err.response?.data?.message || 'Invalid PIN'}. ${3 - nextAcc} attempts remaining.`
                                         );
                                         return false;
                                     }
@@ -353,6 +428,11 @@ const Login = () => {
                                     localStorage.setItem('managementAccess', 'true');
                                     sessionStorage.setItem('managementAccess', 'true');
                                     localStorage.setItem('lastRole', 'management');
+                                    
+                                    // Clear management attempts on success
+                                    localStorage.setItem('mgmt_attempts', '0');
+                                    setMgmtAttempts(0);
+
                                     Swal.fire({
                                         icon: 'success',
                                         title: 'Welcome!',
