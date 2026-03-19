@@ -153,7 +153,7 @@ const SalaryManagement = () => {
         .replace(/'/g, '&#39;');
 
     const handlePrint = () => {
-        const items = salaries.filter(s => activeRole === 'all' || s.role === activeRole);
+        const items = salaries.filter(s => activeRole === 'all' || (s.role || '').toLowerCase() === activeRole.toLowerCase());
         if (!items || items.length === 0) return;
 
         const printWindow = window.open('', '_blank', 'width=1200,height=800');
@@ -282,7 +282,7 @@ const SalaryManagement = () => {
             <body>
                 <div class="print-brand">
                     <p class="app-name">PPG EMP HUB</p>
-                    <p class="print-time">${new Date().toLocaleString('en-GB')}</p>
+                    <p class="print-time">${new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })}</p>
                 </div>
                 <h1>${escapeHtml(title)}</h1>
                 <div class="meta">
@@ -477,7 +477,7 @@ const SalaryManagement = () => {
                                     <tbody className="divide-y divide-gray-50/50">
                                         <AnimatePresence mode="popLayout">
                                             {salaries
-                                                .filter(s => activeRole === 'all' || s.role === activeRole)
+                                                .filter(s => activeRole === 'all' || (s.role || '').toLowerCase() === activeRole.toLowerCase())
                                                 .map((s, idx) => (
                                                     <motion.tr
                                                         key={s.id}
@@ -588,7 +588,7 @@ const SalaryManagement = () => {
                         </div>
                         <h3 className="text-4xl font-black text-gray-800 tracking-tighter relative z-10">
                             ₹{salaries
-                                .filter(s => activeRole === 'all' || s.role === activeRole)
+                                .filter(s => activeRole === 'all' || (s.role || '').toLowerCase() === activeRole.toLowerCase())
                                 .reduce((acc, curr) => acc + parseFloat(curr.calculated_salary), 0).toLocaleString()}
                         </h3>
                     </motion.div>
@@ -613,7 +613,7 @@ const SalaryManagement = () => {
                         </div>
                         <h3 className="text-4xl font-black text-gray-800 tracking-tighter relative z-10">
                             ₹{salaries
-                                .filter(s => (activeRole === 'all' || s.role === activeRole) && s.status === 'Paid')
+                                .filter(s => (activeRole === 'all' || (s.role || '').toLowerCase() === activeRole.toLowerCase()) && s.status === 'Paid')
                                 .reduce((acc, curr) => acc + parseFloat(curr.calculated_salary), 0).toLocaleString()}
                         </h3>
                     </motion.div>
@@ -638,7 +638,7 @@ const SalaryManagement = () => {
                         </div>
                         <h3 className="text-4xl font-black text-gray-800 tracking-tighter relative z-10">
                             ₹{salaries
-                                .filter(s => (activeRole === 'all' || s.role === activeRole) && s.status === 'Pending')
+                                .filter(s => (activeRole === 'all' || (s.role || '').toLowerCase() === activeRole.toLowerCase()) && s.status === 'Pending')
                                 .reduce((acc, curr) => acc + parseFloat(curr.calculated_salary), 0).toLocaleString()}
                         </h3>
                     </motion.div>
