@@ -167,7 +167,7 @@ const Sidebar = ({ userRole = 'staff', isOpen, onClose }) => {
           title="Logout"
         >
           <FaSignOutAlt className="text-lg mb-1" />
-          <span className="text-[7px] font-black uppercase">Out</span>
+          <span className="text-[7px] font-black uppercase tracking-widest">Logout</span>
         </button>
       </div>
     </div>
