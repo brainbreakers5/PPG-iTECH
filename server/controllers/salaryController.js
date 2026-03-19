@@ -41,8 +41,12 @@ exports.calculateSalary = async (req, res) => {
             const totalLop = parseInt(stats[0].total_lop) || 0;
 
             const totalDays = 30; // Standard month
-            const salaryPerDay = user.monthly_salary / totalDays;
+            const baseSalary = parseFloat(user.monthly_salary) || 0;
+            const salaryPerDay = baseSalary / totalDays;
             const calculatedAmount = (salaryPerDay * payableDays).toFixed(2);
+            
+            // Ensure we don't insert "NaN"
+            const finalPay = isNaN(calculatedAmount) ? "0.00" : calculatedAmount;
 
             await pool.query(`
                 INSERT INTO salary_records (emp_id, month, year, total_present, total_leave, total_lop, calculated_salary, status)
@@ -52,7 +56,7 @@ exports.calculateSalary = async (req, res) => {
                 total_leave = EXCLUDED.total_leave, 
                 total_lop = EXCLUDED.total_lop,
                 calculated_salary = EXCLUDED.calculated_salary
-             `, [user.emp_id, month, year, payableDays, 0, totalLop, calculatedAmount]);
+             `, [user.emp_id, month, year, payableDays, 0, totalLop, finalPay]);
 
             results.push({
                 emp_id: user.emp_id,
