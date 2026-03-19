@@ -63,7 +63,7 @@ const Layout = ({ children }) => {
                     />
                 )}
 
-                <main className="flex-1 overflow-x-hidden overflow-y-auto p-4 md:p-8 no-scrollbar scroll-smooth transition-all duration-500 ease-in-out ml-0 lg:ml-20">
+                <main className={`flex-1 overflow-x-hidden ${sidebarOpen ? 'overflow-y-hidden lg:overflow-y-auto' : 'overflow-y-auto'} p-4 md:p-8 no-scrollbar scroll-smooth transition-all duration-500 ease-in-out ml-0 lg:ml-20`}>
                     <div className="max-w-7xl mx-auto space-y-6 animate-fade-in relative z-10">
                         {/* Real-time Dashboard Clock - Top Right (Only on Dashboards) */}
                         {['/admin', '/principal', '/hod', '/staff', '/management'].includes(location.pathname) && (
