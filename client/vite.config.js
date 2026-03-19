@@ -44,7 +44,6 @@ export default defineConfig({
       },
       injectManifest: {
         globPatterns: ['**/*.{js,css,html,png,jpg,jpeg,svg,woff2}'],
-        cleanupOutdatedCaches: true,
       }
     })
   ],
