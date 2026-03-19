@@ -192,10 +192,10 @@ const DepartmentStaffPage = () => {
                                         >
                                             <td className="py-4 px-6">
                                                 <div className="flex items-center gap-4">
-                                                    <img 
-                                                        src={member.profile_pic || `https://ui-avatars.com/api/?name=${encodeURIComponent(member.name)}&size=80&background=2563eb&color=fff&bold=true`} 
-                                                        className="w-12 h-12 rounded-[14px] object-cover shadow-sm bg-gray-100 border border-gray-100" 
-                                                        alt="" 
+                                                    <img
+                                                        src={member.profile_pic || `https://ui-avatars.com/api/?name=${encodeURIComponent(member.name)}&size=80&background=2563eb&color=fff&bold=true`}
+                                                        className="w-12 h-12 rounded-[14px] object-cover shadow-sm bg-gray-100 border border-gray-100"
+                                                        alt=""
                                                     />
                                                     <div>
                                                         <h3 className="text-sm font-black text-gray-800 tracking-tight group-hover/row:text-sky-600 transition-colors uppercase">{member.name}</h3>
@@ -230,26 +230,26 @@ const DepartmentStaffPage = () => {
                                                     >
                                                         <FaEye size={12} /> <span className="hidden sm:inline">Profile</span>
                                                     </button>
-                                                    <button
-                                                        onClick={() => {
-                                                            if (isManagement) {
-                                                                navigate(-1);
-                                                            } else if (user?.role === 'admin') {
-                                                                navigate(`/admin/timetable/${member.emp_id}`);
-                                                            } else if (user?.role === 'principal') {
-                                                                navigate(`/principal/timetable/${member.emp_id}`);
-                                                            } else if (user?.role === 'hod') {
-                                                                navigate(`/hod/timetable/${member.emp_id}`);
-                                                            } else {
-                                                                navigate(`/staff/timetables/${member.emp_id}`);
-                                                            }
-                                                            window.dispatchEvent(new CustomEvent('closeSidebar'));
-                                                        }}
-                                                        className="h-10 px-4 bg-gray-900 text-white rounded-xl flex items-center justify-center hover:bg-black shadow-lg shadow-gray-200 active:scale-95 transition-all text-[9.5px] font-black uppercase tracking-wider gap-2"
-                                                        title="View Schedule"
-                                                    >
-                                                        <FaCalendarAlt size={12} /> <span className="hidden xl:inline">Schedule</span>
-                                                    </button>
+                                                    {!isManagement && (
+                                                        <button
+                                                            onClick={() => {
+                                                                if (user?.role === 'admin') {
+                                                                    navigate(`/admin/timetable/${member.emp_id}`);
+                                                                } else if (user?.role === 'principal') {
+                                                                    navigate(`/principal/timetable/${member.emp_id}`);
+                                                                } else if (user?.role === 'hod') {
+                                                                    navigate(`/hod/timetable/${member.emp_id}`);
+                                                                } else {
+                                                                    navigate(`/staff/timetables/${member.emp_id}`);
+                                                                }
+                                                                window.dispatchEvent(new CustomEvent('closeSidebar'));
+                                                            }}
+                                                            className="h-10 px-4 bg-gray-900 text-white rounded-xl flex items-center justify-center hover:bg-black shadow-lg shadow-gray-200 active:scale-95 transition-all text-[9.5px] font-black uppercase tracking-wider gap-2"
+                                                            title="View Schedule"
+                                                        >
+                                                            <FaCalendarAlt size={12} /> <span className="hidden xl:inline">Schedule</span>
+                                                        </button>
+                                                    )}
                                                 </div>
                                             </td>
                                         </motion.tr>
