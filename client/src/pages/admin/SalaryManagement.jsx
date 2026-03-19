@@ -41,8 +41,8 @@ const SalaryManagement = () => {
             const m = d.getMonth() + 1;
             const y = d.getFullYear();
             const { data } = await api.get(`/salary?month=${m}&year=${y}`);
-            // Staff and HOD should only see their own salary
-            if (user.role === 'staff' || user.role === 'hod') {
+            // Staff, HOD, and Principal should only see their own salary
+            if (user.role === 'staff' || user.role === 'hod' || user.role === 'principal') {
                 setSalaries(data.filter(s => s.emp_id === user.emp_id));
             } else {
                 setSalaries(data);
@@ -358,8 +358,8 @@ const SalaryManagement = () => {
                     </div>
                 </div>
 
-                {/* Role Tabs - Only for Admin and Principal */}
-                {(user.role === 'admin' || user.role === 'principal') && (
+                {/* Role Tabs - Only for Admin */}
+                {user.role === 'admin' && (
                     <div className="flex flex-wrap gap-4 mb-10 no-print">
                         {[
                             { id: 'all', label: 'All Personnel', icon: <FaChartLine /> },
