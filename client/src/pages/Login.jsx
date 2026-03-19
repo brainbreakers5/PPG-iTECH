@@ -44,18 +44,6 @@ const Login = () => {
     const [pinAttempts, setPinAttempts] = useState(() => Number(localStorage.getItem('pin_attempts')) || 0);
     const [mgmtAttempts, setMgmtAttempts] = useState(() => Number(localStorage.getItem('mgmt_attempts')) || 0);
 
-    useEffect(() => {
-        // Initial check for lockouts on mount
-        const types = ['id', 'pin', 'mgmt'];
-        for (const type of types) {
-            const lockUntil = localStorage.getItem(`${type}_lock_until`);
-            if (lockUntil && Number(lockUntil) > Date.now()) {
-                checkLockout(type);
-                break; // Show one at a time
-            }
-        }
-    }, []);
-
     const checkLockout = (type) => {
         const lockKey = `${type}_lock_until`;
         const lockUntil = localStorage.getItem(lockKey);
