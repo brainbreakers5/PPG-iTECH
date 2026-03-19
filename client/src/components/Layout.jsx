@@ -38,30 +38,32 @@ const Layout = ({ children }) => {
     </div>;
 
     return (
-        <div className="flex h-screen bg-transparent overflow-hidden font-sans">
-            {/* Sidebar */}
-            <Sidebar
-                userRole={effectiveRole}
-                isOpen={sidebarOpen}
-                onToggle={() => setSidebarOpen(!sidebarOpen)}
-                onClose={() => setSidebarOpen(false)}
+        <div className="flex flex-col h-screen bg-transparent overflow-hidden font-sans">
+            {/* Full-width Top Header (Desktop & Mobile) */}
+            <Header
+                toggleSidebar={() => setSidebarOpen(!sidebarOpen)}
+                sidebarOpen={sidebarOpen}
             />
 
-            {/* Backdrop for mobile */}
-            {sidebarOpen && (
-                <div
-                    className="fixed inset-0 bg-sky-900/20 backdrop-blur-sm lg:hidden z-30 transition-all duration-500"
-                    onClick={() => setSidebarOpen(false)}
-                />
-            )}
-
-            <div className={`flex-1 flex flex-col overflow-hidden transition-all duration-500 ease-in-out ml-0 lg:ml-20`}>
-                <Header
-                    toggleSidebar={() => setSidebarOpen(!sidebarOpen)}
-                    sidebarOpen={sidebarOpen}
+            <div className="flex flex-1 overflow-hidden relative">
+                {/* Sidebar - Positioned below header on desktop */}
+                <Sidebar
+                    userRole={effectiveRole}
+                    isOpen={sidebarOpen}
+                    onToggle={() => setSidebarOpen(!sidebarOpen)}
+                    onClose={() => setSidebarOpen(false)}
                 />
 
-                <main className="flex-1 overflow-x-hidden overflow-y-auto p-4 md:p-8 no-scrollbar scroll-smooth">
+                {/* Backdrop for mobile */}
+                {sidebarOpen && (
+                    <div
+                        className="fixed inset-0 bg-sky-900/20 backdrop-blur-sm lg:hidden z-30 transition-all duration-500"
+                        onClick={() => setSidebarOpen(false)}
+                        style={{ top: '80px' }} // Starts below header
+                    />
+                )}
+
+                <main className="flex-1 overflow-x-hidden overflow-y-auto p-4 md:p-8 no-scrollbar scroll-smooth transition-all duration-500 ease-in-out ml-0 lg:ml-20">
                     <div className="max-w-7xl mx-auto space-y-6 animate-fade-in relative z-10">
                         {/* Real-time Dashboard Clock - Top Right (Only on Dashboards) */}
                         {['/admin', '/principal', '/hod', '/staff', '/management'].includes(location.pathname) && (
