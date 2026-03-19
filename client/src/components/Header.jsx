@@ -538,8 +538,11 @@ const Header = ({ toggleSidebar, sidebarOpen }) => {
                     <div
                         className="flex items-center space-x-3 cursor-pointer hover:bg-gray-50 transition-all px-2 py-1 rounded-2xl group"
                         onClick={() => {
-                            if (isManagement) return;
-                            navigate(`/${effectiveRole}/profile/${user.emp_id}`);
+                            if (isManagement) {
+                                navigate('/management/profile');
+                            } else {
+                                navigate(`/${effectiveRole}/profile/${user.emp_id}`);
+                            }
                             window.dispatchEvent(new CustomEvent('closeSidebar'));
                         }}
                     >
