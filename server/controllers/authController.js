@@ -288,12 +288,12 @@ exports.updateManagementProfile = async (req, res) => {
             );
         } else if (pin) {
             await pool.query(
-                "UPDATE users SET pin = $1 WHERE id = $3",
+                "UPDATE users SET pin = $1 WHERE id = $2",
                 [pin.trim(), mgmtId]
             );
         } else if (emp_id) {
             await pool.query(
-                "UPDATE users SET emp_id = $1 WHERE id = $3",
+                "UPDATE users SET emp_id = $1 WHERE id = $2",
                 [emp_id.trim(), mgmtId]
             );
         }
