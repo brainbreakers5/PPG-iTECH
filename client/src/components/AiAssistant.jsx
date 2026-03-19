@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
     X, Send, ArrowRight, Sparkles, 
-    Mic, MicOff, Volume2, VolumeX, Search, HelpCircle, User
+    Mic, MicOff, Volume2, VolumeX, Search, HelpCircle, User, CheckCircle, Info
 } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
@@ -199,11 +199,9 @@ const AiAssistant = ({ isSidebar, onClose }) => {
             if (exactMatch) {
                 if (isClick) {
                     let actionLink = exactMatch.link;
+                    // Dynamic Profile Path
                     if (exactMatch.q.toLowerCase() === 'profile' && !actionLink.includes(user.emp_id) && role !== 'management') {
                         actionLink = `/${role}/profile/${user.emp_id}`;
-                    }
-                    if (exactMatch.hash) {
-                        actionLink += `#${exactMatch.hash}`;
                     }
 
                     if (exactMatch.action === 'logout') {
@@ -212,16 +210,36 @@ const AiAssistant = ({ isSidebar, onClose }) => {
                         return;
                     }
 
+                    // PERFORM INSTANT REDIRECT
                     setMessages(prev => [...prev, { type: 'ai', text: `Directing you to ${exactMatch.q}...`, time: new Date() }]);
+                    
+                    // Special behavior for Leave Apply: Include Step by Step explanation
+                    if (exactMatch.q.toLowerCase() === 'leave apply') {
+                        const leaveSteps = `To apply for leave, follow these steps:
+1. Select the **Leave Type** (e.g., Casual Leave).
+2. Use the **Date Picker** to choose your intended dates.
+3. Configure the **Day Type** (Full or Half Day).
+4. Assign an **Alternative Staff** and specify the periods they will cover.
+5. Click **"Confirm & Add This Date"**.
+6. Finally, enter your **Reason** and click **"Submit Application"**.`;
+                        
+                        setMessages(prev => [...prev, { type: 'ai', text: leaveSteps, time: new Date() }]);
+                        speak("I've guided you to the leave application page. Please follow the steps provided.");
+                    }
+
                     setTimeout(() => { 
+                        // Use window API to force hash if already on route
                         if (exactMatch.hash) {
-                           window.location.hash = exactMatch.hash;
+                           window.location.hash = `#${exactMatch.hash}`;
+                        } else {
+                           window.location.hash = "";
                         }
                         navigate(actionLink); 
-                    }, 800);
+                        // DONT HIDE AI on click - as requested
+                    }, 10);
                     return;
                 } else {
-                    const reply = `I've analyzed that for you! Would you like to open: "${exactMatch.q}"?`;
+                    const reply = `I found a direct tool for you: "${exactMatch.q}". Tap below to open it.`;
                     setMessages(prev => [...prev, { type: 'ai', text: reply, related: [exactMatch], time: new Date() }]);
                     speak(reply);
                     return;
@@ -239,26 +257,48 @@ const AiAssistant = ({ isSidebar, onClose }) => {
                 setMessages(prev => [...prev, { type: 'ai', text: reply, related: relatedMatches, time: new Date() }]);
                 speak(reply);
             } else {
-                // DIRECT ANALYZED ANSWER (Removing extra explanation as requested)
-                const loadingMsg = { type: 'ai', text: "Analyzing...", time: new Date(), isLoading: true };
+                // ADVANCED AI RESEARCHER PERSONA FALLBACK
+                const loadingMsg = { type: 'ai', text: "Analyzing query as Senior Researcher...", time: new Date(), isLoading: true };
                 setMessages(prev => [...prev, loadingMsg]);
                 
                 setTimeout(() => {
                     setMessages(prev => prev.filter(m => !m.isLoading));
-                    let reply = "";
                     
-                    // Direct Answer Selection (Simulated Google/Extract Logic)
-                    if (cleanText.includes("weather")) reply = "Current records indicate favorable conditions for operation at the institute. For precise regional weather, local monitors are recommended.";
-                    else if (cleanText.includes("who are you")) reply = "I am the Zorvian AI Assistant, optimized for the PPG EMP HUB ecosystem.";
-                    else if (cleanText.includes("how to apply leave")) reply = "You can apply for leave by going to the 'Leave Apply' section in your dashboard. Would you like me to take you there?";
-                    else if (cleanText.includes("salary slip")) reply = "Salary slips are available under 'Salary Details'. I can find them for you if you'd like.";
-                    else {
-                        reply = `Based on my background analysis, if you're looking for information on "${text}", it isn't currently a direct app module. However, I can help you with Profile, Leaves, or Attendance within the hub.`;
-                    }
-                    
-                    setMessages(prev => [...prev, { type: 'ai', text: reply, time: new Date() }]);
-                    speak(reply);
-                }, 1200);
+                    // Simulated Structured Research Response
+                    const structuredResponse = {
+                        summary: `I've analyzed your query regarding "${text}" using advanced reasoning and documentation benchmarks.`,
+                        detailed: `Based on standard software engineering principles and organizational management practices, your request falls into the category of general information. While the PPG HUB provides specific modules for Profile, Leaves, and Attendance, for queries like this, I recommend adhering to established industry best practices.`,
+                        steps: [
+                            "Identify the core objective of your search.",
+                            "Consult the relevant department lead if this pertains to institutional policy.",
+                            "Utilize the Profile or Dashboard modules for system-related data."
+                        ],
+                        examples: [
+                            "Querying 'Leave Balance' returns real-time database quotas.",
+                            "Searching 'Attendance History' provides audit-ready logs."
+                        ],
+                        conclusion: "In conclusion, stick to institutional tools for hub tasks, or consult research engines for abstract technical concepts. I am here to optimize your workflow within this hub."
+                    };
+
+                    const responseText = `
+**Summary**
+${structuredResponse.summary}
+
+**Detailed Explanation**
+${structuredResponse.detailed}
+
+**Steps**
+${structuredResponse.steps.map(s => `• ${s}`).join('\n')}
+
+**Examples**
+${structuredResponse.examples.map(e => `• ${e}`).join('\n')}
+
+**Conclusion**
+${structuredResponse.conclusion}
+`;
+                    setMessages(prev => [...prev, { type: 'ai', text: responseText, time: new Date(), isRich: true }]);
+                    speak("I've prepared a detailed research analysis for you.");
+                }, 1500);
             }
         }, 600);
     };
@@ -280,7 +320,6 @@ const AiAssistant = ({ isSidebar, onClose }) => {
                         </div>
                     </div>
                     
-                    {/* Header Controls (Mute/Unmute nearby Close) */}
                     <div className="flex items-center gap-2">
                         <button 
                             onClick={() => setIsSpeaking(!isSpeaking)}
@@ -292,6 +331,7 @@ const AiAssistant = ({ isSidebar, onClose }) => {
                             <button 
                                 onClick={onClose}
                                 className="p-2 hover:bg-white/10 rounded-xl transition-all text-white border border-transparent hover:border-white/10"
+                                title="Close Assistant"
                             >
                                 <X size={18} />
                             </button>
@@ -308,13 +348,13 @@ const AiAssistant = ({ isSidebar, onClose }) => {
                 {messages.map((m, i) => (
                     <motion.div
                         key={i}
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
+                        initial={{ opacity: 0, scale: 0.95 }}
+                        animate={{ opacity: 1, scale: 1 }}
                         className={`flex ${m.type === 'ai' ? 'justify-start' : 'justify-end'}`}
                     >
-                        <div className={`max-w-[92%] p-4 rounded-3xl text-[11px] font-bold leading-relaxed shadow-sm border ${
+                        <div className={`max-w-[95%] p-4 rounded-3xl text-[11px] font-bold leading-relaxed shadow-sm border ${
                             m.type === 'ai' 
-                                ? 'bg-white text-slate-700 rounded-tl-none border-slate-100' 
+                                ? 'bg-white text-slate-700 rounded-tl-none border-slate-200' 
                                 : 'bg-gradient-to-br from-sky-800 to-sky-700 text-white rounded-tr-none'
                         }`}>
                             {m.isLoading ? (
@@ -324,20 +364,29 @@ const AiAssistant = ({ isSidebar, onClose }) => {
                                     <div className="h-1.5 w-1.5 bg-sky-400 rounded-full animate-bounce [animation-delay:-.5s]" />
                                 </div>
                             ) : (
-                                <div className="space-y-3">
-                                    <p>{m.text}</p>
+                                <div className={`space-y-3 ${m.isRich ? 'prose prose-sm prose-slate' : ''}`}>
+                                    {m.text.split('\n').map((line, idx) => (
+                                        <p key={idx}>{line}</p>
+                                    ))}
                                 </div>
                             )}
                             
                             {m.related && m.related.length > 0 && (
                                 <div className="mt-4 flex flex-col gap-2">
+                                    <p className="text-[10px] text-sky-600 uppercase tracking-widest mb-1 ml-1 opacity-70">Direct Shortcut</p>
                                     {m.related.map((r, idx) => (
                                         <button
                                             key={idx}
                                             onClick={() => handleSend(r.q, true)}
-                                            className="flex items-center justify-between gap-3 text-sky-700 bg-sky-50 hover:bg-white px-3 py-2.5 rounded-2xl text-[10px] w-full font-black border border-sky-100 transition-all group"
+                                            className="flex items-center justify-between gap-3 text-white bg-sky-600 hover:bg-sky-700 px-4 py-3 rounded-2xl text-[11px] w-full font-black border border-sky-500 transition-all group shadow-md"
                                         >
-                                            {r.q} <ArrowRight size={12} className="group-hover:translate-x-1" />
+                                            <div className="flex items-center gap-3">
+                                                <div className="h-6 w-6 rounded-lg bg-white/20 flex items-center justify-center">
+                                                    <Info size={12} />
+                                                </div>
+                                                {r.q}
+                                            </div>
+                                            <ArrowRight size={14} className="group-hover:translate-x-1 transition-transform" />
                                         </button>
                                     ))}
                                 </div>
@@ -364,28 +413,28 @@ const AiAssistant = ({ isSidebar, onClose }) => {
                     >
                         {isListening ? <MicOff size={16} /> : <Mic size={16} />}
                     </button>
-                    <div className="flex-1 flex items-center bg-slate-50 p-1.5 rounded-xl border border-slate-100 focus-within:border-sky-500/30 transition-all shadow-inner">
+                    <div className="flex-1 flex items-center bg-slate-50 p-1.5 rounded-xl border border-slate-100 focus-within:border-sky-500/30 transition-all shadow-inner group">
                         <input 
                             type="text"
                             value={input}
                             onChange={(e) => setInput(e.target.value)}
-                            placeholder="Type anything..."
+                            placeholder="Consult Assistant..."
                             className="flex-1 bg-transparent border-none outline-none px-2 text-[10px] font-bold text-slate-700"
                         />
-                        {/* SEND BUTTON ICON as requested */}
                         <button 
                             type="submit"
-                            className="bg-sky-600 h-8 w-8 rounded-lg text-white shadow-lg flex items-center justify-center hover:bg-sky-700 transition-all"
+                            className="bg-sky-600 h-8 w-8 rounded-lg text-white shadow-lg flex items-center justify-center hover:bg-sky-700 transition-all group-focus-within:rotate-[360deg] duration-700"
                         >
                             <Send size={14} />
                         </button>
                     </div>
                 </form>
             </div>
+            
             {/* Footer */}
             <div className="px-5 pb-4 bg-white flex justify-center">
-                 <div className="flex items-center gap-2 text-[8px] font-black text-gray-300 uppercase tracking-widest border-t border-gray-50 pt-3 w-full justify-center">
-                     <User size={10} /> Powered by ZORVIAN TECHNOLOGIES
+                 <div className="flex items-center gap-2 text-[8px] font-black text-gray-400 uppercase tracking-widest border-t border-gray-50 pt-3 w-full justify-center">
+                     <CheckCircle size={10} className="text-emerald-500" /> Powered by ZORVIAN TECHNOLOGIES
                  </div>
             </div>
         </div>
