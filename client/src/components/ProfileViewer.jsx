@@ -508,13 +508,15 @@ const ProfileViewer = ({ user, onClose }) => {
                             <p className="text-[10px] font-black text-sky-500 uppercase tracking-[0.3em] mt-1">Official Personnel Data</p>
                         </div>
                         <div className="flex items-center gap-2">
-                            <button
-                                onClick={handlePrintProfile}
-                                className="flex items-center gap-2 px-5 py-2.5 bg-white border border-gray-200 text-gray-600 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-gray-50 transition-all shadow-sm group"
-                                title="Print Profile & Certificates"
-                            >
-                                <FaPrint size={12} className="group-hover:scale-110 transition-transform" /> Print
-                            </button>
+                            {user.role !== 'management' && (
+                                <button
+                                    onClick={handlePrintProfile}
+                                    className="flex items-center gap-2 px-5 py-2.5 bg-white border border-gray-200 text-gray-600 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-gray-50 transition-all shadow-sm group"
+                                    title="Print Profile & Certificates"
+                                >
+                                    <FaPrint size={12} className="group-hover:scale-110 transition-transform" /> Print
+                                </button>
+                            )}
                             {isOwnProfile && !isEditingProfile && (
                                 <button
                                     onClick={() => setIsEditingProfile(true)}
