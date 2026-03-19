@@ -100,12 +100,12 @@ exports.managementLogin = async (req, res) => {
     try {
         let query, params;
 
-        if (emp_id) {
-            // If emp_id provided, find that specific management user
+        if (emp_id && emp_id.toLowerCase() !== 'management') {
+            // If specific emp_id provided (not the generic word 'Management'), find that user
             query = "SELECT id, name, pin, emp_id FROM users WHERE role = 'management' AND LOWER(emp_id) = LOWER($1)";
             params = [emp_id.trim()];
         } else {
-            // Fallback: find any management user (supports the old button flow)
+            // Fallback: find the first management user (standard for the button flow)
             query = "SELECT id, name, pin, emp_id FROM users WHERE role = 'management' LIMIT 1";
             params = [];
         }
