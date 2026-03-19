@@ -245,6 +245,10 @@ exports.updateEmployee = async (req, res) => {
             hashedPassword = await bcrypt.hash(pin, 10);
         }
 
+        // Fetch the emp_id for audit logging before update
+        const { rows: targetUser } = await pool.query('SELECT emp_id FROM users WHERE id = $1', [req.params.id]);
+        const target_emp_id = targetUser[0]?.emp_id || 'Unknown';
+
         const query = `
             UPDATE users SET 
                 name = $1, emp_code = $2, role = $3, department_id = $4, designation = $5, 
@@ -274,6 +278,7 @@ exports.updateEmployee = async (req, res) => {
         res.json({ message: 'Employee updated successfully' });
         await logActivity(req.user.id, 'UPDATE_EMPLOYEE', { 
             target_id: req.params.id, 
+            emp_id: target_emp_id,
             name, 
             role, 
             department_id, 
