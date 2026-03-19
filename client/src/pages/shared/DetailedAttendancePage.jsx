@@ -9,6 +9,7 @@ const DetailedAttendancePage = () => {
     const { empId, month, startDate: paramStart, endDate: paramEnd } = useParams();
     const navigate = useNavigate();
     const printRef = useRef(null);
+    const [summary, setSummary] = React.useState({ workingDays: 0, holidays: 0 });
 
     // Support both month-based and range-based navigation
     const start = paramStart || (month ? `${month}-01` : null);
@@ -70,7 +71,12 @@ const DetailedAttendancePage = () => {
                 <p class="print-time">${new Date().toLocaleString('en-GB')}</p>
             </div>
             <h1>Detailed Attendance Report</h1>
-            <div class="meta">Employee: <b>${empId}</b> &nbsp;|&nbsp; Period: ${periodLabel}</div>
+            <div class="meta">
+                Employee: <b>${empId}</b> &nbsp;|&nbsp; 
+                Period: ${periodLabel} &nbsp;|&nbsp; 
+                Working Days: <b>${summary.workingDays}</b> &nbsp;|&nbsp; 
+                Holidays: <b>${summary.holidays}</b>
+            </div>
             <table>
                 <thead><tr><th>Date</th><th>Status</th><th>In Time</th><th>Out Time</th><th>Work Hours</th><th>Remarks</th></tr></thead>
                 <tbody>${rowsHtml}</tbody>
@@ -102,6 +108,10 @@ const DetailedAttendancePage = () => {
                                 <FaCalendarAlt className="text-sky-500" />
                                 {start && end ? `${new Date(start).toLocaleDateString()} - ${new Date(end).toLocaleDateString()}` : 'Date Range'}
                             </span>
+                            <span className="h-1 w-1 bg-gray-300 rounded-full"></span>
+                            <span className="flex items-center gap-1">W.Days: <b className="text-emerald-600 ml-1">{summary.workingDays}</b></span>
+                            <span className="h-1 w-1 bg-gray-300 rounded-full"></span>
+                            <span className="flex items-center gap-1">Holidays: <b className="text-rose-500 ml-1">{summary.holidays}</b></span>
                         </p>
                     </div>
                 </div>
@@ -119,7 +129,13 @@ const DetailedAttendancePage = () => {
                 className="bg-white rounded-[40px] shadow-2xl shadow-sky-500/5 border border-white"
             >
                 <div ref={printRef} className="p-2 overflow-hidden">
-                    <AttendanceHistory empId={empId} startDate={start} endDate={end} recentOnly={false} />
+                    <AttendanceHistory 
+                        empId={empId} 
+                        startDate={start} 
+                        endDate={end} 
+                        recentOnly={false} 
+                        onLoadSummary={(s) => setSummary(s)} 
+                    />
                 </div>
             </motion.div>
         </Layout>
