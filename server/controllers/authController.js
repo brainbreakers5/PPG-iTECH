@@ -60,7 +60,7 @@ exports.loginUser = async (req, res) => {
                 const loginMsg = `Employee Login: ${user.name} (${user.emp_id}) logged into the hub`;
                 for (const admin of admins) {
                     if (admin.emp_id !== user.emp_id) {
-                        await createNotification(admin.emp_id, loginMsg, 'login', { emp_id: user.emp_id }, null, true);
+                        await createNotification(admin.emp_id, loginMsg, 'login', { emp_id: user.emp_id }, null, false);
                     }
                 }
 
