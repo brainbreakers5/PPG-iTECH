@@ -16,8 +16,18 @@ const Layout = ({ children }) => {
     const effectiveRole = isManagement ? 'management' : (user?.role || 'staff');
 
     useEffect(() => {
-        const handleCloseSidebar = () => setSidebarOpen(false);
-        const handleToggleAi = () => setIsAiOpen(prev => !prev);
+        const handleCloseSidebar = () => {
+            setSidebarOpen(false);
+            setIsAiOpen(false);
+            window.dispatchEvent(new CustomEvent('AI_STATUS', { detail: { open: false } }));
+        };
+        const handleToggleAi = () => {
+            setIsAiOpen(prev => {
+                const newState = !prev;
+                window.dispatchEvent(new CustomEvent('AI_STATUS', { detail: { open: newState } }));
+                return newState;
+            });
+        };
         
         window.addEventListener('closeSidebar', handleCloseSidebar);
         window.addEventListener('TOGGLE_AI_ASSISTANT', handleToggleAi);
@@ -135,7 +145,10 @@ const Layout = ({ children }) => {
                                     : 'fixed bottom-4 right-4 w-[calc(100vw-32px)] h-[600px] rounded-[32px]'
                                 }`}
                             >
-                                <AiAssistant isSidebar={true} onClose={() => setIsAiOpen(false)} />
+                                <AiAssistant isSidebar={true} onClose={() => {
+                                    setIsAiOpen(false);
+                                    window.dispatchEvent(new CustomEvent('AI_STATUS', { detail: { open: false } }));
+                                }} />
                             </motion.div>
                         )}
                     </AnimatePresence>
