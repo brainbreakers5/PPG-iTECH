@@ -318,7 +318,7 @@ const Login = () => {
                                         type="password"
                                         value={pin}
                                         onChange={handlePinChange}
-                                        placeholder={`Enter ${expectedPinLength === '4or6' ? '4/6' : expectedPinLength}-digit PIN`}
+                                        placeholder="Enter PIN"
                                         required
                                         autoFocus
                                         maxLength={6}
