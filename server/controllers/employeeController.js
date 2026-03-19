@@ -2,6 +2,29 @@ const { pool } = require('../config/db');
 const bcrypt = require('bcryptjs');
 const sendEmail = require('../utils/sendEmail');
 const logActivity = require('../utils/activityLogger');
+const { createNotification } = require('./notificationController');
+
+// @desc    Check all birthdays and send notifications (Internal use)
+exports.checkAllBirthdaysAndNotify = async () => {
+    try {
+        const { rows: birthdayPeople } = await pool.query(`
+            SELECT id, name, emp_id, dob, email
+            FROM users
+            WHERE dob IS NOT NULL
+              AND EXTRACT(MONTH FROM dob) = EXTRACT(MONTH FROM CURRENT_DATE) 
+              AND EXTRACT(DAY FROM dob) = EXTRACT(DAY FROM CURRENT_DATE)
+        `);
+
+        for (const person of birthdayPeople) {
+            const message = `🎉 Happy Birthday, ${person.name}! Have a wonderful day! 🎂`;
+            // This will send both in-app and email
+            await createNotification(person.emp_id, message, 'birthday', { emp_id: person.emp_id });
+            console.log(`Birthday wish sent to ${person.name} (${person.emp_id})`);
+        }
+    } catch (error) {
+        console.error('Birthday Job Error:', error);
+    }
+};
 
 // @desc    Get employees with birthday today
 // @route   GET /api/employees/birthdays/today
