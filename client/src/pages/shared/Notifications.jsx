@@ -21,6 +21,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useSocket } from '../../context/SocketContext';
 import { useNavigate } from 'react-router-dom';
 import Swal from 'sweetalert2';
+import { formatTo12Hr } from '../../utils/timeFormatter';
 
 const Notifications = () => {
     const { user } = useAuth();
@@ -73,7 +74,7 @@ const Notifications = () => {
             const localTimestamp = now.toISOString().replace('Z', '');
             const newNotif = {
                 id: Date.now(),
-                message: `${data.name} punched ${data.type} at ${data.time}`,
+                message: `${data.name} punched ${data.type} at ${formatTo12Hr(data.time)}`,
                 type: 'system',
                 created_at: localTimestamp,
                 is_read: false,
