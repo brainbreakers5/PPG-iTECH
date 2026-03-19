@@ -108,28 +108,7 @@ function ReloadPrompt() {
         </div>
       )}
 
-      {offlineReady && !needRefresh && (
-        <motion.div
-          initial={{ opacity: 0, x: 50 }}
-          animate={{ opacity: 1, x: 0 }}
-          exit={{ opacity: 0, x: 50 }}
-          className="fixed bottom-6 right-6 z-[9998] p-5 bg-white rounded-2xl shadow-2xl border border-emerald-100 flex items-center gap-4"
-        >
-          <div className="h-10 w-10 bg-emerald-500 rounded-xl flex items-center justify-center text-white shadow-lg shadow-emerald-100">
-            <FaShieldAlt />
-          </div>
-          <div>
-            <p className="text-[11px] font-black text-gray-800 uppercase tracking-wider">Ready for Offline</p>
-            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-tight">Access via Mobile Icon</p>
-          </div>
-          <button 
-            onClick={() => setOfflineReady(false)}
-            className="ml-4 p-2 text-gray-300 hover:text-gray-500 transition-colors"
-          >
-            ×
-          </button>
-        </motion.div>
-      )}
+
     </AnimatePresence>
   );
 }
