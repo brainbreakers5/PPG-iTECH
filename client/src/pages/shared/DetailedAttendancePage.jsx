@@ -68,7 +68,7 @@ const DetailedAttendancePage = () => {
             </style></head><body>
             <div class="print-brand">
                 <p class="app-name">PPG EMP HUB</p>
-                <p class="print-time">${new Date().toLocaleString('en-GB')}</p>
+                <p class="print-time">${new Date().toLocaleString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: true })}</p>
             </div>
             <h1>Detailed Attendance Report</h1>
             <div class="meta">
