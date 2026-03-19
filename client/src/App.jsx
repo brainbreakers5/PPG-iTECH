@@ -105,9 +105,13 @@ const AppContent = () => {
   };
 
   const isAlreadyLogged = !!localStorage.getItem('token') || !!localStorage.getItem('managementAccess');
+  const forceFullSplash = localStorage.getItem('force_full_splash') === 'true';
 
   if (showSplash) {
-    return <Splash onFinish={handleSplashFinish} isFast={isAlreadyLogged} />;
+    if (forceFullSplash) {
+      localStorage.removeItem('force_full_splash');
+    }
+    return <Splash onFinish={handleSplashFinish} isFast={isAlreadyLogged && !forceFullSplash} />;
   }
 
   return (
