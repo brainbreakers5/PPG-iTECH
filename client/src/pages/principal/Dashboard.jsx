@@ -9,7 +9,7 @@ import { useNavigate } from 'react-router-dom';
 import AttendanceHistory from '../../components/AttendanceHistory';
 import MonthlyDetailsModal from '../../components/MonthlyDetailsModal';
 import PersonalAttendanceChart from '../../components/PersonalAttendanceChart';
-import { formatTo12Hr } from '../../utils/timeFormatter';
+import { formatTo12Hr } from '../../utils/timeFormatter.js';
 
 // ── Small helper components ─────────────────────────────────────────────────
 // InfoCard removed ... (it was already redundant or small)
