@@ -9,7 +9,7 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
-      registerType: 'autoUpdate',
+      registerType: 'prompt',
       manifestFilename: 'manifest.json',
       includeAssets: ['ppg-logo.png', 'ppg-bg.jpg'],
       manifest: {
@@ -49,7 +49,7 @@ export default defineConfig({
         ],
         cleanupOutdatedCaches: true,
         clientsClaim: true,
-        skipWaiting: true, // Automatically update without prompt
+        skipWaiting: false, // Wait for manual reload
       }
     })
   ],
