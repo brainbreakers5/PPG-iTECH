@@ -324,7 +324,6 @@ function App() {
       <AuthProvider>
         <SocketProvider>
           <AppContent />
-          <AiAssistant />
         </SocketProvider>
       </AuthProvider>
 
