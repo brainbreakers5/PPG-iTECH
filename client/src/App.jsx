@@ -223,6 +223,7 @@ const AppContent = () => {
             <Route path="attendance" element={<PrincipalAttendance />} />
             <Route path="attendance/:empId/:month" element={<DetailedAttendancePage />} />
             <Route path="attendance/:empId/:startDate/:endDate" element={<DetailedAttendancePage />} />
+            <Route path="profile" element={<ProfilePage />} />
             <Route path="profile/:id" element={<ProfilePage />} />
             <Route path="notifications" element={<Notifications />} />
             <Route path="biometric-history" element={<BiometricHistory />} />
