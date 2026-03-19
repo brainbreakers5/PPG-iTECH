@@ -111,13 +111,7 @@ const Sidebar = ({ userRole = 'staff', isOpen, onClose }) => {
         
         {/* Close button with real-time clock */}
         <div className="flex flex-col items-center gap-2">
-           <button
-              onClick={onClose}
-              className="lg:hidden h-8 w-8 bg-white/50 text-sky-600 hover:bg-white hover:text-sky-800 rounded-lg flex items-center justify-center border border-white/50 shadow-sm transition-all active:scale-90"
-              title="Close Menu"
-            >
-              <FaChevronLeft size={12} />
-            </button>
+            {/* Back button removed per request */}
             <div className="scale-[0.8] origin-center -ml-0.5">
               <LiveStatus />
             </div>
@@ -153,17 +147,7 @@ const Sidebar = ({ userRole = 'staff', isOpen, onClose }) => {
         </nav>
       </div>
 
-      {/* Logout */}
-      <div className="p-2 border-t border-white/40 shrink-0">
-        <button
-          onClick={handleLogout}
-          className="w-full flex flex-col items-center justify-center py-2 bg-white/50 text-rose-500 hover:bg-rose-600 hover:text-white rounded-xl transition-all duration-300 border border-white/50 shadow-sm"
-          title="Logout"
-        >
-          <FaSignOutAlt className="text-lg mb-1" />
-          <span className="text-[7px] font-black uppercase tracking-widest">Logout</span>
-        </button>
-      </div>
+      {/* Logout button removed per request */}
     </div>
   );
 };
