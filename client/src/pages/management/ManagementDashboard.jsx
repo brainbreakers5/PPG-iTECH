@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { FaBirthdayCake, FaUserCheck, FaUserTimes, FaCalendarDay, FaBus, FaFileAlt, FaTimes, FaCalendarAlt, FaStar, FaBriefcase, FaClock, FaHistory, FaEye } from 'react-icons/fa';
 import AttendanceHistory from '../../components/AttendanceHistory';
+import { formatTo12Hr } from '../../utils/timeFormatter';
 
 const ManagementDashboard = () => {
     const socket = useSocket();
@@ -408,7 +409,7 @@ const ManagementDashboard = () => {
                                                                 ? `P / ${attendanceMap[emp.emp_id].status.replace('Present +', '').trim()}` 
                                                                 : (attendanceMap[emp.emp_id]?.status || 'N/A')}
                                                             {attendanceMap[emp.emp_id]?.status?.startsWith('Present') === false && attendanceMap[emp.emp_id]?.status !== 'Absent' && attendanceMap[emp.emp_id]?.in_time && attendanceMap[emp.emp_id]?.out_time && (
-                                                                <> ({attendanceMap[emp.emp_id].in_time.slice(0, 5)} - {attendanceMap[emp.emp_id].out_time.slice(0, 5)})</>
+                                                                <> ({formatTo12Hr(attendanceMap[emp.emp_id].in_time)} - {formatTo12Hr(attendanceMap[emp.emp_id].out_time)})</>
                                                             )}
                                                         </span>
                                                     </td>
