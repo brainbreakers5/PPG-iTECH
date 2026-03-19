@@ -19,35 +19,47 @@ const AI_KNOWLEDGE_BASE = {
     general: [
         { q: "How to use the hub?", a: "Navigate via the sidebar. Check your attendance summary on the dashboard and stay updated with live notifications.", link: "/dashboard" },
         { q: "Update my profile?", a: "Access 'Profile' to manage your personal details and professional avatar.", link: "/profile" },
-        { q: "Help with Biometrics?", a: "If your punch is not syncing, ensure the server is online in the 'Biometric Sync' status page.", link: "/biometric-status" }
+        { q: "Help with Biometrics?", a: "If your punch is not syncing, ensure the server is online in the 'Biometric Sync' status page.", link: "/biometric-status" },
+        { q: "Institutional Calendar?", a: "View global academic events, holidays, and college schedules in the shared 'Calendar'.", link: "/calendar" }
     ],
     admin: [
-        { q: "Manage Employees?", a: "Use the 'Employee Management' module to create, update, or archive staff records.", link: "/admin/employees" },
-        { q: "Approve Leaves?", a: "The 'Leave Approvals' section lists all pending requests requiring your authorization.", link: "/admin/approvals" },
-        { q: "Biometric Sync status?", a: "Monitor real-time biometric server connectivity in the 'Biometric History' or status section.", link: "/admin/biometric" },
-        { q: "System Settings?", a: "Configure platform-wide settings like VAPID keys and SMTP in the 'Settings' panel.", link: "/admin/settings" },
-        { q: "Manage Departments?", a: "Assign staff and define roles in the 'Department Management' module.", link: "/admin/department" }
+        { q: "Manage Employees?", a: "Use the 'Employee Management' module to create, update, or archive staff records professionally.", link: "/admin/employees" },
+        { q: "Approve Leaves?", a: "The 'Leave Approvals' section lists all pending requests requiring your administrative authorization.", link: "/admin/approvals" },
+        { q: "Biometric History?", a: "Monitor real-time biometric server connectivity and raw punch logs in the 'Biometric History' section.", link: "/admin/biometric-history" },
+        { q: "System Settings?", a: "Configure platform-wide parameters including VAPID keys and SMTP servers in 'Settings'.", link: "/admin/settings" },
+        { q: "Manage Departments?", a: "Assign staff, define roles, and manage academic structures in 'Department Management'.", link: "/admin/departments" },
+        { q: "Leave Limitations?", a: "Define annual quotas and policy rules for various leave types in 'Leave Limits'.", link: "/admin/leave-limits" },
+        { q: "Activity Logs?", a: "Audit system-wide security events and user actions in the 'Activity Logs' module.", link: "/admin/activity-logs" },
+        { q: "Timetable Setup?", a: "Configure the master institutional timetable and session structures in 'Timetable Setup'.", link: "/admin/timetable-setup" },
+        { q: "Staff Payroll?", a: "Generate and manage digital salary slips for all institutional employees in 'Payroll'.", link: "/admin/payroll" }
     ],
     staff: [
         { q: "Mark my attendance?", a: "Navigate to 'Attendance' and click 'Mark Entry' or 'Mark Exit' for the current session.", link: "/staff/attendance" },
-        { q: "How to apply for leave?", a: "Submit your request through the 'Leave Application' form, specifying dates and alternative staff.", link: "/staff/leave-apply" },
-        { q: "View my salary slips?", a: "Access and download your digital payroll slips in the 'Payroll' section.", link: "/staff/payroll" },
-        { q: "Check punch history?", a: "Review your previous biometric logs and attendance regularizations in 'Biometric History'.", link: "/staff/biometric-history" }
+        { q: "How to apply for leave?", a: "Submit your formal request through 'Leave Application', including alternative staff details.", link: "/staff/leave-apply" },
+        { q: "View my salary slips?", a: "Securely access and download your professional payroll documents in the 'Payroll' section.", link: "/staff/payroll" },
+        { q: "My Timetable?", a: "Check your assigned weekly lecture sessions and academic schedules in 'My Timetable'.", link: "/staff/timetables" },
+        { q: "Purchase Items?", a: "Initiate procurement requests for necessary department resources in 'Purchase/Items'.", link: "/staff/items" },
+        { q: "Punch History?", a: "Review your personal biometric logs and synchronization status in 'Biometric History'.", link: "/staff/biometric-history" }
     ],
     principal: [
-        { q: "Dashboard Overview?", a: "Get a comprehensive view of institutional attendance and staff presence on your main dashboard.", link: "/principal" },
-        { q: "Generate Reports?", a: "The 'Reports' module allows you to filter and export attendance data by department.", link: "/principal/reports" },
-        { q: "Approve Principal Leaves?", a: "Manage and submit your own leave requests in the 'Leaves' section.", link: "/principal/leaves" }
+        { q: "Institutional Dashboard?", a: "Obtain a live, college-wide overview of staff presence and institutional analytics.", link: "/principal" },
+        { q: "Generate Reports?", a: "Filter and export comprehensive attendance and performance data in the 'Reports' module.", link: "/principal/reports" },
+        { q: "Principal Leaves?", a: "Submit and track your own professional leave authorizations in the 'Leaves' section.", link: "/principal/leaves" },
+        { q: "Conversation Hub?", a: "Engage in institutional topics and coordinate with HODs in the 'Conversation' module.", link: "/principal/conversation" },
+        { q: "Purchase Approvals?", a: "Review and authorize procurement requests from various departments in 'Purchase Management'.", link: "/principal/purchase" },
+        { q: "Attendance Sync?", a: "Review the institutional record of biometric synchronization and punch regularizations.", link: "/principal/attendance" }
     ],
     hod: [
-        { q: "Department Stats?", a: "Monitor your department's performance and staff attendance on the HOD dashboard.", link: "/hod" },
-        { q: "Map Timetable?", a: "Synchronize faculty schedules and session allotments in the 'Timetable' module.", link: "/hod/timetable" },
-        { q: "Staff Leaves?", a: "Review and recommend leaves for your department faculty in 'Leaves' management.", link: "/hod/leaves" }
+        { q: "Department Dashboard?", a: "Monitor real-time faculty attendance and department-specific performance metrics.", link: "/hod" },
+        { q: "Map Timetable?", a: "Coordinate and assign faculty sessions effectively in the 'Timetable Mapping' module.", link: "/hod/timetable" },
+        { q: "Faculty Leaves?", a: "Review and recommend leave requests for your department's staff in the 'Leaves' section.", link: "/hod/leaves" },
+        { q: "Department Payroll?", a: "Monitor and verify the payroll status for all faculty in your department in 'Payroll'.", link: "/hod/payroll" }
     ],
     management: [
-        { q: "Management View?", a: "Access a bird's-eye view of all institutional operations and financial summaries.", link: "/management" },
-        { q: "Analytics & Reports?", a: "Download high-level auditing reports in the management 'Reports' section.", link: "/management/reports" },
-        { q: "Institutional Calendar?", a: "Check upcoming academic events and holidays in the global 'Calendar'.", link: "/management/calendar" }
+        { q: "Executive Analytics?", a: "Access bird's-eye summaries of institutional operations and financial performance.", link: "/management" },
+        { q: "Audit Logs?", a: "Review comprehensive system-wide audit trails and biometric history for compliance.", link: "/management/biometric-history" },
+        { q: "Financial Oversight?", a: "Monitor institutional payroll and salary distributions in the 'Management Salary' section.", link: "/management/payroll" },
+        { q: "Departmental Summary?", a: "Review staff distribution and operational status across all college departments.", link: "/management/departments" }
     ]
 };
 
@@ -246,6 +258,22 @@ const AiAssistant = () => {
                             ref={scrollRef}
                             className="flex-1 overflow-y-auto p-8 space-y-6 bg-slate-50/50 scroll-smooth"
                         >
+                            {/* Role-Based Quick Suggestions */}
+                            {suggestions.length > 0 && (
+                                <div className="flex flex-wrap gap-2 mb-4">
+                                    {suggestions.map((s, i) => (
+                                        <button
+                                            key={i}
+                                            onClick={() => handleSend(s.q)}
+                                            className="px-4 py-2 bg-white border border-sky-100 rounded-2xl text-[11px] font-black text-sky-800 hover:bg-sky-50 hover:border-sky-300 transition-all shadow-sm flex items-center gap-2 group whitespace-nowrap"
+                                        >
+                                            <Sparkles size={14} className="text-sky-400 group-hover:animate-spin" />
+                                            {s.q}
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
+
                             {messages.map((m, i) => (
                                 <motion.div
                                     key={i}
