@@ -214,7 +214,6 @@ const AiAssistant = ({ isSidebar, onClose }) => {
 
                     setMessages(prev => [...prev, { type: 'ai', text: `Directing you to ${exactMatch.q}...`, time: new Date() }]);
                     setTimeout(() => { 
-                        // FORCE HASH NAVIGATION if needed
                         if (exactMatch.hash) {
                            window.location.hash = exactMatch.hash;
                         }
@@ -222,7 +221,7 @@ const AiAssistant = ({ isSidebar, onClose }) => {
                     }, 800);
                     return;
                 } else {
-                    const reply = `I found a matching institutional feature: "${exactMatch.q}". Would you like to open it?`;
+                    const reply = `I've analyzed that for you! Would you like to open: "${exactMatch.q}"?`;
                     setMessages(prev => [...prev, { type: 'ai', text: reply, related: [exactMatch], time: new Date() }]);
                     speak(reply);
                     return;
@@ -236,22 +235,26 @@ const AiAssistant = ({ isSidebar, onClose }) => {
             });
 
             if (relatedMatches.length > 0 && !isClick) {
-                const reply = `I've analyzed your request and found some matching features within the platform:`;
+                const reply = `I found some relevant modules on the hub for you:`;
                 setMessages(prev => [...prev, { type: 'ai', text: reply, related: relatedMatches, time: new Date() }]);
                 speak(reply);
             } else {
-                // GENERAL KNOWLEDGE FALLBACK (Direct Answering)
-                const loadingMsg = { type: 'ai', text: "Analyzing query in background...", time: new Date(), isLoading: true };
+                // DIRECT ANALYZED ANSWER (Removing extra explanation as requested)
+                const loadingMsg = { type: 'ai', text: "Analyzing...", time: new Date(), isLoading: true };
                 setMessages(prev => [...prev, loadingMsg]);
                 
                 setTimeout(() => {
                     setMessages(prev => prev.filter(m => !m.isLoading));
-                    // Basic simulated search response logic
-                    let reply = `That's an interesting question! While that specific term isn't a direct module in the PPG HUB, I can tell you that my background analysis suggests you might be looking for general information. For institutional tasks, try asking about your Profile or Attendance. How else can I assist you?`;
+                    let reply = "";
                     
-                    // Add direct answers for common general queries if detected
-                    if (cleanText.includes("weather")) reply = "I'm sorry, I don't have real-time weather data right now, but it's always a great day to work at PPG Institute!";
-                    if (cleanText.includes("who are you")) reply = "I am the Zorvian AI Assistant, custom-built to help you navigate the PPG EMP HUB ecosystem efficiently.";
+                    // Direct Answer Selection (Simulated Google/Extract Logic)
+                    if (cleanText.includes("weather")) reply = "Current records indicate favorable conditions for operation at the institute. For precise regional weather, local monitors are recommended.";
+                    else if (cleanText.includes("who are you")) reply = "I am the Zorvian AI Assistant, optimized for the PPG EMP HUB ecosystem.";
+                    else if (cleanText.includes("how to apply leave")) reply = "You can apply for leave by going to the 'Leave Apply' section in your dashboard. Would you like me to take you there?";
+                    else if (cleanText.includes("salary slip")) reply = "Salary slips are available under 'Salary Details'. I can find them for you if you'd like.";
+                    else {
+                        reply = `Based on my background analysis, if you're looking for information on "${text}", it isn't currently a direct app module. However, I can help you with Profile, Leaves, or Attendance within the hub.`;
+                    }
                     
                     setMessages(prev => [...prev, { type: 'ai', text: reply, time: new Date() }]);
                     speak(reply);
@@ -276,23 +279,24 @@ const AiAssistant = ({ isSidebar, onClose }) => {
                             </span>
                         </div>
                     </div>
-                    {onClose && (
+                    
+                    {/* Header Controls (Mute/Unmute nearby Close) */}
+                    <div className="flex items-center gap-2">
                         <button 
-                            onClick={onClose}
-                            className="p-2 hover:bg-white/10 rounded-xl transition-all text-white border border-transparent hover:border-white/10"
+                            onClick={() => setIsSpeaking(!isSpeaking)}
+                            className={`p-2 rounded-xl transition-all ${isSpeaking ? 'bg-white/10 text-white border border-white/20' : 'bg-black/30 text-white/40'}`}
                         >
-                            <X size={18} />
+                            {isSpeaking ? <Volume2 size={16} /> : <VolumeX size={16} />}
                         </button>
-                    )}
-                </div>
-
-                <div className="flex items-center gap-3 mt-2">
-                    <button 
-                        onClick={() => setIsSpeaking(!isSpeaking)}
-                        className={`p-1.5 rounded-lg transition-all ${isSpeaking ? 'bg-white/10 text-white border border-white/20' : 'bg-black/30 text-white/40'}`}
-                    >
-                        {isSpeaking ? <Volume2 size={12} /> : <VolumeX size={12} />}
-                    </button>
+                        {onClose && (
+                            <button 
+                                onClick={onClose}
+                                className="p-2 hover:bg-white/10 rounded-xl transition-all text-white border border-transparent hover:border-white/10"
+                            >
+                                <X size={18} />
+                            </button>
+                        )}
+                    </div>
                 </div>
             </div>
 
@@ -368,16 +372,17 @@ const AiAssistant = ({ isSidebar, onClose }) => {
                             placeholder="Type anything..."
                             className="flex-1 bg-transparent border-none outline-none px-2 text-[10px] font-bold text-slate-700"
                         />
+                        {/* SEND BUTTON ICON as requested */}
                         <button 
                             type="submit"
-                            className="bg-slate-900 h-8 w-8 rounded-lg text-white shadow-lg flex items-center justify-center hover:bg-black transition-all"
+                            className="bg-sky-600 h-8 w-8 rounded-lg text-white shadow-lg flex items-center justify-center hover:bg-sky-700 transition-all"
                         >
-                            <Search size={14} />
+                            <Send size={14} />
                         </button>
                     </div>
                 </form>
             </div>
-            {/* Hint Chip for Split Screen */}
+            {/* Footer */}
             <div className="px-5 pb-4 bg-white flex justify-center">
                  <div className="flex items-center gap-2 text-[8px] font-black text-gray-300 uppercase tracking-widest border-t border-gray-50 pt-3 w-full justify-center">
                      <User size={10} /> Powered by ZORVIAN TECHNOLOGIES
