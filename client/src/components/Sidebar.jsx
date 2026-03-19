@@ -107,13 +107,7 @@ const Sidebar = ({ userRole = 'staff', isOpen, onClose }) => {
     >
       {/* Header - No top border, below Header line */}
       <div className="p-4 lg:p-3 bg-white/40 shrink-0">
-        {/* User Role Portal */}
-        <div className="flex flex-col items-center justify-center bg-gradient-to-br from-sky-50 to-blue-50 border border-sky-100 rounded-xl shadow-sm py-2">
-          <div className="h-1.5 w-1.5 rounded-full bg-sky-600 animate-pulse mb-1" />
-          <p className="text-[7.5px] font-black text-sky-600 uppercase tracking-tighter text-center leading-none">
-            {userRole.substring(0, 5)}
-          </p>
-        </div>
+        {/* User Role Portal removed */}
         
         {/* Close button with real-time clock */}
         <div className="flex flex-col items-center gap-2">
