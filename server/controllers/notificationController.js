@@ -3,7 +3,7 @@ const sendEmail = require('../utils/sendEmail');
 const socketUtil = require('../utils/socket');
 
 // @desc    Create a notification and send email
-exports.createNotification = async (emp_id, message, type = 'info', metadata = null, client = null) => {
+exports.createNotification = async (emp_id, message, type = 'info', metadata = null, client = null, skipEmail = false) => {
     const db = client || pool;
     try {
         // 1. Insert into DB
@@ -27,42 +27,44 @@ exports.createNotification = async (emp_id, message, type = 'info', metadata = n
             }
         }
 
-        // 5. Fetch employee email and name for email notification
-        const { rows } = await pool.query('SELECT email, name FROM users WHERE emp_id = $1', [emp_id]);
-        
-        if (rows.length > 0 && rows[0].email) {
-            const { email, name } = rows[0];
-            const appUrl = process.env.APP_URL || 'http://localhost:3000';
-            const subject = `PPG iTech HUB: New ${type.charAt(0).toUpperCase() + type.slice(1)} Notification`;
+        // 5. Fetch employee email and name then send email (if not skipped)
+        if (!skipEmail) {
+            const { rows } = await pool.query('SELECT email, name FROM users WHERE emp_id = $1', [emp_id]);
             
-            const html = `
-                <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e5e7eb; border-radius: 12px; overflow: hidden;">
-                    <div style="background-color: #4A90E2; padding: 24px; text-align: center;">
-                        <h1 style="color: white; margin: 0; font-size: 24px;">PPG iTech HUB</h1>
-                    </div>
-                    <div style="padding: 32px; background-color: white;">
-                        <p style="font-size: 16px; color: #374151; margin-bottom: 24px;">Hello <strong>${name}</strong>,</p>
-                        <p style="font-size: 16px; color: #4b5563; line-height: 1.5;">You have received a new notification in the application:</p>
-                        <div style="background-color: #f9fafb; border-left: 4px solid #4A90E2; padding: 20px; margin: 24px 0; font-style: italic; color: #1f2937;">
-                            "${message}"
+            if (rows.length > 0 && rows[0].email) {
+                const { email, name } = rows[0];
+                const appUrl = process.env.APP_URL || 'http://localhost:3000';
+                const subject = `PPG iTech HUB: New ${type.charAt(0).toUpperCase() + type.slice(1)} Notification`;
+                
+                const html = `
+                    <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e5e7eb; border-radius: 12px; overflow: hidden;">
+                        <div style="background-color: #4A90E2; padding: 24px; text-align: center;">
+                            <h1 style="color: white; margin: 0; font-size: 24px;">PPG iTech HUB</h1>
                         </div>
-                        <p style="font-size: 16px; color: #4b5563; margin-bottom: 32px;">Please click the button below to log in and view the details.</p>
-                        <div style="text-align: center;">
-                            <a href="${appUrl}" style="background-color: #4A90E2; color: white; padding: 14px 28px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block;">View in Application</a>
+                        <div style="padding: 32px; background-color: white;">
+                            <p style="font-size: 16px; color: #374151; margin-bottom: 24px;">Hello <strong>${name}</strong>,</p>
+                            <p style="font-size: 16px; color: #4b5563; line-height: 1.5;">You have received a new notification in the application:</p>
+                            <div style="background-color: #f9fafb; border-left: 4px solid #4A90E2; padding: 20px; margin: 24px 0; font-style: italic; color: #1f2937;">
+                                "${message}"
+                            </div>
+                            <p style="font-size: 16px; color: #4b5563; margin-bottom: 32px;">Please click the button below to log in and view the details.</p>
+                            <div style="text-align: center;">
+                                <a href="${appUrl}" style="background-color: #4A90E2; color: white; padding: 14px 28px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block;">View in Application</a>
+                            </div>
+                        </div>
+                        <div style="background-color: #f3f4f6; padding: 16px; text-align: center; color: #6b7280; font-size: 12px;">
+                            <p>© ${new Date().getFullYear()} PPG iTech HUB. All rights reserved.</p>
+                            <p>This is an automated notification. Please do not reply to this email.</p>
                         </div>
                     </div>
-                    <div style="background-color: #f3f4f6; padding: 16px; text-align: center; color: #6b7280; font-size: 12px;">
-                        <p>© ${new Date().getFullYear()} PPG iTech HUB. All rights reserved.</p>
-                        <p>This is an automated notification. Please do not reply to this email.</p>
-                    </div>
-                </div>
-            `;
+                `;
 
-            sendEmail({
-                email: email,
-                subject: subject,
-                html: html
-            }).catch(err => console.error("Email notification failed:", err));
+                sendEmail({
+                    email: email,
+                    subject: subject,
+                    html: html
+                }).catch(err => console.error("Email notification failed:", err));
+            }
         }
     } catch (error) {
         console.error("Error creating notification", error);
