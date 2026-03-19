@@ -14,14 +14,8 @@ import { useSocket } from '../../context/SocketContext';
 import { useTimetableConfig } from '../../hooks/useTimetableConfig';
 import AttendanceHistory from '../../components/AttendanceHistory';
 import PersonalAttendanceChart from '../../components/PersonalAttendanceChart';
+import { formatTo12Hr } from '../../utils/timeFormatter';
 
-const to12h = (timeStr) => {
-    if (!timeStr) return '';
-    const [h, m] = timeStr.split(':').map(Number);
-    const ampm = h >= 12 ? 'PM' : 'AM';
-    const h12 = h % 12 || 12;
-    return `${h12}:${String(m).padStart(2, '0')} ${ampm}`;
-};
 
 // ── Small helper components ─────────────────────────────────────────────────
 // InfoCard removed
@@ -303,7 +297,7 @@ const HODDashboard = () => {
                                         <div className="flex items-center gap-2 text-[10px] font-bold text-gray-500">
                                             <FaClock className="text-sky-400" size={10} />
                                             <span>
-                                                {to12h(getPeriodConfig(period.period_number)?.start_time || period.start_time)} – {to12h(getPeriodConfig(period.period_number)?.end_time || period.end_time)}
+                                                {formatTo12Hr(getPeriodConfig(period.period_number)?.start_time || period.start_time)} – {formatTo12Hr(getPeriodConfig(period.period_number)?.end_time || period.end_time)}
                                             </span>
                                         </div>
                                         {period.room_number && (
@@ -611,7 +605,7 @@ const HODDashboard = () => {
                                                               !String(attendanceMap[emp.emp_id]?.status).startsWith('Present')
                                                             ) && (
                                                                 <span className="ml-1 opacity-70">
-                                                                    ({attendanceMap[emp.emp_id].in_time.slice(0, 5)} - {attendanceMap[emp.emp_id].out_time.slice(0, 5)})
+                                                                    ({formatTo12Hr(attendanceMap[emp.emp_id].in_time)} - {formatTo12Hr(attendanceMap[emp.emp_id].out_time)})
                                                                 </span>
                                                             )}
                                                         </span>
