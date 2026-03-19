@@ -4,39 +4,41 @@ import { FaCalendarAlt, FaClock, FaHistory, FaCheckCircle, FaTimesCircle, FaBus 
 import api from '../utils/api';
 import { useSocket } from '../context/SocketContext';
 
-const AttendanceHistory = ({ empId, month: propMonth, startDate, endDate, recentOnly = true, statusFilter = null }) => {
+const AttendanceHistory = ({ empId, month: propMonth, startDate, endDate, recentOnly = true, statusFilter = null, onLoadSummary = null }) => {
     const [records, setRecords] = useState([]);
     const [loading, setLoading] = useState(true);
     const socket = useSocket();
 
     const fetchAttendance = useCallback(async () => {
+        let data;
         try {
             let query = `/attendance?emp_id=${empId}`;
-
             if (statusFilter) {
-                // statusFilter mode: fetch full month data (CTE generates absent/holiday rows)
                 const selectedMonth = propMonth || new Date().toISOString().slice(0, 7);
                 query += `&month=${selectedMonth}`;
-                // NO onlyUploaded — so absent/holiday rows are included via CTE
             } else if (recentOnly) {
                 query += `&onlyUploaded=true&recent=true&limit=50`;
             } else if (startDate && endDate) {
-                // Full date range — use CTE query (no onlyUploaded) to include absent days
                 query += `&startDate=${startDate}&endDate=${endDate}`;
             } else {
-                // Month view — use CTE query to include absent/holiday rows
                 const selectedMonth = propMonth || new Date().toISOString().slice(0, 7);
                 query += `&month=${selectedMonth}`;
             }
 
-            const { data } = await api.get(query);
+            const response = await api.get(query);
+            data = response.data;
             setRecords(data || []);
         } catch (error) {
             console.error('Error fetching attendance history', error);
         } finally {
             setLoading(false);
+            if (onLoadSummary && data) {
+                 const workingDays = data.filter(r => r.status && !['Weekend', 'Holiday'].includes(r.status)).length;
+                 const holidays = data.filter(r => r.status === 'Holiday').length;
+                 onLoadSummary({ workingDays, holidays });
+            }
         }
-    }, [empId, propMonth, startDate, endDate, recentOnly, statusFilter]);
+    }, [empId, propMonth, startDate, endDate, recentOnly, statusFilter, onLoadSummary]);
 
     useEffect(() => {
         fetchAttendance();
