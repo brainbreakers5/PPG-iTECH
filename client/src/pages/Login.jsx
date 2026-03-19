@@ -66,21 +66,22 @@ const Login = () => {
         }
     };
 
-    const handleSubmit = async (e) => {
+    const handleSubmit = async (e, manualPin = null) => {
         if (e) e.preventDefault();
-        if (!pin.trim()) return;
+        const finalPin = manualPin !== null ? manualPin : pin;
+        if (!finalPin.trim()) return;
 
         // Validation for length
         if (expectedPinLength === '4or6') {
-            if (pin.length !== 4 && pin.length !== 6) return;
-        } else if (pin.length < expectedPinLength) {
+            if (finalPin.length !== 4 && finalPin.length !== 6) return;
+        } else if (finalPin.length < Number(expectedPinLength)) {
             return;
         }
 
         setLoading(true);
         try {
             console.log('🔐 Attempting login with:', { emp_id: empId, pin: '***', role: userRole });
-            const data = await login(empId.trim(), pin.trim(), userRole);
+            const data = await login(empId.trim(), finalPin.trim(), userRole);
             console.log('✅ Login successful:', data);
             
             // Show success message
@@ -144,57 +145,17 @@ const Login = () => {
         setPin(onlyNums);
         
         if (expectedPinLength === '4or6') {
-             if (onlyNums.length === 4 || onlyNums.length === 6) {
-                 // But wait... if they are typing 6, and I trigger at 4...
-                 // I should only trigger at 4 if it works? No, that's impossible.
-                 // The user specified "wait the pin 4digit or 6digit after automatically login".
-                 // This implies that if it's 4, it should login. If it's 6, it should login.
-                 // One way to do this is to call handleSubmit at 4, if it fails, don't show error, 
-                 // and keep waiting for 6.
-                 if (onlyNums.length === 4) {
-                     // Attempt silent login
-                     silentLogin(onlyNums);
-                 } else if (onlyNums.length === 6) {
-                     handleSubmit();
-                 }
-             }
+            if (onlyNums.length === 4) {
+                 handleSubmit(null, onlyNums); // Try 4 first
+            } else if (onlyNums.length === 6) {
+                 handleSubmit(null, onlyNums); // Try 6
+            }
         } else if (onlyNums.length === Number(expectedPinLength)) {
-            handleSubmit();
+            handleSubmit(null, onlyNums);
         }
     };
 
-    const silentLogin = async (p) => {
-        try {
-            const data = await login(empId.trim(), p.trim(), userRole);
-            // If it succeeds, navigate directly
-            Swal.fire({
-                icon: 'success',
-                title: 'Welcome!',
-                text: `Logged in as ${data.role}`,
-                timer: 1000,
-                showConfirmButton: false,
-                background: '#fff',
-                color: '#1e3a8a',
-                allowOutsideClick: false,
-                allowEscapeKey: false
-            });
-            setTimeout(() => {
-                const routes = {
-                    'admin': '/admin',
-                    'principal': '/principal',
-                    'hod': '/hod',
-                    'staff': '/staff',
-                    'management': '/management'
-                };
-                navigate(routes[data.role] || '/', { replace: true });
-                setEmpId('');
-                setPin('');
-            }, 600);
-        } catch (err) {
-            // Silently fail at 4 digits if it's not the right PIN
-            console.log('Silent login failed at 4 digits, waiting for more if any...');
-        }
-    };
+
 
     return (
         <div
