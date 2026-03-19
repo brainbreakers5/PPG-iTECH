@@ -109,17 +109,61 @@ const AppContent = () => {
   const forceFullSplash = localStorage.getItem('force_full_splash') === 'true';
 
   useEffect(() => {
+    // Helper to convert VAPID public key
+    function urlBase64ToUint8Array(base64String) {
+      const padding = '='.repeat((4 - base64String.length % 4) % 4);
+      const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+      const rawData = window.atob(base64);
+      const outputArray = new Uint8Array(rawData.length);
+      for (let i = 0; i < rawData.length; ++i) {
+        outputArray[i] = rawData.charCodeAt(i);
+      }
+      return outputArray;
+    }
+
+    const subscribeToPush = async (registration) => {
+      try {
+        // VAPID Public Key from environment (hardcoded here for the client build)
+        const publicVapidKey = 'BFm4oktKjD5KB68I5w0oaZO-m84CoCFNXGsXNpXIY4p7EvOYIrwwgid181cNRtOKD_9Ffw_5EdvKflS11X4JoO0';
+        const subscription = await registration.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: urlBase64ToUint8Array(publicVapidKey)
+        });
+
+        // Send to server
+        await fetch(`${import.meta.env.VITE_API_URL || ''}/api/notifications/subscribe`, {
+          method: 'POST',
+          body: JSON.stringify({ subscription }),
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          }
+        });
+        console.log('--- Successfully subscribed to background push ---');
+      } catch (err) {
+        console.error('Push Subscription Failed:', err);
+      }
+    };
+
     const checkNotificationPermission = async () => {
       if (!showSplash && 'Notification' in window) {
-        if (Notification.permission === 'default') {
-          await Notification.requestPermission();
+        let permission = Notification.permission;
+        
+        if (permission === 'default') {
+          permission = await Notification.requestPermission();
         }
         
-        if (Notification.permission !== 'granted') {
+        if (permission === 'granted') {
+          // If granted, ensure we are subscribed to push for background notifications
+          if ('serviceWorker' in navigator) {
+            const registration = await navigator.serviceWorker.ready;
+            await subscribeToPush(registration);
+          }
+        } else {
           Swal.fire({
             title: 'Mandatory Notification Sync',
-            text: Notification.permission === 'denied'
-              ? 'Your notifications are currently BLOCKED. To receive mandatory updates for punches, leaves, and system alerts, you MUST manually enable them in your browser/app settings.'
+            text: permission === 'denied'
+              ? 'Your notifications are currently BLOCKED. To receive mandatory updates for punches, leaves, and system alerts (even when the app is closed), you MUST manually enable them in your browser/app settings.'
               : 'To ensure your biometric punches and system updates are synchronized in real-time, please click ALLOW when prompted for notifications.',
             icon: 'warning',
             confirmButtonText: 'I Understand',
