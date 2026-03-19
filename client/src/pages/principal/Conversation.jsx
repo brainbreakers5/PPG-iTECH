@@ -130,17 +130,18 @@ const Conversation = () => {
     }, []);
 
     const formatTime = (dateStr) => {
+        if (!dateStr) return '';
         const date = new Date(dateStr);
         const now = new Date();
         const isToday = date.toDateString() === now.toDateString();
         const yesterday = new Date(now);
         yesterday.setDate(yesterday.getDate() - 1);
         const isYesterday = date.toDateString() === yesterday.toDateString();
-        const time = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        const time = date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
 
         if (isToday) return time;
         if (isYesterday) return `Yesterday ${time}`;
-        return `${date.toLocaleDateString()} ${time}`;
+        return `${date.toLocaleDateString('en-GB')} ${time}`;
     };
 
     useEffect(() => {
