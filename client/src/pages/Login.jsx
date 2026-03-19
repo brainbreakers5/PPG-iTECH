@@ -246,7 +246,7 @@ const Login = () => {
                     <h1 className="text-3xl font-black text-white tracking-tight leading-tight">
                         PPG <span className="text-transparent bg-clip-text" style={{ backgroundImage: 'linear-gradient(135deg, #60a5fa, #22d3ee)' }}>iTech - HUB</span>
                     </h1>
-                    <p className="text-[7.5px] font-black text-sky-200 uppercase tracking-[0.35em] mt-2 whitespace-normal text-center max-w-[240px] mx-auto">
+                    <p className="text-[7.5px] font-black text-sky-200 uppercase tracking-[0.35em] mt-2 whitespace-nowrap text-center mx-auto">
                         Enterprise & Attendance Management System
                     </p>
                 </div>
