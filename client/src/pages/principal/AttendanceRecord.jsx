@@ -337,8 +337,8 @@ const AttendanceRecord = () => {
             if (viewMode === 'summary') {
                 title = 'Attendance Summary report';
                 listItems = summaryRecords;
-                listHeadings = ['#', 'Emp ID', 'Name', 'Role', 'W.Days', 'Hol', 'P', 'A', 'LOP', 'CL', 'ML', 'Comp', 'OD', 'LE'];
-                getListRowData = (rec, idx) => [idx + 1, rec.emp_id, rec.name, rec.role, rec.total_working_days, rec.total_holidays, rec.total_present, rec.total_computed_absent || rec.total_absent, rec.total_lop, rec.total_cl, rec.total_ml, rec.total_comp, rec.total_od, rec.total_late];
+                listHeadings = ['#', 'Emp ID', 'Name', 'Role', 'P', 'A', 'LOP', 'CL', 'ML', 'Comp', 'OD', 'LE'];
+                getListRowData = (rec, idx) => [idx + 1, rec.emp_id, rec.name, rec.role, rec.total_present, rec.total_computed_absent || rec.total_absent, rec.total_lop, rec.total_cl, rec.total_ml, rec.total_comp, rec.total_od, rec.total_late];
             } else if (viewMode === 'biometric') {
                 title = 'Biometric Activity report';
                 listItems = biometricRecords;
@@ -381,7 +381,11 @@ const AttendanceRecord = () => {
                 <div class="header">
                     <div>
                         <h1>${escapeHtml(title)}</h1>
-                        <p class="meta">Period: ${new Date(startDate).toLocaleDateString('en-GB')} - ${new Date(endDate).toLocaleDateString('en-GB')}</p>
+                        <p class="meta">
+                            Period: ${new Date(startDate).toLocaleDateString('en-GB')} - ${new Date(endDate).toLocaleDateString('en-GB')}
+                            &nbsp;|&nbsp; Working Days: <b>${summaryRecords[0]?.total_working_days || 0}</b>
+                            &nbsp;|&nbsp; Holidays: <b>${summaryRecords[0]?.total_holidays || 0}</b>
+                        </p>
                     </div>
                     <div class="print-time">
                         <div class="brand">PPG EMP HUB</div>
@@ -544,6 +548,7 @@ const AttendanceRecord = () => {
                                     className="flex-1 p-4 bg-gray-50 border border-gray-100 rounded-2xl outline-none focus:ring-4 focus:ring-sky-100 focus:border-sky-500 transition-all font-bold text-gray-700 text-sm appearance-none"
                                 >
                                     <option value="">All Roles</option>
+                                    <option value="principal">Principal</option>
                                     <option value="hod">HOD</option>
                                     <option value="staff">Staff</option>
                                 </select>
@@ -575,19 +580,31 @@ const AttendanceRecord = () => {
                             exit={{ opacity: 0, x: 20 }}
                             className="styled-table-container modern-card overflow-hidden"
                         >
-                            {/* Live Date Display for Summary */}
-                            <div className="p-6 border-b border-gray-100 bg-gradient-to-r from-sky-50 to-blue-50">
+                            {/* Global Summary Info */}
+                            <div className="p-6 border-b border-gray-100 bg-gradient-to-r from-sky-50 to-blue-50 flex flex-wrap items-center gap-8">
                                 <div className="flex items-center gap-3">
-                                    <FaCalendarAlt className="text-sky-600 text-lg" />
-                                    <div>
-                                        <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Live Date</p>
-                                        <p className="text-sm font-black text-gray-800">
-                                            {new Date().toLocaleDateString('en-US', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' })}
-                                        </p>
+                                    <div className="h-10 w-10 rounded-xl bg-white text-sky-600 flex items-center justify-center shadow-sm border border-sky-100">
+                                        <FaCalendarAlt />
                                     </div>
-                                    <span className="ml-auto px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest border bg-sky-50 text-sky-600 border-sky-100 flex items-center gap-1.5">
+                                    <div>
+                                        <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Period Summary</p>
+                                        <div className="flex items-center gap-4 mt-0.5">
+                                            <div className="flex items-center gap-1.5">
+                                                <span className="text-[10px] font-bold text-gray-500">Working Days:</span>
+                                                <span className="text-sm font-black text-emerald-600">{summaryRecords[0]?.total_working_days || 0}</span>
+                                            </div>
+                                            <div className="h-3 w-px bg-gray-200" />
+                                            <div className="flex items-center gap-1.5">
+                                                <span className="text-[10px] font-bold text-gray-500">Holidays:</span>
+                                                <span className="text-sm font-black text-rose-500">{summaryRecords[0]?.total_holidays || 0}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div className="ml-auto flex items-center gap-2">
+                                    <span className="px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest border bg-sky-50 text-sky-600 border-sky-100 flex items-center gap-1.5">
                                         <span className="h-1.5 w-1.5 bg-sky-500 rounded-full animate-ping" />
-                                        Live
+                                        Live Status
                                     </span>
                                 </div>
                             </div>
@@ -598,8 +615,6 @@ const AttendanceRecord = () => {
                                             <th className="p-5 text-xs font-black uppercase tracking-widest bg-gray-50/50">Emp ID</th>
                                             <th className="p-5 text-xs font-black uppercase tracking-widest bg-gray-50/50">Name</th>
                                             <th className="p-5 text-xs font-black uppercase tracking-widest bg-gray-50/50">Role</th>
-                                            <th className="p-5 text-xs font-black uppercase tracking-widest bg-gray-50/50 text-center">Working Days</th>
-                                            <th className="p-5 text-xs font-black uppercase tracking-widest bg-gray-50/50 text-center">Holidays</th>
                                             <th className="p-5 text-xs font-black uppercase tracking-widest bg-gray-50/50 text-center">Present</th>
                                             <th className="p-5 text-xs font-black uppercase tracking-widest bg-gray-50/50 text-center">Absent</th>
                                             <th className="p-5 text-xs font-black uppercase tracking-widest bg-gray-50/50 text-center">LOP</th>
@@ -619,8 +634,6 @@ const AttendanceRecord = () => {
                                                 <td className="p-5 text-[10px] font-black uppercase text-gray-400 tracking-wider text-left">
                                                     <span className="px-3 py-1 bg-gray-100 rounded-full">{rec.role}</span>
                                                 </td>
-                                                <td className="p-5 text-sm font-black text-center text-emerald-600">{rec.total_working_days}</td>
-                                                <td className="p-5 text-sm font-black text-center text-rose-500">{rec.total_holidays}</td>
                                                 <td className="p-5 text-sm font-black text-center text-sky-600">{rec.total_present}</td>
                                                 <td className="p-5 text-sm font-black text-center text-rose-500">{(rec.total_computed_absent != null && rec.total_computed_absent > 0) ? rec.total_computed_absent : rec.total_absent}</td>
                                                 <td className="p-5 text-sm font-black text-center text-rose-800">{rec.total_lop}</td>
