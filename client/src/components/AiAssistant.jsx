@@ -69,7 +69,7 @@ const AiAssistant = () => {
     const navigate = useNavigate();
     const [isOpen, setIsOpen] = useState(false);
     const [messages, setMessages] = useState([
-        { type: 'ai', text: `Greetings ${user?.name || 'User'}. I am the PPG iTech Professional Assistant. How may I facilitate your operations today?`, time: new Date() }
+        { type: 'ai', text: `Greetings ${user?.name || 'User'}. I am your professional PPG iTech Assistant. You can interact with me using voice or text. Please utilize the "Quick Action" chips above to explore features, or say "Go to..." to navigate directly. How may I facilitate your operations today?`, time: new Date() }
     ]);
     const [input, setInput] = useState('');
     const [suggestions, setSuggestions] = useState([]);
@@ -120,7 +120,8 @@ const AiAssistant = () => {
         const role = user?.role?.toLowerCase() || 'staff';
         const roleSugg = AI_KNOWLEDGE_BASE[role] || [];
         const genSugg = AI_KNOWLEDGE_BASE.general;
-        setSuggestions([...roleSugg, ...genSugg].slice(0, 4));
+        // Shuffle or pick relevant suggestions to keep it dynamic and instructive
+        setSuggestions([...roleSugg, ...genSugg].slice(0, 5));
     }, [user?.role]);
 
     useEffect(() => {
@@ -130,7 +131,7 @@ const AiAssistant = () => {
     }, [messages]);
 
     const handleSend = (text = input) => {
-        const cleanText = text.trim().toLowerCase();
+        const cleanText = text.trim().toLowerCase().replace(/[?.,!]/g, "");
         if (!cleanText) return;
         
         setMessages(prev => [...prev, { type: 'user', text, time: new Date() }]);
@@ -140,42 +141,54 @@ const AiAssistant = () => {
             const role = user?.role?.toLowerCase() || 'staff';
             const allKnowledge = [...AI_KNOWLEDGE_BASE.general, ...(AI_KNOWLEDGE_BASE[role] || [])];
             
-            // Operational Intent Detection
-            const navIntents = ["go to", "open", "take me to", "navigate to", "show me"];
+            // Refined Operational Intent Detection
+            const navIntents = ["go to", "open", "take me to", "navigate to", "show me", "move to"];
             let targetMatch = null;
+            let isAutoNav = false;
 
-            for (const intent of navIntents) {
-                if (cleanText.includes(intent)) {
-                    const query = cleanText.replace(intent, "").trim();
-                    targetMatch = allKnowledge.find(k => 
-                        query.includes(k.q.split("?")[0].toLowerCase()) || 
-                        k.q.toLowerCase().includes(query)
-                    );
+            // Check if it's a direct click from suggestions (exact match)
+            targetMatch = allKnowledge.find(k => k.q.toLowerCase().replace(/[?.,!]/g, "") === cleanText);
+
+            if (!targetMatch) {
+                // Check if it contains a navigation intent
+                for (const intent of navIntents) {
+                    if (cleanText.includes(intent)) {
+                        const query = cleanText.replace(intent, "").trim();
+                        targetMatch = allKnowledge.find(k => 
+                            query.length > 3 && (
+                                k.q.toLowerCase().includes(query) || 
+                                query.includes(k.q.split("?")[0].toLowerCase())
+                            )
+                        );
+                        if (targetMatch) isAutoNav = true;
+                    }
                 }
             }
 
-            // Regular Match
+            // General keyword matching if still no match
             if (!targetMatch) {
                 targetMatch = allKnowledge.find(k => 
-                    cleanText.includes(k.q.toLowerCase()) || 
-                    k.q.toLowerCase().includes(cleanText)
+                    cleanText.includes(k.q.toLowerCase().replace(/[?.,!]/g, "")) || 
+                    k.q.toLowerCase().replace(/[?.,!]/g, "").includes(cleanText)
                 );
             }
 
-            let reply = "Affirmative. I am processing your request. Please specify the module or action you require if you need further assistance.";
+            let reply = "I apologize, but I couldn't find a specific module for that. Please try asking about 'Attendance', 'Leaves', or 'Profile'. You can also click the quick action chips for guidance.";
             let actionLink = null;
 
             if (targetMatch) {
                 reply = targetMatch.a;
                 actionLink = targetMatch.link;
                 
-                // Active Operation (Auto-Navigation)
-                if (cleanText.match(/go to|open|navigate|take me/)) {
-                    reply = `Certainly. Navigating you to ${targetMatch.q.replace("?", "")} now.`;
+                // If it's a critical action or the user used a nav intent, suggest moving
+                if (isAutoNav || cleanText.match(/go to|open|navigate|take me|move to/)) {
+                    reply = `Process recognized. Navigating you to the ${targetMatch.q.replace("?", "")} module now. Please wait...`;
                     setTimeout(() => {
                         navigate(actionLink);
                         setIsOpen(false);
-                    }, 1200);
+                    }, 1500);
+                } else {
+                    reply += " Would you like me to take you there? You can click the 'Access Module' button below.";
                 }
             }
 
@@ -287,12 +300,12 @@ const AiAssistant = () => {
                                             : 'bg-gradient-to-br from-sky-700 to-sky-600 text-white rounded-tr-none shadow-sky-200 border-sky-400/20'
                                     }`}>
                                         {m.text}
-                                        {m.link && !m.text.includes("Navigating") && (
+                                        {m.link && !m.text.includes("Navigat") && (
                                             <button 
                                                 onClick={() => { navigate(m.link); setIsOpen(false); }}
                                                 className="mt-5 flex items-center justify-between gap-2 text-sky-700 bg-sky-50 hover:bg-sky-100 px-5 py-4 rounded-3xl text-[12px] w-full font-black border border-sky-100 transition-all group"
                                             >
-                                                Initialize Access <ChevronRight size={18} className="group-hover:translate-x-1 transition-transform" />
+                                                Access Module <ChevronRight size={18} className="group-hover:translate-x-1 transition-transform" />
                                             </button>
                                         )}
                                     </div>
