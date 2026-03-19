@@ -104,6 +104,28 @@ const Header = ({ toggleSidebar, sidebarOpen }) => {
     }, []);
 
     useEffect(() => {
+        // Request Notification Permission on mount
+        const requestNotificationPermission = async () => {
+            if ('Notification' in window && Notification.permission !== 'granted' && Notification.permission !== 'denied') {
+                const permission = await Notification.requestPermission();
+                if (permission !== 'granted') {
+                    console.log('Notification permission not granted');
+                }
+            } else if ('Notification' in window && Notification.permission === 'denied') {
+                Swal.fire({
+                    title: 'Enable Notifications?',
+                    text: 'To receive mandatory real-time alerts for your punches, leave status, and important updates, please enable notifications in your browser settings.',
+                    icon: 'warning',
+                    showCancelButton: false,
+                    confirmButtonText: 'I Understand',
+                    confirmButtonColor: '#0ea5e9',
+                    allowOutsideClick: false,
+                    allowEscapeKey: false
+                });
+            }
+        };
+        requestNotificationPermission();
+
         if (user?.dob) {
             const today = new Date();
             const dob = new Date(user.dob);
@@ -116,7 +138,19 @@ const Header = ({ toggleSidebar, sidebarOpen }) => {
         // Auto-refresh every 10 seconds like dashboard for real-time updates
         const interval = setInterval(fetchNotifications, 10000);
         return () => clearInterval(interval);
-    }, []);
+    }, [user]);
+
+    // Helper to send native notification
+    const sendNativeNotification = (title, message, icon = '/ppg-logo.png') => {
+        if ('Notification' in window && Notification.permission === 'granted') {
+            new Notification(title, {
+                body: message,
+                icon: icon,
+                badge: '/ppg-logo.png',
+                vibrate: [200, 100, 200]
+            });
+        }
+    };
 
     // Real-time socket listeners for instant notifications
     useEffect(() => {
@@ -125,37 +159,47 @@ const Header = ({ toggleSidebar, sidebarOpen }) => {
         // Listen for all notifications - instant updates
         socket.on('notification_received', (newNotif) => {
             console.log('Real-time notification received:', newNotif);
+
+            // Filter for global notifications with role/dept targets
+            if (newNotif.target_role && newNotif.target_role !== 'all') {
+                if (newNotif.target_role !== user?.role) return;
+            }
+            if (newNotif.target_dept && parseInt(newNotif.target_dept) !== user?.department_id) {
+                return;
+            }
+            if (newNotif.sender_id === user?.emp_id) return; // Don't notify self
+
             setNotifications(prev => {
-                // Check if notification already exists to avoid duplicates
                 const exists = prev.some(n => n.id === newNotif.id);
                 return exists ? prev : [newNotif, ...prev];
             });
             setUnreadCount(prev => prev + 1);
+
+            // Show native notification
+            const title = newNotif.type === 'message' ? 'New Message' : 'New Update - PPG HUB';
+            sendNativeNotification(title, newNotif.message);
         });
 
         // Listen for biometric punch specifically
         socket.on('biometric_punch', (data) => {
             console.log('Real-time punch received:', data);
-            // Capture client's current LOCAL time
-            const now = new Date();
-            const year = now.getFullYear();
-            const month = String(now.getMonth() + 1).padStart(2, '0');
-            const day = String(now.getDate()).padStart(2, '0');
-            const hours = String(now.getHours()).padStart(2, '0');
-            const minutes = String(now.getMinutes()).padStart(2, '0');
-            const seconds = String(now.getSeconds()).padStart(2, '0');
-            const localTimestamp = `${year}-${month}-${day}T${hours}:${minutes}:${seconds}`;
+            
+            // Show native notification for mandatory punch visibility
+            sendNativeNotification('Biometric Punch Recorded', `${data.message} at ${new Date().toLocaleTimeString()}`);
 
-            const newNotif = {
-                id: Date.now(),
-                message: `${data.name} punched ${data.type} at ${data.time}`,
-                type: 'system',
-                created_at: localTimestamp,
-                is_read: false,
-                metadata: null
-            };
-            setNotifications(prev => [newNotif, ...prev]);
-            setUnreadCount(prev => prev + 1);
+            // Optional: Internal Toast
+            Swal.fire({
+                title: 'Punch Successful',
+                text: data.message,
+                icon: 'success',
+                timer: 3000,
+                toast: true,
+                position: 'top-end',
+                showConfirmButton: false
+            });
+
+            // Refresh notifications
+            fetchNotifications();
         });
 
         return () => {
