@@ -14,7 +14,7 @@ self.addEventListener('message', (event) => {
   }
 })
 
-// ... (rest of the file)
+
 
 // Handle Push Events (Background notifications)
 self.addEventListener('push', (event) => {
