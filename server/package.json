@@ -37,6 +37,7 @@
     "socket.io-client": "^4.8.3",
     "sweetalert2": "^11.26.19",
     "tailwindcss": "^4.2.0",
+    "web-push": "^3.6.7",
     "zkteco-js": "^1.7.1"
   }
 }
