@@ -7,14 +7,7 @@ import { FaSearch, FaUserTie, FaClock, FaDoorOpen, FaCalendarAlt, FaBookOpen, Fa
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTimetableConfig } from '../../hooks/useTimetableConfig';
 import Swal from 'sweetalert2';
-
-const to12h = (timeStr) => {
-    if (!timeStr) return '';
-    const [h, m] = timeStr.split(':').map(Number);
-    const ampm = h >= 12 ? 'PM' : 'AM';
-    const h12 = h % 12 || 12;
-    return `${h12}:${String(m).padStart(2, '0')} ${ampm}`;
-};
+import { formatTo12Hr } from '../../utils/timeFormatter';
 
 const StaffTimetable = () => {
     const { user } = useAuth();
@@ -140,7 +133,7 @@ const StaffTimetable = () => {
                                 document.getElementById('end_time').value = p.end_time ? p.end_time.slice(0,5) : ''; 
                              }
                          ">
-                             ${teachingPeriods.map(p => `<option value="${p.period_number}" ${entry?.period_number === p.period_number ? 'selected' : ''}>${p.label || 'Period ' + p.period_number}${p.start_time ? ' (' + to12h(p.start_time) + ' – ' + to12h(p.end_time) + ')' : ''}</option>`).join('')}
+                             ${teachingPeriods.map(p => `<option value="${p.period_number}" ${entry?.period_number === p.period_number ? 'selected' : ''}>${p.label || 'Period ' + p.period_number}${p.start_time ? ' (' + formatTo12Hr(p.start_time) + ' – ' + formatTo12Hr(p.end_time) + ')' : ''}</option>`).join('')}
                          </select>
                      </div>
                      <div class="swal-field-group">
@@ -218,7 +211,7 @@ const StaffTimetable = () => {
 
         const slotsHtml = displaySlots.map(slot => {
             if (slot.is_break) return `<th class="break-col"></th>`; // Empty header as requested
-            return `<th>${slot.label || 'Period ' + slot.period_number} &bull; <span style="font-size:7pt;font-weight:400;color:#6b7280;">${slot.start_time ? to12h(slot.start_time) + ' – ' + to12h(slot.end_time) : ''}</span></th>`;
+            return `<th>${slot.label || 'Period ' + slot.period_number} &bull; <span style="font-size:7pt;font-weight:400;color:#6b7280;">${slot.start_time ? formatTo12Hr(slot.start_time) + ' – ' + formatTo12Hr(slot.end_time) : ''}</span></th>`;
         }).join('');
 
         const rowsHtml = days.map((day, dIdx) => {
@@ -267,7 +260,7 @@ const StaffTimetable = () => {
             tr:hover { background: #f3f4f6; }
             @media print { body { padding: 0; } tr { page-break-inside: avoid; } thead { display: table-header-group; } }
         </style></head><body>
-        <div class="print-brand"><p class="app-name">PPG EMP HUB</p><p class="print-time">${new Date().toLocaleString('en-GB')}</p></div>
+        <div class="print-brand"><p class="app-name">PPG EMP HUB</p><p class="print-time">${new Date().toLocaleString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: true })}</p></div>
         <h1>Timetable</h1>
         <div class="meta">Staff: <strong>${staffName}</strong> &nbsp;|&nbsp; Printed: ${new Date().toLocaleDateString('en-GB', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' })}</div>
         <table><thead><tr><th class="day-col">Day</th>${slotsHtml}</tr></thead><tbody>${rowsHtml}</tbody></table>
