@@ -50,10 +50,14 @@ const Login = () => {
         if (lockUntil) {
             const timeLeft = Number(lockUntil) - Date.now();
             if (timeLeft > 0) {
-                const minutes = Math.ceil(timeLeft / 60000);
-                const hours = Math.floor(timeLeft / 3600000);
-                let message = `System locked due to multiple failed attempts. Try again in ${minutes} minute(s).`;
-                if (hours > 0) message = `System locked. Try again in ${hours} hour(s) and ${minutes % 60} minute(s).`;
+                const totalSeconds = Math.ceil(timeLeft / 1000);
+                const minutes = Math.floor(totalSeconds / 60);
+                const seconds = totalSeconds % 60;
+                const hours = Math.floor(minutes / 60);
+                
+                let message = `System locked due to multiple failed attempts. Try again in ${seconds} second(s).`;
+                if (minutes > 0) message = `System locked. Try again in ${minutes}m ${seconds}s.`;
+                if (hours > 0) message = `System locked. Try again in ${hours}h ${minutes % 60}m ${seconds}s.`;
                 
                 Swal.fire({
                     icon: 'warning',
@@ -122,7 +126,9 @@ const Login = () => {
         if (e) e.preventDefault();
         const finalPin = manualPin !== null ? manualPin : pin;
         if (!finalPin.trim()) return;
-        if (checkLockout('pin')) return;
+        
+        const lockoutType = userRole === 'management' ? 'mgmt' : 'pin';
+        if (checkLockout(lockoutType)) return;
 
         // Validation for length
         if (expectedPinLength === '4or6') {
@@ -133,13 +139,14 @@ const Login = () => {
 
         setLoading(true);
         try {
-            console.log('🔐 Attempting login with:', { emp_id: empId, pin: '***', role: userRole });
+            console.log(`🔐 Attempting ${userRole} login with:`, { emp_id: empId, pin: '***' });
             const data = await login(empId.trim(), finalPin.trim(), userRole);
             console.log('✅ Login successful:', data);
             
-            // Clear PIN attempts on success
-            localStorage.setItem('pin_attempts', '0');
-            setPinAttempts(0);
+            // Clear attempts on success
+            localStorage.setItem(`${lockoutType}_attempts`, '0');
+            if (lockoutType === 'mgmt') setMgmtAttempts(0);
+            else setPinAttempts(0);
 
             // Show success message
             Swal.fire({
@@ -154,9 +161,8 @@ const Login = () => {
                 allowEscapeKey: false
             });
             
-            // Navigate after a brief delay to let the dialog show
+            // Navigate after a brief delay
             setTimeout(() => {
-                console.log('🔄 Navigating based on role:', data.role);
                 const routes = {
                     'admin': '/admin',
                     'principal': '/principal',
@@ -165,10 +171,8 @@ const Login = () => {
                     'management': '/management'
                 };
                 const route = routes[data.role] || '/';
-                console.log('📍 Navigating to:', route);
                 navigate(route, { replace: true });
                 setLoading(false);
-                // Clear form
                 setEmpId('');
                 setPin('');
             }, 600);
@@ -177,16 +181,25 @@ const Login = () => {
             console.error('❌ Login error:', error);
             setLoading(false);
             
-            const newAttempts = pinAttempts + 1;
-            setPinAttempts(newAttempts);
-            localStorage.setItem('pin_attempts', String(newAttempts));
+            const curAttempts = Number(localStorage.getItem(`${lockoutType}_attempts`)) || 0;
+            const newAttempts = curAttempts + 1;
+            
+            if (lockoutType === 'mgmt') {
+                setMgmtAttempts(newAttempts);
+                localStorage.setItem('mgmt_attempts', String(newAttempts));
+            } else {
+                setPinAttempts(newAttempts);
+                localStorage.setItem('pin_attempts', String(newAttempts));
+            }
 
             let errorMessage = `Invalid Security PIN. ${3 - newAttempts} attempts remaining.`;
             
             if (newAttempts >= 3) {
-                const lockUntil = Date.now() + 60 * 60 * 1000; // 1 hour
-                localStorage.setItem('pin_lock_until', String(lockUntil));
-                errorMessage = 'Too many failed attempts. Security PIN access locked for 1 hour.';
+                // Determine lock duration based on role
+                const duration = lockoutType === 'mgmt' ? 60 * 1000 : 60 * 60 * 1000;
+                const lockUntil = Date.now() + duration;
+                localStorage.setItem(`${lockoutType}_lock_until`, String(lockUntil));
+                errorMessage = `Too many failed attempts. Access locked for ${lockoutType === 'mgmt' ? '1 minute' : '1 hour'}.`;
             } else if (error.response?.data?.message) {
                 errorMessage = `${error.response.data.message}. ${3 - newAttempts} attempts remaining.`;
             }
@@ -197,7 +210,6 @@ const Login = () => {
                 text: errorMessage,
                 confirmButtonColor: '#2563eb'
             });
-            // Reset pin on failure
             setPin('');
         }
     };
@@ -379,73 +391,11 @@ const Login = () => {
                         whileTap={{ scale: 0.95 }}
                         onClick={() => {
                             if (checkLockout('mgmt')) return;
-                            
-                            Swal.fire({
-                                title: 'Management Access',
-                                input: 'password',
-                                inputLabel: 'Enter Management PIN',
-                                inputPlaceholder: 'Enter PIN',
-                                inputAttributes: { autocapitalize: 'off', autocorrect: 'off' },
-                                showCancelButton: true,
-                                confirmButtonText: 'Enter',
-                                confirmButtonColor: '#7c3aed',
-                                cancelButtonColor: '#64748b',
-                                background: '#fff',
-                                customClass: {
-                                    popup: 'rounded-3xl',
-                                    title: 'font-black text-gray-800 tracking-tight',
-                                    input: 'rounded-xl'
-                                },
-                                showLoaderOnConfirm: true,
-                                preConfirm: async (value) => {
-                                    if (!value) {
-                                        Swal.showValidationMessage('Please enter a PIN');
-                                        return false;
-                                    }
-                                    try {
-                                        const { data } = await api.post('/auth/management-login', { emp_id: 'Management', pin: String(value) });
-                                        return data;
-                                    } catch (err) {
-                                        const curAcc = Number(localStorage.getItem('mgmt_attempts')) || 0;
-                                        const nextAcc = curAcc + 1;
-                                        localStorage.setItem('mgmt_attempts', String(nextAcc));
-                                        
-                                        if (nextAcc >= 3) {
-                                            const lockUntil = Date.now() + 60 * 1000; // 1 min
-                                            localStorage.setItem('mgmt_lock_until', String(lockUntil));
-                                        }
-
-                                        Swal.showValidationMessage(
-                                            `${err.response?.data?.message || 'Invalid PIN'}. ${3 - nextAcc} attempts remaining.`
-                                        );
-                                        return false;
-                                    }
-                                },
-                                allowOutsideClick: () => !Swal.isLoading()
-                            }).then((result) => {
-                                if (result.isConfirmed && result.value) {
-                                    localStorage.setItem('token', result.value.token);
-                                    localStorage.setItem('managementAccess', 'true');
-                                    sessionStorage.setItem('managementAccess', 'true');
-                                    localStorage.setItem('lastRole', 'management');
-                                    
-                                    // Clear management attempts on success
-                                    localStorage.setItem('mgmt_attempts', '0');
-                                    setMgmtAttempts(0);
-
-                                    Swal.fire({
-                                        icon: 'success',
-                                        title: 'Welcome!',
-                                        text: 'Management access granted',
-                                        timer: 1500,
-                                        showConfirmButton: false,
-                                        background: '#fff',
-                                        color: '#1e3a8a'
-                                    }).then(() => {
-                                        navigate('/management');
-                                    });
-                                }
-                            });
+                            setEmpId('Management');
+                            setUserName('Management');
+                            setUserRole('management');
+                            setStep('pin');
+                            setExpectedPinLength(4);
                         }}
                         className="text-[10px] font-black text-orange-400/60 hover:text-orange-400 transition-colors uppercase tracking-[0.3em] cursor-pointer"
                     >
