@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 
 const InstallApp = () => {
   const [deferredPrompt, setDeferredPrompt] = useState(null);
+  const [isAiOpen, setIsAiOpen] = useState(false);
 
   useEffect(() => {
     const handler = (e) => {
@@ -9,9 +10,18 @@ const InstallApp = () => {
       setDeferredPrompt(e);
     };
 
-    window.addEventListener("beforeinstallprompt", handler);
+    const aiStatusHandler = (e) => {
+      // Instantly update visibility based on AI status
+      setIsAiOpen(e.detail.open);
+    };
 
-    return () => window.removeEventListener("beforeinstallprompt", handler);
+    window.addEventListener("beforeinstallprompt", handler);
+    window.addEventListener("AI_STATUS", aiStatusHandler);
+
+    return () => {
+      window.removeEventListener("beforeinstallprompt", handler);
+      window.removeEventListener("AI_STATUS", aiStatusHandler);
+    };
   }, []);
 
   const installApp = async () => {
@@ -28,7 +38,8 @@ const InstallApp = () => {
     setDeferredPrompt(null);
   };
 
-  if (!deferredPrompt) return null;
+  // Hide button if AI is active OR if no install prompt
+  if (!deferredPrompt || isAiOpen) return null;
 
   return (
     <button
