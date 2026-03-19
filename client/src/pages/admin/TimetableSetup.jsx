@@ -8,13 +8,9 @@ import {
 } from 'react-icons/fa';
 import { motion, AnimatePresence } from 'framer-motion';
 
-const to12h = (timeStr) => {
-    if (!timeStr) return '--:--';
-    const [h, m] = timeStr.split(':').map(Number);
-    const ampm = h >= 12 ? 'PM' : 'AM';
-    const h12 = h % 12 || 12;
-    return `${h12}:${String(m).padStart(2, '0')} ${ampm}`;
-};
+import { formatTo12Hr } from '../../utils/timeFormatter';
+
+const to12h = (timeStr) => formatTo12Hr(timeStr);
 
 const DEFAULT_PERIOD = (pos, periodNum) => ({
     sort_order: pos,
