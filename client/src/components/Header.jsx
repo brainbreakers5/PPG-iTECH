@@ -17,6 +17,9 @@ const Header = ({ toggleSidebar, sidebarOpen }) => {
     const [showNotifs, setShowNotifs] = useState(false);
     const [unreadCount, setUnreadCount] = useState(0);
     const notifRef = useRef(null);
+    const [showProfileMenu, setShowProfileMenu] = useState(false);
+    const profileRef = useRef(null);
+    const { logout } = useAuth();
 
 
 
@@ -165,6 +168,9 @@ const Header = ({ toggleSidebar, sidebarOpen }) => {
         const handleClickOutside = (e) => {
             if (notifRef.current && !notifRef.current.contains(e.target)) {
                 setShowNotifs(false);
+            }
+            if (profileRef.current && !profileRef.current.contains(e.target)) {
+                setShowProfileMenu(false);
             }
             if (searchRef.current && !searchRef.current.contains(e.target)) {
                 setShowSearchResults(false);
@@ -536,32 +542,70 @@ const Header = ({ toggleSidebar, sidebarOpen }) => {
                     )}
 
                     <div
-                        className="flex items-center space-x-3 cursor-pointer hover:bg-gray-50 transition-all px-2 py-1 rounded-2xl group"
-                        onClick={() => {
-                            if (isManagement) {
-                                navigate('/management/profile');
-                            } else {
-                                navigate(`/${effectiveRole}/profile/${user.emp_id}`);
-                            }
-                            window.dispatchEvent(new CustomEvent('closeSidebar'));
-                        }}
+                        className="relative"
+                        ref={profileRef}
                     >
-                        <div className="hidden md:text-right md:block">
-                            <p className="text-xs font-black text-gray-800 tracking-tight transition-colors uppercase tracking-widest text-[10px] group-hover:text-sky-600">{isManagement ? 'Management' : user?.name}</p>
-                            <p className="text-[8px] text-sky-600 font-black uppercase tracking-[0.2em] mt-0.5">{isManagement ? 'Management Portal' : (user?.designation || user?.role)}</p>
+                        <div
+                            className="flex items-center space-x-3 cursor-pointer hover:bg-gray-50 transition-all px-2 py-1 rounded-2xl group shadow-sm border border-transparent hover:border-gray-100"
+                            onClick={() => setShowProfileMenu(!showProfileMenu)}
+                        >
+                            <div className="hidden md:text-right md:block">
+                                <p className="text-xs font-black text-gray-800 tracking-tight transition-colors uppercase tracking-widest text-[10px] group-hover:text-sky-600">{isManagement ? 'Management' : user?.name}</p>
+                                <p className="text-[8px] text-sky-600 font-black uppercase tracking-[0.2em] mt-0.5">{isManagement ? 'Management Portal' : (user?.designation || user?.role)}</p>
+                            </div>
+                            <div className="relative">
+                                <div className="absolute -inset-1 bg-gradient-to-tr from-sky-200 to-white rounded-2xl blur opacity-25 group-hover:opacity-50 transition duration-1000 group-hover:duration-200"></div>
+                                {isManagement ? (
+                                    <div className="relative w-11 h-11 rounded-2xl border-2 border-white shadow-xl bg-gradient-to-br from-purple-500 to-purple-700 flex items-center justify-center text-white font-black text-lg">M</div>
+                                ) : (
+                                    <img
+                                        src={user?.profile_pic || `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.name || 'U')}&background=ffffff&color=0EA5E9`}
+                                        alt="Profile"
+                                        className="relative w-11 h-11 rounded-2xl border-2 border-white shadow-xl group-hover:scale-105 transition-all object-cover"
+                                    />
+                                )}
+                            </div>
                         </div>
-                        <div className="relative">
-                            <div className="absolute -inset-1 bg-gradient-to-tr from-sky-200 to-white rounded-2xl blur opacity-25 group-hover:opacity-50 transition duration-1000 group-hover:duration-200"></div>
-                            {isManagement ? (
-                                <div className="relative w-11 h-11 rounded-2xl border-2 border-white shadow-xl bg-gradient-to-br from-purple-500 to-purple-700 flex items-center justify-center text-white font-black text-lg">M</div>
-                            ) : (
-                                <img
-                                    src={user?.profile_pic || `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.name || 'U')}&background=ffffff&color=0EA5E9`}
-                                    alt="Profile"
-                                    className="relative w-11 h-11 rounded-2xl border-2 border-white shadow-xl group-hover:scale-105 transition-all object-cover"
-                                />
+
+                        {/* Profile Dropdown */}
+                        <AnimatePresence>
+                            {showProfileMenu && (
+                                <motion.div
+                                    initial={{ opacity: 0, y: 10 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    exit={{ opacity: 0, y: 10 }}
+                                    className="absolute right-0 mt-2 w-56 bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl border border-gray-100 overflow-hidden z-50 ring-1 ring-black/5"
+                                >
+                                    <div className="p-2 space-y-1">
+                                        <button
+                                            onClick={() => {
+                                                if (isManagement) navigate('/management/profile');
+                                                else navigate(`/${effectiveRole}/profile/${user.emp_id}`);
+                                                setShowProfileMenu(false);
+                                                window.dispatchEvent(new CustomEvent('closeSidebar'));
+                                            }}
+                                            className="w-full flex items-center gap-3 px-4 py-3 text-[10px] font-black uppercase tracking-widest text-gray-700 hover:bg-sky-50 hover:text-sky-600 rounded-xl transition-all"
+                                        >
+                                            <FaUser className="text-sky-500 text-sm" /> Profile View
+                                        </button>
+                                        <button
+                                            onClick={() => {
+                                                sessionStorage.removeItem('managementAccess');
+                                                localStorage.removeItem('managementAccess');
+                                                localStorage.removeItem('token');
+                                                localStorage.removeItem('lastRole');
+                                                logout();
+                                                navigate('/login');
+                                            }}
+                                            className="w-full flex items-center gap-3 px-4 py-3 text-[10px] font-black uppercase tracking-widest text-rose-600 hover:bg-rose-50 rounded-xl transition-all"
+                                        >
+                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg>
+                                            Logout Session
+                                        </button>
+                                    </div>
+                                </motion.div>
                             )}
-                        </div>
+                        </AnimatePresence>
                     </div>
                 </div>
             </header>
