@@ -8,7 +8,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import AttendanceHistory from '../../components/AttendanceHistory';
 import BiometricMonitor from '../../components/biometric/BiometricMonitor';
-import { formatTo12Hr, formatTimestamp } from '../../utils/timeFormatter';
+import { formatTo12Hr, formatTimestamp } from '../../utils/timeFormatter.js';
 
 const AttendanceRecord = () => {
     const { user } = useAuth();
