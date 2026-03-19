@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { FaFingerprint, FaClock, FaIdBadge, FaCalendarDay, FaSync } from 'react-icons/fa';
 import api from '../../utils/api';
+import { formatTo12Hr } from '../../utils/timeFormatter';
 
 const BiometricMonitor = ({ empId, onDataChange }) => {
     const [logs, setLogs] = useState([]);
@@ -186,13 +187,13 @@ const BiometricMonitor = ({ empId, onDataChange }) => {
                                         <td className="px-8 py-5">
                                             <div className="flex items-center gap-2">
                                                 <FaClock className="text-emerald-500 text-[10px]" />
-                                                <span className="text-[11px] font-black text-gray-700">{log.intime || '--:--'}</span>
+                                                <span className="text-[11px] font-black text-gray-700">{formatTo12Hr(log.intime) || '--:--'}</span>
                                             </div>
                                         </td>
                                         <td className="px-8 py-5">
                                             <div className="flex items-center gap-2">
                                                 <FaClock className="text-rose-500 text-[10px]" />
-                                                <span className="text-[11px] font-black text-gray-700">{log.outtime || '--:--'}</span>
+                                                <span className="text-[11px] font-black text-gray-700">{formatTo12Hr(log.outtime) || '--:--'}</span>
                                             </div>
                                         </td>
                                         <td className="px-8 py-5">
