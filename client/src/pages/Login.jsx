@@ -103,7 +103,8 @@ const Login = () => {
                     'admin': '/admin',
                     'principal': '/principal',
                     'hod': '/hod',
-                    'staff': '/staff'
+                    'staff': '/staff',
+                    'management': '/management'
                 };
                 const route = routes[data.role] || '/';
                 console.log('📍 Navigating to:', route);
@@ -164,12 +165,33 @@ const Login = () => {
 
     const silentLogin = async (p) => {
         try {
-            await login(empId.trim(), p.trim(), userRole);
-            // If it succeeds, call regular handleSubmit (it will show success etc)
-            handleSubmit();
+            const data = await login(empId.trim(), p.trim(), userRole);
+            // If it succeeds, navigate directly
+            Swal.fire({
+                icon: 'success',
+                title: 'Welcome!',
+                text: `Logged in as ${data.role}`,
+                timer: 1000,
+                showConfirmButton: false,
+                background: '#fff',
+                color: '#1e3a8a',
+                allowOutsideClick: false,
+                allowEscapeKey: false
+            });
+            setTimeout(() => {
+                const routes = {
+                    'admin': '/admin',
+                    'principal': '/principal',
+                    'hod': '/hod',
+                    'staff': '/staff',
+                    'management': '/management'
+                };
+                navigate(routes[data.role] || '/', { replace: true });
+                setEmpId('');
+                setPin('');
+            }, 600);
         } catch (err) {
             // Silently fail at 4 digits if it's not the right PIN
-            // This allows the user to continue typing if their PIN is 6 digits
             console.log('Silent login failed at 4 digits, waiting for more if any...');
         }
     };
@@ -354,7 +376,7 @@ const Login = () => {
                                         return false;
                                     }
                                     try {
-                                        const { data } = await api.post('/auth/management-login', { pin: String(value) });
+                                        const { data } = await api.post('/auth/management-login', { emp_id: 'Management', pin: String(value) });
                                         return data;
                                     } catch (err) {
                                         Swal.showValidationMessage(
@@ -369,6 +391,7 @@ const Login = () => {
                                     localStorage.setItem('token', result.value.token);
                                     localStorage.setItem('managementAccess', 'true');
                                     sessionStorage.setItem('managementAccess', 'true');
+                                    localStorage.setItem('lastRole', 'management');
                                     Swal.fire({
                                         icon: 'success',
                                         title: 'Welcome!',
@@ -377,8 +400,9 @@ const Login = () => {
                                         showConfirmButton: false,
                                         background: '#fff',
                                         color: '#1e3a8a'
+                                    }).then(() => {
+                                        navigate('/management');
                                     });
-                                    navigate('/management');
                                 }
                             });
                         }}
