@@ -353,7 +353,7 @@ const Header = ({ toggleSidebar, sidebarOpen }) => {
 
 
     return (
-        <div className="flex flex-col w-full relative z-40">
+        <div className="flex flex-col w-full relative z-50">
             {isBirthday && !isDismissed && user && (
                 <div className="bg-gradient-to-r from-pink-400 to-purple-500 text-white px-6 py-2.5 text-center animate-pulse-banner flex items-center justify-between relative shadow-xl rounded-b-xl mx-4 mt-2">
                     <div className="flex-1 flex items-center justify-center gap-3">
