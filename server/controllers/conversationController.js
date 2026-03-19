@@ -110,7 +110,45 @@ exports.sendMessage = async (req, res) => {
 
         // Real-time Emit via Socket
         const io = getIO(req);
-        if (io) io.to(`conv_${conversationId}`).emit('new_message', newMessageRows[0]);
+        if (io) {
+            // Emit to the conversation room for active chatters
+            io.to(`conv_${conversationId}`).emit('new_message', newMessageRows[0]);
+            
+            // Also emit a general notification to participants so they see it even if not in the chat room
+            const { rows: participants } = await pool.query(
+                `SELECT creator_id, target_role, target_dept_id, target_user_ids FROM conversations WHERE id = $1`,
+                [conversationId]
+            );
+            
+            if (participants.length > 0) {
+                const conv = participants[0];
+                const senderId = req.user.emp_id;
+                const senderName = req.user.name;
+
+                // Simple Broad Notification for anyone interested (could be more targeted)
+                // We emit a 'notification_received' payload so Header.jsx picks it up
+                const msgNotif = {
+                    id: Date.now(),
+                    message: `New message from ${senderName}: ${content.substring(0, 50)}${content.length > 50 ? '...' : ''}`,
+                    type: 'message',
+                    metadata: { conversationId },
+                    created_at: new Date().toISOString()
+                };
+
+                // Emit to targeted users
+                if (conv.target_user_ids) {
+                    conv.target_user_ids.forEach(uid => {
+                        if (uid !== senderId) io.to(uid).emit('notification_received', msgNotif);
+                    });
+                    // Also notify creator if sender is not creator
+                    if (conv.creator_id !== senderId) io.to(conv.creator_id).emit('notification_received', msgNotif);
+                } else {
+                    // Role or Dept based: Emit to all (Header handles filtering if needed, but better to target here)
+                    // For now, emit globally but with a 'target' flag
+                    io.emit('notification_received', { ...msgNotif, target_role: conv.target_role, target_dept: conv.target_dept_id, sender_id: senderId });
+                }
+            }
+        }
 
         res.status(201).json(newMessageRows[0]);
     } catch (error) {
