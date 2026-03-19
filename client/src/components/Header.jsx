@@ -104,26 +104,36 @@ const Header = ({ toggleSidebar, sidebarOpen }) => {
     }, []);
 
     useEffect(() => {
-        // Request Notification Permission on mount
+        // Mandatory and Persistent Notification Permission Request
         const requestNotificationPermission = async () => {
-            if ('Notification' in window && Notification.permission !== 'granted' && Notification.permission !== 'denied') {
+            if (!('Notification' in window)) return;
+
+            if (Notification.permission === 'default') {
                 const permission = await Notification.requestPermission();
                 if (permission !== 'granted') {
-                    console.log('Notification permission not granted');
+                    showMandatoryModal();
                 }
-            } else if ('Notification' in window && Notification.permission === 'denied') {
-                Swal.fire({
-                    title: 'Enable Notifications?',
-                    text: 'To receive mandatory real-time alerts for your punches, leave status, and important updates, please enable notifications in your browser settings.',
-                    icon: 'warning',
-                    showCancelButton: false,
-                    confirmButtonText: 'I Understand',
-                    confirmButtonColor: '#0ea5e9',
-                    allowOutsideClick: false,
-                    allowEscapeKey: false
-                });
+            } else if (Notification.permission === 'denied') {
+                showMandatoryModal(true);
             }
         };
+
+        const showMandatoryModal = (isDenied = false) => {
+            Swal.fire({
+                title: 'System Notification Required',
+                text: isDenied 
+                    ? 'Your notifications are blocked. To receive mandatory updates for Biometric Punches and Leave Status, you MUST manually enable notifications in your browser/app settings.'
+                    : 'To ensure synchronization and receive mandatory live alerts for your punches and system updates, please click ALLOW when prompted for notifications.',
+                icon: 'warning',
+                showCancelButton: false,
+                confirmButtonText: 'I Understood, I will enable it',
+                confirmButtonColor: '#0ea5e9',
+                allowOutsideClick: false,
+                allowEscapeKey: false,
+                footer: '<p style="font-size: 10px; color: #64748b; font-weight: bold;">MANDATORY SYSTEM SYNC</p>'
+            });
+        };
+
         requestNotificationPermission();
 
         if (user?.dob) {
@@ -135,7 +145,6 @@ const Header = ({ toggleSidebar, sidebarOpen }) => {
         }
 
         fetchNotifications();
-        // Auto-refresh every 10 seconds like dashboard for real-time updates
         const interval = setInterval(fetchNotifications, 10000);
         return () => clearInterval(interval);
     }, [user]);
