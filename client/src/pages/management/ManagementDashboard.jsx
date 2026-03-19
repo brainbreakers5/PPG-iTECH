@@ -169,36 +169,55 @@ const ManagementDashboard = () => {
                 </div>
             </motion.div>
 
-            {/* Monthly Summary Bar */}
+            {/* Monthly Summary Bar — clickable → Calendar */}
             <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="mb-10">
+                <div className="flex items-center gap-2 mb-3">
+                    <p className="text-[9px] font-black text-gray-400 uppercase tracking-[0.25em]">This Month's Overview</p>
+                    <span className="text-[8px] font-black text-purple-400 uppercase tracking-widest bg-purple-50 border border-purple-100 px-2 py-0.5 rounded-lg animate-pulse">Click any card to view Calendar →</span>
+                </div>
                 <div className="grid grid-cols-3 gap-4">
-                    <div className="bg-emerald-50 border border-emerald-100 rounded-2xl p-5 flex items-center gap-4">
-                        <div className="h-11 w-11 rounded-xl bg-emerald-500 text-white flex items-center justify-center shadow-sm">
+                    <motion.div
+                        whileHover={{ scale: 1.03, y: -3 }}
+                        whileTap={{ scale: 0.97 }}
+                        onClick={() => { navigate('/management/calendar'); window.dispatchEvent(new CustomEvent('closeSidebar')); }}
+                        className="bg-emerald-50 border border-emerald-100 rounded-2xl p-5 flex items-center gap-4 cursor-pointer hover:shadow-lg hover:shadow-emerald-100/60 transition-all group"
+                    >
+                        <div className="h-11 w-11 rounded-xl bg-emerald-500 text-white flex items-center justify-center shadow-sm group-hover:bg-emerald-600 transition-colors">
                             <FaCalendarAlt />
                         </div>
                         <div>
                             <p className="text-[9px] font-black text-emerald-500 uppercase tracking-widest">Working Days</p>
                             <p className="text-2xl font-black text-emerald-700 tracking-tighter">{monthStats.workingDays}</p>
                         </div>
-                    </div>
-                    <div className="bg-rose-50 border border-rose-100 rounded-2xl p-5 flex items-center gap-4">
-                        <div className="h-11 w-11 rounded-xl bg-rose-500 text-white flex items-center justify-center shadow-sm">
+                    </motion.div>
+                    <motion.div
+                        whileHover={{ scale: 1.03, y: -3 }}
+                        whileTap={{ scale: 0.97 }}
+                        onClick={() => { navigate('/management/calendar'); window.dispatchEvent(new CustomEvent('closeSidebar')); }}
+                        className="bg-rose-50 border border-rose-100 rounded-2xl p-5 flex items-center gap-4 cursor-pointer hover:shadow-lg hover:shadow-rose-100/60 transition-all group"
+                    >
+                        <div className="h-11 w-11 rounded-xl bg-rose-500 text-white flex items-center justify-center shadow-sm group-hover:bg-rose-600 transition-colors">
                             <FaCalendarDay />
                         </div>
                         <div>
                             <p className="text-[9px] font-black text-rose-500 uppercase tracking-widest">Holidays</p>
                             <p className="text-2xl font-black text-rose-700 tracking-tighter">{monthStats.holidays}</p>
                         </div>
-                    </div>
-                    <div className="bg-amber-50 border border-amber-100 rounded-2xl p-5 flex items-center gap-4">
-                        <div className="h-11 w-11 rounded-xl bg-amber-500 text-white flex items-center justify-center shadow-sm">
+                    </motion.div>
+                    <motion.div
+                        whileHover={{ scale: 1.03, y: -3 }}
+                        whileTap={{ scale: 0.97 }}
+                        onClick={() => { navigate('/management/calendar'); window.dispatchEvent(new CustomEvent('closeSidebar')); }}
+                        className="bg-amber-50 border border-amber-100 rounded-2xl p-5 flex items-center gap-4 cursor-pointer hover:shadow-lg hover:shadow-amber-100/60 transition-all group"
+                    >
+                        <div className="h-11 w-11 rounded-xl bg-amber-500 text-white flex items-center justify-center shadow-sm group-hover:bg-amber-600 transition-colors">
                             <FaStar />
                         </div>
                         <div>
                             <p className="text-[9px] font-black text-amber-500 uppercase tracking-widest">Special Events</p>
                             <p className="text-2xl font-black text-amber-700 tracking-tighter">{monthStats.specialEvents}</p>
                         </div>
-                    </div>
+                    </motion.div>
                 </div>
             </motion.div>
 
