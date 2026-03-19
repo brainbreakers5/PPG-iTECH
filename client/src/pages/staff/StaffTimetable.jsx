@@ -9,6 +9,14 @@ import { useTimetableConfig } from '../../hooks/useTimetableConfig';
 import Swal from 'sweetalert2';
 import { formatTo12Hr } from '../../utils/timeFormatter';
 
+const to12h = (timeStr) => {
+    if (!timeStr) return '';
+    const [h, m] = timeStr.split(':').map(Number);
+    const ampm = h >= 12 ? 'PM' : 'AM';
+    const h12 = h % 12 || 12;
+    return `${h12}:${String(m).padStart(2, '0')} ${ampm}`;
+};
+
 const StaffTimetable = () => {
     const { user } = useAuth();
     const { empId } = useParams();
