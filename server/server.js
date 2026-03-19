@@ -34,6 +34,16 @@ const initDB = async () => {
             console.log('--- Management User Created (ID: Management, PIN: 1234) ---');
         }
 
+        // Initialize birthday wishes and other automated checks
+        const { checkAllBirthdaysAndNotify } = require('./controllers/employeeController');
+        checkAllBirthdaysAndNotify(); // Check on server start
+        
+        // Check every 24 hours
+        setInterval(() => {
+            console.log('--- Checking for Daily Birthdays ---');
+            checkAllBirthdaysAndNotify();
+        }, 24 * 60 * 60 * 1000); // 86,400,000 ms
+
         // Ensure salary_records unique constraint for ON CONFLICT
         console.log('--- Checking salary_records constraint ---');
         try {
