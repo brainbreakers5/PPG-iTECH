@@ -186,19 +186,38 @@ const ActivityLogs = () => {
                                                 animate={{ opacity: 1, y: 0 }}
                                                 transition={{ delay: index * 0.02 }}
                                                 onClick={() => {
-                                                    if (log.details && Object.keys(log.details).length > 0) {
-                                                        const detailsList = Object.entries(log.details)
-                                                            .map(([key, value]) => `
-                                                                <div style="display: flex; justify-content: space-between; border-bottom: 1px solid #f1f5f9; padding: 6px 0;">
-                                                                    <span style="font-weight: 800; text-transform: uppercase; font-size: 10px; color: #64748b;">${key.replace(/_/g, ' ')}:</span>
-                                                                    <span style="font-weight: 500; font-size: 12px; color: #1e293b;">${value || '—'}</span>
+                                                    let detailsObj = log.details;
+                                                    // Auto-parse if it's a string (Postgres TEXT vs JSONB)
+                                                    if (typeof detailsObj === 'string' && detailsObj.trim().startsWith('{')) {
+                                                        try { detailsObj = JSON.parse(detailsObj); } catch(e) { console.error("Parse Error:", e); }
+                                                    }
+
+                                                    if (detailsObj && typeof detailsObj === 'object' && Object.keys(detailsObj).length > 0) {
+                                                        // Sort details: Target ID first, then Emp ID, then others
+                                                        const detailKeys = Object.keys(detailsObj).sort((a, b) => {
+                                                            if (a === 'target_id') return -1;
+                                                            if (b === 'target_id') return 1;
+                                                            if (a === 'emp_id') return -1;
+                                                            if (b === 'emp_id') return 1;
+                                                            return 0;
+                                                        });
+
+                                                        const detailsList = detailKeys.map(key => {
+                                                            const value = detailsObj[key];
+                                                            const isHighlight = ['target_id', 'emp_id'].includes(key);
+                                                            const label = key === 'target_id' ? 'System Target ID' : key === 'emp_id' ? 'Employee ID' : key.replace(/_/g, ' ');
+                                                            return `
+                                                                <div style="display: flex; justify-content: space-between; border-bottom: 2px solid #f8fafc; padding: 12px 10px; gap: 20px; ${isHighlight ? 'background: #eff6ff; border-radius: 8px; margin: 2px 0;' : ''}">
+                                                                    <span style="font-weight: 800; text-transform: uppercase; font-size: 10px; color: ${isHighlight ? '#1e40af' : '#64748b'}; white-space: nowrap;">${label}:</span>
+                                                                    <span style="font-weight: 800; font-size: 13px; color: ${isHighlight ? '#1e293b' : '#334155'}; text-align: right; word-break: break-all;">${value || '—'}</span>
                                                                 </div>
-                                                            `).join('');
+                                                            `;
+                                                        }).join('');
 
                                                         Swal.fire({
                                                             title: `${log.action?.replace(/_/g, ' ')} Details`,
                                                             html: `
-                                                                <div style="text-align: left; background: #f8fafc; border-radius: 12px; padding: 15px; margin-top: 10px;">
+                                                                <div style="text-align: left; background: #f8fafc; border-radius: 12px; padding: 15px; margin-top: 10px; border: 1px solid #e2e8f0;">
                                                                     ${detailsList}
                                                                 </div>
                                                             `,
@@ -213,7 +232,7 @@ const ActivityLogs = () => {
                                                         });
                                                     }
                                                 }}
-                                                className={`hover:bg-slate-50/50 transition-colors group cursor-default ${log.details && Object.keys(log.details).length > 0 ? 'cursor-pointer' : ''}`}
+                                                className="hover:bg-slate-50/50 transition-colors group cursor-pointer"
                                             >
                                                 <td className="px-8 py-5">
                                                     <div className="flex flex-col">
