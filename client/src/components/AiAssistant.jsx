@@ -2,26 +2,37 @@ import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
     X, Send, ArrowRight, Sparkles, 
-    Mic, MicOff, Volume2, VolumeX, Search, HelpCircle, User, CheckCircle, Info
+    Mic, MicOff, Volume2, VolumeX, Search, HelpCircle, User, CheckCircle2
 } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
 const AI_KNOWLEDGE_BASE = {
     staff: [
+        { 
+            q: "Leave Apply", 
+            a: "Follow these exact steps to apply for your leave:", 
+            steps: [
+                "1. Go to the 'Leave Apply' tab.",
+                "2. Choose your 'Leave Type' (CL, ML, OD, etc.).",
+                "3. Select the 'From Date' and 'To Date'.",
+                "4. Assign an 'Alternative Staff' for your duty.",
+                "5. Provide a valid reason and click 'Submit Application'."
+            ],
+            link: "/staff/leaves", 
+            hash: "apply" 
+        },
         { q: "Notification", a: "Access your notifications.", link: "/staff/notifications" },
         { q: "Profile", a: "View your profile.", link: "/staff/profile" },
         { q: "Logout", a: "Logging out...", action: 'logout' },
         { q: "Dashboard", a: "Returning to dashboard.", link: "/staff" },
-        { q: "Your Personal Attendance", a: "Viewing personal attendance.", link: "/staff" },
-        { q: "Recent Attendance History", a: "Checking attendance history.", link: "/staff" },
-        { q: "Leave Management", a: "Opening leave management.", link: "/staff/leaves" },
-        { q: "Leave Apply", a: "Opening leave application.", link: "/staff/leaves", hash: "apply" },
+        { q: "Personal Attendance", a: "Viewing personal attendance.", link: "/staff" },
+        { q: "Attendance History", a: "Checking attendance history.", link: "/staff" },
+        { q: "Leave Management", a: "Opening leave management.", link: "/staff/leaves", hash: "history" },
         { q: "Permission Letter", a: "Opening permissions.", link: "/staff/leaves", hash: "permission" },
         { q: "Comp Leave", a: "Viewing comp leave.", link: "/staff/leaves", hash: "compoff" },
         { q: "Leave Balance", a: "Checking leave balance.", link: "/staff/leaves", hash: "balance" },
         { q: "Incoming Approvals", a: "Checking approvals.", link: "/staff/leaves", hash: "approvals" },
-        { q: "My Leave History", a: "Viewing leave history.", link: "/staff/leaves", hash: "history" },
         { q: "Salary Details", a: "Opening salary details.", link: "/staff/payroll" },
         { q: "My Timetable", a: "Opening your timetable.", link: "/staff/timetables" },
         { q: "Staff Timetable", a: "Viewing institutional timetable.", link: "/staff/timetables" },
@@ -30,31 +41,30 @@ const AI_KNOWLEDGE_BASE = {
         { q: "Academic Calendar", a: "Opening academic calendar.", link: "/staff/calendar" }
     ],
     hod: [
+        { 
+            q: "Leave Apply", 
+            a: "Follow these steps to apply for your leave:", 
+            steps: [
+                "1. Go to the 'Leave Apply' tab.",
+                "2. Select Leave Type.",
+                "3. Select Dates.",
+                "4. Assign Alternative Staff.",
+                "5. Submit for Principal's Approval."
+            ],
+            link: "/hod/leaves", 
+            hash: "apply" 
+        },
         { q: "Notification", a: "Accessing notifications.", link: "/hod/notifications" },
         { q: "Profile", a: "Opening profile.", link: "/hod/profile" },
         { q: "Logout", a: "Logging out...", action: 'logout' },
         { q: "Dashboard", a: "Returning to dashboard.", link: "/hod" },
-        { q: "Your Personal Attendance", a: "Viewing personal attendance.", link: "/hod" },
-        { q: "Recent Attendance History", a: "Checking attendance history.", link: "/hod" },
-        { q: "Leave Management", a: "Opening leave management.", link: "/hod/leaves" },
-        { q: "Leave Apply", a: "Opening leave apply.", link: "/hod/leaves", hash: "apply" },
+        { q: "Leave Management", a: "Opening leave management.", link: "/hod/leaves", hash: "history" },
         { q: "Permission Letter", a: "Opening permissions.", link: "/hod/leaves", hash: "permission" },
-        { q: "Comp Leave", a: "Viewing comp leave.", link: "/hod/leaves", hash: "compoff" },
         { q: "Leave Balance", a: "Checking leave balance.", link: "/hod/leaves", hash: "balance" },
         { q: "Incoming Approvals", a: "Opening incoming approvals.", link: "/hod/leaves", hash: "approvals" },
-        { q: "My Leave History", a: "Viewing leave history.", link: "/hod/leaves", hash: "history" },
         { q: "Salary Details", a: "Opening salary details.", link: "/hod/payroll" },
-        { q: "My Timetable", a: "Opening your timetable.", link: "/hod/timetable" },
-        { q: "Staff Timetable", a: "Viewing staff timetable.", link: "/hod/timetable" },
         { q: "Conversation", a: "Opening conversation hub.", link: "/hod/conversation" },
-        { q: "Purchase Requests", a: "Opening purchase requests.", link: "/hod/items" },
-        { q: "Academic Calendar", a: "Opening academic calendar.", link: "/hod/calendar" },
         { q: "Attendance Records", a: "Opening attendance records.", link: "/hod/attendance" },
-        { q: "Summary View", a: "Opening summary view.", link: "/hod/attendance" },
-        { q: "Details Logs", a: "Opening details logs.", link: "/hod/attendance" },
-        { q: "Biometric Sync", a: "Opening biometric sync.", link: "/hod/attendance" },
-        { q: "HODs Attendance Core", a: "Opening HOD attendance core.", link: "/hod/attendance" },
-        { q: "Staff Attendance Core", a: "Opening staff attendance core.", link: "/hod/attendance" },
         { q: "Department Staff", a: "Opening department staff.", link: "/hod/department" }
     ],
     principal: [
@@ -62,55 +72,34 @@ const AI_KNOWLEDGE_BASE = {
         { q: "Profile", a: "Opening profile.", link: "/principal/profile" },
         { q: "Logout", a: "Logging out...", action: 'logout' },
         { q: "Dashboard", a: "Returning to dashboard.", link: "/principal" },
-        { q: "Your Personal Attendance", a: "Viewing personal attendance.", link: "/principal" },
-        { q: "Recent Attendance History", a: "Checking history.", link: "/principal" },
-        { q: "HODs Attendance Core", a: "Opening HOD attendance core.", link: "/principal/attendance" },
-        { q: "Staff Attendance Core", a: "Opening staff attendance core.", link: "/principal/attendance" },
         { q: "Attendance Records", a: "Opening attendance records.", link: "/principal/attendance" },
-        { q: "Summary View", a: "Opening summary view.", link: "/principal/attendance" },
-        { q: "Biometric Sync", a: "Opening biometric sync.", link: "/principal/attendance" },
         { q: "Conversation", a: "Opening conversation.", link: "/principal/conversation" },
         { q: "Purchase Requests", a: "Opening purchase requests.", link: "/principal/purchase" },
         { q: "Departments", a: "Opening departments.", link: "/principal/departments" },
         { q: "Academic Calendar", a: "Opening academic calendar.", link: "/principal/calendar" },
-        { q: "Leave Requests", a: "Opening leave requests.", link: "/principal/leaves" },
-        { q: "Permission Requests", a: "Opening permission requests.", link: "/principal/leaves" },
-        { q: "Detail Logs", a: "Opening detail logs.", link: "/principal/attendance" }
+        { q: "Leave Requests", a: "Opening leave requests.", link: "/principal/leaves" }
     ],
     admin: [
         { q: "Notification", a: "Opening notifications.", link: "/admin/notifications" },
         { q: "Logout", a: "Logging out...", action: 'logout' },
         { q: "Employee Management", a: "Opening employee management.", link: "/admin/employees" },
-        { q: "Add New Employee", a: "Opening add employee.", link: "/admin/employees/new" },
         { q: "Departments", a: "Opening departments.", link: "/admin/departments" },
         { q: "Salary Management", a: "Opening salary management.", link: "/admin/payroll" },
         { q: "Attendance Records", a: "Opening attendance records.", link: "/admin/attendance" },
-        { q: "Summary View", a: "Opening summary view.", link: "/admin/attendance" },
-        { q: "Details Logs", a: "Opening details logs.", link: "/admin/attendance" },
-        { q: "Biometric Sync", a: "Opening biometric sync.", link: "/admin/biometric-history" },
         { q: "Leave Balance", a: "Opening leave balance.", link: "/admin/leave-limits" },
         { q: "Timetable Setup", a: "Opening timetable setup.", link: "/admin/timetable-setup" },
         { q: "Security Log", a: "Opening security log.", link: "/admin/activity-logs" },
         { q: "Academic Calendar", a: "Opening academic calendar.", link: "/admin/calendar" },
         { q: "Purchase Requests", a: "Opening purchase requests.", link: "/admin/purchase" },
-        { q: "Profile", a: "Opening profile.", link: "/admin/profile" },
-        { q: "Principal Attendance Core", a: "Opening principal attendance.", link: "/admin/attendance" },
-        { q: "HODs Attendance Core", a: "Opening HOD attendance.", link: "/admin/attendance" },
-        { q: "Staff Attendance Core", a: "Opening staff attendance.", link: "/admin/attendance" }
+        { q: "Profile", a: "Opening profile.", link: "/admin/profile" }
     ],
     management: [
         { q: "Profile", a: "Opening profile.", link: "/management/profile" },
         { q: "Logout", a: "Logging out...", action: 'logout' },
         { q: "Dashboard", a: "Opening dashboard.", link: "/management" },
         { q: "Attendance Records", a: "Opening attendance records.", link: "/management/biometric-history" },
-        { q: "Principal Attendance Core", a: "Opening principal attendance.", link: "/management/attendance" },
-        { q: "HODs Attendance Core", a: "Opening HOD attendance.", link: "/management/attendance" },
-        { q: "Staff Attendance Core", a: "Opening staff attendance.", link: "/management/attendance" },
         { q: "Academic Calendar", a: "Opening academic calendar.", link: "/management/calendar" },
-        { q: "Summary View", a: "Opening summary view.", link: "/management/attendance" },
-        { q: "Details Logs", a: "Opening details logs.", link: "/management/attendance" },
-        { q: "Departments", a: "Opening departments.", link: "/management/departments" },
-        { q: "Biometric Sync", a: "Opening biometric sync.", link: "/management/biometric-history" }
+        { q: "Departments", a: "Opening departments.", link: "/management/departments" }
     ]
 };
 
@@ -199,48 +188,39 @@ const AiAssistant = ({ isSidebar, onClose }) => {
             if (exactMatch) {
                 if (isClick) {
                     let actionLink = exactMatch.link;
-                    // Dynamic Profile Path
                     if (exactMatch.q.toLowerCase() === 'profile' && !actionLink.includes(user.emp_id) && role !== 'management') {
                         actionLink = `/${role}/profile/${user.emp_id}`;
                     }
-
+                    
                     if (exactMatch.action === 'logout') {
                         setMessages(prev => [...prev, { type: 'ai', text: "Logging out safely...", time: new Date() }]);
                         setTimeout(() => { logout(); navigate('/login'); }, 1000);
                         return;
                     }
 
-                    // PERFORM INSTANT REDIRECT
-                    setMessages(prev => [...prev, { type: 'ai', text: `Directing you to ${exactMatch.q}...`, time: new Date() }]);
+                    // ENHANCED REDIRECT LOGIC
+                    setMessages(prev => [...prev, { type: 'ai', text: `Directing you to ${exactMatch.q}...`, time: new Date(), steps: exactMatch.steps }]);
                     
-                    // Special behavior for Leave Apply: Include Step by Step explanation
-                    if (exactMatch.q.toLowerCase() === 'leave apply') {
-                        const leaveSteps = `To apply for leave, follow these steps:
-1. Select the **Leave Type** (e.g., Casual Leave).
-2. Use the **Date Picker** to choose your intended dates.
-3. Configure the **Day Type** (Full or Half Day).
-4. Assign an **Alternative Staff** and specify the periods they will cover.
-5. Click **"Confirm & Add This Date"**.
-6. Finally, enter your **Reason** and click **"Submit Application"**.`;
-                        
-                        setMessages(prev => [...prev, { type: 'ai', text: leaveSteps, time: new Date() }]);
-                        speak("I've guided you to the leave application page. Please follow the steps provided.");
-                    }
-
                     setTimeout(() => { 
-                        // Use window API to force hash if already on route
-                        if (exactMatch.hash) {
-                           window.location.hash = `#${exactMatch.hash}`;
+                        // Force a forceful navigation with hash
+                        const hashPart = exactMatch.hash ? `#${exactMatch.hash}` : '';
+                        const fullTarget = `${actionLink}${hashPart}`;
+                        
+                        // If we're already on that base link, force a window location update
+                        if (location.pathname === actionLink) {
+                            window.location.hash = exactMatch.hash || '';
                         } else {
-                           window.location.hash = "";
+                            navigate(fullTarget);
                         }
-                        navigate(actionLink); 
-                        // DONT HIDE AI on click - as requested
-                    }, 10);
+                    }, 500);
+                    // DONT HIDE CHAT BOX AS PER USER REQUEST
                     return;
                 } else {
-                    const reply = `I found a direct tool for you: "${exactMatch.q}". Tap below to open it.`;
-                    setMessages(prev => [...prev, { type: 'ai', text: reply, related: [exactMatch], time: new Date() }]);
+                    const reply = exactMatch.steps 
+                        ? `I can help you with that! Here are the steps for ${exactMatch.q}:` 
+                        : `I've analyzed that for you! Would you like to open: "${exactMatch.q}"?`;
+                    
+                    setMessages(prev => [...prev, { type: 'ai', text: reply, related: [exactMatch], steps: exactMatch.steps, time: new Date() }]);
                     speak(reply);
                     return;
                 }
@@ -257,48 +237,33 @@ const AiAssistant = ({ isSidebar, onClose }) => {
                 setMessages(prev => [...prev, { type: 'ai', text: reply, related: relatedMatches, time: new Date() }]);
                 speak(reply);
             } else {
-                // ADVANCED AI RESEARCHER PERSONA FALLBACK
-                const loadingMsg = { type: 'ai', text: "Analyzing query as Senior Researcher...", time: new Date(), isLoading: true };
+                const loadingMsg = { type: 'ai', text: "Analyzing...", time: new Date(), isLoading: true };
                 setMessages(prev => [...prev, loadingMsg]);
                 
                 setTimeout(() => {
                     setMessages(prev => prev.filter(m => !m.isLoading));
+                    let reply = "";
                     
-                    // Simulated Structured Research Response
-                    const structuredResponse = {
-                        summary: `I've analyzed your query regarding "${text}" using advanced reasoning and documentation benchmarks.`,
-                        detailed: `Based on standard software engineering principles and organizational management practices, your request falls into the category of general information. While the PPG HUB provides specific modules for Profile, Leaves, and Attendance, for queries like this, I recommend adhering to established industry best practices.`,
-                        steps: [
-                            "Identify the core objective of your search.",
-                            "Consult the relevant department lead if this pertains to institutional policy.",
-                            "Utilize the Profile or Dashboard modules for system-related data."
-                        ],
-                        examples: [
-                            "Querying 'Leave Balance' returns real-time database quotas.",
-                            "Searching 'Attendance History' provides audit-ready logs."
-                        ],
-                        conclusion: "In conclusion, stick to institutional tools for hub tasks, or consult research engines for abstract technical concepts. I am here to optimize your workflow within this hub."
-                    };
-
-                    const responseText = `
-**Summary**
-${structuredResponse.summary}
-
-**Detailed Explanation**
-${structuredResponse.detailed}
-
-**Steps**
-${structuredResponse.steps.map(s => `• ${s}`).join('\n')}
-
-**Examples**
-${structuredResponse.examples.map(e => `• ${e}`).join('\n')}
-
-**Conclusion**
-${structuredResponse.conclusion}
-`;
-                    setMessages(prev => [...prev, { type: 'ai', text: responseText, time: new Date(), isRich: true }]);
-                    speak("I've prepared a detailed research analysis for you.");
-                }, 1500);
+                    if (cleanText.includes("weather")) reply = "Current records indicate favorable conditions for operation at the institute. For precise regional weather, local monitors are recommended.";
+                    else if (cleanText.includes("who are you")) reply = "I am the Zorvian AI Assistant, optimized for the PPG EMP HUB ecosystem.";
+                    else if (cleanText.includes("how to apply leave") || cleanText.includes("leave apply")) {
+                         // Find leave apply for current role if possible
+                         const leaveLink = allowedKIs.find(k => k.q === "Leave Apply");
+                         if (leaveLink) {
+                             reply = "To apply for leave, go to the 'Leave Apply' section. Here are the steps:";
+                             setMessages(prev => [...prev, { type: 'ai', text: reply, steps: leaveLink.steps, related: [leaveLink], time: new Date() }]);
+                             speak(reply);
+                             return;
+                         }
+                         reply = "To apply for leave, navigate to your leave management portal and use the 'Apply' tab.";
+                    }
+                    else {
+                        reply = `Based on my analysis, if you're looking for information on "${text}", it isn't currently a direct app module. Try asking about your Profile, Leaves, or Attendance.`;
+                    }
+                    
+                    setMessages(prev => [...prev, { type: 'ai', text: reply, time: new Date() }]);
+                    speak(reply);
+                }, 1200);
             }
         }, 600);
     };
@@ -348,13 +313,13 @@ ${structuredResponse.conclusion}
                 {messages.map((m, i) => (
                     <motion.div
                         key={i}
-                        initial={{ opacity: 0, scale: 0.95 }}
-                        animate={{ opacity: 1, scale: 1 }}
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
                         className={`flex ${m.type === 'ai' ? 'justify-start' : 'justify-end'}`}
                     >
                         <div className={`max-w-[95%] p-4 rounded-3xl text-[11px] font-bold leading-relaxed shadow-sm border ${
                             m.type === 'ai' 
-                                ? 'bg-white text-slate-700 rounded-tl-none border-slate-200' 
+                                ? 'bg-white text-slate-700 rounded-tl-none border-slate-100' 
                                 : 'bg-gradient-to-br from-sky-800 to-sky-700 text-white rounded-tr-none'
                         }`}>
                             {m.isLoading ? (
@@ -364,29 +329,34 @@ ${structuredResponse.conclusion}
                                     <div className="h-1.5 w-1.5 bg-sky-400 rounded-full animate-bounce [animation-delay:-.5s]" />
                                 </div>
                             ) : (
-                                <div className={`space-y-3 ${m.isRich ? 'prose prose-sm prose-slate' : ''}`}>
-                                    {m.text.split('\n').map((line, idx) => (
-                                        <p key={idx}>{line}</p>
-                                    ))}
+                                <div className="space-y-3">
+                                    <p>{m.text}</p>
+                                    
+                                    {/* Step-by-Step Guide Display */}
+                                    {m.steps && (
+                                        <div className="mt-3 space-y-2.5 p-3.5 bg-sky-50/50 rounded-2xl border border-sky-100 ring-1 ring-white/50">
+                                            {m.steps.map((step, sIdx) => (
+                                                <div key={sIdx} className="flex items-start gap-3">
+                                                    <div className="mt-0.5">
+                                                        <CheckCircle2 size={12} className="text-sky-600 shrink-0" />
+                                                    </div>
+                                                    <p className="text-[10px] text-sky-900 leading-tight font-black">{step}</p>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
                                 </div>
                             )}
                             
                             {m.related && m.related.length > 0 && (
                                 <div className="mt-4 flex flex-col gap-2">
-                                    <p className="text-[10px] text-sky-600 uppercase tracking-widest mb-1 ml-1 opacity-70">Direct Shortcut</p>
                                     {m.related.map((r, idx) => (
                                         <button
                                             key={idx}
                                             onClick={() => handleSend(r.q, true)}
-                                            className="flex items-center justify-between gap-3 text-white bg-sky-600 hover:bg-sky-700 px-4 py-3 rounded-2xl text-[11px] w-full font-black border border-sky-500 transition-all group shadow-md"
+                                            className="flex items-center justify-between gap-3 text-sky-700 bg-sky-50 hover:bg-white px-3 py-2.5 rounded-2xl text-[10px] w-full font-black border border-sky-100 transition-all group"
                                         >
-                                            <div className="flex items-center gap-3">
-                                                <div className="h-6 w-6 rounded-lg bg-white/20 flex items-center justify-center">
-                                                    <Info size={12} />
-                                                </div>
-                                                {r.q}
-                                            </div>
-                                            <ArrowRight size={14} className="group-hover:translate-x-1 transition-transform" />
+                                            {r.q} <ArrowRight size={12} className="group-hover:translate-x-1" />
                                         </button>
                                     ))}
                                 </div>
@@ -413,17 +383,17 @@ ${structuredResponse.conclusion}
                     >
                         {isListening ? <MicOff size={16} /> : <Mic size={16} />}
                     </button>
-                    <div className="flex-1 flex items-center bg-slate-50 p-1.5 rounded-xl border border-slate-100 focus-within:border-sky-500/30 transition-all shadow-inner group">
+                    <div className="flex-1 flex items-center bg-slate-50 p-1.5 rounded-xl border border-slate-100 focus-within:border-sky-500/30 transition-all shadow-inner">
                         <input 
                             type="text"
                             value={input}
                             onChange={(e) => setInput(e.target.value)}
-                            placeholder="Consult Assistant..."
+                            placeholder="Type anything..."
                             className="flex-1 bg-transparent border-none outline-none px-2 text-[10px] font-bold text-slate-700"
                         />
                         <button 
                             type="submit"
-                            className="bg-sky-600 h-8 w-8 rounded-lg text-white shadow-lg flex items-center justify-center hover:bg-sky-700 transition-all group-focus-within:rotate-[360deg] duration-700"
+                            className="bg-sky-600 h-8 w-8 rounded-lg text-white shadow-lg flex items-center justify-center hover:bg-sky-700 transition-all"
                         >
                             <Send size={14} />
                         </button>
@@ -431,10 +401,9 @@ ${structuredResponse.conclusion}
                 </form>
             </div>
             
-            {/* Footer */}
             <div className="px-5 pb-4 bg-white flex justify-center">
-                 <div className="flex items-center gap-2 text-[8px] font-black text-gray-400 uppercase tracking-widest border-t border-gray-50 pt-3 w-full justify-center">
-                     <CheckCircle size={10} className="text-emerald-500" /> Powered by ZORVIAN TECHNOLOGIES
+                 <div className="flex items-center gap-2 text-[8px] font-black text-gray-300 uppercase tracking-widest border-t border-gray-50 pt-3 w-full justify-center">
+                     <User size={10} /> Powered by ZORVIAN TECHNOLOGIES
                  </div>
             </div>
         </div>
