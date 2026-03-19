@@ -1,18 +1,19 @@
 import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 
-const Splash = ({ onFinish }) => {
+const Splash = ({ onFinish, isFast = false }) => {
     const [phase, setPhase] = useState(0);
     const [exiting, setExiting] = useState(false);
 
     useEffect(() => {
-        const t1 = setTimeout(() => setPhase(1), 300);
-        const t2 = setTimeout(() => setPhase(2), 1200);
-        const t3 = setTimeout(() => setPhase(3), 2200);
-        const t4 = setTimeout(() => setExiting(true), 4200);
-        const t5 = setTimeout(() => onFinish(), 5000);
+        const speed = isFast ? 0.4 : 1; // 2.5x faster if logged in (approx 2s total)
+        const t1 = setTimeout(() => setPhase(1), 300 * speed);
+        const t2 = setTimeout(() => setPhase(2), 1200 * speed);
+        const t3 = setTimeout(() => setPhase(3), 2200 * speed);
+        const t4 = setTimeout(() => setExiting(true), 4200 * speed);
+        const t5 = setTimeout(() => onFinish(), 5000 * speed);
         return () => [t1, t2, t3, t4, t5].forEach(clearTimeout);
-    }, [onFinish]);
+    }, [onFinish, isFast]);
 
     return (
         <AnimatePresence>
