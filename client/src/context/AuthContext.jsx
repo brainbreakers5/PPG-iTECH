@@ -13,15 +13,21 @@ export const AuthProvider = ({ children }) => {
         const checkUser = async () => {
             const token = localStorage.getItem('token');
             const isManagement = localStorage.getItem('managementAccess') === 'true';
-            if (token && !isManagement) {
+            if (token) {
                 try {
-                    const { data } = await api.get('/auth/profile');
-                    setUser(data);
-                    // Store role for fast redirect on next open
-                    localStorage.setItem('lastRole', data.role);
+                    if (isManagement) {
+                        // For management, set a minimal user object from localStorage
+                        setUser({ role: 'management', name: 'Management', token });
+                    } else {
+                        const { data } = await api.get('/auth/profile');
+                        setUser(data);
+                        // Store role for fast redirect on next open
+                        localStorage.setItem('lastRole', data.role);
+                    }
                 } catch (error) {
                     localStorage.removeItem('token');
                     localStorage.removeItem('lastRole');
+                    localStorage.removeItem('managementAccess');
                     setUser(null);
                 }
             }
