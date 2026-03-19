@@ -1,8 +1,18 @@
 const { pool } = require('../config/db');
 const sendEmail = require('../utils/sendEmail');
 const socketUtil = require('../utils/socket');
+const webpush = require('web-push');
 
-// @desc    Create a notification and send email
+// Configure web-push with VAPID keys
+if (process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
+    webpush.setVapidDetails(
+        process.env.VAPID_SUBJECT || 'mailto:zorvian agency@gmail.com',
+        process.env.VAPID_PUBLIC_KEY,
+        process.env.VAPID_PRIVATE_KEY
+    );
+}
+
+// @desc    Create a notification, send email, and trigger Web Push
 exports.createNotification = async (emp_id, message, type = 'info', metadata = null, client = null, skipEmail = false) => {
     const db = client || pool;
     try {
@@ -12,13 +22,13 @@ exports.createNotification = async (emp_id, message, type = 'info', metadata = n
             [emp_id, message, type, metadata ? (typeof metadata === 'string' ? metadata : JSON.stringify(metadata)) : null]
         );
 
-        // 3. Re-fetch the inserted notification to get the ID and timestamp
+        // 3. Re-fetch the inserted notification to get details
         const { rows: notifRows } = await db.query(
             'SELECT id, user_id, message, is_read, type, metadata, created_at FROM notifications WHERE user_id = $1 ORDER BY created_at DESC LIMIT 1',
             [emp_id]
         );
 
-        // 4. Real-time emit
+        // 4. Real-time emit via Socket
         const io = socketUtil.getIO();
         if (io && notifRows.length > 0) {
             const { rows: userRows } = await pool.query('SELECT id FROM users WHERE emp_id = $1', [emp_id]);
@@ -27,7 +37,31 @@ exports.createNotification = async (emp_id, message, type = 'info', metadata = n
             }
         }
 
-        // 5. Fetch employee email and name then send email (if not skipped)
+        // 5. Send Web Push Notification (Mobile/Desktop background)
+        const { rows: subscriptions } = await pool.query('SELECT subscription FROM push_subscriptions WHERE user_id = $1', [emp_id]);
+        if (subscriptions.length > 0) {
+            const payload = JSON.stringify({
+                title: 'PPG EMP HUB',
+                body: message,
+                icon: '/ppg-logo.png',
+                data: {
+                    url: process.env.APP_URL || '/',
+                    metadata: metadata
+                }
+            });
+
+            subscriptions.forEach(sub => {
+                webpush.sendNotification(sub.subscription, payload).catch(err => {
+                    console.error('Push notification failed for a subscription:', err.statusCode);
+                    if (err.statusCode === 410 || err.statusCode === 404) {
+                        // Cleanup expired subscriptions
+                        pool.query('DELETE FROM push_subscriptions WHERE subscription = $1', [JSON.stringify(sub.subscription)]);
+                    }
+                });
+            });
+        }
+
+        // 6. Fetch employee email and name then send email (if not skipped)
         if (!skipEmail) {
             const { rows } = await pool.query('SELECT email, name FROM users WHERE emp_id = $1', [emp_id]);
             
@@ -68,6 +102,23 @@ exports.createNotification = async (emp_id, message, type = 'info', metadata = n
         }
     } catch (error) {
         console.error("Error creating notification", error);
+    }
+};
+
+// @desc    Save Push Subscription
+// @route   POST /api/notifications/subscribe
+// @access  Private
+exports.subscribePush = async (req, res) => {
+    const { subscription } = req.body;
+    try {
+        await pool.query(
+            'INSERT INTO push_subscriptions (user_id, subscription) VALUES ($1, $2) ON CONFLICT (subscription) DO UPDATE SET user_id = EXCLUDED.user_id',
+            [req.user.emp_id, JSON.stringify(subscription)]
+        );
+        res.status(201).json({ message: 'Subscribed successfully' });
+    } catch (error) {
+        console.error('Push Subscription Error:', error);
+        res.status(500).json({ message: 'Server Error' });
     }
 };
 
