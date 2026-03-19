@@ -79,24 +79,7 @@ const BiometricMonitor = ({ empId, onDataChange }) => {
     return (
         <div className="space-y-6">
             {/* Stats Overview */}
-            {!empId && stats && (
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div className="bg-white p-6 rounded-[32px] border border-sky-50 shadow-xl shadow-sky-500/5">
-                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Active Today</p>
-                        <h3 className="text-2xl font-black text-gray-800 mt-1">{stats.total_users} Users</h3>
-                    </div>
-                    <div className="bg-white p-6 rounded-[32px] border border-sky-50 shadow-xl shadow-sky-500/5">
-                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Total Punches</p>
-                        <h3 className="text-2xl font-black text-sky-600 mt-1">{stats.total_punches_today}</h3>
-                    </div>
-                    <div className="bg-white p-6 rounded-[32px] border border-sky-50 shadow-xl shadow-sky-500/5">
-                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Sync Status</p>
-                        <h3 className="text-2xl font-black text-emerald-500 mt-1 flex items-center gap-2">
-                            Live <span className="h-2 w-2 bg-emerald-500 rounded-full animate-ping" />
-                        </h3>
-                    </div>
-                </div>
-            )}
+            {/* Stats Overview removed per request */}
 
             {/* Logs Table */}
             <div className="bg-white rounded-[40px] shadow-2xl shadow-sky-500/5 border border-sky-50 overflow-hidden">
@@ -119,22 +102,7 @@ const BiometricMonitor = ({ empId, onDataChange }) => {
                             <FaSync className={loading ? 'animate-spin' : ''} />
                         </button>
                     </div>
-                    {/* Live Date Display */}
-                    <div className="flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-emerald-50 to-sky-50 rounded-2xl border border-emerald-100">
-                        <div className="flex items-center gap-2">
-                            <FaCalendarDay className="text-emerald-600 text-sm" />
-                            <div>
-                                <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Live Date</p>
-                                <p className="text-sm font-black text-gray-800">
-                                    {new Date().toLocaleDateString('en-US', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' })}
-                                </p>
-                            </div>
-                        </div>
-                        <span className="ml-auto px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest border bg-emerald-50 text-emerald-600 border-emerald-100 flex items-center gap-1.5">
-                            <span className="h-1.5 w-1.5 bg-emerald-500 rounded-full animate-ping" />
-                            Live
-                        </span>
-                    </div>
+                    {/* Live Date Display removed per request */}
                 </div>
 
                 <div className="overflow-x-auto">
