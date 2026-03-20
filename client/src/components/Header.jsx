@@ -425,16 +425,11 @@ const Header = ({ toggleSidebar, sidebarOpen }) => {
                             </div>
                         </button>
                     )}
-                    <div className="flex items-center gap-3">
-                        <div className="h-10 w-10 rounded-xl overflow-hidden shadow-md ring-2 ring-white">
-                            <img src="/ppg-logo.png" alt="PPG Institute of Technology" className="w-full h-full object-cover" />
-                        </div>
-                        <div>
+                        <div className="ml-1">
                             <h2 className="text-lg font-black text-gray-800 tracking-tight">
                                 PPG <span className="text-sky-600 ">iTech HUB</span>
                             </h2>
                         </div>
-                    </div>
                 </div>
 
                 <div className="flex items-center space-x-3">
