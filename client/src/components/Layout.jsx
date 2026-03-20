@@ -41,9 +41,9 @@ const Layout = ({ children }) => {
         };
     }, []);
 
-    // Persist AI state
+    // Persist AI state and notify app
     useEffect(() => {
-        localStorage.setItem('isAiOpen', isAiOpen);
+        localStorage.setItem('isAiOpen', isAiOpen.toString());
         window.dispatchEvent(new CustomEvent('AI_STATUS', { detail: { open: isAiOpen } }));
     }, [isAiOpen]);
 
