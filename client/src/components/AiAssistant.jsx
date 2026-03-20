@@ -1,151 +1,144 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
     X, Send, ArrowRight, Sparkles, 
-    Mic, MicOff, Volume2, VolumeX, Search, HelpCircle, User, CheckCircle2,
-    AlertCircle, BookOpen, Layers, Terminal, Info, ChevronRight, Settings
+    Mic, MicOff, Volume2, VolumeX, User, CheckCircle2
 } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
-/**
- * PPG EMP HUB - ADVANCED AI ASSISTANT KNOWLEDGE BASE
- * Structured for "How To", "Error", and "General" responses.
- */
-const AI_SYSTEM_KNOWLEDGE = {
-    staff: {
-        roleName: "Staff Member",
-        modules: [
-            { id: 'leave', name: "Leave Management", path: "/staff/leaves", menu: "Leave Apply Tab" },
-            { id: 'payroll', name: "Salary Details", path: "/staff/payroll", menu: "Salary Dashboard" },
-            { id: 'timetable', name: "My Timetable", path: "/staff/timetables", menu: "Timetable View" },
-            { id: 'conversation', name: "Conversation Hub", path: "/staff/conversation", menu: "Message Center" },
-            { id: 'profile', name: "My Profile", path: "/staff/profile", menu: "Profile View" }
-        ],
-        howTo: [
-            { 
-                q: "Apply for Leave", 
-                module: "Leave Management",
-                menu: "Leave Apply Tab",
-                option: "Apply New",
-                fields: [
-                    "Leave Type → Select CL, ML, OD, etc.",
-                    "Dates → Select From and To dates",
-                    "Alternative Staff → Assign a duty alternate",
-                    "Reason → Enter valid justification"
-                ],
-                steps: [
-                    "Navigate to /staff/leaves",
-                    "Select the 'Apply' tab from the top menu",
-                    "Choose your desired leave type from the dropdown",
-                    "Pick your dates and assign an alternative staff member",
-                    "Click 'Submit Application' for HOD review"
-                ],
-                link: "/staff/leaves",
-                hash: "apply"
-            },
-            {
-                q: "Check Salary",
-                module: "Payroll",
-                menu: "Salary Details",
-                steps: [
-                    "Go to the Salary Details module",
-                    "Select the month and year you wish to view",
-                    "Click on 'View Payslip' to see detailed breakdown",
-                    "You can download the PDF for your records"
-                ],
-                link: "/staff/payroll"
-            }
-        ],
-        errors: [
-            {
-                q: "Cannot see salary",
-                reasons: ["Payroll not yet processed for current month", "Network connectivity issue", "Browser cache conflict"],
-                solution: "Wait for the 5th of the month or contact the Accounts department if the error persists."
-            }
-        ]
-    },
-    hod: {
-        roleName: "Head of Department (HOD)",
-        modules: [
-            { id: 'approval', name: "Leave Approvals", path: "/hod/leaves", hash: "approvals" },
-            { id: 'dept_staff', name: "Department Staff", path: "/hod/department" },
-            { id: 'attendance', name: "Attendance Records", path: "/hod/attendance" }
-        ],
-        howTo: [
-            {
-                q: "Approve Staff Leave",
-                module: "Leave Management",
-                menu: "Incoming Approvals",
-                steps: [
-                    "Go to Leave Management module",
-                    "Click on the 'Approvals' tab",
-                    "Review the applicant's details and alternative staff assignment",
-                    "Click 'Approve' to forward to Principal or 'Reject' with reason"
-                ],
-                link: "/hod/leaves",
-                hash: "approvals"
-            }
-        ]
-    },
-    principal: {
-        roleName: "Principal",
-        modules: [
-            { id: 'leaves', name: "Leave Requests", path: "/principal/leaves" },
-            { id: 'purchases', name: "Purchase Requests", path: "/principal/purchase" },
-            { id: 'departments', name: "Departments Overview", path: "/principal/department" }
-        ],
-        howTo: [
-            {
-                q: "Approve Purchase Request",
-                module: "Purchase Management",
-                menu: "Purchases",
-                steps: [
-                    "Navigate to the Purchase Requests module",
-                    "Locate the pending request in the list",
-                    "Review the items, estimated cost, and department justification",
-                    "Click 'Approve' to finalize for Admin/Management"
-                ],
-                link: "/principal/purchase"
-            }
-        ]
-    },
-    admin: {
-        roleName: "System Administrator",
-        modules: [
-            { id: 'employees', name: "Employee Management", path: "/admin/employees" },
-            { id: 'depts', name: "Department Setup", path: "/admin/departments" },
-            { id: 'payroll', name: "Salary Management", path: "/admin/payroll" }
-        ],
-        howTo: [
-            {
-                q: "Add New Employee",
-                module: "Employee Management",
-                menu: "Employee List",
-                option: "Create New",
-                fields: [
-                    "Emp ID → Unique identifier",
-                    "Name → Full name of staff",
-                    "Role/Dept → Assign to correct department",
-                    "Access Level → Admin, HOD, or Staff"
-                ],
-                steps: [
-                    "Go to Employee Management module",
-                    "Click the 'New Employee' button",
-                    "Fill all required personal and institutional fields",
-                    "Set initial password and click 'Save'"
-                ],
-                link: "/admin/employees/new"
-            }
-        ]
-    },
-    management: {
-        roleName: "Management/Trustee",
-        modules: [
-            { id: 'dashboard', name: "Management Dashboard", path: "/management" },
-            { id: 'dept_overview', name: "Department Statistics", path: "/management/departments" }
-        ]
-    }
+const AI_KNOWLEDGE_BASE = {
+    staff: [
+        { q: "Notification", link: "/staff/notifications" },
+        { q: "Profile", link: "/staff/profile" },
+        { q: "Logout", action: 'logout' },
+        { q: "Dashboard", link: "/staff" },
+        { q: "Your Personal Attendance", link: "/staff" },
+        { q: "Recent Attendance History", link: "/staff" },
+        { q: "Leave Management", link: "/staff/leaves", hash: "history" },
+        { 
+            q: "Leave Apply", 
+            a: "To apply for leave, please follow these steps correctly:", 
+            steps: [
+                "1. Go to the 'New Application' tab in Leave Management.",
+                "2. Select your 'Leave Type' (CL, ML, OD, etc.).",
+                "3. Enter the 'Subject' and 'Reason' for your leave.",
+                "4. For each date: Select the Date, choose Configuration (Full/Half Day), add Alternative Staff & Periods, and click 'Confirm & Add This Date'.",
+                "5. Once all dates are added, click 'Submit Application' to finish."
+            ],
+            link: "/staff/leaves", 
+            hash: "apply" 
+        },
+        { q: "Permission Letter", link: "/staff/leaves", hash: "permission" },
+        { q: "Comp Leave", link: "/staff/leaves", hash: "compoff" },
+        { q: "Leave Balance", link: "/staff/leaves", hash: "balance" },
+        { q: "Incoming Approvals", link: "/staff/leaves", hash: "approvals" },
+        { q: "My Leave History", link: "/staff/leaves", hash: "history" },
+        { q: "Salary Details", link: "/staff/payroll" },
+        { q: "My Timetable", link: "/staff/timetables" },
+        { q: "Staff Timetable", link: "/staff/timetables" },
+        { q: "Conversation", link: "/staff/conversation" },
+        { q: "Purchase Requests", link: "/staff/items" },
+        { q: "Academic Calendar", link: "/staff/calendar" }
+    ],
+    hod: [
+        { q: "Notification", link: "/hod/notifications" },
+        { q: "Profile", link: "/hod/profile" },
+        { q: "Logout", action: 'logout' },
+        { q: "Dashboard", link: "/hod" },
+        { q: "Your Personal Attendance", link: "/hod" },
+        { q: "Recent Attendance History", link: "/hod" },
+        { q: "Leave Management", link: "/hod/leaves", hash: "history" },
+        { 
+            q: "Leave Apply", 
+            a: "To apply for leave, please follow these steps correctly:", 
+            steps: [
+                "1. Go to the 'New Application' tab in Leave Management.",
+                "2. Select your 'Leave Type' (CL, ML, OD, etc.).",
+                "3. Enter the 'Subject' and 'Reason' for your leave.",
+                "4. For each date: Select the Date, choose Configuration (Full/Half Day), add Alternative Staff & Periods, and click 'Confirm & Add This Date'.",
+                "5. Once all dates are added, click 'Submit Application' to finish."
+            ],
+            link: "/hod/leaves", 
+            hash: "apply" 
+        },
+        { q: "Permission Letter", link: "/hod/leaves", hash: "permission" },
+        { q: "Comp Leave", link: "/hod/leaves", hash: "compoff" },
+        { q: "Leave Balance", link: "/hod/leaves", hash: "balance" },
+        { q: "Incoming Approvals", link: "/hod/leaves", hash: "approvals" },
+        { q: "My Leave History", link: "/hod/leaves", hash: "history" },
+        { q: "Salary Details", link: "/hod/payroll" },
+        { q: "My Timetable", link: "/hod/timetable" },
+        { q: "Staff Timetable", link: "/hod/timetable" },
+        { q: "Conversation", link: "/hod/conversation" },
+        { q: "Purchase Requests", link: "/hod/purchase" },
+        { q: "Academic Calendar", link: "/hod/calendar" },
+        { q: "Attendance Records", link: "/hod/attendance" },
+        { q: "Summary View", link: "/hod/attendance", hash: "summary" },
+        { q: "Details Logs", link: "/hod/biometric-history" },
+        { q: "Biometric Sync", link: "/hod/attendance" },
+        { q: "Conversation", link: "/hod/conversation" },
+        { q: "Purchase Requests", link: "/hod/purchase" },
+        { q: "HODs Attendance Core", link: "/hod/attendance" },
+        { q: "Staff Attendance Core", link: "/hod/attendance" },
+        { q: "Academic Calendar", link: "/hod/calendar" },
+        { q: "Department Staff", link: "/hod/department" }
+    ],
+    principal: [
+        { q: "Notification", link: "/principal/notifications" },
+        { q: "Profile", link: "/principal/profile" },
+        { q: "Logout", action: 'logout' },
+        { q: "Dashboard", link: "/principal" },
+        { q: "Your Personal Attendance", link: "/principal" },
+        { q: "Recent Attendance History", link: "/principal" },
+        { q: "HODs Attendance Core", link: "/principal/attendance" },
+        { q: "Staff Attendance Core", link: "/principal/attendance" },
+        { q: "Attendance Records", link: "/principal/attendance" },
+        { q: "Summary View", link: "/principal/attendance", hash: "summary" },
+        { q: "Biometric Sync", link: "/principal/attendance" },
+        { q: "Conversation", link: "/principal/conversation" },
+        { q: "Purchase Requests", link: "/principal/purchase" },
+        { q: "Departments", link: "/principal/department" },
+        { q: "Academic Calendar", link: "/principal/calendar" },
+        { q: "Leave Requests", link: "/principal/leaves" },
+        { q: "Permission Requests", link: "/principal/leaves", hash: "permission" },
+        { q: "Detail Logs", link: "/principal/biometric-history" }
+    ],
+    admin: [
+        { q: "Notification", link: "/admin/notifications" },
+        { q: "Logout", action: 'logout' },
+        { q: "Employee Management", link: "/admin/employees" },
+        { q: "Add New Employee", link: "/admin/employees/new" },
+        { q: "Departments", link: "/admin/departments" },
+        { q: "Salary Management", link: "/admin/payroll" },
+        { q: "Attendance Records", link: "/admin/attendance" },
+        { q: "Summary View", link: "/admin/attendance", hash: "summary" },
+        { q: "Details Logs", link: "/admin/biometric-history" },
+        { q: "Biometric Sync", link: "/admin/attendance" },
+        { q: "Leave Balance", link: "/admin/leave-limits" },
+        { q: "Timetable Setup", link: "/admin/timetable-setup" },
+        { q: "Security Log", link: "/admin/activity-logs" },
+        { q: "Academic Calendar", link: "/admin/calendar" },
+        { q: "Purchase Requests", link: "/admin/purchase" },
+        { q: "Profile", link: "/admin/profile" },
+        { q: "Principal Attendance Core", link: "/admin/attendance" },
+        { q: "HODs Attendance Core", link: "/admin/attendance" },
+        { q: "Staff Attendance Core", link: "/admin/attendance" }
+    ],
+    management: [
+        { q: "Profile", link: "/management/profile" },
+        { q: "Logout", action: 'logout' },
+        { q: "Dashboard", link: "/management" },
+        { q: "Attendance Records", link: "/management/attendance" },
+        { q: "Principal Attendance Core", link: "/management/attendance" },
+        { q: "HODs Attendance Core", link: "/management/attendance" },
+        { q: "Staff Attendance Core", link: "/management/attendance" },
+        { q: "Academic Calendar", link: "/management/calendar" },
+        { q: "Summary View", link: "/management/attendance", hash: "summary" },
+        { q: "Details Logs", link: "/management/attendance" },
+        { q: "Departments", link: "/management/departments" },
+        { q: "Biometric Sync", link: "/management/attendance" }
+    ]
 };
 
 const AiAssistant = ({ isSidebar, onClose }) => {
@@ -159,23 +152,23 @@ const AiAssistant = ({ isSidebar, onClose }) => {
     const scrollRef = useRef(null);
     const recognitionRef = useRef(null);
 
-    const userRole = useMemo(() => user?.role?.toLowerCase() || 'staff', [user]);
-    const roleData = useMemo(() => AI_SYSTEM_KNOWLEDGE[userRole] || AI_SYSTEM_KNOWLEDGE.staff, [userRole]);
+    const role = user?.role?.toLowerCase() || 'staff';
+    const allowedKIs = AI_KNOWLEDGE_BASE[role] || [];
 
-    // Initial greeting following User Information Rules
+    // Rule 1: Initial greeting shows only role-specific options
     useEffect(() => {
         if (messages.length === 0 && user) {
             setMessages([
                 { 
                     type: 'ai', 
-                    text: `Hello ${user.name}, I am your PPG EMP HUB Assistant. I've analyzed your role as **${roleData.roleName}** and I'm ready to help you with ${roleData.modules[0]?.name || 'the system'} today. How can I assist you?`, 
+                    text: `Hello ${user.name}, I am your PPG EMP HUB AI Assistant. Please select from the available options for your role:`, 
+                    related: allowedKIs,
                     time: new Date() 
                 }
             ]);
         }
-    }, [user, messages.length, roleData, userRole]);
+    }, [user, messages.length, allowedKIs]);
 
-    // Speech Recognition Setup
     useEffect(() => {
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
         if (SpeechRecognition) {
@@ -205,20 +198,20 @@ const AiAssistant = ({ isSidebar, onClose }) => {
     };
 
     const toggleListening = () => {
-        if (isListening) recognitionRef.current?.stop();
-        else {
+        if (isListening) {
+            recognitionRef.current?.stop();
+        } else {
             setIsListening(true);
             recognitionRef.current?.start();
         }
     };
 
     useEffect(() => {
-        if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+        if (scrollRef.current) {
+            scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+        }
     }, [messages]);
 
-    /**
-     * CORE INTELLIGENCE: ANALYZE INTENT AND PROVIDE STRUCTURED SOLUTIONS
-     */
     const handleSend = async (text = input, isClick = false) => {
         const cleanText = text.trim().toLowerCase().replace(/[?.,!]/g, "");
         if (!cleanText) return;
@@ -228,127 +221,94 @@ const AiAssistant = ({ isSidebar, onClose }) => {
         }
         setInput('');
 
-        // 1. Analyze user's intent (How to, Error, General)
-        const isHowTo = cleanText.includes("how") || cleanText.includes("where") || cleanText.includes("apply") || cleanText.includes("check") || cleanText.includes("set");
-        const isError = cleanText.includes("error") || cleanText.includes("not working") || cleanText.includes("failed") || cleanText.includes("unable") || cleanText.includes("cannot");
-        
-        // 2. Identification of Module
-        const currentPath = location.pathname;
-        const currentModule = roleData.modules.find(m => currentPath.includes(m.path))?.name || "current module";
-
         setTimeout(async () => {
-            // Find Match in Knowledge Base
-            const howToMatch = roleData.howTo?.find(h => 
-                cleanText.includes(h.q.toLowerCase()) || 
-                cleanText.includes(h.module.toLowerCase()) ||
-                (isClick && h.q.toLowerCase().includes(cleanText))
-            );
+            // Rule 2 & 3 & 4: Strictly follow provided questions
+            const exactMatch = allowedKIs.find(k => k.q.toLowerCase().replace(/[?.,!]/g, "") === cleanText);
 
-            const errorMatch = roleData.errors?.find(e => 
-                cleanText.includes(e.q.toLowerCase())
-            );
-
-            // Response Logic
-            if (howToMatch) {
-                if (isClick && howToMatch.link) {
-                    setMessages(prev => [...prev, { type: 'ai', text: `Step 1: Navigating to ${howToMatch.module}...`, time: new Date() }]);
-                    setTimeout(() => {
-                        const target = `${howToMatch.link}${howToMatch.hash ? '#' + howToMatch.hash : ''}`;
-                        navigate(target);
-                    }, 800);
-                    return;
-                }
-
-                // Format: HOW TO DO SOMETHING
-                const reply = `I can help you with that. Here is the step-by-step guide for **${howToMatch.q}**:`;
-                setMessages(prev => [...prev, { 
-                    type: 'ai', 
-                    text: reply, 
-                    howTo: howToMatch,
-                    time: new Date() 
-                }]);
-                speak(reply);
-            } else if (errorMatch || (isError && !howToMatch)) {
-                // Format: ERROR
-                const match = errorMatch || { q: text, reasons: ["System synchronization delay", "Insufficient permissions for this action"], solution: "Please try reloading the page or contact the Administrator." };
-                const reply = `I've analyzed the issue regarding "${match.q}". Here are the possible reasons and solutions:`;
-                setMessages(prev => [...prev, { 
-                    type: 'ai', 
-                    text: reply, 
-                    error: match, 
-                    time: new Date() 
-                }]);
-                speak(reply);
-            } else if (cleanText.includes("where am i") || cleanText.includes("this page")) {
-                const reply = `You are currently in the **${currentModule}** module of the PPG EMP HUB. My analysis shows you have access to: ${roleData.modules.map(m => m.name).join(', ')}.`;
-                setMessages(prev => [...prev, { type: 'ai', text: reply, time: new Date() }]);
-                speak(reply);
-            } else if (cleanText.includes("logout")) {
-                setMessages(prev => [...prev, { type: 'ai', text: "Logging out of your session...", time: new Date() }]);
-                setTimeout(() => { logout(); navigate('/login'); }, 1000);
-            } else {
-                // FALLBACK LOGIC BASED ON USER RULES
-                const loadingMsg = { type: 'ai', text: "Analyzing system state...", time: new Date(), isLoading: true };
-                setMessages(prev => [...prev, loadingMsg]);
-
-                setTimeout(() => {
-                    setMessages(prev => prev.filter(m => !m.isLoading));
-                    
-                    let reply = "";
-                    if (cleanText.length < 5) {
-                        reply = "Which module are you referring to? Please provide more details so I can guide you effectively.";
-                    } else if (cleanText.includes("feature xyz") || cleanText.includes("unavailable")) {
-                        reply = "This feature is not available in this module. You may contact the administrator.";
-                    } else {
-                        reply = `Based on the current module (**${currentModule}**), here is the best possible solution: You can explore the ${roleData.modules[0]?.name} or check your Profile for recent updates. If you need a specific guide, try asking "How do I apply for leave?".`;
+            if (exactMatch) {
+                if (isClick && !exactMatch.steps) {
+                    let actionLink = exactMatch.link;
+                    if (exactMatch.q.toLowerCase() === 'profile' && !actionLink.includes(user.emp_id) && role !== 'management') {
+                        actionLink = `/${role}/profile/${user.emp_id}`;
                     }
                     
-                    setMessages(prev => [...prev, { type: 'ai', text: reply, time: new Date() }]);
+                    if (exactMatch.action === 'logout') {
+                        setMessages(prev => [...prev, { type: 'ai', text: "Logging out safely...", time: new Date() }]);
+                        setTimeout(() => { logout(); navigate('/login'); }, 1000);
+                        return;
+                    }
+
+                    // Rule 4: Respond with exact list of options
+                    setMessages(prev => [...prev, { 
+                        type: 'ai', 
+                        text: `Directing you to ${exactMatch.q}...`, 
+                        time: new Date(),
+                        related: allowedKIs 
+                    }]);
+                    
+                    setTimeout(() => { 
+                        const hashPart = exactMatch.hash ? `#${exactMatch.hash}` : '';
+                        const fullTarget = `${actionLink}${hashPart}`;
+                        
+                        if (location.pathname === actionLink) {
+                            window.location.hash = (exactMatch.hash || '');
+                        } else {
+                            navigate(fullTarget);
+                        }
+                    }, 500);
+                } else {
+                    // Rule 5: Respond within that feature
+                    const reply = exactMatch.a || `Opening "${exactMatch.q}" guide for you:`;
+                    setMessages(prev => [...prev, { 
+                        type: 'ai', 
+                        text: reply, 
+                        steps: exactMatch.steps,
+                        related: allowedKIs, // Maintain the list as per Rule 4
+                        time: new Date() 
+                    }]);
                     speak(reply);
-                }, 1000);
+                }
+            } else {
+                // Rule 6: Unrelated message fallback
+                const reply = "Please select from the available options.";
+                setMessages(prev => [...prev, { 
+                    type: 'ai', 
+                    text: reply, 
+                    related: allowedKIs, 
+                    time: new Date() 
+                }]);
+                speak(reply);
             }
         }, 600);
     };
 
     return (
-        <div className="flex flex-col h-full w-full bg-white relative overflow-hidden">
-            {/* Header - Premium Design */}
-            <div className="bg-gradient-to-br from-[#0f172a] via-[#1e293b] to-[#0d9488] p-6 flex flex-col gap-2 shrink-0 relative overflow-hidden">
-                <div className="absolute top-0 right-0 p-10 opacity-10 rotate-12">
-                    <Sparkles className="h-24 w-24 text-white" />
-                </div>
-                
-                <div className="flex items-center justify-between relative z-10">
+        <div className="flex flex-col h-full w-full bg-white relative">
+            <div className="bg-gradient-to-br from-slate-900 via-sky-900 to-sky-800 p-6 flex flex-col gap-2 shrink-0">
+                <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                        <motion.div 
-                            animate={{ rotate: [0, 10, -10, 0] }}
-                            transition={{ repeat: Infinity, duration: 5 }}
-                            className="h-12 w-12 bg-white/10 backdrop-blur-2xl rounded-[18px] flex items-center justify-center border border-white/20 shadow-2xl ring-1 ring-white/10"
-                        >
-                            <Sparkles className="text-teal-400 h-6 w-6" />
-                        </motion.div>
+                        <div className="h-10 w-10 bg-white/10 backdrop-blur-2xl rounded-2xl flex items-center justify-center border border-white/20 shadow-xl">
+                            <Sparkles className="text-sky-300 h-5 w-5" />
+                        </div>
                         <div className="flex flex-col">
-                            <h3 className="text-white font-black text-sm tracking-tighter leading-none mb-1">PPG ASSISTANT</h3>
-                            <div className="flex items-center gap-2">
-                                <div className="h-1.5 w-1.5 bg-teal-400 rounded-full animate-pulse shadow-[0_0_10px_#2dd4bf]" />
-                                <span className="text-teal-400 text-[8px] font-black uppercase tracking-[0.2em] opacity-90">
-                                    System Expert • Online
-                                </span>
-                            </div>
+                            <h3 className="text-white font-black text-xs tracking-tight leading-none mb-1 uppercase">PPG EMP HUB</h3>
+                            <span className="text-sky-300 text-[8px] font-black uppercase tracking-[0.2em] opacity-90 flex items-center gap-1.5">
+                                <div className="h-1 w-1 bg-emerald-400 rounded-full animate-pulse" /> ZORVIAN AI ASSISTANT
+                            </span>
                         </div>
                     </div>
                     
                     <div className="flex items-center gap-2">
                         <button 
                             onClick={() => setIsSpeaking(!isSpeaking)}
-                            className={`p-2.5 rounded-2xl transition-all duration-300 ${isSpeaking ? 'bg-white/10 text-white border border-white/20 ring-1 ring-white/10' : 'bg-black/30 text-white/40'}`}
+                            className={`p-2 rounded-xl transition-all ${isSpeaking ? 'bg-white/10 text-white border border-white/20' : 'bg-black/30 text-white/40'}`}
                         >
                             {isSpeaking ? <Volume2 size={16} /> : <VolumeX size={16} />}
                         </button>
                         {onClose && (
                             <button 
                                 onClick={onClose}
-                                className="p-2.5 hover:bg-white/10 rounded-2xl transition-all text-white border border-transparent hover:border-white/10 active:scale-90"
+                                className="p-2 hover:bg-white/10 rounded-xl transition-all text-white border border-transparent hover:border-white/10"
                             >
                                 <X size={18} />
                             </button>
@@ -357,102 +317,61 @@ const AiAssistant = ({ isSidebar, onClose }) => {
                 </div>
             </div>
 
-            {/* Chat Body */}
             <div 
                 ref={scrollRef}
-                className="flex-1 overflow-y-auto p-5 space-y-6 bg-slate-50/30 scroll-smooth no-scrollbar"
+                className="flex-1 overflow-y-auto p-5 space-y-4 bg-slate-50/50 scroll-smooth no-scrollbar"
             >
                 {messages.map((m, i) => (
                     <motion.div
                         key={i}
-                        initial={{ opacity: 0, y: 15, scale: 0.95 }}
-                        animate={{ opacity: 1, y: 0, scale: 1 }}
-                        className={`flex ${m.type === 'ai' ? 'justify-start' : 'justify-end'} group`}
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className={`flex ${m.type === 'ai' ? 'justify-start' : 'justify-end'}`}
                     >
-                        <div className={`max-w-[95%] p-4 rounded-[28px] text-[11px] font-bold leading-relaxed shadow-sm border transition-all ${
+                        <div className={`max-w-[95%] p-4 rounded-3xl text-[11px] font-bold leading-relaxed shadow-sm border ${
                             m.type === 'ai' 
                                 ? 'bg-white text-slate-700 rounded-tl-none border-slate-100' 
-                                : 'bg-gradient-to-br from-[#0f172a] to-[#1e293b] text-white rounded-tr-none'
+                                : 'bg-gradient-to-br from-sky-800 to-sky-700 text-white rounded-tr-none'
                         }`}>
-                            <div className="space-y-4">
-                                <p className={m.type === 'ai' ? 'text-slate-600' : 'text-slate-100'}>{m.text}</p>
+                            <div className="space-y-3">
+                                <p>{m.text}</p>
                                 
-                                {/* HOW TO FORMAT */}
-                                {m.howTo && (
-                                    <div className="space-y-4 mt-2">
-                                        <div className="p-4 bg-teal-50/50 rounded-3xl border border-teal-100/50 ring-1 ring-white/50 space-y-3">
-                                            <div className="flex items-center gap-2 text-teal-700">
-                                                <Layers size={14} className="animate-pulse" />
-                                                <span className="uppercase tracking-widest text-[9px] font-black">Module: {m.howTo.module}</span>
-                                            </div>
-                                            
-                                            {m.howTo.fields && (
-                                                <div className="space-y-1.5 border-l-2 border-teal-200 pl-3">
-                                                    <p className="text-[9px] text-teal-900/60 uppercase font-black mb-1">Required Fields:</p>
-                                                    {m.howTo.fields.map((f, idx) => (
-                                                        <div key={idx} className="flex items-center gap-2 text-[10px] text-teal-800">
-                                                            <div className="h-1 w-1 bg-teal-400 rounded-full" />
-                                                            {f}
-                                                        </div>
-                                                    ))}
+                                {m.steps && (
+                                    <div className="mt-3 space-y-2.5 p-3.5 bg-sky-50/50 rounded-2xl border border-sky-100 ring-1 ring-white/50">
+                                        {m.steps.map((step, sIdx) => (
+                                            <div key={sIdx} className="flex items-start gap-3">
+                                                <div className="mt-0.5">
+                                                    <CheckCircle2 size={12} className="text-sky-600 shrink-0" />
                                                 </div>
-                                            )}
-
-                                            <div className="space-y-2.5">
-                                                {m.howTo.steps.map((step, sIdx) => (
-                                                    <div key={sIdx} className="flex items-start gap-3">
-                                                        <div className="h-5 w-5 rounded-lg bg-teal-100 flex items-center justify-center text-teal-700 shrink-0 text-[9px] font-black">
-                                                            {sIdx + 1}
-                                                        </div>
-                                                        <p className="text-[10px] text-teal-900 leading-tight pt-0.5">{step}</p>
-                                                    </div>
-                                                ))}
+                                                <p className="text-[10px] text-sky-900 font-bold leading-tight">{step}</p>
                                             </div>
-
-                                            <button
-                                                onClick={() => handleSend(m.howTo.q, true)}
-                                                className="w-full mt-2 py-2.5 bg-teal-600 text-white rounded-2xl flex items-center justify-center gap-2 hover:bg-teal-700 transition-all shadow-lg shadow-teal-600/20 active:scale-95"
-                                            >
-                                                <ChevronRight size={14} /> Open {m.howTo.module}
-                                            </button>
-                                        </div>
-                                    </div>
-                                )}
-
-                                {/* ERROR FORMAT */}
-                                {m.error && (
-                                    <div className="space-y-4 mt-2 animate-in fade-in slide-in-from-bottom-2">
-                                        <div className="p-4 bg-rose-50/50 rounded-3xl border border-rose-100 ring-1 ring-white/50 space-y-4">
-                                            <div className="flex items-center gap-2 text-rose-600">
-                                                <AlertCircle size={14} />
-                                                <span className="uppercase tracking-widest text-[9px] font-black">Possible Reasons</span>
-                                            </div>
-                                            <ul className="space-y-1.5">
-                                                {m.error.reasons.map((r, idx) => (
-                                                    <li key={idx} className="flex items-center gap-2 text-[10px] text-rose-800">
-                                                        <div className="h-1 w-1 bg-rose-400 rounded-full" />
-                                                        {r}
-                                                    </li>
-                                                ))}
-                                            </ul>
-                                            <div className="pt-3 border-t border-rose-100">
-                                                <div className="flex items-center gap-2 text-rose-600 mb-2">
-                                                    <CheckCircle2 size={14} />
-                                                    <span className="uppercase tracking-widest text-[9px] font-black">Solution</span>
-                                                </div>
-                                                <p className="text-[10px] text-rose-900 leading-relaxed font-bold bg-white/50 p-3 rounded-2xl border border-rose-50">{m.error.solution}</p>
-                                            </div>
-                                        </div>
+                                        ))}
                                     </div>
                                 )}
                             </div>
+                            
+                            {m.related && m.related.length > 0 && (
+                                <div className="mt-4 flex flex-col gap-2">
+                                    <p className="text-[8px] uppercase tracking-widest text-slate-400 mb-1 ml-1 font-black">Please select an option:</p>
+                                    <div className="grid grid-cols-1 gap-1.5 max-h-[300px] overflow-y-auto pr-1 no-scrollbar">
+                                        {m.related.map((r, idx) => (
+                                            <button
+                                                key={idx}
+                                                onClick={() => handleSend(r.q, true)}
+                                                className="flex items-center justify-between gap-3 text-sky-700 bg-sky-50/80 hover:bg-white px-3 py-3 rounded-2xl text-[10px] w-full font-black border border-sky-100 transition-all group shadow-sm active:scale-[0.98]"
+                                            >
+                                                {r.q} <ArrowRight size={12} className="group-hover:translate-x-1 transition-transform" />
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     </motion.div>
                 ))}
             </div>
 
-            {/* Input Area */}
-            <div className="p-5 bg-white border-t border-slate-100 shrink-0 relative z-20">
+            <div className="p-5 bg-white border-t border-slate-100 shrink-0">
                 <form 
                     onSubmit={(e) => { e.preventDefault(); handleSend(); }}
                     className="flex items-center gap-3"
@@ -460,35 +379,35 @@ const AiAssistant = ({ isSidebar, onClose }) => {
                     <button
                         type="button"
                         onClick={toggleListening}
-                        className={`h-11 w-11 rounded-2xl transition-all duration-300 shadow-sm flex items-center justify-center border ring-offset-2 ${
+                        className={`h-9 w-9 rounded-xl transition-all shadow-sm flex items-center justify-center border ${
                             isListening 
-                                ? 'bg-rose-500 text-white animate-pulse border-rose-400 ring-4 ring-rose-500/20' 
-                                : 'bg-slate-50 text-slate-500 border-slate-100 hover:bg-slate-100 active:scale-90 shadow-inner'
+                                ? 'bg-rose-500 text-white animate-pulse' 
+                                : 'bg-slate-50 text-slate-500 border-slate-100'
                         }`}
                     >
-                        {isListening ? <MicOff size={18} /> : <Mic size={18} />}
+                        {isListening ? <MicOff size={16} /> : <Mic size={16} />}
                     </button>
-                    <div className="flex-1 flex items-center bg-slate-50 p-2 rounded-2xl border border-slate-100 focus-within:border-teal-500/30 focus-within:bg-white focus-within:ring-4 focus-within:ring-teal-500/5 transition-all duration-300 shadow-inner group">
+                    <div className="flex-1 flex items-center bg-slate-50 p-1.5 rounded-xl border border-slate-100 focus-within:border-sky-500/30 transition-all shadow-inner">
                         <input 
                             type="text"
                             value={input}
                             onChange={(e) => setInput(e.target.value)}
-                            placeholder="Ask me how to do something or report an error"
-                            className="flex-1 bg-transparent border-none outline-none px-3 text-[11px] font-bold text-slate-700 placeholder:text-slate-400"
+                            placeholder="Select an option above..."
+                            className="flex-1 bg-transparent border-none outline-none px-2 text-[10px] font-bold text-slate-700"
                         />
                         <button 
                             type="submit"
-                            className="bg-teal-600 h-9 w-9 rounded-xl text-white shadow-lg shadow-teal-600/30 flex items-center justify-center hover:bg-teal-700 transition-all active:scale-90 group-hover:rotate-12"
+                            className="bg-sky-600 h-8 w-8 rounded-lg text-white shadow-lg flex items-center justify-center hover:bg-sky-700 transition-all"
                         >
-                            <Send size={16} />
+                            <Send size={14} />
                         </button>
                     </div>
                 </form>
             </div>
             
-            <div className="px-5 pb-4 bg-white flex justify-center border-t border-slate-50/50 pt-2">
-                 <div className="flex items-center gap-2 text-[8px] font-black text-slate-300 uppercase tracking-[0.3em] w-full justify-center">
-                     <Terminal size={10} className="text-teal-500/30" /> POWERED BY ZORVIAN HUB INTELLIGENCE
+            <div className="px-5 pb-4 bg-white flex justify-center">
+                 <div className="flex items-center gap-2 text-[8px] font-black text-gray-300 uppercase tracking-widest border-t border-gray-50 pt-3 w-full justify-center">
+                     <User size={10} /> Powered by ZORVIAN TECHNOLOGIES
                  </div>
             </div>
         </div>
