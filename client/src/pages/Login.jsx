@@ -223,13 +223,16 @@ const Login = () => {
             let errorMessage = `Invalid Security PIN. ${3 - newAttempts} attempts remaining.`;
             
             if (newAttempts >= 3) {
-                // Determine lock duration based on role
-                const duration = lockoutType === 'mgmt' ? 60 * 1000 : 60 * 60 * 1000;
+                // Determine lock duration (Standardizing to 1 hour for all roles to be consistent with security policy)
+                const duration = 60 * 60 * 1000; 
                 const lockUntil = Date.now() + duration;
                 localStorage.setItem(`${lockoutType}_lock_until`, String(lockUntil));
-                errorMessage = `Too many failed attempts. Access locked for ${lockoutType === 'mgmt' ? '1 minute' : '1 hour'}.`;
+                errorMessage = `Too many failed attempts. Access locked for 1 hour.`;
             } else if (error.response?.data?.message) {
-                errorMessage = `${error.response.data.message}. ${3 - newAttempts} attempts remaining.`;
+                // Use server message unless it's the specific management PIN error, then keep it consistent
+                errorMessage = error.response.data.message.includes('management') 
+                    ? `Invalid Security PIN. ${3 - newAttempts} attempts remaining.`
+                    : `${error.response.data.message}. ${3 - newAttempts} attempts remaining.`;
             }
             
             Swal.fire({
@@ -440,13 +443,35 @@ const Login = () => {
                         whileHover={{ scale: 1.05 }}
                         whileTap={{ scale: 0.95 }}
                         disabled={isMgmtLocked}
-                        onClick={() => {
+                        onClick={async () => {
                             if (checkLockout('mgmt')) return;
-                            setEmpId('Management');
-                            setUserName('Management');
-                            setUserRole('management');
-                            setStep('pin');
-                            setExpectedPinLength(4);
+                            setLoading(true);
+                            try {
+                                const { data } = await api.post('/auth/check-id', { emp_id: 'Management' });
+                                if (data.exists) {
+                                    setEmpId('Management');
+                                    setUserName(data.name);
+                                    setUserRole('management');
+                                    setStep('pin');
+                                    setExpectedPinLength(data.pin_length || 4);
+                                } else {
+                                    // Fallback if record not found
+                                    setEmpId('Management');
+                                    setUserName('Management');
+                                    setUserRole('management');
+                                    setStep('pin');
+                                    setExpectedPinLength(4);
+                                }
+                            } catch (err) {
+                                // Regular fallback
+                                setEmpId('Management');
+                                setUserName('Management');
+                                setUserRole('management');
+                                setStep('pin');
+                                setExpectedPinLength(4);
+                            } finally {
+                                setLoading(false);
+                            }
                         }}
                         className={`text-[10px] font-black uppercase tracking-[0.3em] transition-colors ${isMgmtLocked ? 'text-red-400 animate-pulse' : 'text-orange-400/60 hover:text-orange-400 cursor-pointer'}`}
                     >
