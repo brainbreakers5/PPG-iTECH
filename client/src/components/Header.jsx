@@ -633,6 +633,7 @@ const Header = ({ toggleSidebar, sidebarOpen }) => {
                                                 localStorage.removeItem('managementAccess');
                                                 localStorage.removeItem('token');
                                                 localStorage.removeItem('lastRole');
+                                                localStorage.removeItem('ai_chat_history');
                                                 logout();
                                                 navigate('/login');
                                             }}
