@@ -219,8 +219,12 @@ const AiAssistant = ({ isSidebar, onClose, userRole }) => {
     }, [messages]);
 
     const handleSend = async (text = input, isClick = false) => {
-        const cleanText = text.trim().toLowerCase().replace(/[?.,!]/g, "");
-        if (!cleanText) return;
+        const lowerText = text.trim().toLowerCase();
+        const wantsPrint = lowerText.includes('report') || lowerText.includes('print');
+        // Clean text for matching: remove report/print words
+        const cleanText = lowerText.replace(/report|print/g, "").trim().replace(/[?.,!]/g, "");
+        
+        if (!cleanText && !wantsPrint) return;
         
         if (!isClick) {
             setMessages(prev => [...prev, { type: 'user', text, time: new Date() }]);
@@ -228,10 +232,11 @@ const AiAssistant = ({ isSidebar, onClose, userRole }) => {
         setInput('');
 
         setTimeout(async () => {
-            // Check direct match
-            const exactMatch = allowedKIs.find(k => k.q.toLowerCase().replace(/[?.,!]/g, "") === cleanText);
+            // Check direct match or keyword match
+            const exactMatch = allowedKIs.find(k => k.q.toLowerCase().replace(/[?.,!]/g, "") === cleanText) || 
+                               allowedKIs.find(k => k.q.toLowerCase().includes(cleanText) && cleanText.length > 3);
 
-            if (exactMatch && isClick) {
+            if (exactMatch) {
                 let actionLink = exactMatch.link;
                 if (exactMatch.q.toLowerCase() === 'profile' && !actionLink.includes(user.emp_id) && role !== 'management') {
                     actionLink = `/${role}/profile/${user.emp_id}`;
@@ -243,10 +248,13 @@ const AiAssistant = ({ isSidebar, onClose, userRole }) => {
                     return;
                 }
 
-                // RULE: DO NOT HIDE Assistant chat box on redirect
+                const responseText = wantsPrint 
+                    ? `Generating ${exactMatch.q} report...` 
+                    : `Switching to ${exactMatch.q}...`;
+
                 setMessages(prev => [...prev, { 
                     type: 'ai', 
-                    text: `Switching to ${exactMatch.q}...`, 
+                    text: responseText, 
                     time: new Date() 
                 }]);
                 
@@ -255,8 +263,9 @@ const AiAssistant = ({ isSidebar, onClose, userRole }) => {
                     if (location.pathname === actionLink) {
                         window.location.hash = (exactMatch.hash || '');
                         window.dispatchEvent(new Event('hashchange'));
+                        if (wantsPrint) window.print();
                     } else {
-                        navigate(`${actionLink}${hashPart}`);
+                        navigate(`${actionLink}${hashPart}`, { state: { autoPrint: wantsPrint } });
                     }
                 }, 400);
                 return;
@@ -269,7 +278,9 @@ const AiAssistant = ({ isSidebar, onClose, userRole }) => {
             );
 
             if (filtered.length > 0) {
-                const reply = `I found ${filtered.length} relevant options based on your keyword:`;
+                const reply = wantsPrint 
+                    ? `Which report would you like to print?`
+                    : `I found ${filtered.length} relevant options based on your keyword:`;
                 setMessages(prev => [...prev, { 
                     type: 'ai', 
                     text: reply, 
@@ -278,7 +289,7 @@ const AiAssistant = ({ isSidebar, onClose, userRole }) => {
                 }]);
                 speak(reply);
             } else {
-                const reply = "Please select from the available options (type 'all' to see everything):";
+                const reply = "I couldn't find matches for that. Try a specific keyword like 'attendance' or 'profile'.";
                 setMessages(prev => [...prev, { 
                     type: 'ai', 
                     text: reply, 
@@ -291,7 +302,7 @@ const AiAssistant = ({ isSidebar, onClose, userRole }) => {
     };
 
     return (
-        <div className="flex flex-col h-full w-full bg-white relative">
+        <div className="flex flex-col h-full w-full bg-white relative no-print">
             {/* Header */}
             <div className="bg-gradient-to-br from-slate-900 via-sky-900 to-sky-800 p-6 flex flex-col gap-2 shrink-0">
                 <div className="flex items-center justify-between">
