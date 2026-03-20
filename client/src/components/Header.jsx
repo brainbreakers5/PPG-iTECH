@@ -53,7 +53,7 @@ const Header = ({ toggleSidebar, sidebarOpen }) => {
             { label: 'Dashboard', path: '/principal' },
             { label: 'Attendance Records', path: '/principal/attendance' },
             { label: 'Departments', path: '/principal/department' },
-            { label: 'Leave Requests', path: '/principal/leaves' },
+            { label: 'Incoming Requests', path: '/principal/leaves' },
             { label: 'Leave History', path: '/principal/leave-history' },
             { label: 'Salary Overview', path: '/principal/payroll' },
             { label: 'Conversation', path: '/principal/conversation' },
