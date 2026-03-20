@@ -7,14 +7,14 @@ import {
 } from 'react-icons/fa';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import Layout from '../../components/Layout';
-import api from '../../utils/api';
-import { useAuth } from '../../context/AuthContext';
-import { useSocket } from '../../context/SocketContext';
-import { useTimetableConfig } from '../../hooks/useTimetableConfig';
-import AttendanceHistory from '../../components/AttendanceHistory';
-import PersonalAttendanceChart from '../../components/PersonalAttendanceChart';
-import { formatTo12Hr } from '../../utils/timeFormatter';
+import Layout from '@/components/Layout';
+import api from '@/utils/api';
+import { useAuth } from '@/context/AuthContext';
+import { useSocket } from '@/context/SocketContext';
+import { useTimetableConfig } from '@/hooks/useTimetableConfig';
+import AttendanceHistory from '@/components/AttendanceHistory';
+import PersonalAttendanceChart from '@/components/PersonalAttendanceChart';
+import { formatTo12Hr } from '@/utils/timeFormatter';
 
 
 // ── Small helper components ─────────────────────────────────────────────────
