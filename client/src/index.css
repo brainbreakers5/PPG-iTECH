@@ -101,6 +101,28 @@ body {
   background: transparent;
 }
 
+@keyframes pulse-green {
+  0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(74, 144, 226, 0.4); }
+  50% { transform: scale(1.05); box-shadow: 0 0 15px 5px rgba(16, 185, 129, 0.4); }
+  100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(74, 144, 226, 0); }
+}
+
+.animate-pulse-green {
+  animation: pulse-green 2s infinite cubic-bezier(0.4, 0, 0.6, 1);
+}
+
+.ai-badge {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  color: white;
+  font-size: 6px;
+  font-weight: 900;
+  padding: 1px 3px;
+  border-radius: 4px;
+  border: 1px solid white;
+  text-transform: uppercase;
+  z-index: 10;
+}
+
 .custom-scrollbar::-webkit-scrollbar-thumb {
   background: rgba(0, 0, 0, 0.05);
   border-radius: 10px;
