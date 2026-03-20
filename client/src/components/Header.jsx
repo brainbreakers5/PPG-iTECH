@@ -512,7 +512,7 @@ const Header = ({ toggleSidebar, sidebarOpen }) => {
                             alt="Zorvian AI" 
                             className="h-8 w-8 object-contain rounded-lg animate-pulse-green" 
                         />
-                        <span className="absolute -bottom-1 -right-1 ai-badge shadow-sm">AI</span>
+                        <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 ai-badge shadow-sm whitespace-nowrap !text-[5px]">AI ASSISTANT</span>
                     </button>
 
                     {!isManagement && (
@@ -639,6 +639,8 @@ const Header = ({ toggleSidebar, sidebarOpen }) => {
                                                 localStorage.removeItem('token');
                                                 localStorage.removeItem('lastRole');
                                                 localStorage.removeItem('ai_chat_history');
+                                                localStorage.removeItem('ai_chat_emp_id');
+                                                window.dispatchEvent(new CustomEvent('CLEAR_AI_HISTORY'));
                                                 logout();
                                                 navigate('/login');
                                             }}
