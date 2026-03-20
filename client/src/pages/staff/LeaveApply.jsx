@@ -1,11 +1,11 @@
 import { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
-import Layout from '../../components/Layout';
-import api from '../../utils/api';
+import Layout from '@/components/Layout';
+import api from '@/utils/api';
 import Swal from 'sweetalert2';
-import { useAuth } from '../../context/AuthContext';
-import { formatTo12Hr } from '../../utils/timeFormatter';
-import { useSocket } from '../../context/SocketContext';
+import { useAuth } from '@/context/AuthContext';
+import { formatTo12Hr } from '@/utils/timeFormatter';
+import { useSocket } from '@/context/SocketContext';
 import {
     FaPaperPlane, FaUserFriends, FaHistory, FaCalendarCheck,
     FaClock, FaInfoCircle, FaCheckCircle, FaTimesCircle,
