@@ -236,6 +236,15 @@ const AiAssistant = ({ isSidebar, onClose, userRole }) => {
 
         setTimeout(async () => {
             // Conversational Queries
+            if (lowerText === 'zorvian' || lowerText.includes('zorvian technologies') || lowerText.includes('open zorvian') || lowerText.includes('visit zorvian')) {
+                const instructions = "Opening Zorvian Technologies...";
+                setMessages(prev => [...prev, { type: 'ai', text: instructions, time: new Date() }]);
+                speak(instructions);
+                setTimeout(() => window.open('https://zorvian-technologies.vercel.app', '_blank'), 500);
+                return;
+            }
+
+
             if ((role === 'staff' || role === 'hod') && (lowerText.includes('how to apply leave') || lowerText.includes('apply for leave') || lowerText.includes('apply leave'))) {
                 const instructions = "To apply for a leave: select the date, choose full day or half day, select your replacement staff, pick the leave type, enter the subject and reason, check your available leave limit, and then click apply leave.";
                 setMessages(prev => [...prev, { type: 'ai', text: instructions, time: new Date() }]);
@@ -391,8 +400,8 @@ const AiAssistant = ({ isSidebar, onClose, userRole }) => {
             <div className="bg-gradient-to-br from-slate-900 via-sky-900 to-sky-800 p-6 flex flex-col gap-2 shrink-0">
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                        <div className="h-10 w-10 bg-white/10 backdrop-blur-2xl rounded-2xl flex items-center justify-center border border-white/20 shadow-xl">
-                            <Sparkles className="text-sky-300 h-5 w-5" />
+                        <div className="h-10 w-10 bg-white/10 backdrop-blur-2xl rounded-2xl flex items-center justify-center border border-white/20 shadow-xl overflow-hidden p-0.5">
+                            <img src="/zorvian logo.jpeg" alt="Zorvian AI" className="h-full w-full object-cover rounded-[14px]" />
                         </div>
                         <div className="flex flex-col">
                             <h3 className="text-white font-black text-xs tracking-tight leading-none mb-1 uppercase">PPG EMP HUB</h3>
