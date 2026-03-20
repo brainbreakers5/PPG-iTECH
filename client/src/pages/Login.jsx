@@ -308,7 +308,7 @@ const Login = () => {
                         transition={{ type: 'spring', stiffness: 300 }}
                         className="w-[88px] h-[88px] mx-auto mb-6 flex items-center justify-center drop-shadow-xl"
                     >
-                        <img src="/ppg-logo.png" alt="PPG Institute of Technology" className="w-full h-full object-contain" />
+                        <img src="/zorvian logo.jpeg" alt="Zorvian AI" className="w-full h-full object-contain" />
                     </motion.div>
 
                     <h1 className="text-3xl font-black text-white tracking-tight leading-tight">
