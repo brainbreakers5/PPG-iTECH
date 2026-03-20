@@ -425,11 +425,17 @@ const Header = ({ toggleSidebar, sidebarOpen }) => {
                             </div>
                         </button>
                     )}
+                    <div className="flex items-center gap-3">
+                        {/* Institutional Logo (Desktop Only) */}
+                        <div className="hidden lg:block h-10 w-10 rounded-xl overflow-hidden shadow-sm ring-1 ring-gray-100 flex-shrink-0">
+                            <img src="/ppg-logo.png" alt="PPG Logo" className="w-full h-full object-contain bg-white" />
+                        </div>
                         <div className="ml-1">
                             <h2 className="text-lg font-black text-gray-800 tracking-tight">
                                 PPG <span className="text-sky-600 ">iTech HUB</span>
                             </h2>
                         </div>
+                    </div>
                 </div>
 
                 <div className="flex items-center space-x-3">
@@ -499,15 +505,21 @@ const Header = ({ toggleSidebar, sidebarOpen }) => {
                     {/* AI Assistant Trigger */}
                     <button
                         onClick={() => window.dispatchEvent(new CustomEvent('TOGGLE_AI_ASSISTANT'))}
-                        className="bg-white hover:bg-sky-50 h-11 w-11 rounded-xl border border-sky-100 hover:border-sky-300 transition-all shadow-sm flex items-center justify-center group active:scale-95 relative"
+                        className="bg-sky-50/50 hover:bg-sky-100/80 h-11 px-4 rounded-2xl border border-sky-100 hover:border-sky-300 transition-all shadow-sm flex items-center justify-center group active:scale-95 relative overflow-hidden"
                         title="Zorvian AI Assistant"
                     >
-                        <img 
-                            src="/zorvian logo.jpeg" 
-                            alt="Zorvian AI" 
-                            className="h-8 w-8 object-contain rounded-lg animate-pulse-green" 
-                        />
-                        <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 ai-badge shadow-sm whitespace-nowrap !text-[5px]">AI ASSISTANT</span>
+                        <motion.div 
+                            animate={{ 
+                                y: [0, -2, 0],
+                                rotate: [0, -2, 2, 0],
+                                scale: [1, 1.05, 1]
+                            }}
+                            transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
+                            className="bg-white px-3 py-1.5 rounded-xl shadow-[0_4px_12px_rgba(14,165,233,0.15)] border border-sky-100 flex items-center gap-2"
+                        >
+                            <div className="h-2 w-2 bg-emerald-400 rounded-full animate-pulse shadow-[0_0_10px_rgba(52,211,153,1)]" />
+                            <span className="text-[9px] font-black text-sky-600 uppercase tracking-widest leading-none">AI ASSISTANT</span>
+                        </motion.div>
                     </button>
 
                     {!isManagement && (
