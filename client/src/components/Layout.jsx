@@ -10,6 +10,7 @@ import Swal from 'sweetalert2';
 const Layout = ({ children }) => {
     const [sidebarOpen, setSidebarOpen] = useState(false);
     const [isAiOpen, setIsAiOpen] = useState(() => localStorage.getItem('isAiOpen') === 'true');
+    const [isAiMinimized, setIsAiMinimized] = useState(false);
     const { user, loading } = useAuth();
     const location = useLocation();
 
@@ -28,10 +29,15 @@ const Layout = ({ children }) => {
                 window.dispatchEvent(new CustomEvent('AI_STATUS', { detail: { open: newState } }));
                 return newState;
             });
+            setIsAiMinimized(false);
+        };
+        const handleMinimizeAi = (e) => {
+            if (window.innerWidth < 1024) setIsAiMinimized(e.detail !== undefined ? e.detail : true);
         };
         
         window.addEventListener('closeSidebar', handleCloseSidebar);
         window.addEventListener('TOGGLE_AI_ASSISTANT', handleToggleAi);
+        window.addEventListener('AI_MINIMIZE', handleMinimizeAi);
         
         // Initial sync of state
         window.dispatchEvent(new CustomEvent('AI_STATUS', { detail: { open: localStorage.getItem('isAiOpen') === 'true' } }));
@@ -39,6 +45,7 @@ const Layout = ({ children }) => {
         return () => {
             window.removeEventListener('closeSidebar', handleCloseSidebar);
             window.removeEventListener('TOGGLE_AI_ASSISTANT', handleToggleAi);
+            window.removeEventListener('AI_MINIMIZE', handleMinimizeAi);
         };
     }, []);
 
@@ -52,7 +59,17 @@ const Layout = ({ children }) => {
     useEffect(() => {
         const mainElement = document.querySelector('main');
         if (mainElement) {
-            mainElement.scrollTo({ top: 0, behavior: 'smooth' });
+            if (location.hash) {
+                const targetId = location.hash.substring(1);
+                setTimeout(() => {
+                    const targetElement = document.getElementById(targetId);
+                    if (targetElement) {
+                        mainElement.scrollTo({ top: targetElement.offsetTop - 20, behavior: 'smooth' });
+                    }
+                }, 400);
+            } else {
+                mainElement.scrollTo({ top: 0, behavior: 'smooth' });
+            }
         }
 
         // Perfect setup: Handle direct print request from AI Assistant by obtaining a trusted click gesture
@@ -182,16 +199,27 @@ const Layout = ({ children }) => {
                                 animate={window.innerWidth >= 1024 ? { x: 0 } : { opacity: 1, y: 0 }}
                                 exit={window.innerWidth >= 1024 ? { x: '100%' } : { opacity: 0, y: 50 }}
                                 transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-                                className={`z-40 border-l border-gray-100 bg-white shadow-2xl overflow-hidden ${
+                                className={`z-40 border border-gray-100 bg-white shadow-2xl overflow-hidden transition-all duration-500 ease-[cubic-bezier(0.34,1.56,0.64,1)] ${
                                     window.innerWidth >= 1024 
-                                    ? 'static w-1/4 h-full' 
-                                    : 'fixed bottom-4 right-4 w-[calc(100vw-32px)] h-[600px] rounded-[32px]'
+                                    ? 'static w-1/4 h-full border-l' 
+                                    : `fixed right-4 rounded-[32px] w-[calc(100vw-32px)] ${isAiMinimized ? 'bottom-4 h-[25vh] cursor-pointer hover:shadow-sky-300 border-sky-300 ring-4 ring-sky-50' : 'bottom-4 h-[600px] border-t'}`
                                 }`}
+                                onClick={() => isAiMinimized && setIsAiMinimized(false)}
                             >
-                                <AiAssistant isSidebar={true} userRole={effectiveRole} onClose={() => {
-                                    setIsAiOpen(false);
-                                    window.dispatchEvent(new CustomEvent('AI_STATUS', { detail: { open: false } }));
-                                }} />
+                                <div className={`relative h-full w-full transition-all duration-300 ${isAiMinimized ? 'scale-95 opacity-50 blur-[1px] pointer-events-none' : 'scale-100 opacity-100 blur-0'}`}>
+                                    <AiAssistant isSidebar={true} userRole={effectiveRole} onClose={() => {
+                                        setIsAiOpen(false);
+                                        window.dispatchEvent(new CustomEvent('AI_STATUS', { detail: { open: false } }));
+                                    }} />
+                                    {isAiMinimized && (
+                                        <div className="absolute inset-0 z-50 flex items-center justify-center p-4">
+                                            <div className="bg-gradient-to-r from-sky-500 to-sky-600 text-white px-8 py-3 rounded-full shadow-2xl font-black text-[10px] uppercase tracking-[0.2em] shadow-sky-500/50 flex items-center gap-2 animate-bounce">
+                                                <svg className="w-4 h-4 animate-bounce" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 10l7-7m0 0l7 7m-7-7v18" /></svg>
+                                                Tap to Expand AI
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
                             </motion.div>
                         )}
                     </AnimatePresence>
