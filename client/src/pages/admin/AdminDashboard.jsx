@@ -311,7 +311,7 @@ const AdminDashboard = () => {
                 )}
             </AnimatePresence>
             {/* Stats Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-12">
+            <div id="attendance-cores" className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-12">
                 {roleConfigs.map((role) => (
                     <motion.div
                         key={role.key}
