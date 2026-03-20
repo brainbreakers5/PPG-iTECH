@@ -56,8 +56,8 @@ const AI_KNOWLEDGE_BASE = {
         { q: "Summary View", link: "/hod/attendance", hash: "summary", p: true },
         { q: "Details Logs", link: "/hod/attendance", hash: "logs", p: true },
         { q: "Biometric Sync", link: "/hod/attendance", hash: "sync", p: true },
-        { q: "HODs Attendance Core", link: "/hod", p: true },
-        { q: "Staff Attendance Core", link: "/hod", p: true },
+        { q: "HODs Attendance Core", link: "/hod", hash: "attendance-cores", p: true },
+        { q: "Staff Attendance Core", link: "/hod", hash: "attendance-cores", p: true },
         { q: "Department Staff", link: "/hod/department", p: true, desc: "View and manage personnel within your department." }
     ],
     principal: [
@@ -67,8 +67,8 @@ const AI_KNOWLEDGE_BASE = {
         { q: "Dashboard", link: "/principal", p: true, desc: "Institutional summary including total present, absent, and ongoing events." },
         { q: "Your Personal Attendance", link: "/principal", hash: "personal-attendance" },
         { q: "Recent Attendance History", link: "/principal", hash: "attendance-history" },
-        { q: "HODs Attendance Core", link: "/principal", p: true },
-        { q: "Staff Attendance Core", link: "/principal", p: true },
+        { q: "HODs Attendance Core", link: "/principal", hash: "attendance-cores", p: true },
+        { q: "Staff Attendance Core", link: "/principal", hash: "attendance-cores", p: true },
         { q: "Attendance Records", link: "/principal/attendance", p: true, desc: "This module contains Summary View, Detailed Logs, and Biometric Sync tabs across all departments." },
         { q: "Summary View", link: "/principal/attendance", hash: "summary", p: true },
         { q: "Biometric Sync", link: "/principal/attendance", hash: "sync", p: true },
@@ -99,18 +99,18 @@ const AI_KNOWLEDGE_BASE = {
         { q: "Purchase Requests", link: "/admin/purchase", p: true },
         { q: "Profile", link: "/admin/profile" },
         { q: "Change PIN", link: "/admin/profile", desc: "To change your PIN: navigate to your profile view, scroll to the bottom of the page, click the change pin button, enter your new pin, confirm it, and click update pin." },
-        { q: "Principal Attendance Core", link: "/admin", p: true },
-        { q: "HODs Attendance Core", link: "/admin", p: true },
-        { q: "Staff Attendance Core", link: "/admin", p: true }
+        { q: "Principal Attendance Core", link: "/admin", hash: "attendance-cores", p: true },
+        { q: "HODs Attendance Core", link: "/admin", hash: "attendance-cores", p: true },
+        { q: "Staff Attendance Core", link: "/admin", hash: "attendance-cores", p: true }
     ],
     management: [
         { q: "Profile", link: "/management/profile" },
         { q: "Logout", action: 'logout' },
         { q: "Dashboard", link: "/management", p: true, desc: "High-level overview of institutional attendance and performance." },
         { q: "Attendance Records", link: "/management/attendance", p: true, desc: "This module contains Summary View, Detailed Logs, and Biometric Sync tabs." },
-        { q: "Principal Attendance Core", link: "/management", p: true },
-        { q: "HODs Attendance Core", link: "/management", p: true },
-        { q: "Staff Attendance Core", link: "/management", p: true },
+        { q: "Principal Attendance Core", link: "/management", hash: "attendance-cores", p: true },
+        { q: "HODs Attendance Core", link: "/management", hash: "attendance-cores", p: true },
+        { q: "Staff Attendance Core", link: "/management", hash: "attendance-cores", p: true },
         { q: "Academic Calendar", link: "/management/calendar" },
         { q: "Summary View", link: "/management/attendance", hash: "summary", p: true },
         { q: "Details Logs", link: "/management/attendance", hash: "logs", p: true },
@@ -307,6 +307,10 @@ const AiAssistant = ({ isSidebar, onClose, userRole }) => {
                 let actionLink = exactMatch.link;
                 if ((exactMatch.q.toLowerCase() === 'profile' || exactMatch.q.toLowerCase() === 'change pin') && !actionLink.includes(user.emp_id) && role !== 'management') {
                     actionLink = `/${role}/profile/${user.emp_id}`;
+                }
+
+                if (window.innerWidth < 1024) {
+                    window.dispatchEvent(new CustomEvent('AI_MINIMIZE', { detail: true }));
                 }
                 
                 if (exactMatch.action === 'logout') {
