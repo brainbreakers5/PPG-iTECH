@@ -114,7 +114,7 @@ const AI_KNOWLEDGE_BASE = {
     ]
 };
 
-const AiAssistant = ({ isSidebar, onClose }) => {
+const AiAssistant = ({ isSidebar, onClose, userRole }) => {
     const { user, logout } = useAuth();
     const navigate = useNavigate();
     const location = useLocation();
@@ -129,23 +129,37 @@ const AiAssistant = ({ isSidebar, onClose }) => {
     const inputRef = useRef(null);
     const recognitionRef = useRef(null);
 
-    const role = user?.role?.toLowerCase() || 'staff';
+    const role = (userRole || user?.role || 'staff').toLowerCase();
     const allowedKIs = AI_KNOWLEDGE_BASE[role] || [];
 
-    // Greeting: HIDE DEFAULT QUESTIONS per latest request
+    // Greeting: Role-specific initial message
     useEffect(() => {
         if (messages.length === 0 && user) {
+            let initialText = `Hello ${user.name}, I am your AI Assistant. Type a keyword (like 'attendance', 'leave', 'timetable') to see available options.`;
+            let related = [];
+
+            if (role === 'management') {
+                initialText = `Hello ${user.name}, I am your Management AI Assistant. How can I help you manage the portal today?`;
+                // For management, show "required" default questions ONLY
+                related = allowedKIs.filter(k => 
+                    ["Dashboard", "Attendance Records", "Departments", "Academic Calendar", "Profile"].includes(k.q)
+                );
+            } else if (role === 'principal') {
+                initialText = `Hello ${user.name}, I am your Principal AI Assistant. You can manage 'leaves', 'permissions', and 'attendance' here.`;
+            }
+
             const initialMessage = [
                 { 
                     type: 'ai', 
-                    text: `Hello ${user.name}, I am your PPG EMP HUB AI Assistant. Type a keyword (like 'attendance', 'leave', 'timetable') to see available options.`, 
+                    text: initialText, 
+                    related: related, // Only management gets default buttons for now as per "default questions only set by management"
                     time: new Date() 
                 }
             ];
             setMessages(initialMessage);
             localStorage.setItem('ai_chat_history', JSON.stringify(initialMessage));
         }
-    }, [user, messages.length]);
+    }, [user, messages.length, role, allowedKIs]);
 
     // Persist messages to localStorage
     useEffect(() => {
