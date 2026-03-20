@@ -22,9 +22,9 @@ const AI_KNOWLEDGE_BASE = {
         { q: "Leave Balance", link: "/staff/leaves", hash: "balance" },
         { q: "Incoming Approvals", link: "/staff/leaves", hash: "approvals" },
         { q: "My Leave History", link: "/staff/leaves", hash: "history" },
-        { q: "Salary Details", link: "/staff/payroll" },
-        { q: "My Timetable", link: "/staff/timetables" },
-        { q: "Staff Timetable", link: "/staff/timetables", hash: "all" },
+        { q: "Salary Details", link: "/staff/payroll", p: true },
+        { q: "My Timetable", link: "/staff/timetables", p: true },
+        { q: "Staff Timetable", link: "/staff/timetables", hash: "all", p: true },
         { q: "Conversation", link: "/staff/conversation" },
         { q: "Purchase Requests", link: "/staff/items" },
         { q: "Academic Calendar", link: "/staff/calendar" }
@@ -33,7 +33,7 @@ const AI_KNOWLEDGE_BASE = {
         { q: "Notification", link: "/hod/notifications" },
         { q: "Profile", link: "/hod/profile" },
         { q: "Logout", action: 'logout' },
-        { q: "Dashboard", link: "/hod" },
+        { q: "Dashboard", link: "/hod", p: true },
         { q: "Your Personal Attendance", link: "/hod", hash: "personal-attendance" },
         { q: "Recent Attendance History", link: "/hod", hash: "attendance-history" },
         { q: "Leave Management", link: "/hod/leaves", hash: "history" },
@@ -43,74 +43,74 @@ const AI_KNOWLEDGE_BASE = {
         { q: "Leave Balance", link: "/hod/leaves", hash: "balance" },
         { q: "Incoming Approvals", link: "/hod/leaves", hash: "approvals" },
         { q: "My Leave History", link: "/hod/leaves", hash: "history" },
-        { q: "Salary Details", link: "/hod/payroll" },
-        { q: "My Timetable", link: "/hod/timetable" },
-        { q: "Staff Timetable", link: "/hod/timetable" },
+        { q: "Salary Details", link: "/hod/payroll", p: true },
+        { q: "My Timetable", link: "/hod/timetable", p: true },
+        { q: "Staff Timetable", link: "/hod/timetable", p: true },
         { q: "Conversation", link: "/hod/conversation" },
-        { q: "Purchase Requests", link: "/hod/purchase" },
+        { q: "Purchase Requests", link: "/hod/purchase", p: true },
         { q: "Academic Calendar", link: "/hod/calendar" },
-        { q: "Attendance Records", link: "/hod/attendance" },
-        { q: "Summary View", link: "/hod/attendance", hash: "summary" },
-        { q: "Details Logs", link: "/hod/biometric-history" },
-        { q: "Biometric Sync", link: "/hod/attendance", hash: "sync" },
-        { q: "HODs Attendance Core", link: "/hod/attendance" },
-        { q: "Staff Attendance Core", link: "/hod/attendance" },
-        { q: "Department Staff", link: "/hod/department" }
+        { q: "Attendance Records", link: "/hod/attendance", p: true },
+        { q: "Summary View", link: "/hod/attendance", hash: "summary", p: true },
+        { q: "Details Logs", link: "/hod/biometric-history", p: true },
+        { q: "Biometric Sync", link: "/hod/attendance", hash: "sync", p: true },
+        { q: "HODs Attendance Core", link: "/hod/attendance", p: true },
+        { q: "Staff Attendance Core", link: "/hod/attendance", p: true },
+        { q: "Department Staff", link: "/hod/department", p: true }
     ],
     principal: [
         { q: "Notification", link: "/principal/notifications" },
         { q: "Profile", link: "/principal/profile" },
         { q: "Logout", action: 'logout' },
-        { q: "Dashboard", link: "/principal" },
+        { q: "Dashboard", link: "/principal", p: true },
         { q: "Your Personal Attendance", link: "/principal" },
         { q: "Recent Attendance History", link: "/principal" },
-        { q: "HODs Attendance Core", link: "/principal/attendance" },
-        { q: "Staff Attendance Core", link: "/principal/attendance" },
-        { q: "Attendance Records", link: "/principal/attendance" },
-        { q: "Summary View", link: "/principal/attendance", hash: "summary" },
-        { q: "Biometric Sync", link: "/principal/attendance", hash: "sync" },
+        { q: "HODs Attendance Core", link: "/principal/attendance", p: true },
+        { q: "Staff Attendance Core", link: "/principal/attendance", p: true },
+        { q: "Attendance Records", link: "/principal/attendance", p: true },
+        { q: "Summary View", link: "/principal/attendance", hash: "summary", p: true },
+        { q: "Biometric Sync", link: "/principal/attendance", hash: "sync", p: true },
         { q: "Conversation", link: "/principal/conversation" },
-        { q: "Purchase Requests", link: "/principal/purchase" },
-        { q: "Departments", link: "/principal/department" },
-        { q: "Academic Calendar", link: "/principal/calendar" },
+        { q: "Purchase Requests", link: "/principal/purchase", p: true },
+        { q: "Departments", link: "/principal/department", p: true },
+        { q: "Academic Calendar", link: "/principal/calendar", p: true },
         { q: "Leave Requests", link: "/principal/leaves" },
         { q: "Permission Requests", link: "/principal/leaves", hash: "permission" },
-        { q: "Detail Logs", link: "/principal/biometric-history" }
+        { q: "Detail Logs", link: "/principal/biometric-history", p: true }
     ],
     admin: [
         { q: "Notification", link: "/admin/notifications" },
         { q: "Logout", action: 'logout' },
-        { q: "Employee Management", link: "/admin/employees" },
+        { q: "Employee Management", link: "/admin/employees", p: true },
         { q: "Add New Employee", link: "/admin/employees/new" },
-        { q: "Departments", link: "/admin/departments" },
-        { q: "Salary Management", link: "/admin/payroll" },
-        { q: "Attendance Records", link: "/admin/attendance" },
-        { q: "Summary View", link: "/admin/attendance", hash: "summary" },
-        { q: "Details Logs", link: "/admin/biometric-history" },
-        { q: "Biometric Sync", link: "/admin/attendance", hash: "sync" },
+        { q: "Departments", link: "/admin/departments", p: true },
+        { q: "Salary Management", link: "/admin/payroll", p: true },
+        { q: "Attendance Records", link: "/admin/attendance", p: true },
+        { q: "Summary View", link: "/admin/attendance", hash: "summary", p: true },
+        { q: "Details Logs", link: "/admin/biometric-history", p: true },
+        { q: "Biometric Sync", link: "/admin/attendance", hash: "sync", p: true },
         { q: "Leave Balance", link: "/admin/leave-limits" },
         { q: "Timetable Setup", link: "/admin/timetable-setup" },
         { q: "Security Log", link: "/admin/activity-logs" },
         { q: "Academic Calendar", link: "/admin/calendar" },
-        { q: "Purchase Requests", link: "/admin/purchase" },
+        { q: "Purchase Requests", link: "/admin/purchase", p: true },
         { q: "Profile", link: "/admin/profile" },
-        { q: "Principal Attendance Core", link: "/admin/attendance" },
-        { q: "HODs Attendance Core", link: "/admin/attendance" },
-        { q: "Staff Attendance Core", link: "/admin/attendance" }
+        { q: "Principal Attendance Core", link: "/admin/attendance", p: true },
+        { q: "HODs Attendance Core", link: "/admin/attendance", p: true },
+        { q: "Staff Attendance Core", link: "/admin/attendance", p: true }
     ],
     management: [
         { q: "Profile", link: "/management/profile" },
         { q: "Logout", action: 'logout' },
-        { q: "Dashboard", link: "/management" },
-        { q: "Attendance Records", link: "/management/attendance" },
-        { q: "Principal Attendance Core", link: "/management/attendance" },
-        { q: "HODs Attendance Core", link: "/management/attendance" },
-        { q: "Staff Attendance Core", link: "/management/attendance" },
+        { q: "Dashboard", link: "/management", p: true },
+        { q: "Attendance Records", link: "/management/attendance", p: true },
+        { q: "Principal Attendance Core", link: "/management/attendance", p: true },
+        { q: "HODs Attendance Core", link: "/management/attendance", p: true },
+        { q: "Staff Attendance Core", link: "/management/attendance", p: true },
         { q: "Academic Calendar", link: "/management/calendar" },
-        { q: "Summary View", link: "/management/attendance", hash: "summary" },
-        { q: "Details Logs", link: "/management/attendance" },
-        { q: "Departments", link: "/management/departments" },
-        { q: "Biometric Sync", link: "/management/attendance", hash: "sync" }
+        { q: "Summary View", link: "/management/attendance", hash: "summary", p: true },
+        { q: "Details Logs", link: "/management/attendance", p: true },
+        { q: "Departments", link: "/management/departments", p: true },
+        { q: "Biometric Sync", link: "/management/attendance", hash: "sync", p: true }
     ]
 };
 
@@ -249,7 +249,7 @@ const AiAssistant = ({ isSidebar, onClose, userRole }) => {
                 }
 
                 const responseText = wantsPrint 
-                    ? `Generating ${exactMatch.q} report...` 
+                    ? (exactMatch.p ? `Generating ${exactMatch.q} report...` : `${exactMatch.q} doesn't have a direct report view, but I'll take you there.`)
                     : `Switching to ${exactMatch.q}...`;
 
                 setMessages(prev => [...prev, { 
@@ -263,9 +263,9 @@ const AiAssistant = ({ isSidebar, onClose, userRole }) => {
                     if (location.pathname === actionLink) {
                         window.location.hash = (exactMatch.hash || '');
                         window.dispatchEvent(new Event('hashchange'));
-                        if (wantsPrint) window.print();
+                        if (wantsPrint && exactMatch.p) window.print();
                     } else {
-                        navigate(`${actionLink}${hashPart}`, { state: { autoPrint: wantsPrint } });
+                        navigate(`${actionLink}${hashPart}`, { state: { autoPrint: wantsPrint && exactMatch.p } });
                     }
                 }, 400);
                 return;
