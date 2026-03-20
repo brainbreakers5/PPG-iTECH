@@ -47,6 +47,11 @@ export default defineConfig({
       }
     })
   ],
+  resolve: {
+    alias: {
+      '@': path.resolve(__dirname, './src')
+    }
+  },
   build: {
     chunkSizeWarningLimit: 2000, // Increase limit for larger chunks
     rollupOptions: {
