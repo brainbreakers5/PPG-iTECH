@@ -231,6 +231,14 @@ const AiAssistant = ({ isSidebar, onClose, userRole }) => {
         setInput('');
 
         setTimeout(async () => {
+            // Conversational Queries
+            if ((role === 'staff' || role === 'hod') && (lowerText.includes('how to apply') || lowerText.includes('apply for leave') || lowerText.includes('apply leave'))) {
+                const instructions = "To apply for a leave: select the date, choose full day or half day, select your replacement staff, pick the leave type, enter the subject and reason, check your available leave limit, and then click apply leave.";
+                setMessages(prev => [...prev, { type: 'ai', text: instructions, time: new Date() }]);
+                speak(instructions);
+                return;
+            }
+
             // 1. Check if user just wants to print the CURRENT page
             if (wantsPrint && (!cleanText || cleanText.length < 3)) {
                 const printBtn = Array.from(document.querySelectorAll('button')).find(btn => 
