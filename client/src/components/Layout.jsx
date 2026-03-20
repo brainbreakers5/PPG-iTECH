@@ -58,7 +58,20 @@ const Layout = ({ children }) => {
         if (location.state?.autoPrint) {
             console.log('Auto-printing triggered via AI Assistant...');
             const timer = setTimeout(() => {
-                window.print();
+                // Try to find the page's native custom Print button
+                const printBtn = Array.from(document.querySelectorAll('button')).find(btn => 
+                    (btn.title && btn.title.toLowerCase().includes('print')) || 
+                    (btn.textContent && btn.textContent.toLowerCase().includes('print'))
+                );
+                
+                if (printBtn) {
+                    console.log('Found custom print button, initiating...');
+                    printBtn.click();
+                } else {
+                    console.log('No custom print button found, falling back to window.print()...');
+                    window.print();
+                }
+
                 // Clear state to prevent re-printing on manual refresh
                 window.history.replaceState({}, document.title);
             }, 1200); // 1.2s delay to allow content to finish rendering
