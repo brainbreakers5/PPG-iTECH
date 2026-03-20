@@ -11,12 +11,12 @@ import Swal from 'sweetalert2';
 const AI_KNOWLEDGE_BASE = {
     staff: [
         { q: "Notification", link: "/staff/notifications" },
-        { q: "Profile", link: "/staff/profile" },
+        { q: "Profile", link: "/staff/profile", desc: "Manage your personal and professional details." },
         { q: "Logout", action: 'logout' },
-        { q: "Dashboard", link: "/staff" },
+        { q: "Dashboard", link: "/staff", desc: "Includes your daily attendance, leave stats, and quick actions." },
         { q: "Your Personal Attendance", link: "/staff", hash: "personal-attendance" },
         { q: "Recent Attendance History", link: "/staff", hash: "attendance-history" },
-        { q: "Leave Management", link: "/staff/leaves", hash: "history" },
+        { q: "Leave Management", link: "/staff/leaves", hash: "history", desc: "This includes Apply Leave, Permission Letter, Comp Leave, Leave Balance, and History tabs." },
         { q: "Leave Apply", link: "/staff/leaves", hash: "apply" },
         { q: "Permission Letter", link: "/staff/leaves", hash: "permission" },
         { q: "Comp Leave", link: "/staff/leaves", hash: "compoff" },
@@ -24,20 +24,20 @@ const AI_KNOWLEDGE_BASE = {
         { q: "Incoming Approvals", link: "/staff/leaves", hash: "approvals" },
         { q: "My Leave History", link: "/staff/leaves", hash: "history" },
         { q: "Salary Details", link: "/staff/payroll", p: true },
-        { q: "My Timetable", link: "/staff/timetables", p: true },
+        { q: "My Timetable", link: "/staff/timetables", p: true, desc: "View your weekly class schedule." },
         { q: "Staff Timetable", link: "/staff/timetables", hash: "all", p: true },
         { q: "Conversation", link: "/staff/conversation" },
-        { q: "Purchase Requests", link: "/staff/items" },
+        { q: "Purchase Requests", link: "/staff/items", desc: "You can view your item requests and create new ones." },
         { q: "Academic Calendar", link: "/staff/calendar" }
     ],
     hod: [
         { q: "Notification", link: "/hod/notifications" },
         { q: "Profile", link: "/hod/profile" },
         { q: "Logout", action: 'logout' },
-        { q: "Dashboard", link: "/hod", p: true },
+        { q: "Dashboard", link: "/hod", p: true, desc: "Displays department-wide attendance, your personal stats, and shortcuts." },
         { q: "Your Personal Attendance", link: "/hod", hash: "personal-attendance" },
         { q: "Recent Attendance History", link: "/hod", hash: "attendance-history" },
-        { q: "Leave Management", link: "/hod/leaves", hash: "history" },
+        { q: "Leave Management", link: "/hod/leaves", hash: "history", desc: "Includes Apply Leave, Permission Letter, Comp Leave, Leave Balance, History, and Incoming Approvals from your department." },
         { q: "Leave Apply", link: "/hod/leaves", hash: "apply" },
         { q: "Permission Letter", link: "/hod/leaves", hash: "permission" },
         { q: "Comp Leave", link: "/hod/leaves", hash: "compoff" },
@@ -48,50 +48,50 @@ const AI_KNOWLEDGE_BASE = {
         { q: "My Timetable", link: "/hod/timetable", p: true },
         { q: "Staff Timetable", link: "/hod/timetable", p: true },
         { q: "Conversation", link: "/hod/conversation" },
-        { q: "Purchase Requests", link: "/hod/purchase", p: true },
+        { q: "Purchase Requests", link: "/hod/purchase", p: true, desc: "Includes creating new requests and tracking your department's purchases." },
         { q: "Academic Calendar", link: "/hod/calendar" },
-        { q: "Attendance Records", link: "/hod/attendance", p: true },
+        { q: "Attendance Records", link: "/hod/attendance", p: true, desc: "This module contains Summary View, Detailed Logs, and Biometric Sync tabs for your department." },
         { q: "Summary View", link: "/hod/attendance", hash: "summary", p: true },
         { q: "Details Logs", link: "/hod/biometric-history", p: true },
         { q: "Biometric Sync", link: "/hod/attendance", hash: "sync", p: true },
         { q: "HODs Attendance Core", link: "/hod/attendance", p: true },
         { q: "Staff Attendance Core", link: "/hod/attendance", p: true },
-        { q: "Department Staff", link: "/hod/department", p: true }
+        { q: "Department Staff", link: "/hod/department", p: true, desc: "View and manage personnel within your department." }
     ],
     principal: [
         { q: "Notification", link: "/principal/notifications" },
         { q: "Profile", link: "/principal/profile" },
         { q: "Logout", action: 'logout' },
-        { q: "Dashboard", link: "/principal", p: true },
+        { q: "Dashboard", link: "/principal", p: true, desc: "Institutional summary including total present, absent, and ongoing events." },
         { q: "Your Personal Attendance", link: "/principal" },
         { q: "Recent Attendance History", link: "/principal" },
         { q: "HODs Attendance Core", link: "/principal/attendance", p: true },
         { q: "Staff Attendance Core", link: "/principal/attendance", p: true },
-        { q: "Attendance Records", link: "/principal/attendance", p: true },
+        { q: "Attendance Records", link: "/principal/attendance", p: true, desc: "This module contains Summary View, Detailed Logs, and Biometric Sync tabs across all departments." },
         { q: "Summary View", link: "/principal/attendance", hash: "summary", p: true },
         { q: "Biometric Sync", link: "/principal/attendance", hash: "sync", p: true },
         { q: "Conversation", link: "/principal/conversation" },
-        { q: "Purchase Requests", link: "/principal/purchase", p: true },
-        { q: "Departments", link: "/principal/department", p: true },
+        { q: "Purchase Requests", link: "/principal/purchase", p: true, desc: "Monitor all institutional purchase requests here." },
+        { q: "Departments", link: "/principal/department", p: true, desc: "Browse all departments and their respective staff." },
         { q: "Academic Calendar", link: "/principal/calendar", p: true },
-        { q: "Leave Requests", link: "/principal/leaves" },
+        { q: "Leave Requests", link: "/principal/leaves", desc: "This page includes tabs for Incoming Leave Requests and Incoming Permission Requests." },
         { q: "Permission Requests", link: "/principal/leaves", hash: "permission" },
         { q: "Detail Logs", link: "/principal/biometric-history", p: true }
     ],
     admin: [
         { q: "Notification", link: "/admin/notifications" },
         { q: "Logout", action: 'logout' },
-        { q: "Employee Management", link: "/admin/employees", p: true },
+        { q: "Employee Management", link: "/admin/employees", p: true, desc: "List of all employees. You can view, edit, or add new personnel." },
         { q: "Add New Employee", link: "/admin/employees/new" },
-        { q: "Departments", link: "/admin/departments", p: true },
-        { q: "Salary Management", link: "/admin/payroll", p: true },
-        { q: "Attendance Records", link: "/admin/attendance", p: true },
+        { q: "Departments", link: "/admin/departments", p: true, desc: "View and manage all departments." },
+        { q: "Salary Management", link: "/admin/payroll", p: true, desc: "Manage payroll and salary slips for all employees." },
+        { q: "Attendance Records", link: "/admin/attendance", p: true, desc: "This module contains Summary View, Detailed Logs, and Biometric Sync for the entire institution." },
         { q: "Summary View", link: "/admin/attendance", hash: "summary", p: true },
         { q: "Details Logs", link: "/admin/biometric-history", p: true },
         { q: "Biometric Sync", link: "/admin/attendance", hash: "sync", p: true },
-        { q: "Leave Balance", link: "/admin/leave-limits" },
-        { q: "Timetable Setup", link: "/admin/timetable-setup" },
-        { q: "Security Log", link: "/admin/activity-logs" },
+        { q: "Leave Balance", link: "/admin/leave-limits", desc: "Configure yearly leave limitations and balances." },
+        { q: "Timetable Setup", link: "/admin/timetable-setup", desc: "Set up and assign timetables to staff." },
+        { q: "Security Log", link: "/admin/activity-logs", desc: "View system activities and admin actions." },
         { q: "Academic Calendar", link: "/admin/calendar" },
         { q: "Purchase Requests", link: "/admin/purchase", p: true },
         { q: "Profile", link: "/admin/profile" },
@@ -102,15 +102,15 @@ const AI_KNOWLEDGE_BASE = {
     management: [
         { q: "Profile", link: "/management/profile" },
         { q: "Logout", action: 'logout' },
-        { q: "Dashboard", link: "/management", p: true },
-        { q: "Attendance Records", link: "/management/attendance", p: true },
+        { q: "Dashboard", link: "/management", p: true, desc: "High-level overview of institutional attendance and performance." },
+        { q: "Attendance Records", link: "/management/attendance", p: true, desc: "This module contains Summary View, Detailed Logs, and Biometric Sync tabs." },
         { q: "Principal Attendance Core", link: "/management/attendance", p: true },
         { q: "HODs Attendance Core", link: "/management/attendance", p: true },
         { q: "Staff Attendance Core", link: "/management/attendance", p: true },
         { q: "Academic Calendar", link: "/management/calendar" },
         { q: "Summary View", link: "/management/attendance", hash: "summary", p: true },
         { q: "Details Logs", link: "/management/attendance", p: true },
-        { q: "Departments", link: "/management/departments", p: true },
+        { q: "Departments", link: "/management/departments", p: true, desc: "View institutional structure and department personnel." },
         { q: "Biometric Sync", link: "/management/attendance", hash: "sync", p: true }
     ]
 };
@@ -273,9 +273,13 @@ const AiAssistant = ({ isSidebar, onClose, userRole }) => {
                     return;
                 }
 
-                const responseText = wantsPrint 
+                let responseText = wantsPrint 
                     ? (exactMatch.p ? `Generating ${exactMatch.q} report...` : `${exactMatch.q} doesn't have a direct report view, but I'll take you there.`)
                     : `Switching to ${exactMatch.q}...`;
+
+                if (exactMatch.desc && !wantsPrint) {
+                    responseText += ` ${exactMatch.desc}`;
+                }
 
                 setMessages(prev => [...prev, { 
                     type: 'ai', 
