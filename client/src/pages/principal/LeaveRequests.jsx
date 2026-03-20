@@ -174,7 +174,21 @@ const LeaveRequests = () => {
     const pendingPerms = permissions.filter(p => p.my_approval_status === 'Pending' && p.emp_id !== user?.emp_id);
     const pastPerms = permissions.filter(p => (p.my_approval_status === 'Approved' || p.my_approval_status === 'Rejected') && p.emp_id !== user?.emp_id);
 
-    const [activeTab, setActiveTab] = useState('leaves'); // 'leaves' or 'permissions'
+    const [activeTab, setActiveTab] = useState(() => {
+        const hash = window.location.hash.replace('#', '');
+        return hash === 'permission' ? 'permissions' : 'leaves';
+    });
+
+    useEffect(() => {
+        const handleHash = () => {
+            const hash = window.location.hash.replace('#', '');
+            if (hash === 'permission') setActiveTab('permissions');
+            else if (hash === 'leaves' || hash === '') setActiveTab('leaves');
+        };
+        handleHash();
+        window.addEventListener('hashchange', handleHash);
+        return () => window.removeEventListener('hashchange', handleHash);
+    }, []);
 
     return (
         <Layout>
