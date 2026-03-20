@@ -118,11 +118,15 @@ const AiAssistant = ({ isSidebar, onClose }) => {
     const { user, logout } = useAuth();
     const navigate = useNavigate();
     const location = useLocation();
-    const [messages, setMessages] = useState([]);
+    const [messages, setMessages] = useState(() => {
+        const saved = localStorage.getItem('ai_chat_history');
+        return saved ? JSON.parse(saved) : [];
+    });
     const [input, setInput] = useState('');
     const [isListening, setIsListening] = useState(false);
     const [isSpeaking, setIsSpeaking] = useState(true);
     const scrollRef = useRef(null);
+    const inputRef = useRef(null);
     const recognitionRef = useRef(null);
 
     const role = user?.role?.toLowerCase() || 'staff';
@@ -131,15 +135,31 @@ const AiAssistant = ({ isSidebar, onClose }) => {
     // Greeting: HIDE DEFAULT QUESTIONS per latest request
     useEffect(() => {
         if (messages.length === 0 && user) {
-            setMessages([
+            const initialMessage = [
                 { 
                     type: 'ai', 
                     text: `Hello ${user.name}, I am your PPG EMP HUB AI Assistant. Type a keyword (like 'attendance', 'leave', 'timetable') to see available options.`, 
                     time: new Date() 
                 }
-            ]);
+            ];
+            setMessages(initialMessage);
+            localStorage.setItem('ai_chat_history', JSON.stringify(initialMessage));
         }
     }, [user, messages.length]);
+
+    // Persist messages to localStorage
+    useEffect(() => {
+        if (messages.length > 0) {
+            localStorage.setItem('ai_chat_history', JSON.stringify(messages));
+        }
+    }, [messages]);
+
+    // Focus input on mount
+    useEffect(() => {
+        if (inputRef.current) {
+            inputRef.current.focus();
+        }
+    }, []);
 
     useEffect(() => {
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -353,6 +373,7 @@ const AiAssistant = ({ isSidebar, onClose }) => {
                     </button>
                     <div className="flex-1 flex items-center bg-slate-50 p-1.5 rounded-xl border border-slate-100 focus-within:border-sky-500/30 transition-all shadow-inner">
                         <input 
+                            ref={inputRef}
                             type="text"
                             value={input}
                             onChange={(e) => setInput(e.target.value)}
