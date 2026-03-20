@@ -8,7 +8,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 
 const Layout = ({ children }) => {
     const [sidebarOpen, setSidebarOpen] = useState(false);
-    const [isAiOpen, setIsAiOpen] = useState(false);
+    const [isAiOpen, setIsAiOpen] = useState(() => localStorage.getItem('isAiOpen') === 'true');
     const { user, loading } = useAuth();
     const location = useLocation();
 
@@ -32,11 +32,20 @@ const Layout = ({ children }) => {
         window.addEventListener('closeSidebar', handleCloseSidebar);
         window.addEventListener('TOGGLE_AI_ASSISTANT', handleToggleAi);
         
+        // Initial sync of state
+        window.dispatchEvent(new CustomEvent('AI_STATUS', { detail: { open: localStorage.getItem('isAiOpen') === 'true' } }));
+
         return () => {
             window.removeEventListener('closeSidebar', handleCloseSidebar);
             window.removeEventListener('TOGGLE_AI_ASSISTANT', handleToggleAi);
         };
     }, []);
+
+    // Persist AI state
+    useEffect(() => {
+        localStorage.setItem('isAiOpen', isAiOpen);
+        window.dispatchEvent(new CustomEvent('AI_STATUS', { detail: { open: isAiOpen } }));
+    }, [isAiOpen]);
 
     // Scroll to top on route change
     useEffect(() => {
