@@ -5,6 +5,7 @@ import Header from './Header';
 import AiAssistant from './AiAssistant';
 import { useAuth } from '../context/AuthContext';
 import { AnimatePresence, motion } from 'framer-motion';
+import Swal from 'sweetalert2';
 
 const Layout = ({ children }) => {
     const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -54,7 +55,7 @@ const Layout = ({ children }) => {
             mainElement.scrollTo({ top: 0, behavior: 'smooth' });
         }
 
-        // Perfect setup: Handle direct print request from AI Assistant
+        // Perfect setup: Handle direct print request from AI Assistant by obtaining a trusted click gesture
         if (location.state?.autoPrint) {
             console.log('Auto-printing triggered via AI Assistant...');
             const timer = setTimeout(() => {
@@ -65,8 +66,17 @@ const Layout = ({ children }) => {
                 );
                 
                 if (printBtn) {
-                    console.log('Found custom print button, initiating...');
-                    printBtn.click();
+                    Swal.fire({
+                        title: 'Report Ready',
+                        text: 'Your document is ready. Click below to view the report.',
+                        icon: 'success',
+                        confirmButtonText: 'Open Report',
+                        confirmButtonColor: '#0ea5e9'
+                    }).then((result) => {
+                        if (result.isConfirmed) {
+                            printBtn.click();
+                        }
+                    });
                 } else {
                     console.log('No custom print button found, falling back to window.print()...');
                     window.print();
