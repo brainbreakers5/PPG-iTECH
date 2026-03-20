@@ -24,6 +24,9 @@ const LeaveApply = () => {
     if (location.hash === '#approvals') initialTab = 'approvals';
     if (location.hash === '#history') initialTab = 'history';
     if (location.hash === '#permission') initialTab = 'permission';
+    if (location.hash === '#compoff') initialTab = 'compoff';
+    if (location.hash === '#balance') initialTab = 'balance';
+    if (location.hash === '#apply') initialTab = 'apply';
 
     const [activeTab, setActiveTab] = useState(initialTab); // 'apply', 'approvals', 'history'
     const [pendingApprovals, setPendingApprovals] = useState([]);
@@ -93,6 +96,12 @@ const LeaveApply = () => {
             setActiveTab('history');
         } else if (location.hash === '#permission') {
             setActiveTab('permission');
+        } else if (location.hash === '#compoff') {
+            setActiveTab('compoff');
+        } else if (location.hash === '#balance') {
+            setActiveTab('balance');
+        } else if (location.hash === '#apply') {
+            setActiveTab('apply');
         }
     }, [location.hash]);
 
