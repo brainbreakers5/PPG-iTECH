@@ -119,7 +119,7 @@ const AI_KNOWLEDGE_BASE = {
     ]
 };
 
-const AiAssistant = ({ isSidebar, onClose, userRole }) => {
+const AiAssistant = ({ isSidebar, onClose, userRole, isAiMinimized }) => {
     const { user, logout } = useAuth();
     const navigate = useNavigate();
     const location = useLocation();
@@ -424,18 +424,13 @@ const AiAssistant = ({ isSidebar, onClose, userRole }) => {
     return (
         <div className="flex flex-col h-full w-full bg-white relative no-print">
             {/* Header */}
-            <div className="bg-gradient-to-br from-slate-900 via-sky-900 to-sky-800 p-6 flex flex-col gap-2 shrink-0">
+            <div className="bg-gradient-to-br from-slate-900 via-sky-900 to-sky-800 p-4 flex flex-col gap-2 shrink-0">
                 <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                        <div className="h-10 w-10 bg-white/10 backdrop-blur-2xl rounded-2xl flex items-center justify-center border border-white/20 shadow-xl overflow-hidden p-0.5">
-                            <img src="/zorvian logo.jpeg" alt="Zorvian AI" className="h-full w-full object-cover rounded-[14px] animate-pulse-green" />
-                        </div>
-                        <div className="flex flex-col">
-                            <h3 className="text-white font-black text-xs tracking-tight leading-none mb-1 uppercase">PPG EMP HUB</h3>
-                            <span className="text-sky-300 text-[8px] font-black uppercase tracking-[0.2em] opacity-90 flex items-center gap-1.5">
-                                <div className="h-1 w-1 bg-emerald-400 rounded-full animate-pulse" /> ZORVIAN AI ASSISTANT
-                            </span>
-                        </div>
+                    <div className="flex flex-col">
+                        <h3 className="text-white font-black text-[10px] tracking-tight leading-none mb-1 uppercase">PPG EMP HUB</h3>
+                        <span className="text-sky-300 text-[8px] font-black uppercase tracking-[0.2em] opacity-90 flex items-center gap-1.5">
+                            <div className="h-1 w-1 bg-emerald-400 rounded-full animate-pulse" /> ZORVIAN AI ASSISTANT
+                        </span>
                     </div>
                     
                     <div className="flex items-center gap-2">
@@ -458,10 +453,10 @@ const AiAssistant = ({ isSidebar, onClose, userRole }) => {
                 </div>
             </div>
 
-            {/* Chat Content */}
+            {/* Chat Content - Blurred when minimized */}
             <div 
                 ref={scrollRef}
-                className="flex-1 overflow-y-auto p-5 space-y-4 bg-slate-50/50 scroll-smooth no-scrollbar"
+                className={`flex-1 overflow-y-auto p-5 space-y-4 bg-slate-50/50 scroll-smooth no-scrollbar transition-all duration-300 ${isAiMinimized ? 'blur-sm grayscale-[0.3]' : 'blur-0 grayscale-0'}`}
             >
                 {messages.map((m, i) => (
                     <motion.div
@@ -499,8 +494,8 @@ const AiAssistant = ({ isSidebar, onClose, userRole }) => {
                 ))}
             </div>
 
-            {/* User Input Area */}
-            <div className="p-5 bg-white border-t border-slate-100 shrink-0">
+            {/* User Input Area - Blurred when minimized */}
+            <div className={`p-5 bg-white border-t border-slate-100 shrink-0 transition-all duration-300 ${isAiMinimized ? 'blur-sm grayscale-[0.3]' : 'blur-0 grayscale-0'}`}>
                 <form 
                     onSubmit={(e) => { e.preventDefault(); handleSend(); }}
                     className="flex items-center gap-3"
@@ -535,7 +530,7 @@ const AiAssistant = ({ isSidebar, onClose, userRole }) => {
                 </form>
             </div>
             
-            <div className="px-5 pb-4 bg-white flex justify-center">
+            <div className={`px-5 pb-4 bg-white flex justify-center transition-all duration-300 ${isAiMinimized ? 'blur-sm' : ''}`}>
                  <div className="flex items-center gap-2 text-[8px] font-black text-gray-300 uppercase tracking-widest border-t border-gray-50 pt-3 w-full justify-center">
                      <User size={10} /> Powered by ZORVIAN TECHNOLOGIES
                  </div>
