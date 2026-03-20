@@ -24,7 +24,7 @@ const AI_KNOWLEDGE_BASE = {
         { q: "My Leave History", link: "/staff/leaves", hash: "history" },
         { q: "Salary Details", link: "/staff/payroll" },
         { q: "My Timetable", link: "/staff/timetables" },
-        { q: "Staff Timetable", link: "/staff/timetables" },
+        { q: "Staff Timetable", link: "/staff/timetables", hash: "all" },
         { q: "Conversation", link: "/staff/conversation" },
         { q: "Purchase Requests", link: "/staff/items" },
         { q: "Academic Calendar", link: "/staff/calendar" }
@@ -128,18 +128,18 @@ const AiAssistant = ({ isSidebar, onClose }) => {
     const role = user?.role?.toLowerCase() || 'staff';
     const allowedKIs = AI_KNOWLEDGE_BASE[role] || [];
 
+    // Greeting: HIDE DEFAULT QUESTIONS per latest request
     useEffect(() => {
         if (messages.length === 0 && user) {
             setMessages([
                 { 
                     type: 'ai', 
-                    text: `Hello ${user.name}, I am your PPG EMP HUB AI Assistant. Please select from the available options for your role:`, 
-                    related: allowedKIs,
+                    text: `Hello ${user.name}, I am your PPG EMP HUB AI Assistant. Type a keyword (like 'attendance', 'leave', 'timetable') to see available options.`, 
                     time: new Date() 
                 }
             ]);
         }
-    }, [user, messages.length, allowedKIs]);
+    }, [user, messages.length]);
 
     useEffect(() => {
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -194,6 +194,7 @@ const AiAssistant = ({ isSidebar, onClose }) => {
         setInput('');
 
         setTimeout(async () => {
+            // Check direct match
             const exactMatch = allowedKIs.find(k => k.q.toLowerCase().replace(/[?.,!]/g, "") === cleanText);
 
             if (exactMatch && isClick) {
@@ -203,17 +204,16 @@ const AiAssistant = ({ isSidebar, onClose }) => {
                 }
                 
                 if (exactMatch.action === 'logout') {
-                    setMessages(prev => [...prev, { type: 'ai', text: "Logging out safely...", time: new Date(), related: allowedKIs }]);
+                    setMessages(prev => [...prev, { type: 'ai', text: "Logging out safely...", time: new Date() }]);
                     setTimeout(() => { logout(); navigate('/login'); }, 1000);
                     return;
                 }
 
-                // Rule: Don't hide/close assistant!
+                // RULE: DO NOT HIDE Assistant chat box on redirect
                 setMessages(prev => [...prev, { 
                     type: 'ai', 
-                    text: `Opening "${exactMatch.q}"...`, 
-                    time: new Date(),
-                    related: allowedKIs 
+                    text: `Switching to ${exactMatch.q}...`, 
+                    time: new Date() 
                 }]);
                 
                 setTimeout(() => { 
@@ -228,15 +228,31 @@ const AiAssistant = ({ isSidebar, onClose }) => {
                 return;
             }
 
-            // RULE: If user asks ANY questions, only send the EXACTLY default questions.
-            const reply = "Please select from the available options:";
-            setMessages(prev => [...prev, { 
-                type: 'ai', 
-                text: reply, 
-                related: allowedKIs, 
-                time: new Date() 
-            }]);
-            speak(reply);
+            // Keyword Filter: Find all that contain the search term
+            const filtered = allowedKIs.filter(k => 
+                k.q.toLowerCase().includes(cleanText) || 
+                cleanText.includes(k.q.toLowerCase().split(" ")[0])
+            );
+
+            if (filtered.length > 0) {
+                const reply = `I found ${filtered.length} relevant options based on your keyword:`;
+                setMessages(prev => [...prev, { 
+                    type: 'ai', 
+                    text: reply, 
+                    related: filtered, 
+                    time: new Date() 
+                }]);
+                speak(reply);
+            } else {
+                const reply = "Please select from the available options (type 'all' to see everything):";
+                setMessages(prev => [...prev, { 
+                    type: 'ai', 
+                    text: reply, 
+                    related: cleanText === "all" ? allowedKIs : [], 
+                    time: new Date() 
+                }]);
+                speak(reply);
+            }
         }, 600);
     };
 
@@ -264,7 +280,7 @@ const AiAssistant = ({ isSidebar, onClose }) => {
                         >
                             {isSpeaking ? <Volume2 size={16} /> : <VolumeX size={16} />}
                         </button>
-                        {/* Always visible, user only clicks to close */}
+                        {/* Persistent Close: Only user can click to close */}
                         {onClose && (
                             <button 
                                 onClick={onClose}
@@ -277,7 +293,7 @@ const AiAssistant = ({ isSidebar, onClose }) => {
                 </div>
             </div>
 
-            {/* Chat Body */}
+            {/* Chat Content */}
             <div 
                 ref={scrollRef}
                 className="flex-1 overflow-y-auto p-5 space-y-4 bg-slate-50/50 scroll-smooth no-scrollbar"
@@ -318,7 +334,7 @@ const AiAssistant = ({ isSidebar, onClose }) => {
                 ))}
             </div>
 
-            {/* Input Area */}
+            {/* User Input Area */}
             <div className="p-5 bg-white border-t border-slate-100 shrink-0">
                 <form 
                     onSubmit={(e) => { e.preventDefault(); handleSend(); }}
@@ -340,7 +356,7 @@ const AiAssistant = ({ isSidebar, onClose }) => {
                             type="text"
                             value={input}
                             onChange={(e) => setInput(e.target.value)}
-                            placeholder="Type your request or select below..."
+                            placeholder="Try searching 'attendance'..."
                             className="flex-1 bg-transparent border-none outline-none px-2 text-[10px] font-bold text-slate-700"
                         />
                         <button 
