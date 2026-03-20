@@ -47,13 +47,24 @@ const Layout = ({ children }) => {
         window.dispatchEvent(new CustomEvent('AI_STATUS', { detail: { open: isAiOpen } }));
     }, [isAiOpen]);
 
-    // Scroll to top on route change
+    // Scroll to top and handle autoPrint
     useEffect(() => {
         const mainElement = document.querySelector('main');
         if (mainElement) {
             mainElement.scrollTo({ top: 0, behavior: 'smooth' });
         }
-    }, [location.pathname]);
+
+        // Perfect setup: Handle direct print request from AI Assistant
+        if (location.state?.autoPrint) {
+            console.log('Auto-printing triggered via AI Assistant...');
+            const timer = setTimeout(() => {
+                window.print();
+                // Clear state to prevent re-printing on manual refresh
+                window.history.replaceState({}, document.title);
+            }, 1200); // 1.2s delay to allow content to finish rendering
+            return () => clearTimeout(timer);
+        }
+    }, [location.pathname, location.state]);
 
     const [now, setNow] = useState(new Date());
 
@@ -154,7 +165,7 @@ const Layout = ({ children }) => {
                                     : 'fixed bottom-4 right-4 w-[calc(100vw-32px)] h-[600px] rounded-[32px]'
                                 }`}
                             >
-                                <AiAssistant isSidebar={true} onClose={() => {
+                                <AiAssistant isSidebar={true} userRole={effectiveRole} onClose={() => {
                                     setIsAiOpen(false);
                                     window.dispatchEvent(new CustomEvent('AI_STATUS', { detail: { open: false } }));
                                 }} />
