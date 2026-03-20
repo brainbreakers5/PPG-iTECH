@@ -206,8 +206,8 @@ const Layout = ({ children }) => {
                                 }`}
                                 onClick={() => isAiMinimized && setIsAiMinimized(false)}
                             >
-                                <div className={`relative h-full w-full transition-all duration-300 ${isAiMinimized ? 'scale-95 opacity-50 blur-[1px] pointer-events-none' : 'scale-100 opacity-100 blur-0'}`}>
-                                    <AiAssistant isSidebar={true} userRole={effectiveRole} onClose={() => {
+                                <div className={`relative h-full w-full transition-all duration-300 ${isAiMinimized ? 'scale-95 opacity-50 pointer-events-none' : 'scale-100 opacity-100 blur-0'}`}>
+                                    <AiAssistant isSidebar={true} userRole={effectiveRole} isAiMinimized={isAiMinimized} onClose={() => {
                                         setIsAiOpen(false);
                                         window.dispatchEvent(new CustomEvent('AI_STATUS', { detail: { open: false } }));
                                     }} />
