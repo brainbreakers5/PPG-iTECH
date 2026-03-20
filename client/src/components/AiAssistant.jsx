@@ -5,7 +5,7 @@ import {
     Mic, MicOff, Volume2, VolumeX, User
 } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '@/context/AuthContext';
 
 const AI_KNOWLEDGE_BASE = {
     staff: [
