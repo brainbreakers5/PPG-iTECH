@@ -502,15 +502,13 @@ const Header = ({ toggleSidebar, sidebarOpen }) => {
                     </div>
 
                     {/* AI Assistant Trigger */}
-                    {!isManagement && (
-                        <button
-                            onClick={() => window.dispatchEvent(new CustomEvent('TOGGLE_AI_ASSISTANT'))}
-                            className="bg-white hover:bg-sky-50 text-sky-600 p-2.5 rounded-xl border border-sky-100 hover:border-sky-300 transition-all shadow-sm flex items-center justify-center group active:scale-95"
-                            title="AI Assistant"
-                        >
-                            <Sparkles className="text-lg group-hover:rotate-12 transition-transform h-5 w-5" />
-                        </button>
-                    )}
+                    <button
+                        onClick={() => window.dispatchEvent(new CustomEvent('TOGGLE_AI_ASSISTANT'))}
+                        className="bg-white hover:bg-sky-50 text-sky-600 p-2.5 rounded-xl border border-sky-100 hover:border-sky-300 transition-all shadow-sm flex items-center justify-center group active:scale-95"
+                        title="AI Assistant"
+                    >
+                        <Sparkles className="text-lg group-hover:rotate-12 transition-transform h-5 w-5" />
+                    </button>
 
                     {!isManagement && (
                         <div className="relative" ref={notifRef}>
