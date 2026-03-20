@@ -504,14 +504,15 @@ const Header = ({ toggleSidebar, sidebarOpen }) => {
                     {/* AI Assistant Trigger */}
                     <button
                         onClick={() => window.dispatchEvent(new CustomEvent('TOGGLE_AI_ASSISTANT'))}
-                        className="bg-white hover:bg-sky-50 p-1.5 rounded-xl border border-sky-100 hover:border-sky-300 transition-all shadow-sm flex items-center justify-center group active:scale-95"
+                        className="bg-white hover:bg-sky-50 h-11 w-11 rounded-xl border border-sky-100 hover:border-sky-300 transition-all shadow-sm flex items-center justify-center group active:scale-95 relative"
                         title="Zorvian AI Assistant"
                     >
                         <img 
                             src="/zorvian logo.jpeg" 
                             alt="Zorvian AI" 
-                            className="h-8 w-8 object-contain rounded-lg animate-pulse" 
+                            className="h-8 w-8 object-contain rounded-lg animate-pulse-green" 
                         />
+                        <span className="absolute -bottom-1 -right-1 ai-badge shadow-sm">AI</span>
                     </button>
 
                     {!isManagement && (
