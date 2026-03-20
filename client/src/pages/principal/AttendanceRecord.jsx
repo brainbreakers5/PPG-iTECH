@@ -21,7 +21,13 @@ const AttendanceRecord = () => {
     const [startDate, setStartDate] = useState(firstDayOfMonth);
     const [endDate, setEndDate] = useState(today);
     const [departmentId, setDepartmentId] = useState(user?.role === 'hod' ? String(user.department_id || '') : '');
-    const [role, setRole] = useState('');
+    const [role, setRole] = useState(() => {
+        const hash = window.location.hash.replace('#', '');
+        if (hash === 'hod-core') return 'hod';
+        if (hash === 'staff-core') return 'staff';
+        if (hash === 'principal-core') return 'principal';
+        return '';
+    });
     const [summaryRecords, setSummaryRecords] = useState([]);
     const [detailedRecords, setDetailedRecords] = useState([]);
     const [biometricRecords, setBiometricRecords] = useState([]);
@@ -29,8 +35,9 @@ const AttendanceRecord = () => {
     const [viewMode, setViewMode] = useState(() => {
         const hash = window.location.hash.replace('#', '');
         if (hash === 'summary') return 'summary';
-        if (hash === 'detailed') return 'detailed';
+        if (hash === 'detailed' || hash === 'logs') return 'detailed';
         if (hash === 'sync' || hash === 'biometric') return 'biometric';
+        if (hash === 'hod-core' || hash === 'staff-core' || hash === 'principal-core') return 'table';
         return 'summary';
     });
     const [selectedEmployee, setSelectedEmployee] = useState(null); // For summary view modal
@@ -167,9 +174,12 @@ const AttendanceRecord = () => {
     useEffect(() => {
         const handleHash = () => {
             const hash = window.location.hash.replace('#', '');
-            if (hash === 'summary') setViewMode('summary');
-            else if (hash === 'detailed') setViewMode('detailed');
-            else if (hash === 'sync' || hash === 'biometric') setViewMode('biometric');
+            if (hash === 'summary') { setViewMode('summary'); setRole(''); }
+            else if (hash === 'detailed' || hash === 'logs') { setViewMode('detailed'); setRole(''); }
+            else if (hash === 'sync' || hash === 'biometric') { setViewMode('biometric'); setRole(''); }
+            else if (hash === 'hod-core') { setViewMode('table'); setRole('hod'); }
+            else if (hash === 'staff-core') { setViewMode('table'); setRole('staff'); }
+            else if (hash === 'principal-core') { setViewMode('table'); setRole('principal'); }
         };
         handleHash();
         window.addEventListener('hashchange', handleHash);
