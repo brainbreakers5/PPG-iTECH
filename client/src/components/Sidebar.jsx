@@ -38,6 +38,7 @@ const Sidebar = ({ userRole = 'staff', isOpen, onClose }) => {
     localStorage.removeItem('managementAccess');
     localStorage.removeItem('token');
     localStorage.removeItem('lastRole');
+    localStorage.removeItem('ai_chat_history');
     logout(); // also clears AuthContext user state
     navigate('/login');
   };
