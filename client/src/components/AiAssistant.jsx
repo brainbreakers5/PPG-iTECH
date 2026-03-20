@@ -166,10 +166,23 @@ const AiAssistant = ({ isSidebar, onClose, userRole }) => {
         }
     }, [user, messages.length, role, allowedKIs]);
 
-    // Respond to history wipe requests (typically when chatbox is closed or user logs out)
+    // Fresh start only on User Switch or explicit AI logout event
+    useEffect(() => {
+        const savedEmpId = localStorage.getItem('ai_chat_emp_id');
+        if (savedEmpId && user && savedEmpId !== user.emp_id) {
+            localStorage.removeItem('ai_chat_history');
+            setMessages([]);
+        }
+        if (user) {
+            localStorage.setItem('ai_chat_emp_id', user.emp_id);
+        }
+    }, [user?.emp_id]);
+
+    // Respond to history wipe requests (typically on actual Logout from app)
     useEffect(() => {
         const handleClear = () => {
             localStorage.removeItem('ai_chat_history');
+            localStorage.removeItem('ai_chat_emp_id');
             setMessages([]);
         };
         window.addEventListener('CLEAR_AI_HISTORY', handleClear);
@@ -414,9 +427,8 @@ const AiAssistant = ({ isSidebar, onClose, userRole }) => {
             <div className="bg-gradient-to-br from-slate-900 via-sky-900 to-sky-800 p-6 flex flex-col gap-2 shrink-0">
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                        <div className="h-10 w-10 bg-white/10 backdrop-blur-2xl rounded-2xl flex items-center justify-center border border-white/20 shadow-xl overflow-hidden p-0.5 relative">
+                        <div className="h-10 w-10 bg-white/10 backdrop-blur-2xl rounded-2xl flex items-center justify-center border border-white/20 shadow-xl overflow-hidden p-0.5">
                             <img src="/zorvian logo.jpeg" alt="Zorvian AI" className="h-full w-full object-cover rounded-[14px] animate-pulse-green" />
-                            <span className="absolute -bottom-0.5 -right-0.5 ai-badge scale-75 origin-bottom-right">AI</span>
                         </div>
                         <div className="flex flex-col">
                             <h3 className="text-white font-black text-xs tracking-tight leading-none mb-1 uppercase">PPG EMP HUB</h3>
