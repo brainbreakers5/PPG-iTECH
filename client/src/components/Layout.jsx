@@ -53,12 +53,6 @@ const Layout = ({ children }) => {
     useEffect(() => {
         localStorage.setItem('isAiOpen', isAiOpen.toString());
         window.dispatchEvent(new CustomEvent('AI_STATUS', { detail: { open: isAiOpen } }));
-        
-        // If AI is explicitly closed, clear full history as requested
-        if (!isAiOpen) {
-            localStorage.removeItem('ai_chat_history');
-            window.dispatchEvent(new CustomEvent('CLEAR_AI_HISTORY'));
-        }
     }, [isAiOpen]);
 
     // Scroll to top and handle autoPrint
