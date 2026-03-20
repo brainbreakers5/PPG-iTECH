@@ -1,381 +1,320 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { 
-    X, Send, ArrowRight, Sparkles, 
-    Mic, MicOff, Volume2, VolumeX, User
-} from 'lucide-react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
+import Layout from '../../components/Layout';
+import api from '../../utils/api';
+import { useAuth } from '@/context/AuthContext';
+import { motion, AnimatePresence } from 'framer-motion';
+import { useSocket } from '@/context/SocketContext';
+import { FaUserCheck, FaUserTimes, FaBus, FaFileAlt, FaCalendarDay, FaCalendarAlt, FaStar, FaBriefcase, FaTimes, FaFilter, FaClock, FaBookOpen, FaDoorOpen, FaChalkboardTeacher } from 'react-icons/fa';
+import AttendanceHistory from '@/components/AttendanceHistory';
+import PersonalAttendanceChart from '@/components/PersonalAttendanceChart';
+import { useTimetableConfig } from '@/hooks/useTimetableConfig';
+import { formatTo12Hr } from '@/utils/timeFormatter';
 
-const AI_KNOWLEDGE_BASE = {
-    staff: [
-        { q: "Notification", link: "/staff/notifications" },
-        { q: "Profile", link: "/staff/profile" },
-        { q: "Logout", action: 'logout' },
-        { q: "Dashboard", link: "/staff" },
-        { q: "Your Personal Attendance", link: "/staff", hash: "personal-attendance" },
-        { q: "Recent Attendance History", link: "/staff", hash: "attendance-history" },
-        { q: "Leave Management", link: "/staff/leaves", hash: "history" },
-        { q: "Leave Apply", link: "/staff/leaves", hash: "apply" },
-        { q: "Permission Letter", link: "/staff/leaves", hash: "permission" },
-        { q: "Comp Leave", link: "/staff/leaves", hash: "compoff" },
-        { q: "Leave Balance", link: "/staff/leaves", hash: "balance" },
-        { q: "Incoming Approvals", link: "/staff/leaves", hash: "approvals" },
-        { q: "My Leave History", link: "/staff/leaves", hash: "history" },
-        { q: "Salary Details", link: "/staff/payroll" },
-        { q: "My Timetable", link: "/staff/timetables" },
-        { q: "Staff Timetable", link: "/staff/timetables", hash: "all" },
-        { q: "Conversation", link: "/staff/conversation" },
-        { q: "Purchase Requests", link: "/staff/items" },
-        { q: "Academic Calendar", link: "/staff/calendar" }
-    ],
-    hod: [
-        { q: "Notification", link: "/hod/notifications" },
-        { q: "Profile", link: "/hod/profile" },
-        { q: "Logout", action: 'logout' },
-        { q: "Dashboard", link: "/hod" },
-        { q: "Your Personal Attendance", link: "/hod", hash: "personal-attendance" },
-        { q: "Recent Attendance History", link: "/hod", hash: "attendance-history" },
-        { q: "Leave Management", link: "/hod/leaves", hash: "history" },
-        { q: "Leave Apply", link: "/hod/leaves", hash: "apply" },
-        { q: "Permission Letter", link: "/hod/leaves", hash: "permission" },
-        { q: "Comp Leave", link: "/hod/leaves", hash: "compoff" },
-        { q: "Leave Balance", link: "/hod/leaves", hash: "balance" },
-        { q: "Incoming Approvals", link: "/hod/leaves", hash: "approvals" },
-        { q: "My Leave History", link: "/hod/leaves", hash: "history" },
-        { q: "Salary Details", link: "/hod/payroll" },
-        { q: "My Timetable", link: "/hod/timetable" },
-        { q: "Staff Timetable", link: "/hod/timetable" },
-        { q: "Conversation", link: "/hod/conversation" },
-        { q: "Purchase Requests", link: "/hod/purchase" },
-        { q: "Academic Calendar", link: "/hod/calendar" },
-        { q: "Attendance Records", link: "/hod/attendance" },
-        { q: "Summary View", link: "/hod/attendance", hash: "summary" },
-        { q: "Details Logs", link: "/hod/biometric-history" },
-        { q: "Biometric Sync", link: "/hod/attendance", hash: "sync" },
-        { q: "HODs Attendance Core", link: "/hod/attendance" },
-        { q: "Staff Attendance Core", link: "/hod/attendance" },
-        { q: "Department Staff", link: "/hod/department" }
-    ],
-    principal: [
-        { q: "Notification", link: "/principal/notifications" },
-        { q: "Profile", link: "/principal/profile" },
-        { q: "Logout", action: 'logout' },
-        { q: "Dashboard", link: "/principal" },
-        { q: "Your Personal Attendance", link: "/principal" },
-        { q: "Recent Attendance History", link: "/principal" },
-        { q: "HODs Attendance Core", link: "/principal/attendance" },
-        { q: "Staff Attendance Core", link: "/principal/attendance" },
-        { q: "Attendance Records", link: "/principal/attendance" },
-        { q: "Summary View", link: "/principal/attendance", hash: "summary" },
-        { q: "Biometric Sync", link: "/principal/attendance", hash: "sync" },
-        { q: "Conversation", link: "/principal/conversation" },
-        { q: "Purchase Requests", link: "/principal/purchase" },
-        { q: "Departments", link: "/principal/department" },
-        { q: "Academic Calendar", link: "/principal/calendar" },
-        { q: "Leave Requests", link: "/principal/leaves" },
-        { q: "Permission Requests", link: "/principal/leaves", hash: "permission" },
-        { q: "Detail Logs", link: "/principal/biometric-history" }
-    ],
-    admin: [
-        { q: "Notification", link: "/admin/notifications" },
-        { q: "Logout", action: 'logout' },
-        { q: "Employee Management", link: "/admin/employees" },
-        { q: "Add New Employee", link: "/admin/employees/new" },
-        { q: "Departments", link: "/admin/departments" },
-        { q: "Salary Management", link: "/admin/payroll" },
-        { q: "Attendance Records", link: "/admin/attendance" },
-        { q: "Summary View", link: "/admin/attendance", hash: "summary" },
-        { q: "Details Logs", link: "/admin/biometric-history" },
-        { q: "Biometric Sync", link: "/admin/attendance", hash: "sync" },
-        { q: "Leave Balance", link: "/admin/leave-limits" },
-        { q: "Timetable Setup", link: "/admin/timetable-setup" },
-        { q: "Security Log", link: "/admin/activity-logs" },
-        { q: "Academic Calendar", link: "/admin/calendar" },
-        { q: "Purchase Requests", link: "/admin/purchase" },
-        { q: "Profile", link: "/admin/profile" },
-        { q: "Principal Attendance Core", link: "/admin/attendance" },
-        { q: "HODs Attendance Core", link: "/admin/attendance" },
-        { q: "Staff Attendance Core", link: "/admin/attendance" }
-    ],
-    management: [
-        { q: "Profile", link: "/management/profile" },
-        { q: "Logout", action: 'logout' },
-        { q: "Dashboard", link: "/management" },
-        { q: "Attendance Records", link: "/management/attendance" },
-        { q: "Principal Attendance Core", link: "/management/attendance" },
-        { q: "HODs Attendance Core", link: "/management/attendance" },
-        { q: "Staff Attendance Core", link: "/management/attendance" },
-        { q: "Academic Calendar", link: "/management/calendar" },
-        { q: "Summary View", link: "/management/attendance", hash: "summary" },
-        { q: "Details Logs", link: "/management/attendance" },
-        { q: "Departments", link: "/management/departments" },
-        { q: "Biometric Sync", link: "/management/attendance", hash: "sync" }
-    ]
-};
-
-const AiAssistant = ({ isSidebar, onClose }) => {
-    const { user, logout } = useAuth();
+const StaffDashboard = () => {
+    const { user } = useAuth();
     const navigate = useNavigate();
     const location = useLocation();
-    const [messages, setMessages] = useState([]);
-    const [input, setInput] = useState('');
-    const [isListening, setIsListening] = useState(false);
-    const [isSpeaking, setIsSpeaking] = useState(true);
-    const scrollRef = useRef(null);
-    const recognitionRef = useRef(null);
+    const socket = useSocket();
+    const [myStats, setMyStats] = useState({ present: 0, absent: 0, od: 0, cl: 0, ml: 0, comp_leave: 0, lop: 0, late_entry: 0 });
+    const [profile, setProfile] = useState(null);
+    const [loading, setLoading] = useState(true);
+    const [monthStats, setMonthStats] = useState({ workingDays: 0, holidays: 0, specialEvents: 0 });
+    const [todayTimetable, setTodayTimetable] = useState([]);
+    const { getPeriodConfig } = useTimetableConfig();
+    const [statusFilter, setStatusFilter] = useState(null); // null = show all
+    const historyRef = useRef(null);
 
-    const role = user?.role?.toLowerCase() || 'staff';
-    const allowedKIs = AI_KNOWLEDGE_BASE[role] || [];
+    const fetchData = useCallback(async () => {
+        if (!user) return;
+        try {
+            const month = new Date().toISOString().slice(0, 7); // "YYYY-MM"
+            const { data: records } = await api.get(`/attendance?month=${month}`);
 
-    // Greeting: HIDE DEFAULT QUESTIONS per latest request
-    useEffect(() => {
-        if (messages.length === 0 && user) {
-            setMessages([
-                { 
-                    type: 'ai', 
-                    text: `Hello ${user.name}, I am your PPG EMP HUB AI Assistant. Type a keyword (like 'attendance', 'leave', 'timetable') to see available options.`, 
-                    time: new Date() 
-                }
-            ]);
-        }
-    }, [user, messages.length]);
+            const counts = { present: 0, absent: 0, od: 0, cl: 0, ml: 0, comp_leave: 0, lop: 0, late_entry: 0 };
+            (records || []).forEach(r => {
+                const s = (r.status || '').toUpperCase();
+                const rem = (r.remarks || '').toUpperCase();
+                if (s.includes('PRESENT')) counts.present++;
+                if (s.includes('ABSENT')) counts.absent++;
+                if (s.includes('OD') || rem.includes('OD')) counts.od++;
+                if ((s.includes('CL') || rem.includes('CL') || rem.includes('CASUAL')) && !s.includes('COMP') && !rem.includes('COMP')) counts.cl++;
+                if (s.includes('ML') || rem.includes('ML') || rem.includes('MEDICAL')) counts.ml++;
+                if (s.includes('COMP LEAVE') || rem.includes('COMP LEAVE')) counts.comp_leave++;
+                if (s.includes('LOP') || rem.includes('LOP')) counts.lop++;
+                if (rem.includes('LATE ENTRY')) counts.late_entry++;
+            });
+            setMyStats(counts);
 
-    useEffect(() => {
-        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-        if (SpeechRecognition) {
-            recognitionRef.current = new SpeechRecognition();
-            recognitionRef.current.continuous = false;
-            recognitionRef.current.interimResults = false;
-            recognitionRef.current.lang = 'en-US';
-
-            recognitionRef.current.onresult = (event) => {
-                const transcript = event.results[0][0].transcript;
-                setInput(transcript);
-                setIsListening(false);
-                handleSend(transcript);
-            };
-
-            recognitionRef.current.onerror = () => setIsListening(false);
-            recognitionRef.current.onend = () => setIsListening(false);
-        }
-    }, []);
-
-    const speak = (text) => {
-        if (!isSpeaking || !window.speechSynthesis) return;
-        window.speechSynthesis.cancel();
-        const utterance = new SpeechSynthesisUtterance(text);
-        utterance.lang = 'en-US';
-        window.speechSynthesis.speak(utterance);
-    };
-
-    const toggleListening = () => {
-        if (isListening) {
-            recognitionRef.current?.stop();
-        } else {
-            setIsListening(true);
-            recognitionRef.current?.start();
-        }
-    };
-
-    useEffect(() => {
-        if (scrollRef.current) {
-            scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-        }
-    }, [messages]);
-
-    const handleSend = async (text = input, isClick = false) => {
-        const cleanText = text.trim().toLowerCase().replace(/[?.,!]/g, "");
-        if (!cleanText) return;
-        
-        if (!isClick) {
-            setMessages(prev => [...prev, { type: 'user', text, time: new Date() }]);
-        }
-        setInput('');
-
-        setTimeout(async () => {
-            // Check direct match
-            const exactMatch = allowedKIs.find(k => k.q.toLowerCase().replace(/[?.,!]/g, "") === cleanText);
-
-            if (exactMatch && isClick) {
-                let actionLink = exactMatch.link;
-                if (exactMatch.q.toLowerCase() === 'profile' && !actionLink.includes(user.emp_id) && role !== 'management') {
-                    actionLink = `/${role}/profile/${user.emp_id}`;
-                }
-                
-                if (exactMatch.action === 'logout') {
-                    setMessages(prev => [...prev, { type: 'ai', text: "Logging out safely...", time: new Date() }]);
-                    setTimeout(() => { logout(); navigate('/login'); }, 1000);
-                    return;
-                }
-
-                // RULE: DO NOT HIDE Assistant chat box on redirect
-                setMessages(prev => [...prev, { 
-                    type: 'ai', 
-                    text: `Switching to ${exactMatch.q}...`, 
-                    time: new Date() 
-                }]);
-                
-                setTimeout(() => { 
-                    const hashPart = exactMatch.hash ? `#${exactMatch.hash}` : '';
-                    if (location.pathname === actionLink) {
-                        window.location.hash = (exactMatch.hash || '');
-                        window.dispatchEvent(new Event('hashchange'));
-                    } else {
-                        navigate(`${actionLink}${hashPart}`);
-                    }
-                }, 400);
-                return;
+            const { data: profileData } = await api.get('/auth/profile');
+            setProfile(profileData);
+            // Fetch holiday/calendar data for month summary
+            const now = new Date();
+            const curMonth = now.getMonth() + 1;
+            const curYear = now.getFullYear();
+            const { data: holidayData } = await api.get(`holidays?month=${curMonth}&year=${curYear}`);
+            const daysInMonth = new Date(curYear, curMonth, 0).getDate();
+            let hCount = 0, sCount = 0;
+            const holidayDateSet = new Set();
+            (holidayData || []).forEach(h => {
+                holidayDateSet.add(h.h_date);
+                if (h.type === 'Holiday') hCount++;
+                else if (h.type === 'Special') sCount++;
+            });
+            for (let d = 1; d <= daysInMonth; d++) {
+                const dow = new Date(curYear, curMonth - 1, d).getDay();
+                const ds = `${curYear}-${String(curMonth).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+                if ((dow === 0 || dow === 6) && !holidayDateSet.has(ds)) hCount++;
             }
+            setMonthStats({ workingDays: daysInMonth - hCount - sCount, holidays: hCount, specialEvents: sCount });
 
-            // Keyword Filter: Find all that contain the search term
-            const filtered = allowedKIs.filter(k => 
-                k.q.toLowerCase().includes(cleanText) || 
-                cleanText.includes(k.q.toLowerCase().split(" ")[0])
-            );
+            // Fetch today's timetable
+            const { data: ttData } = await api.get('/timetable');
+            const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+            const today = dayNames[new Date().getDay()];
+            const entries = (ttData || [])
+                .filter(t => t.day_of_week === today)
+                .sort((a, b) => (a.period_number - b.period_number));
+            setTodayTimetable(entries);
+        } catch (error) {
+            console.error('Staff dashboard error', error);
+        } finally {
+            setLoading(false);
+        }
+    }, [user]);
 
-            if (filtered.length > 0) {
-                const reply = `I found ${filtered.length} relevant options based on your keyword:`;
-                setMessages(prev => [...prev, { 
-                    type: 'ai', 
-                    text: reply, 
-                    related: filtered, 
-                    time: new Date() 
-                }]);
-                speak(reply);
-            } else {
-                const reply = "Please select from the available options (type 'all' to see everything):";
-                setMessages(prev => [...prev, { 
-                    type: 'ai', 
-                    text: reply, 
-                    related: cleanText === "all" ? allowedKIs : [], 
-                    time: new Date() 
-                }]);
-                speak(reply);
-            }
-        }, 600);
+    useEffect(() => {
+        fetchData();
+        const interval = setInterval(fetchData, 15000);
+        return () => clearInterval(interval);
+    }, [fetchData]);
+
+    useEffect(() => {
+        if (!socket) return;
+        socket.on('attendance_updated', fetchData);
+        return () => socket.off('attendance_updated', fetchData);
+    }, [socket, fetchData]);
+
+    const handleStatClick = (filter) => {
+        setStatusFilter(prev => prev === filter ? null : filter);
+        // Smooth scroll to history section
+        setTimeout(() => {
+            historyRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }, 100);
     };
+
+    useEffect(() => {
+        const handleHash = () => {
+            if (location.hash === '#personal-attendance') {
+                document.getElementById('personal-attendance-section')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            } else if (location.hash === '#attendance-history') {
+                historyRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+        };
+        handleHash();
+        window.addEventListener('hashchange', handleHash);
+        return () => window.removeEventListener('hashchange', handleHash);
+    }, [location.hash]);
+
+    const stats = [
+        { label: 'Present', value: myStats.present, filterKey: 'Present', icon: <FaUserCheck />, colorClass: 'text-sky-600', bgClass: 'bg-sky-50', borderClass: 'border-sky-100', gradientClass: 'from-sky-500 to-sky-700' },
+        { label: 'Absent', value: myStats.absent, filterKey: 'Absent', icon: <FaUserTimes />, colorClass: 'text-rose-600', bgClass: 'bg-rose-50', borderClass: 'border-rose-100', gradientClass: 'from-rose-500 to-rose-700' },
+        { label: 'Loss Of Pay', value: myStats.lop, filterKey: 'LOP', icon: <FaTimes />, colorClass: 'text-rose-800', bgClass: 'bg-rose-100', borderClass: 'border-rose-200', gradientClass: 'from-rose-600 to-rose-800' },
+        { label: 'On Duty', value: myStats.od, filterKey: 'OD', icon: <FaBriefcase />, colorClass: 'text-emerald-600', bgClass: 'bg-emerald-50', borderClass: 'border-emerald-100', gradientClass: 'from-emerald-500 to-emerald-700' },
+        { label: 'Casual Leave', value: myStats.cl, filterKey: 'CL', icon: <FaCalendarDay />, colorClass: 'text-amber-600', bgClass: 'bg-amber-50', borderClass: 'border-amber-100', gradientClass: 'from-amber-500 to-amber-700' },
+        { label: 'Medical Leave', value: myStats.ml, filterKey: 'ML', icon: <FaFileAlt />, colorClass: 'text-purple-600', bgClass: 'bg-purple-50', borderClass: 'border-purple-100', gradientClass: 'from-purple-500 to-purple-700' },
+        { label: 'Comp Leave', value: myStats.comp_leave, filterKey: 'Comp Leave', icon: <FaStar />, colorClass: 'text-indigo-600', bgClass: 'bg-indigo-50', borderClass: 'border-indigo-100', gradientClass: 'from-indigo-500 to-indigo-700' },
+        { label: 'Late Entry', value: myStats.late_entry, filterKey: 'Late Entry', icon: <FaClock />, colorClass: 'text-orange-600', bgClass: 'bg-orange-50', borderClass: 'border-orange-100', gradientClass: 'from-orange-500 to-orange-700' },
+    ];
+
+    const currentMonth = new Date().toLocaleString('default', { month: 'long', year: 'numeric' });
 
     return (
-        <div className="flex flex-col h-full w-full bg-white relative">
+        <Layout>
             {/* Header */}
-            <div className="bg-gradient-to-br from-slate-900 via-sky-900 to-sky-800 p-6 flex flex-col gap-2 shrink-0">
-                <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                        <div className="h-10 w-10 bg-white/10 backdrop-blur-2xl rounded-2xl flex items-center justify-center border border-white/20 shadow-xl">
-                            <Sparkles className="text-sky-300 h-5 w-5" />
-                        </div>
-                        <div className="flex flex-col">
-                            <h3 className="text-white font-black text-xs tracking-tight leading-none mb-1 uppercase">PPG EMP HUB</h3>
-                            <span className="text-sky-300 text-[8px] font-black uppercase tracking-[0.2em] opacity-90 flex items-center gap-1.5">
-                                <div className="h-1 w-1 bg-emerald-400 rounded-full animate-pulse" /> ZORVIAN AI ASSISTANT
-                            </span>
-                        </div>
-                    </div>
-                    
-                    <div className="flex items-center gap-2">
-                        <button 
-                            onClick={() => setIsSpeaking(!isSpeaking)}
-                            className={`p-2 rounded-xl transition-all ${isSpeaking ? 'bg-white/10 text-white border border-white/20' : 'bg-black/30 text-white/40'}`}
-                        >
-                            {isSpeaking ? <Volume2 size={16} /> : <VolumeX size={16} />}
-                        </button>
-                        {/* Persistent Close: Only user can click to close */}
-                        {onClose && (
-                            <button 
-                                onClick={onClose}
-                                className="p-2 hover:bg-white/10 rounded-xl transition-all text-white border border-transparent hover:border-white/10"
-                            >
-                                <X size={18} />
-                            </button>
-                        )}
+            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="mb-10">
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                    <div>
+                        <h1 className="text-4xl font-black text-gray-800 tracking-tighter">
+                            My <span className="text-[#4A90E2]">Dashboard</span>
+                        </h1>
+                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.3em] mt-2">
+                            {currentMonth} · Personal Attendance Record
+                        </p>
                     </div>
                 </div>
-            </div>
+            </motion.div>
 
-            {/* Chat Content */}
-            <div 
-                ref={scrollRef}
-                className="flex-1 overflow-y-auto p-5 space-y-4 bg-slate-50/50 scroll-smooth no-scrollbar"
-            >
-                {messages.map((m, i) => (
-                    <motion.div
-                        key={i}
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        className={`flex ${m.type === 'ai' ? 'justify-start' : 'justify-end'}`}
+            {/* Today's Timetable Section */}
+            <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.1 }} className="mb-10">
+                <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-2">
+                        <div className="h-2 w-2 bg-sky-500 rounded-full animate-pulse" />
+                        <h2 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Today's Schedule</h2>
+                    </div>
+                    <button 
+                        onClick={() => navigate('/staff/timetables')}
+                        className="text-[9px] font-black text-sky-600 uppercase tracking-widest hover:underline"
                     >
-                        <div className={`max-w-[95%] p-4 rounded-3xl text-[11px] font-bold leading-relaxed shadow-sm border ${
-                            m.type === 'ai' 
-                                ? 'bg-white text-slate-700 rounded-tl-none border-slate-100' 
-                                : 'bg-gradient-to-br from-sky-800 to-sky-700 text-white rounded-tr-none'
-                        }`}>
-                            <div className="space-y-3">
-                                <p>{m.text}</p>
-                            </div>
-                            
-                            {m.related && m.related.length > 0 && (
-                                <div className="mt-4 flex flex-col gap-2">
-                                    <div className="grid grid-cols-1 gap-1.5 max-h-[350px] overflow-y-auto pr-1 no-scrollbar">
-                                        {m.related.map((r, idx) => (
-                                            <button
-                                                key={idx}
-                                                onClick={() => handleSend(r.q, true)}
-                                                className="flex items-center justify-between gap-3 text-sky-700 bg-sky-50/80 hover:bg-white px-3 py-3 rounded-2xl text-[10px] w-full font-black border border-sky-100 transition-all group shadow-sm active:scale-[0.98]"
-                                            >
-                                                {r.q} <ArrowRight size={12} className="group-hover:translate-x-1 transition-transform" />
-                                            </button>
-                                        ))}
+                        View Full Timetable
+                    </button>
+                </div>
+
+                <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-hide -mx-2 px-2">
+                    {todayTimetable.length > 0 ? (
+                        todayTimetable.map((period, idx) => (
+                            <motion.div
+                                key={idx}
+                                whileHover={{ y: -5 }}
+                                className="min-w-[240px] bg-white border border-gray-100 rounded-[24px] p-5 shadow-sm hover:shadow-xl hover:shadow-sky-500/5 transition-all relative overflow-hidden group"
+                            >
+                                <div className="absolute top-0 right-0 p-3">
+                                    <span className="text-[9px] font-black text-sky-500/20 uppercase tracking-widest group-hover:text-sky-500/40 transition-colors">
+                                        P{period.period_number}
+                                    </span>
+                                </div>
+                                <div className="flex flex-col h-full">
+                                    <div className="flex items-center gap-2 mb-3">
+                                        <div className="h-8 w-8 rounded-xl bg-sky-50 text-sky-600 flex items-center justify-center">
+                                            <FaBookOpen size={12} />
+                                        </div>
+                                        <div className="overflow-hidden">
+                                            <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest truncate">{period.subject_code || 'SUBJECT'}</p>
+                                            <h3 className="text-sm font-black text-gray-800 truncate tracking-tight">{period.subject}</h3>
+                                        </div>
+                                    </div>
+                                    
+                                    <div className="mt-auto space-y-2">
+                                        <div className="flex items-center gap-2 text-[10px] font-bold text-gray-500">
+                                            <FaClock className="text-sky-400" size={10} />
+                                            <span>
+                                                {formatTo12Hr(getPeriodConfig(period.period_number)?.start_time || period.start_time)} – {formatTo12Hr(getPeriodConfig(period.period_number)?.end_time || period.end_time)}
+                                            </span>
+                                        </div>
+                                        {period.room_number && (
+                                            <div className="flex items-center gap-2 text-[10px] font-bold text-sky-600 bg-sky-50/50 w-fit px-2 py-0.5 rounded-lg">
+                                                <FaDoorOpen size={10} />
+                                                <span className="uppercase tracking-widest">Room: {period.room_number}</span>
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
-                            )}
+                            </motion.div>
+                        ))
+                    ) : (
+                        <div className="w-full bg-gray-50/50 border border-dashed border-gray-200 rounded-[32px] p-8 flex flex-col items-center justify-center text-center">
+                            <div className="h-12 w-12 rounded-2xl bg-white border border-gray-100 flex items-center justify-center text-gray-300 mb-3 shadow-sm">
+                                <FaChalkboardTeacher size={20} />
+                            </div>
+                            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">No classes scheduled for today</p>
+                            <p className="text-[9px] text-gray-300 font-bold mt-1 uppercase tracking-wider">Enjoy your free time!</p>
+                        </div>
+                    )}
+                </div>
+            </motion.div>
+
+            {/* Monthly Summary Bar */}
+            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="mb-10 lg:hidden">
+                <div className="grid grid-cols-3 gap-4">
+                    <motion.div
+                        whileHover={{ scale: 1.03, y: -3 }}
+                        whileTap={{ scale: 0.97 }}
+                        onClick={() => navigate('/staff/calendar')}
+                        className="bg-emerald-50 border border-emerald-100 rounded-2xl p-5 flex items-center gap-4 cursor-pointer hover:border-emerald-300 hover:shadow-md hover:shadow-emerald-100 transition-all"
+                    >
+                        <div className="h-11 w-11 rounded-xl bg-emerald-500 text-white flex items-center justify-center shadow-sm">
+                            <FaCalendarAlt />
+                        </div>
+                        <div>
+                            <p className="text-[9px] font-black text-emerald-500 uppercase tracking-widest">Working Days</p>
+                            <p className="text-2xl font-black text-emerald-700 tracking-tighter">{monthStats.workingDays}</p>
                         </div>
                     </motion.div>
-                ))}
-            </div>
-
-            {/* User Input Area */}
-            <div className="p-5 bg-white border-t border-slate-100 shrink-0">
-                <form 
-                    onSubmit={(e) => { e.preventDefault(); handleSend(); }}
-                    className="flex items-center gap-3"
-                >
-                    <button
-                        type="button"
-                        onClick={toggleListening}
-                        className={`h-9 w-9 rounded-xl transition-all shadow-sm flex items-center justify-center border ${
-                            isListening 
-                                ? 'bg-rose-500 text-white animate-pulse border-rose-400' 
-                                : 'bg-slate-50 text-slate-500 border-slate-100'
-                        }`}
+                    <motion.div
+                        whileHover={{ scale: 1.03, y: -3 }}
+                        whileTap={{ scale: 0.97 }}
+                        onClick={() => navigate('/staff/calendar')}
+                        className="bg-rose-50 border border-rose-100 rounded-2xl p-5 flex items-center gap-4 cursor-pointer hover:border-rose-300 hover:shadow-md hover:shadow-rose-100 transition-all"
                     >
-                        {isListening ? <MicOff size={16} /> : <Mic size={16} />}
-                    </button>
-                    <div className="flex-1 flex items-center bg-slate-50 p-1.5 rounded-xl border border-slate-100 focus-within:border-sky-500/30 transition-all shadow-inner">
-                        <input 
-                            type="text"
-                            value={input}
-                            onChange={(e) => setInput(e.target.value)}
-                            placeholder="Try searching 'attendance'..."
-                            className="flex-1 bg-transparent border-none outline-none px-2 text-[10px] font-bold text-slate-700"
+                        <div className="h-11 w-11 rounded-xl bg-rose-500 text-white flex items-center justify-center shadow-sm">
+                            <FaCalendarDay />
+                        </div>
+                        <div>
+                            <p className="text-[9px] font-black text-rose-500 uppercase tracking-widest">Holidays</p>
+                            <p className="text-2xl font-black text-rose-700 tracking-tighter">{monthStats.holidays}</p>
+                        </div>
+                    </motion.div>
+                    <motion.div
+                        whileHover={{ scale: 1.03, y: -3 }}
+                        whileTap={{ scale: 0.97 }}
+                        onClick={() => navigate('/staff/calendar')}
+                        className="bg-amber-50 border border-amber-100 rounded-2xl p-5 flex items-center gap-4 cursor-pointer hover:border-amber-300 hover:shadow-md hover:shadow-amber-100 transition-all"
+                    >
+                        <div className="h-11 w-11 rounded-xl bg-amber-500 text-white flex items-center justify-center shadow-sm">
+                            <FaStar />
+                        </div>
+                        <div>
+                            <p className="text-[9px] font-black text-amber-500 uppercase tracking-widest">Special Events</p>
+                            <p className="text-2xl font-black text-amber-700 tracking-tighter">{monthStats.specialEvents}</p>
+                        </div>
+                    </motion.div>
+                </div>
+            </motion.div>
+
+
+            {loading ? (
+                <div className="flex flex-col items-center justify-center py-32 gap-4">
+                    <div className="h-12 w-12 border-4 border-sky-100 border-t-sky-600 rounded-full animate-spin" />
+                    <p className="text-[10px] font-black text-sky-500 uppercase tracking-widest">Loading attendance...</p>
+                </div>
+            ) : (
+                <>
+                    {/* Personal Attendance Section */}
+                    <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="mb-16">
+                        <div id="personal-attendance-section" className="flex items-center gap-4 mb-8">
+                            <div className="h-1 w-12 bg-sky-600 rounded-full"></div>
+                            <h2 className="text-xl font-black text-gray-800 tracking-tight uppercase tracking-[0.1em]">Your Personal Attendance</h2>
+                        </div>
+                        
+                        <PersonalAttendanceChart 
+                            stats={myStats} 
+                            onStatClick={handleStatClick} 
+                            activeFilter={statusFilter} 
+                            monthStats={monthStats}
+                            onMonthStatsClick={() => navigate('/staff/calendar')}
                         />
-                        <button 
-                            type="submit"
-                            className="bg-sky-600 h-8 w-8 rounded-lg text-white shadow-lg flex items-center justify-center hover:bg-sky-700 transition-all"
-                        >
-                            <Send size={14} />
-                        </button>
-                    </div>
-                </form>
+                    </motion.div>
+
+                    {/* Filter Active Banner */}
+                    <AnimatePresence>
+                        {statusFilter && (
+                            <motion.div
+                                initial={{ opacity: 0, y: -10 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                exit={{ opacity: 0, y: -10 }}
+                                className="mb-6 flex items-center gap-3 px-5 py-3 bg-sky-50 border border-sky-200 rounded-2xl text-sm font-black text-sky-700"
+                            >
+                                <FaFilter className="text-sky-500" />
+                                <span>Showing records for: <span className="text-sky-900 uppercase">{statusFilter}</span></span>
+                                <button
+                                    onClick={() => setStatusFilter(null)}
+                                    className="ml-auto flex items-center gap-1.5 px-3 py-1 bg-white border border-sky-200 rounded-xl text-[10px] font-black text-rose-500 hover:bg-rose-50 transition-all"
+                                >
+                                    <FaTimes size={10} /> Clear Filter
+                                </button>
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
+                </>
+            )}
+
+            {/* Attendance History Section */}
+            <div ref={historyRef}>
+                <AttendanceHistory empId={user?.emp_id} statusFilter={statusFilter} />
             </div>
-            
-            <div className="px-5 pb-4 bg-white flex justify-center">
-                 <div className="flex items-center gap-2 text-[8px] font-black text-gray-300 uppercase tracking-widest border-t border-gray-50 pt-3 w-full justify-center">
-                     <User size={10} /> Powered by ZORVIAN TECHNOLOGIES
-                 </div>
-            </div>
-        </div>
+        </Layout>
     );
 };
 
-export default AiAssistant;
+export default StaffDashboard;
+
