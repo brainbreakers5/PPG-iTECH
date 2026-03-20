@@ -60,7 +60,7 @@ const Sidebar = ({ userRole = 'staff', isOpen, onClose }) => {
       { label: 'Dashboard', path: '/principal', icon: <FaTachometerAlt /> },
       { label: 'Attendance Records', path: '/principal/attendance', icon: <FaCalendarCheck /> },
       { label: 'Departments', path: '/principal/department', icon: <FaBuilding /> },
-      { label: 'Leave Requests', path: '/principal/leaves', icon: <FaClipboardList /> },
+      { label: 'Incoming Requests', path: '/principal/leaves', icon: <FaClipboardList /> },
       { label: 'Salary Overview', path: '/principal/payroll', icon: <FaMoneyBillWave /> },
       { label: 'Conversation', path: '/principal/conversation', icon: <FaComments /> },
       { label: 'Purchase Requests', path: '/principal/purchase', icon: <FaShoppingBag /> },
