@@ -222,9 +222,7 @@ const AiAssistant = ({ isSidebar, onClose, userRole }) => {
         const lowerText = text.trim().toLowerCase();
         const wantsPrint = lowerText.includes('report') || lowerText.includes('print');
         // Clean text for matching: remove report/print words
-        const cleanText = lowerText.replace(/report|print/g, "").trim().replace(/[?.,!]/g, "");
-        
-        if (!cleanText && !wantsPrint) return;
+        let cleanText = lowerText.replace(/report|print|this page|current page|here|the/g, "").trim().replace(/[?.,!]/g, "");
         
         if (!isClick) {
             setMessages(prev => [...prev, { type: 'user', text, time: new Date() }]);
@@ -232,7 +230,23 @@ const AiAssistant = ({ isSidebar, onClose, userRole }) => {
         setInput('');
 
         setTimeout(async () => {
-            // Check direct match or keyword match
+            // 1. Check if user just wants to print the CURRENT page
+            if (wantsPrint && (!cleanText || cleanText.length < 3)) {
+                const printBtn = Array.from(document.querySelectorAll('button')).find(btn => 
+                    (btn.title && btn.title.toLowerCase().includes('print')) || 
+                    (btn.textContent && btn.textContent.toLowerCase().includes('print'))
+                );
+                
+                if (printBtn) {
+                    setMessages(prev => [...prev, { type: 'ai', text: "Printing the current view...", time: new Date() }]);
+                    setTimeout(() => printBtn.click(), 400);
+                } else {
+                    setMessages(prev => [...prev, { type: 'ai', text: "I couldn't find a direct print/report button on this current page.", time: new Date() }]);
+                }
+                return;
+            }
+
+            // 2. Check direct match or keyword match for navigation
             const exactMatch = allowedKIs.find(k => k.q.toLowerCase().replace(/[?.,!]/g, "") === cleanText) || 
                                allowedKIs.find(k => k.q.toLowerCase().includes(cleanText) && cleanText.length > 3);
 
