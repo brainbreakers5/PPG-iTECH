@@ -263,7 +263,16 @@ const AiAssistant = ({ isSidebar, onClose, userRole }) => {
                     if (location.pathname === actionLink) {
                         window.location.hash = (exactMatch.hash || '');
                         window.dispatchEvent(new Event('hashchange'));
-                        if (wantsPrint && exactMatch.p) window.print();
+                        if (wantsPrint && exactMatch.p) {
+                            setTimeout(() => {
+                                const printBtn = Array.from(document.querySelectorAll('button')).find(btn => 
+                                    (btn.title && btn.title.toLowerCase().includes('print')) || 
+                                    (btn.textContent && btn.textContent.toLowerCase().includes('print'))
+                                );
+                                if (printBtn) printBtn.click();
+                                else window.print();
+                            }, 500);
+                        }
                     } else {
                         navigate(`${actionLink}${hashPart}`, { state: { autoPrint: wantsPrint && exactMatch.p } });
                     }
