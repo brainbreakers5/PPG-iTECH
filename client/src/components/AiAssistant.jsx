@@ -13,8 +13,8 @@ const AI_KNOWLEDGE_BASE = {
         { q: "Profile", link: "/staff/profile" },
         { q: "Logout", action: 'logout' },
         { q: "Dashboard", link: "/staff" },
-        { q: "Your Personal Attendance", link: "/staff" },
-        { q: "Recent Attendance History", link: "/staff" },
+        { q: "Your Personal Attendance", link: "/staff", hash: "personal-attendance" },
+        { q: "Recent Attendance History", link: "/staff", hash: "attendance-history" },
         { q: "Leave Management", link: "/staff/leaves", hash: "history" },
         { q: "Leave Apply", link: "/staff/leaves", hash: "apply" },
         { q: "Permission Letter", link: "/staff/leaves", hash: "permission" },
@@ -34,8 +34,8 @@ const AI_KNOWLEDGE_BASE = {
         { q: "Profile", link: "/hod/profile" },
         { q: "Logout", action: 'logout' },
         { q: "Dashboard", link: "/hod" },
-        { q: "Your Personal Attendance", link: "/hod" },
-        { q: "Recent Attendance History", link: "/hod" },
+        { q: "Your Personal Attendance", link: "/hod", hash: "personal-attendance" },
+        { q: "Recent Attendance History", link: "/hod", hash: "attendance-history" },
         { q: "Leave Management", link: "/hod/leaves", hash: "history" },
         { q: "Leave Apply", link: "/hod/leaves", hash: "apply" },
         { q: "Permission Letter", link: "/hod/leaves", hash: "permission" },
@@ -128,18 +128,18 @@ const AiAssistant = ({ isSidebar, onClose }) => {
     const role = user?.role?.toLowerCase() || 'staff';
     const allowedKIs = AI_KNOWLEDGE_BASE[role] || [];
 
-    // Greeting: HIDDEN DEFAULT QUESTIONS per request
     useEffect(() => {
         if (messages.length === 0 && user) {
             setMessages([
                 { 
                     type: 'ai', 
-                    text: `Hello ${user.name}, I am your PPG EMP HUB AI Assistant. How can I help you today?`, 
+                    text: `Hello ${user.name}, I am your PPG EMP HUB AI Assistant. Please select from the available options for your role:`, 
+                    related: allowedKIs,
                     time: new Date() 
                 }
             ]);
         }
-    }, [user, messages.length]);
+    }, [user, messages.length, allowedKIs]);
 
     useEffect(() => {
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -194,55 +194,41 @@ const AiAssistant = ({ isSidebar, onClose }) => {
         setInput('');
 
         setTimeout(async () => {
-            // Find Match In Knowledge Base
             const exactMatch = allowedKIs.find(k => k.q.toLowerCase().replace(/[?.,!]/g, "") === cleanText);
 
-            if (exactMatch) {
-                if (isClick) {
-                    let actionLink = exactMatch.link;
-                    if (exactMatch.q.toLowerCase() === 'profile' && !actionLink.includes(user.emp_id) && role !== 'management') {
-                        actionLink = `/${role}/profile/${user.emp_id}`;
-                    }
-                    
-                    if (exactMatch.action === 'logout') {
-                        setMessages(prev => [...prev, { type: 'ai', text: "Logging out safely...", time: new Date() }]);
-                        setTimeout(() => { logout(); navigate('/login'); }, 1000);
-                        return;
-                    }
-
-                    // DO NOT CLOSE CHAT BOX per desktop respective rule
-                    setMessages(prev => [...prev, { 
-                        type: 'ai', 
-                        text: `Directing you to ${exactMatch.q}...`, 
-                        time: new Date() 
-                    }]);
-                    
-                    setTimeout(() => { 
-                        const hashPart = exactMatch.hash ? `#${exactMatch.hash}` : '';
-                        
-                        // Detect if already on page to force hash update
-                        if (location.pathname === actionLink) {
-                            window.location.hash = (exactMatch.hash || '');
-                            // Force manual tab update if router doesn't pick it up
-                            window.dispatchEvent(new HashChangeEvent('hashchange'));
-                        } else {
-                            navigate(`${actionLink}${hashPart}`);
-                        }
-                    }, 400);
-                } else {
-                    const reply = `I've analyzed your request for "${exactMatch.q}". Would you like to open it?`;
-                    setMessages(prev => [...prev, { 
-                        type: 'ai', 
-                        text: reply, 
-                        related: [exactMatch], 
-                        time: new Date() 
-                    }]);
-                    speak(reply);
+            if (exactMatch && isClick) {
+                let actionLink = exactMatch.link;
+                if (exactMatch.q.toLowerCase() === 'profile' && !actionLink.includes(user.emp_id) && role !== 'management') {
+                    actionLink = `/${role}/profile/${user.emp_id}`;
                 }
+                
+                if (exactMatch.action === 'logout') {
+                    setMessages(prev => [...prev, { type: 'ai', text: "Logging out safely...", time: new Date(), related: allowedKIs }]);
+                    setTimeout(() => { logout(); navigate('/login'); }, 1000);
+                    return;
+                }
+
+                // Rule: Don't hide/close assistant!
+                setMessages(prev => [...prev, { 
+                    type: 'ai', 
+                    text: `Opening "${exactMatch.q}"...`, 
+                    time: new Date(),
+                    related: allowedKIs 
+                }]);
+                
+                setTimeout(() => { 
+                    const hashPart = exactMatch.hash ? `#${exactMatch.hash}` : '';
+                    if (location.pathname === actionLink) {
+                        window.location.hash = (exactMatch.hash || '');
+                        window.dispatchEvent(new Event('hashchange'));
+                    } else {
+                        navigate(`${actionLink}${hashPart}`);
+                    }
+                }, 400);
                 return;
             }
 
-            // FALLBACK TO LISTING OPTIONS IF UNRELATED
+            // RULE: If user asks ANY questions, only send the EXACTLY default questions.
             const reply = "Please select from the available options:";
             setMessages(prev => [...prev, { 
                 type: 'ai', 
@@ -256,6 +242,7 @@ const AiAssistant = ({ isSidebar, onClose }) => {
 
     return (
         <div className="flex flex-col h-full w-full bg-white relative">
+            {/* Header */}
             <div className="bg-gradient-to-br from-slate-900 via-sky-900 to-sky-800 p-6 flex flex-col gap-2 shrink-0">
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
@@ -277,6 +264,7 @@ const AiAssistant = ({ isSidebar, onClose }) => {
                         >
                             {isSpeaking ? <Volume2 size={16} /> : <VolumeX size={16} />}
                         </button>
+                        {/* Always visible, user only clicks to close */}
                         {onClose && (
                             <button 
                                 onClick={onClose}
@@ -289,6 +277,7 @@ const AiAssistant = ({ isSidebar, onClose }) => {
                 </div>
             </div>
 
+            {/* Chat Body */}
             <div 
                 ref={scrollRef}
                 className="flex-1 overflow-y-auto p-5 space-y-4 bg-slate-50/50 scroll-smooth no-scrollbar"
@@ -311,7 +300,7 @@ const AiAssistant = ({ isSidebar, onClose }) => {
                             
                             {m.related && m.related.length > 0 && (
                                 <div className="mt-4 flex flex-col gap-2">
-                                    <div className="grid grid-cols-1 gap-1.5 max-h-[250px] overflow-y-auto pr-1 no-scrollbar">
+                                    <div className="grid grid-cols-1 gap-1.5 max-h-[350px] overflow-y-auto pr-1 no-scrollbar">
                                         {m.related.map((r, idx) => (
                                             <button
                                                 key={idx}
@@ -329,6 +318,7 @@ const AiAssistant = ({ isSidebar, onClose }) => {
                 ))}
             </div>
 
+            {/* Input Area */}
             <div className="p-5 bg-white border-t border-slate-100 shrink-0">
                 <form 
                     onSubmit={(e) => { e.preventDefault(); handleSend(); }}
@@ -350,7 +340,7 @@ const AiAssistant = ({ isSidebar, onClose }) => {
                             type="text"
                             value={input}
                             onChange={(e) => setInput(e.target.value)}
-                            placeholder="Type your request..."
+                            placeholder="Type your request or select below..."
                             className="flex-1 bg-transparent border-none outline-none px-2 text-[10px] font-bold text-slate-700"
                         />
                         <button 
