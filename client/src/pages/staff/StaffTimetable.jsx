@@ -36,13 +36,20 @@ const StaffTimetable = () => {
     }, []);
 
     useEffect(() => {
-        if (empId) {
-            setView('all');
-            setSelectedStaff(empId);
-        } else {
-            setView('my');
-            setSelectedStaff('');
-        }
+        const handleHash = () => {
+            if (window.location.hash === '#all') {
+                setView('all');
+            } else if (empId) {
+                setView('all');
+                setSelectedStaff(empId);
+            } else {
+                setView('my');
+                setSelectedStaff('');
+            }
+        };
+        handleHash();
+        window.addEventListener('hashchange', handleHash);
+        return () => window.removeEventListener('hashchange', handleHash);
     }, [empId]);
 
     useEffect(() => {
