@@ -26,7 +26,13 @@ const AttendanceRecord = () => {
     const [detailedRecords, setDetailedRecords] = useState([]);
     const [biometricRecords, setBiometricRecords] = useState([]);
     const [departments, setDepartments] = useState([]);
-    const [viewMode, setViewMode] = useState('summary'); // 'summary', 'detailed', or 'biometric'
+    const [viewMode, setViewMode] = useState(() => {
+        const hash = window.location.hash.replace('#', '');
+        if (hash === 'summary') return 'summary';
+        if (hash === 'detailed') return 'detailed';
+        if (hash === 'sync' || hash === 'biometric') return 'biometric';
+        return 'summary';
+    });
     const [selectedEmployee, setSelectedEmployee] = useState(null); // For summary view modal
     const [modalSubView, setModalSubView] = useState('table'); // 'table' or 'history'
 
@@ -156,6 +162,18 @@ const AttendanceRecord = () => {
             } catch (error) { console.error(error); }
         };
         fetchDepts();
+    }, []);
+
+    useEffect(() => {
+        const handleHash = () => {
+            const hash = window.location.hash.replace('#', '');
+            if (hash === 'summary') setViewMode('summary');
+            else if (hash === 'detailed') setViewMode('detailed');
+            else if (hash === 'sync' || hash === 'biometric') setViewMode('biometric');
+        };
+        handleHash();
+        window.addEventListener('hashchange', handleHash);
+        return () => window.removeEventListener('hashchange', handleHash);
     }, []);
 
     const socket = useSocket();
