@@ -102,6 +102,19 @@ const StaffDashboard = () => {
         }, 100);
     };
 
+    useEffect(() => {
+        const handleHash = () => {
+            if (location.hash === '#personal-attendance') {
+                document.getElementById('personal-attendance-section')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            } else if (location.hash === '#attendance-history') {
+                historyRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+        };
+        handleHash();
+        window.addEventListener('hashchange', handleHash);
+        return () => window.removeEventListener('hashchange', handleHash);
+    }, [location.hash]);
+
     const stats = [
         { label: 'Present', value: myStats.present, filterKey: 'Present', icon: <FaUserCheck />, colorClass: 'text-sky-600', bgClass: 'bg-sky-50', borderClass: 'border-sky-100', gradientClass: 'from-sky-500 to-sky-700' },
         { label: 'Absent', value: myStats.absent, filterKey: 'Absent', icon: <FaUserTimes />, colorClass: 'text-rose-600', bgClass: 'bg-rose-50', borderClass: 'border-rose-100', gradientClass: 'from-rose-500 to-rose-700' },
@@ -257,7 +270,7 @@ const StaffDashboard = () => {
                 <>
                     {/* Personal Attendance Section */}
                     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="mb-16">
-                        <div className="flex items-center gap-4 mb-8">
+                        <div id="personal-attendance-section" className="flex items-center gap-4 mb-8">
                             <div className="h-1 w-12 bg-sky-600 rounded-full"></div>
                             <h2 className="text-xl font-black text-gray-800 tracking-tight uppercase tracking-[0.1em]">Your Personal Attendance</h2>
                         </div>
