@@ -427,7 +427,7 @@ const Header = ({ toggleSidebar, sidebarOpen }) => {
                     )}
                     <div className="flex items-center gap-3">
                         <div className="h-10 w-10 rounded-xl overflow-hidden shadow-md ring-2 ring-white">
-                            <img src="/ppg-logo.png" alt="PPG Institute of Technology" className="w-full h-full object-cover" />
+                            <img src="/zorvian logo.jpeg" alt="Zorvian AI" className="w-full h-full object-cover" />
                         </div>
                         <div>
                             <h2 className="text-lg font-black text-gray-800 tracking-tight">
@@ -504,10 +504,14 @@ const Header = ({ toggleSidebar, sidebarOpen }) => {
                     {/* AI Assistant Trigger */}
                     <button
                         onClick={() => window.dispatchEvent(new CustomEvent('TOGGLE_AI_ASSISTANT'))}
-                        className="bg-white hover:bg-sky-50 text-sky-600 p-2.5 rounded-xl border border-sky-100 hover:border-sky-300 transition-all shadow-sm flex items-center justify-center group active:scale-95"
-                        title="AI Assistant"
+                        className="bg-white hover:bg-sky-50 p-1.5 rounded-xl border border-sky-100 hover:border-sky-300 transition-all shadow-sm flex items-center justify-center group active:scale-95"
+                        title="Zorvian AI Assistant"
                     >
-                        <Sparkles className="text-lg group-hover:rotate-12 transition-transform h-5 w-5" />
+                        <img 
+                            src="/zorvian logo.jpeg" 
+                            alt="Zorvian AI" 
+                            className="h-8 w-8 object-contain rounded-lg animate-pulse" 
+                        />
                     </button>
 
                     {!isManagement && (
