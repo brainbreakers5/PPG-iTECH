@@ -427,7 +427,7 @@ const Header = ({ toggleSidebar, sidebarOpen }) => {
                     )}
                     <div className="flex items-center gap-3">
                         <div className="h-10 w-10 rounded-xl overflow-hidden shadow-md ring-2 ring-white">
-                            <img src="/zorvian logo.jpeg" alt="Zorvian AI" className="w-full h-full object-cover" />
+                            <img src="/ppg-logo.png" alt="PPG Institute of Technology" className="w-full h-full object-cover" />
                         </div>
                         <div>
                             <h2 className="text-lg font-black text-gray-800 tracking-tight">
