@@ -17,8 +17,8 @@ const AI_KNOWLEDGE_BASE = {
         { q: "Your Personal Attendance", link: "/staff", hash: "personal-attendance" },
         { q: "Recent Attendance History", link: "/staff", hash: "attendance-history" },
         { q: "Leave Management", link: "/staff/leaves", hash: "apply", desc: "This includes Apply Leave, Permission Letter, Comp Leave, Leave Balance, and History tabs." },
-        { q: "Leave Apply", link: "/staff/leaves", hash: "apply" },
-        { q: "Permission Letter", link: "/staff/leaves", hash: "permission" },
+        { q: "Leave Apply", link: "/staff/leaves", hash: "apply", desc: "To apply for a leave: select the date, choose full day or half day, select your replacement staff, pick the leave type, enter the subject and reason, check your available leave limit, and then click apply leave." },
+        { q: "Permission Letter", link: "/staff/leaves", hash: "permission", desc: "To apply for permission: select the date, choose morning or evening, optionally select replacement staff, enter the subject and reason, and click apply permission request." },
         { q: "Comp Leave", link: "/staff/leaves", hash: "compoff" },
         { q: "Leave Balance", link: "/staff/leaves", hash: "balance" },
         { q: "Incoming Approvals", link: "/staff/leaves", hash: "approvals" },
@@ -27,7 +27,8 @@ const AI_KNOWLEDGE_BASE = {
         { q: "My Timetable", link: "/staff/timetables", p: true, desc: "View your weekly class schedule." },
         { q: "Staff Timetable", link: "/staff/timetables", hash: "all", p: true },
         { q: "Conversation", link: "/staff/conversation" },
-        { q: "Purchase Requests", link: "/staff/items", desc: "You can view your item requests and create new ones." },
+        { q: "Purchase Requests", link: "/staff/items", desc: "To submit a purchase request: click new request, enter the purchasing item name and quantity, select the priority, optionally click add to include more items, and then click save to send the purchase request." },
+        { q: "Change PIN", link: "/staff/profile", desc: "To change your PIN: navigate to your profile view, scroll to the bottom of the page, click the change pin button, enter your new pin, confirm it, and click update pin." },
         { q: "Academic Calendar", link: "/staff/calendar" }
     ],
     hod: [
@@ -38,8 +39,8 @@ const AI_KNOWLEDGE_BASE = {
         { q: "Your Personal Attendance", link: "/hod", hash: "personal-attendance" },
         { q: "Recent Attendance History", link: "/hod", hash: "attendance-history" },
         { q: "Leave Management", link: "/hod/leaves", hash: "apply", desc: "Includes Apply Leave, Permission Letter, Comp Leave, Leave Balance, History, and Incoming Approvals from your department." },
-        { q: "Leave Apply", link: "/hod/leaves", hash: "apply" },
-        { q: "Permission Letter", link: "/hod/leaves", hash: "permission" },
+        { q: "Leave Apply", link: "/hod/leaves", hash: "apply", desc: "To apply for a leave: select the date, choose full day or half day, select your replacement staff, pick the leave type, enter the subject and reason, check your available leave limit, and then click apply leave." },
+        { q: "Permission Letter", link: "/hod/leaves", hash: "permission", desc: "To apply for permission: select the date, choose morning or evening, optionally select replacement staff, enter the subject and reason, and click apply permission request." },
         { q: "Comp Leave", link: "/hod/leaves", hash: "compoff" },
         { q: "Leave Balance", link: "/hod/leaves", hash: "balance" },
         { q: "Incoming Approvals", link: "/hod/leaves", hash: "approvals" },
@@ -48,7 +49,8 @@ const AI_KNOWLEDGE_BASE = {
         { q: "My Timetable", link: "/hod/timetable", p: true },
         { q: "Staff Timetable", link: "/hod/timetables", hash: "all", p: true },
         { q: "Conversation", link: "/hod/conversation" },
-        { q: "Purchase Requests", link: "/hod/purchase", p: true, desc: "Includes creating new requests and tracking your department's purchases." },
+        { q: "Purchase Requests", link: "/hod/purchase", p: true, desc: "To submit a purchase request: click new request, enter the purchasing item name and quantity, select the priority, optionally click add to include more items, and then click save to send the purchase request." },
+        { q: "Change PIN", link: "/hod/profile", desc: "To change your PIN: navigate to your profile view, scroll to the bottom of the page, click the change pin button, enter your new pin, confirm it, and click update pin." },
         { q: "Academic Calendar", link: "/hod/calendar" },
         { q: "Attendance Records", link: "/hod/attendance", p: true, desc: "This module contains Summary View, Detailed Logs, and Biometric Sync tabs for your department." },
         { q: "Summary View", link: "/hod/attendance", hash: "summary", p: true },
@@ -71,12 +73,13 @@ const AI_KNOWLEDGE_BASE = {
         { q: "Summary View", link: "/principal/attendance", hash: "summary", p: true },
         { q: "Biometric Sync", link: "/principal/attendance", hash: "sync", p: true },
         { q: "Conversation", link: "/principal/conversation" },
-        { q: "Purchase Requests", link: "/principal/purchase", p: true, desc: "Monitor all institutional purchase requests here." },
+        { q: "Purchase Requests", link: "/principal/purchase", p: true, desc: "To submit a purchase request: click new request, enter the purchasing item name and quantity, select the priority, optionally click add to include more items, and then click save to send the purchase request." },
         { q: "Departments", link: "/principal/department", p: true, desc: "Browse all departments and their respective staff." },
         { q: "Academic Calendar", link: "/principal/calendar", p: true },
         { q: "Incoming Requests", link: "/principal/leaves", desc: "This page includes tabs for Incoming Leave Requests and Incoming Permission Requests." },
         { q: "Permission Requests", link: "/principal/leaves", hash: "permission" },
-        { q: "Details Logs", link: "/principal/attendance", hash: "logs", p: true }
+        { q: "Details Logs", link: "/principal/attendance", hash: "logs", p: true },
+        { q: "Change PIN", link: "/principal/profile", desc: "To change your PIN: navigate to your profile view, scroll to the bottom of the page, click the change pin button, enter your new pin, confirm it, and click update pin." }
     ],
     admin: [
         { q: "Notification", link: "/admin/notifications" },
@@ -95,6 +98,7 @@ const AI_KNOWLEDGE_BASE = {
         { q: "Academic Calendar", link: "/admin/calendar" },
         { q: "Purchase Requests", link: "/admin/purchase", p: true },
         { q: "Profile", link: "/admin/profile" },
+        { q: "Change PIN", link: "/admin/profile", desc: "To change your PIN: navigate to your profile view, scroll to the bottom of the page, click the change pin button, enter your new pin, confirm it, and click update pin." },
         { q: "Principal Attendance Core", link: "/admin", p: true },
         { q: "HODs Attendance Core", link: "/admin", p: true },
         { q: "Staff Attendance Core", link: "/admin", p: true }
@@ -232,8 +236,29 @@ const AiAssistant = ({ isSidebar, onClose, userRole }) => {
 
         setTimeout(async () => {
             // Conversational Queries
-            if ((role === 'staff' || role === 'hod') && (lowerText.includes('how to apply') || lowerText.includes('apply for leave') || lowerText.includes('apply leave'))) {
+            if ((role === 'staff' || role === 'hod') && (lowerText.includes('how to apply leave') || lowerText.includes('apply for leave') || lowerText.includes('apply leave'))) {
                 const instructions = "To apply for a leave: select the date, choose full day or half day, select your replacement staff, pick the leave type, enter the subject and reason, check your available leave limit, and then click apply leave.";
+                setMessages(prev => [...prev, { type: 'ai', text: instructions, time: new Date() }]);
+                speak(instructions);
+                return;
+            }
+
+            if ((role === 'staff' || role === 'hod') && (lowerText.includes('how to apply permission') || lowerText.includes('how to ask permission') || lowerText.includes('ask permission letter'))) {
+                const instructions = "To apply for permission: select the date, choose morning or evening, optionally select replacement staff, enter the subject and reason, and finally click apply permission request.";
+                setMessages(prev => [...prev, { type: 'ai', text: instructions, time: new Date() }]);
+                speak(instructions);
+                return;
+            }
+
+            if (['staff', 'hod', 'principal'].includes(role) && (lowerText.includes('how to purchase') || lowerText.includes('ask purchase') || lowerText.includes('purchase items'))) {
+                const instructions = "To submit a purchase request: click new request, enter the purchasing item name and quantity, select the priority, click add to include more items if needed, and finally click save to send the purchase request.";
+                setMessages(prev => [...prev, { type: 'ai', text: instructions, time: new Date() }]);
+                speak(instructions);
+                return;
+            }
+
+            if (['staff', 'hod', 'principal', 'admin'].includes(role) && (lowerText.includes('how to change pin') || lowerText.includes('how to change my pin') || lowerText.includes('change pin'))) {
+                const instructions = "To change your PIN: navigate to your profile view, scroll to the bottom of the page, click the change pin button, enter your new pin, confirm it, and click update pin.";
                 setMessages(prev => [...prev, { type: 'ai', text: instructions, time: new Date() }]);
                 speak(instructions);
                 return;
@@ -271,7 +296,7 @@ const AiAssistant = ({ isSidebar, onClose, userRole }) => {
 
             if (exactMatch) {
                 let actionLink = exactMatch.link;
-                if (exactMatch.q.toLowerCase() === 'profile' && !actionLink.includes(user.emp_id) && role !== 'management') {
+                if ((exactMatch.q.toLowerCase() === 'profile' || exactMatch.q.toLowerCase() === 'change pin') && !actionLink.includes(user.emp_id) && role !== 'management') {
                     actionLink = `/${role}/profile/${user.emp_id}`;
                 }
                 
