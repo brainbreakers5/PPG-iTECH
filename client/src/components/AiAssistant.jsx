@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
     X, Send, ArrowRight, Sparkles, 
-    Mic, MicOff, Volume2, VolumeX, User, CheckCircle2
+    Mic, MicOff, Volume2, VolumeX, User
 } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
@@ -16,19 +16,7 @@ const AI_KNOWLEDGE_BASE = {
         { q: "Your Personal Attendance", link: "/staff" },
         { q: "Recent Attendance History", link: "/staff" },
         { q: "Leave Management", link: "/staff/leaves", hash: "history" },
-        { 
-            q: "Leave Apply", 
-            a: "To apply for leave, please follow these steps correctly:", 
-            steps: [
-                "1. Go to the 'New Application' tab in Leave Management.",
-                "2. Select your 'Leave Type' (CL, ML, OD, etc.).",
-                "3. Enter the 'Subject' and 'Reason' for your leave.",
-                "4. For each date: Select the Date, choose Configuration (Full/Half Day), add Alternative Staff & Periods, and click 'Confirm & Add This Date'.",
-                "5. Once all dates are added, click 'Submit Application' to finish."
-            ],
-            link: "/staff/leaves", 
-            hash: "apply" 
-        },
+        { q: "Leave Apply", link: "/staff/leaves", hash: "apply" },
         { q: "Permission Letter", link: "/staff/leaves", hash: "permission" },
         { q: "Comp Leave", link: "/staff/leaves", hash: "compoff" },
         { q: "Leave Balance", link: "/staff/leaves", hash: "balance" },
@@ -49,19 +37,7 @@ const AI_KNOWLEDGE_BASE = {
         { q: "Your Personal Attendance", link: "/hod" },
         { q: "Recent Attendance History", link: "/hod" },
         { q: "Leave Management", link: "/hod/leaves", hash: "history" },
-        { 
-            q: "Leave Apply", 
-            a: "To apply for leave, please follow these steps correctly:", 
-            steps: [
-                "1. Go to the 'New Application' tab in Leave Management.",
-                "2. Select your 'Leave Type' (CL, ML, OD, etc.).",
-                "3. Enter the 'Subject' and 'Reason' for your leave.",
-                "4. For each date: Select the Date, choose Configuration (Full/Half Day), add Alternative Staff & Periods, and click 'Confirm & Add This Date'.",
-                "5. Once all dates are added, click 'Submit Application' to finish."
-            ],
-            link: "/hod/leaves", 
-            hash: "apply" 
-        },
+        { q: "Leave Apply", link: "/hod/leaves", hash: "apply" },
         { q: "Permission Letter", link: "/hod/leaves", hash: "permission" },
         { q: "Comp Leave", link: "/hod/leaves", hash: "compoff" },
         { q: "Leave Balance", link: "/hod/leaves", hash: "balance" },
@@ -76,12 +52,9 @@ const AI_KNOWLEDGE_BASE = {
         { q: "Attendance Records", link: "/hod/attendance" },
         { q: "Summary View", link: "/hod/attendance", hash: "summary" },
         { q: "Details Logs", link: "/hod/biometric-history" },
-        { q: "Biometric Sync", link: "/hod/attendance" },
-        { q: "Conversation", link: "/hod/conversation" },
-        { q: "Purchase Requests", link: "/hod/purchase" },
+        { q: "Biometric Sync", link: "/hod/attendance", hash: "sync" },
         { q: "HODs Attendance Core", link: "/hod/attendance" },
         { q: "Staff Attendance Core", link: "/hod/attendance" },
-        { q: "Academic Calendar", link: "/hod/calendar" },
         { q: "Department Staff", link: "/hod/department" }
     ],
     principal: [
@@ -95,7 +68,7 @@ const AI_KNOWLEDGE_BASE = {
         { q: "Staff Attendance Core", link: "/principal/attendance" },
         { q: "Attendance Records", link: "/principal/attendance" },
         { q: "Summary View", link: "/principal/attendance", hash: "summary" },
-        { q: "Biometric Sync", link: "/principal/attendance" },
+        { q: "Biometric Sync", link: "/principal/attendance", hash: "sync" },
         { q: "Conversation", link: "/principal/conversation" },
         { q: "Purchase Requests", link: "/principal/purchase" },
         { q: "Departments", link: "/principal/department" },
@@ -114,7 +87,7 @@ const AI_KNOWLEDGE_BASE = {
         { q: "Attendance Records", link: "/admin/attendance" },
         { q: "Summary View", link: "/admin/attendance", hash: "summary" },
         { q: "Details Logs", link: "/admin/biometric-history" },
-        { q: "Biometric Sync", link: "/admin/attendance" },
+        { q: "Biometric Sync", link: "/admin/attendance", hash: "sync" },
         { q: "Leave Balance", link: "/admin/leave-limits" },
         { q: "Timetable Setup", link: "/admin/timetable-setup" },
         { q: "Security Log", link: "/admin/activity-logs" },
@@ -137,7 +110,7 @@ const AI_KNOWLEDGE_BASE = {
         { q: "Summary View", link: "/management/attendance", hash: "summary" },
         { q: "Details Logs", link: "/management/attendance" },
         { q: "Departments", link: "/management/departments" },
-        { q: "Biometric Sync", link: "/management/attendance" }
+        { q: "Biometric Sync", link: "/management/attendance", hash: "sync" }
     ]
 };
 
@@ -155,19 +128,18 @@ const AiAssistant = ({ isSidebar, onClose }) => {
     const role = user?.role?.toLowerCase() || 'staff';
     const allowedKIs = AI_KNOWLEDGE_BASE[role] || [];
 
-    // Rule 1: Initial greeting shows only role-specific options
+    // Greeting: HIDDEN DEFAULT QUESTIONS per request
     useEffect(() => {
         if (messages.length === 0 && user) {
             setMessages([
                 { 
                     type: 'ai', 
-                    text: `Hello ${user.name}, I am your PPG EMP HUB AI Assistant. Please select from the available options for your role:`, 
-                    related: allowedKIs,
+                    text: `Hello ${user.name}, I am your PPG EMP HUB AI Assistant. How can I help you today?`, 
                     time: new Date() 
                 }
             ]);
         }
-    }, [user, messages.length, allowedKIs]);
+    }, [user, messages.length]);
 
     useEffect(() => {
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -222,11 +194,11 @@ const AiAssistant = ({ isSidebar, onClose }) => {
         setInput('');
 
         setTimeout(async () => {
-            // Rule 2 & 3 & 4: Strictly follow provided questions
+            // Find Match In Knowledge Base
             const exactMatch = allowedKIs.find(k => k.q.toLowerCase().replace(/[?.,!]/g, "") === cleanText);
 
             if (exactMatch) {
-                if (isClick && !exactMatch.steps) {
+                if (isClick) {
                     let actionLink = exactMatch.link;
                     if (exactMatch.q.toLowerCase() === 'profile' && !actionLink.includes(user.emp_id) && role !== 'management') {
                         actionLink = `/${role}/profile/${user.emp_id}`;
@@ -238,47 +210,47 @@ const AiAssistant = ({ isSidebar, onClose }) => {
                         return;
                     }
 
-                    // Rule 4: Respond with exact list of options
+                    // DO NOT CLOSE CHAT BOX per desktop respective rule
                     setMessages(prev => [...prev, { 
                         type: 'ai', 
                         text: `Directing you to ${exactMatch.q}...`, 
-                        time: new Date(),
-                        related: allowedKIs 
+                        time: new Date() 
                     }]);
                     
                     setTimeout(() => { 
                         const hashPart = exactMatch.hash ? `#${exactMatch.hash}` : '';
-                        const fullTarget = `${actionLink}${hashPart}`;
                         
+                        // Detect if already on page to force hash update
                         if (location.pathname === actionLink) {
                             window.location.hash = (exactMatch.hash || '');
+                            // Force manual tab update if router doesn't pick it up
+                            window.dispatchEvent(new HashChangeEvent('hashchange'));
                         } else {
-                            navigate(fullTarget);
+                            navigate(`${actionLink}${hashPart}`);
                         }
-                    }, 500);
+                    }, 400);
                 } else {
-                    // Rule 5: Respond within that feature
-                    const reply = exactMatch.a || `Opening "${exactMatch.q}" guide for you:`;
+                    const reply = `I've analyzed your request for "${exactMatch.q}". Would you like to open it?`;
                     setMessages(prev => [...prev, { 
                         type: 'ai', 
                         text: reply, 
-                        steps: exactMatch.steps,
-                        related: allowedKIs, // Maintain the list as per Rule 4
+                        related: [exactMatch], 
                         time: new Date() 
                     }]);
                     speak(reply);
                 }
-            } else {
-                // Rule 6: Unrelated message fallback
-                const reply = "Please select from the available options.";
-                setMessages(prev => [...prev, { 
-                    type: 'ai', 
-                    text: reply, 
-                    related: allowedKIs, 
-                    time: new Date() 
-                }]);
-                speak(reply);
+                return;
             }
+
+            // FALLBACK TO LISTING OPTIONS IF UNRELATED
+            const reply = "Please select from the available options:";
+            setMessages(prev => [...prev, { 
+                type: 'ai', 
+                text: reply, 
+                related: allowedKIs, 
+                time: new Date() 
+            }]);
+            speak(reply);
         }, 600);
     };
 
@@ -335,25 +307,11 @@ const AiAssistant = ({ isSidebar, onClose }) => {
                         }`}>
                             <div className="space-y-3">
                                 <p>{m.text}</p>
-                                
-                                {m.steps && (
-                                    <div className="mt-3 space-y-2.5 p-3.5 bg-sky-50/50 rounded-2xl border border-sky-100 ring-1 ring-white/50">
-                                        {m.steps.map((step, sIdx) => (
-                                            <div key={sIdx} className="flex items-start gap-3">
-                                                <div className="mt-0.5">
-                                                    <CheckCircle2 size={12} className="text-sky-600 shrink-0" />
-                                                </div>
-                                                <p className="text-[10px] text-sky-900 font-bold leading-tight">{step}</p>
-                                            </div>
-                                        ))}
-                                    </div>
-                                )}
                             </div>
                             
                             {m.related && m.related.length > 0 && (
                                 <div className="mt-4 flex flex-col gap-2">
-                                    <p className="text-[8px] uppercase tracking-widest text-slate-400 mb-1 ml-1 font-black">Please select an option:</p>
-                                    <div className="grid grid-cols-1 gap-1.5 max-h-[300px] overflow-y-auto pr-1 no-scrollbar">
+                                    <div className="grid grid-cols-1 gap-1.5 max-h-[250px] overflow-y-auto pr-1 no-scrollbar">
                                         {m.related.map((r, idx) => (
                                             <button
                                                 key={idx}
@@ -381,7 +339,7 @@ const AiAssistant = ({ isSidebar, onClose }) => {
                         onClick={toggleListening}
                         className={`h-9 w-9 rounded-xl transition-all shadow-sm flex items-center justify-center border ${
                             isListening 
-                                ? 'bg-rose-500 text-white animate-pulse' 
+                                ? 'bg-rose-500 text-white animate-pulse border-rose-400' 
                                 : 'bg-slate-50 text-slate-500 border-slate-100'
                         }`}
                     >
@@ -392,7 +350,7 @@ const AiAssistant = ({ isSidebar, onClose }) => {
                             type="text"
                             value={input}
                             onChange={(e) => setInput(e.target.value)}
-                            placeholder="Select an option above..."
+                            placeholder="Type your request..."
                             className="flex-1 bg-transparent border-none outline-none px-2 text-[10px] font-bold text-slate-700"
                         />
                         <button 
