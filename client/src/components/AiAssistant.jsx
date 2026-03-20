@@ -74,7 +74,7 @@ const AI_KNOWLEDGE_BASE = {
         { q: "Purchase Requests", link: "/principal/purchase", p: true, desc: "Monitor all institutional purchase requests here." },
         { q: "Departments", link: "/principal/department", p: true, desc: "Browse all departments and their respective staff." },
         { q: "Academic Calendar", link: "/principal/calendar", p: true },
-        { q: "Leave Requests", link: "/principal/leaves", desc: "This page includes tabs for Incoming Leave Requests and Incoming Permission Requests." },
+        { q: "Incoming Requests", link: "/principal/leaves", desc: "This page includes tabs for Incoming Leave Requests and Incoming Permission Requests." },
         { q: "Permission Requests", link: "/principal/leaves", hash: "permission" },
         { q: "Details Logs", link: "/principal/attendance", hash: "logs", p: true }
     ],
