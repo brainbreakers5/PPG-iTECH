@@ -231,6 +231,19 @@ const HODDashboard = () => {
         }
     };
 
+    useEffect(() => {
+        const handleHash = () => {
+            if (window.location.hash === '#personal-attendance') {
+                document.getElementById('personal-attendance-section')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            } else if (window.location.hash === '#attendance-history') {
+                historyRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+        };
+        handleHash();
+        window.addEventListener('hashchange', handleHash);
+        return () => window.removeEventListener('hashchange', handleHash);
+    }, []);
+
     const menuItems = [];
 
     const colorStyles = {
@@ -371,7 +384,7 @@ const HODDashboard = () => {
 
             {/* Personal Attendance Section - Top of the page */}
             <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="mb-16">
-                <div className="flex items-center gap-4 mb-8">
+                <div id="personal-attendance-section" className="flex items-center gap-4 mb-8">
                     <div className="h-1 w-12 bg-sky-600 rounded-full"></div>
                     <h2 className="text-xl font-black text-gray-800 tracking-tight uppercase tracking-[0.1em]">Your Personal Attendance</h2>
                 </div>
