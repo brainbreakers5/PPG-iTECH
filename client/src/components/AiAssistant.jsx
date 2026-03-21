@@ -141,9 +141,9 @@ const AiAssistant = ({ isSidebar, onClose, userRole, isAiMinimized }) => {
     const role = (userRole || user?.role || 'staff').toLowerCase();
     const allowedKIs = AI_KNOWLEDGE_BASE[role] || [];
 
-    // Splash timer - Updated to 2 seconds
+    // Splash timer - 1 second
     useEffect(() => {
-        const timer = setTimeout(() => setShowSplash(false), 2000);
+        const timer = setTimeout(() => setShowSplash(false), 1000);
         return () => clearTimeout(timer);
     }, []);
 
@@ -398,6 +398,8 @@ const AiAssistant = ({ isSidebar, onClose, userRole, isAiMinimized }) => {
                         }
                     } else {
                         navigate(`${actionLink}${hashPart}`, { state: { autoPrint: wantsPrint && exactMatch.p } });
+                    // On mobile: close the chatbox after navigating
+                    if (window.innerWidth < 768 && onClose) onClose();
                     }
                 }, 400);
                 return;
@@ -491,12 +493,18 @@ const AiAssistant = ({ isSidebar, onClose, userRole, isAiMinimized }) => {
                                     <div className="grid grid-cols-1 gap-1.5 max-h-[350px] overflow-y-auto pr-1 no-scrollbar">
                                         {m.related.map((r, idx) => (
                                             <button
-                                                key={idx}
-                                                onClick={() => handleSend(r.q, true)}
-                                                className="flex items-center justify-between gap-3 text-sky-700 bg-sky-50/80 hover:bg-white px-3 py-3 rounded-2xl text-[10px] w-full font-black border border-sky-100 transition-all group shadow-sm active:scale-[0.98]"
-                                            >
-                                                {r.q} <ArrowRight size={12} className="group-hover:translate-x-1 transition-transform" />
-                                            </button>
+                                key={idx}
+                                onClick={() => {
+                                    handleSend(r.q, true);
+                                    // On mobile: close the chatbox after clicking a nav link
+                                    if (r.link && window.innerWidth < 768 && onClose) {
+                                        setTimeout(() => onClose(), 600);
+                                    }
+                                }}
+                                className="flex items-center justify-between gap-3 text-sky-700 bg-sky-50/80 hover:bg-white px-3 py-3 rounded-2xl text-[10px] w-full font-black border border-sky-100 transition-all group shadow-sm active:scale-[0.98]"
+                            >
+                                {r.q} <ArrowRight size={12} className="group-hover:translate-x-1 transition-transform" />
+                            </button>
                                         ))}
                                     </div>
                                 </div>
