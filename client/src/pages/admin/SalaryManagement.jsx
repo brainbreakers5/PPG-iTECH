@@ -81,9 +81,16 @@ const SalaryManagement = () => {
         
         // Auto-calculate on period change, config change, or attendance updates
         const silentCalculate = async () => {
-            if (user.role !== 'admin') return; 
+            if (user.role !== 'admin' && user.role !== 'management') return; 
             try {
-                await api.post('/salary/calculate', { month, year, paidStatuses });
+                // Send explicit range to handle cases like single day or custom windows
+                await api.post('/salary/calculate', { 
+                    month, 
+                    year, 
+                    paidStatuses,
+                    fromDate,
+                    toDate
+                });
                 fetchSalaries();
             } catch (error) {
                 fetchSalaries();
@@ -133,7 +140,7 @@ const SalaryManagement = () => {
             const d = new Date(fromDate);
             const m = d.getMonth() + 1;
             const y = d.getFullYear();
-            const { data } = await api.get(`/salary?month=${m}&year=${y}`);
+            const { data } = await api.get(`/salary?month=${m}&year=${y}&fromDate=${fromDate}&toDate=${toDate}`);
             
             const isAdmin = user.role === 'admin' || user.role === 'management';
             if (!isAdmin) {
@@ -793,7 +800,8 @@ const SalaryManagement = () => {
                                     <tr className="bg-gray-50/50 border-b border-gray-100">
                                         <th className="p-8 text-[10px] font-black uppercase tracking-[0.2em] text-gray-400 text-left">Employee</th>
                                         <th className="p-8 text-[10px] font-black uppercase tracking-[0.2em] text-gray-400 text-center">Attendance</th>
-                                        <th className="p-8 text-[10px] font-black uppercase tracking-[0.2em] text-gray-400 text-right">Computed Pay</th>
+                                        <th className="p-8 text-[10px] font-black uppercase tracking-[0.2em] text-gray-400 text-right">Gross Pay</th>
+                                        <th className="p-8 text-[10px] font-black uppercase tracking-[0.2em] text-gray-400 text-right">Net Salary</th>
                                         <th className="p-8 text-[10px] font-black uppercase tracking-[0.2em] text-gray-400 text-center">Status</th>
                                         <th className="p-8 text-[10px] font-black uppercase tracking-[0.2em] text-gray-400 text-right">Actions</th>
                                     </tr>
@@ -844,8 +852,12 @@ const SalaryManagement = () => {
                                                     </td>
                                                     <td className="p-8 text-right font-black text-gray-800">
                                                         <div className="flex flex-col items-end">
-                                                            <span className="text-[9px] text-gray-300 line-through font-bold tracking-widest mb-1">₹{Number(s.monthly_salary || 0).toLocaleString()}</span>
-                                                            <span className="text-lg text-sky-600 tracking-tighter font-black">₹{Number(s.calculated_salary || 0).toLocaleString()}</span>
+                                                            <span className="text-[10px] text-gray-400 font-bold tracking-widest mb-1">₹{Number(s.monthly_salary || 0).toLocaleString()}</span>
+                                                        </div>
+                                                    </td>
+                                                    <td className="p-8 text-right font-black">
+                                                        <div className="flex flex-col items-end">
+                                                            <span className="text-lg text-emerald-600 tracking-tighter font-black">₹{Number(s.calculated_salary || 0).toLocaleString()}</span>
                                                         </div>
                                                     </td>
                                                     <td className="p-8 text-center">
