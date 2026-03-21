@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { FaArrowLeft, FaSave, FaUser, FaUniversity, FaMapMarkerAlt, FaUsers, FaLock, FaCertificate, FaPlus, FaTrash } from 'react-icons/fa';
+import { FaArrowLeft, FaSave, FaUser, FaUniversity, FaMapMarkerAlt, FaUsers, FaLock, FaCertificate, FaPlus, FaTrash, FaMinusCircle } from 'react-icons/fa';
 import Layout from '../../components/Layout';
 import api from '../../utils/api';
 import Swal from 'sweetalert2';
@@ -42,6 +42,7 @@ const EmployeeFormPage = () => {
     const [formData, setFormData] = useState(defaultData);
     const [certificates, setCertificates] = useState([]);
     const [existingCerts, setExistingCerts] = useState([]);
+    const [deductions, setDeductions] = useState([]); // [{ type, amount }]
 
     useEffect(() => {
         fetchDepartments();
@@ -71,6 +72,10 @@ const EmployeeFormPage = () => {
         try {
             const { data } = await api.get(`/employees/${id}`);
             setFormData({ ...data, confirm_pin: data.pin });
+            // Load existing deductions if stored
+            if (data.deductions) {
+                try { setDeductions(JSON.parse(data.deductions)); } catch(_) {}
+            }
             setLoading(false);
         } catch (error) {
             console.error(error);
@@ -146,6 +151,17 @@ const EmployeeFormPage = () => {
     };
 
 
+    // ─── Deduction Handlers ─────────────────────────────────────────────
+    const DEDUCTION_PRESETS = ['PF (Provident Fund)', 'ESI', 'Income Tax (TDS)', 'Professional Tax', 'Loan Recovery', 'Other'];
+
+    const addDeduction = () => {
+        setDeductions(prev => [...prev, { type: '', amount: '' }]);
+    };
+    const removeDeduction = (i) => setDeductions(prev => prev.filter((_, idx) => idx !== i));
+    const updateDeduction = (i, field, val) => {
+        setDeductions(prev => prev.map((d, idx) => idx === i ? { ...d, [field]: val } : d));
+    };
+
     const handleSubmit = async (e) => {
         if (e) e.preventDefault();
 
@@ -160,9 +176,13 @@ const EmployeeFormPage = () => {
 
         try {
             let userId = formData.id;
+            const payload = {
+                ...formData,
+                deductions: JSON.stringify(deductions.filter(d => d.type && Number(d.amount) > 0))
+            };
 
             if (id) {
-                await api.put(`/employees/${formData.id}`, formData);
+                await api.put(`/employees/${formData.id}`, payload);
 
                 // Automatically notify the employee about the update
                 try {
@@ -187,7 +207,7 @@ const EmployeeFormPage = () => {
                     showConfirmButton: false
                 });
             } else {
-                await api.post('/employees', formData);
+                await api.post('/employees', payload);
                 // Fetch newly created employee to get userId for certificate uploads
                 try {
                     const { data: newEmp } = await api.get(`/employees/${formData.emp_id}`);
@@ -201,6 +221,7 @@ const EmployeeFormPage = () => {
                     showConfirmButton: false
                 });
             }
+
 
             // Upload new certificates
             if (userId && certificates.length > 0) {
@@ -435,6 +456,79 @@ const EmployeeFormPage = () => {
                                     <input name="experience" value={formData.experience || ''} onChange={handleChange} className={inputClass} />
                                 </div>
                             </div>
+                        </FormSection>
+
+                        {/* ─── Deductions Section ─── */}
+                        <FormSection title="Salary Deductions" icon={<FaMinusCircle />}>
+                            <div className="mb-4 bg-amber-50 border border-amber-100 rounded-2xl p-4">
+                                <p className="text-xs text-amber-700 font-bold leading-relaxed">
+                                    ⚠️ Deductions entered here are fixed monthly deductions (e.g. PF, ESI, Loan). They will be automatically subtracted from the employee's net salary during payroll calculation.
+                                </p>
+                            </div>
+
+                            <div className="space-y-4">
+                                {deductions.map((d, i) => (
+                                    <div key={i} className="flex items-center gap-4 bg-gray-50 p-4 rounded-2xl border border-gray-100 relative">
+                                        {/* Type */}
+                                        <div className="flex-1">
+                                            <label className={labelClass}>Deduction Type</label>
+                                            <select
+                                                value={DEDUCTION_PRESETS.includes(d.type) ? d.type : 'Other'}
+                                                onChange={(e) => updateDeduction(i, 'type', e.target.value === 'Other' ? '' : e.target.value)}
+                                                className={inputClass}
+                                            >
+                                                <option value="">Select type...</option>
+                                                {DEDUCTION_PRESETS.map(p => <option key={p} value={p}>{p}</option>)}
+                                            </select>
+                                            {(!DEDUCTION_PRESETS.includes(d.type) || d.type === '') && (
+                                                <input
+                                                    className={inputClass + " mt-2"}
+                                                    placeholder="Or type custom deduction name..."
+                                                    value={d.type}
+                                                    onChange={(e) => updateDeduction(i, 'type', e.target.value)}
+                                                />
+                                            )}
+                                        </div>
+                                        {/* Amount */}
+                                        <div className="w-40">
+                                            <label className={labelClass}>Amount (₹/month)</label>
+                                            <input
+                                                type="number"
+                                                min="0"
+                                                value={d.amount}
+                                                onChange={(e) => updateDeduction(i, 'amount', e.target.value)}
+                                                className={inputClass}
+                                                placeholder="e.g. 1800"
+                                            />
+                                        </div>
+                                        {/* Remove */}
+                                        <button
+                                            type="button"
+                                            onClick={() => removeDeduction(i)}
+                                            className="mt-5 h-10 w-10 rounded-xl bg-rose-50 text-rose-500 flex items-center justify-center hover:bg-rose-100 transition-colors shrink-0"
+                                        >
+                                            <FaTrash size={12} />
+                                        </button>
+                                    </div>
+                                ))}
+                            </div>
+
+                            <button
+                                type="button"
+                                onClick={addDeduction}
+                                className="mt-6 px-6 py-3 bg-rose-50 text-rose-600 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-rose-100 transition-colors flex items-center gap-2"
+                            >
+                                <FaPlus size={10} /> Add Deduction
+                            </button>
+
+                            {deductions.length > 0 && (
+                                <div className="mt-6 bg-sky-50 border border-sky-100 rounded-2xl p-4 flex items-center justify-between">
+                                    <span className="text-[10px] font-black text-sky-600 uppercase tracking-widest">Total Monthly Deductions</span>
+                                    <span className="text-lg font-black text-sky-700">
+                                        ₹{deductions.reduce((acc, d) => acc + (Number(d.amount) || 0), 0).toLocaleString()}
+                                    </span>
+                                </div>
+                            )}
                         </FormSection>
 
                         <FormSection title="Family Relations" icon={<FaUsers />}>
