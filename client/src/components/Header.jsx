@@ -502,15 +502,17 @@ const Header = ({ toggleSidebar, sidebarOpen }) => {
                         )}
                     </div>
 
-                    {/* AI Assistant Trigger - Updated: Image only */}
+                    {/* AI Assistant Trigger - Updated: Blinking Image */}
                     <button
                         onClick={() => window.dispatchEvent(new CustomEvent('TOGGLE_AI_ASSISTANT'))}
                         className="h-10 w-10 lg:h-12 lg:w-12 active:scale-95 transition-transform overflow-hidden no-print rounded-full"
                         title="Zorvian AI Assistant"
                     >
-                        <img 
+                        <motion.img 
                             src="/Zorvian ai logo.jpeg" 
                             alt="Zorvian AI" 
+                            animate={{ opacity: [1, 0.4, 1] }}
+                            transition={{ duration: 2.5, repeat: Infinity, ease: "easeInOut" }}
                             className="w-full h-full object-cover hover:scale-110 transition-transform duration-500" 
                         />
                     </button>
