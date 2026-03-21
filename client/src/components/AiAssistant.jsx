@@ -134,37 +134,49 @@ const AiAssistant = ({ isSidebar, onClose, userRole, isAiMinimized }) => {
     const inputRef = useRef(null);
     const recognitionRef = useRef(null);
 
+    const [showSplash, setShowSplash] = useState(true);
+    const [typedText, setTypedText] = useState('');
+    const [isTyping, setIsTyping] = useState(false);
+
     const role = (userRole || user?.role || 'staff').toLowerCase();
     const allowedKIs = AI_KNOWLEDGE_BASE[role] || [];
 
-    // Greeting: Role-specific initial message
+    // Splash timer
     useEffect(() => {
-        if (messages.length === 0 && user) {
-            let initialText = `Hello ${user.name}, I am your AI Assistant. Type a keyword (like 'attendance', 'leave', 'timetable') to see available options.`;
-            let related = [];
+        const timer = setTimeout(() => setShowSplash(false), 3000);
+        return () => clearTimeout(timer);
+    }, []);
 
-            if (role === 'management') {
-                initialText = `Hello ${user.name}, I am your Management AI Assistant. How can I help you manage the portal today?`;
-                // For management, show "required" default questions ONLY
-                related = allowedKIs.filter(k => 
-                    ["Dashboard", "Attendance Records", "Departments", "Academic Calendar", "Profile"].includes(k.q)
-                );
-            } else if (role === 'principal') {
-                initialText = `Hello ${user.name}, I am your Principal AI Assistant. You can manage 'leaves', 'permissions', and 'attendance' here.`;
-            }
-
+    // Greeting and Typing Effect
+    useEffect(() => {
+        if (!showSplash && messages.length === 0 && user) {
+            const greeting = `Hello ${user.name}, I am your AI Assistant. Type ( 'all' ) to see available options.`;
+            
             const initialMessage = [
                 { 
                     type: 'ai', 
-                    text: initialText, 
-                    related: related, // Only management gets default buttons for now as per "default questions only set by management"
-                    time: new Date() 
+                    text: greeting, 
+                    related: [], 
+                    time: new Date(),
+                    isNew: true 
                 }
             ];
             setMessages(initialMessage);
             localStorage.setItem('ai_chat_history', JSON.stringify(initialMessage));
+            
+            // Start typing effect for the greeting
+            setIsTyping(true);
+            let i = 0;
+            const typeInterval = setInterval(() => {
+                setTypedText(greeting.slice(0, i + 1));
+                i++;
+                if (i >= greeting.length) {
+                    clearInterval(typeInterval);
+                    setIsTyping(false);
+                }
+            }, 30);
         }
-    }, [user, messages.length, role, allowedKIs]);
+    }, [user, messages.length, role, showSplash]);
 
     // Fresh start only on User Switch or explicit AI logout event
     useEffect(() => {
@@ -471,7 +483,7 @@ const AiAssistant = ({ isSidebar, onClose, userRole, isAiMinimized }) => {
                                 : 'bg-gradient-to-br from-sky-800 to-sky-700 text-white rounded-tr-none'
                         }`}>
                             <div className="space-y-3">
-                                <p>{m.text}</p>
+                                <p>{m.isNew && isTyping ? typedText : m.text}</p>
                             </div>
                             
                             {m.related && m.related.length > 0 && (
@@ -535,6 +547,47 @@ const AiAssistant = ({ isSidebar, onClose, userRole, isAiMinimized }) => {
                      <User size={10} /> Powered by ZORVIAN TECHNOLOGIES
                  </div>
             </div>
+
+            {/* Splash Screen Overlay */}
+            <AnimatePresence>
+                {showSplash && (
+                    <motion.div
+                        initial={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="absolute inset-0 z-[100] bg-slate-900 flex flex-col items-center justify-center p-8 text-center"
+                    >
+                        <motion.div
+                            initial={{ scale: 0.8, opacity: 0 }}
+                            animate={{ scale: 1, opacity: 1 }}
+                            transition={{ duration: 1, ease: "easeOut" }}
+                            className="w-32 h-32 mb-8 rounded-3xl overflow-hidden shadow-2xl shadow-sky-500/20"
+                        >
+                            <img src="/Zorvian ai logo.jpeg" alt="Zorvian AI" className="w-full h-full object-cover" />
+                        </motion.div>
+                        <motion.div
+                            initial={{ y: 20, opacity: 0 }}
+                            animate={{ y: 0, opacity: 1 }}
+                            transition={{ delay: 0.5, duration: 0.8 }}
+                        >
+                            <h2 className="text-white font-black text-xl tracking-tighter mb-2">Zorvian AI</h2>
+                            <p className="text-sky-400 text-[9px] font-black uppercase tracking-[0.3em]">Powered by ZORVIAN TECHNOLOGIES</p>
+                        </motion.div>
+                        <motion.div 
+                            className="mt-12 w-48 h-1 bg-white/10 rounded-full overflow-hidden"
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            transition={{ delay: 1 }}
+                        >
+                            <motion.div 
+                                className="h-full bg-sky-500"
+                                initial={{ width: 0 }}
+                                animate={{ width: "100%" }}
+                                transition={{ duration: 2.5, ease: "easeInOut" }}
+                            />
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
         </div>
     );
 };
