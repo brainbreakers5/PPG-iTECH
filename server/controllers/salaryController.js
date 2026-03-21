@@ -40,7 +40,7 @@ exports.calculateSalary = async (req, res) => {
 
         // 1. Fetch all eligible employees
         let usersQuery = `
-            SELECT id, emp_id, name, monthly_salary, role
+            SELECT id, emp_id, name, monthly_salary, role, deductions
             FROM users
             WHERE LOWER(role) IN ('principal', 'hod', 'staff', 'management')
         `;
@@ -109,9 +109,26 @@ exports.calculateSalary = async (req, res) => {
             const payableDays = stats.payable_days;
             const baseSalary = parseFloat(user.monthly_salary) || 0;
 
+            // Compute total deductions
+            let totalDeductions = 0;
+            if (user.deductions) {
+                try {
+                    const parsedDeductions = JSON.parse(user.deductions);
+                    if (Array.isArray(parsedDeductions)) {
+                        totalDeductions = parsedDeductions.reduce((sum, d) => sum + (parseFloat(d.amount) || 0), 0);
+                    }
+                } catch (e) {
+                    console.error('Failed to parse deductions for', userEmpId);
+                }
+            }
+
             // Prorated: daily rate × payable days within the range
             const dailyRate = totalDaysInRange > 0 ? baseSalary / totalDaysInRange : 0;
-            const calculatedAmount = (dailyRate * payableDays).toFixed(2);
+            let calculatedAmount = dailyRate * payableDays;
+            
+            // Subtract deductions (floor at 0)
+            calculatedAmount = Math.max(0, calculatedAmount - totalDeductions).toFixed(2);
+            
             const totalLop = Math.max(0, totalDaysInRange - payableDays);
 
             await pool.query(`
