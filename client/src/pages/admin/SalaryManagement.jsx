@@ -14,12 +14,22 @@ const SalaryManagement = () => {
     
     const getDefaultDates = () => {
         const d = new Date();
-        const from = new Date(d.getFullYear(), d.getMonth(), 25);
-        const to = new Date(d.getFullYear(), d.getMonth() + 1, 25);
-        return {
-            from: from.toISOString().split('T')[0],
-            to: to.toISOString().split('T')[0]
-        };
+        const year = d.getFullYear();
+        const month = d.getMonth(); // 0-indexed (e.g., March is 2)
+        
+        // First Date: Current Month 25th
+        const fromDateStr = `${year}-${String(month + 1).padStart(2, '0')}-25`;
+        
+        // Second Date: Next Month 25th
+        let nextMonth = month + 1;
+        let nextYear = year;
+        if (nextMonth > 11) {
+            nextMonth = 0;
+            nextYear++;
+        }
+        const toDateStr = `${nextYear}-${String(nextMonth + 1).padStart(2, '0')}-25`;
+        
+        return { from: fromDateStr, to: toDateStr };
     };
 
     const { from: defaultFrom, to: defaultTo } = getDefaultDates();
