@@ -19,9 +19,21 @@ const SalaryManagement = () => {
     const [isCalculating, setIsCalculating] = useState(false);
     const [activeRole, setActiveRole] = useState('all');
     const [paidStatuses, setPaidStatuses] = useState(['Present', 'CL', 'ML', 'Comp Leave', 'OD', 'Holiday']);
+    const [unpaidStatuses, setUnpaidStatuses] = useState(['Absent', 'LOP']);
+    const [newStatus, setNewStatus] = useState('');
+    const [isAddingPaid, setIsAddingPaid] = useState(true);
     const socket = useSocket();
 
-    const attendanceOptions = ['Present', 'OD', 'CL', 'ML', 'Comp Leave', 'Holiday', 'Absent', 'LOP'];
+    const handleAddStatus = (isPaid) => {
+        if (!newStatus.trim()) return;
+        const status = newStatus.trim();
+        if (isPaid) {
+            if (!paidStatuses.includes(status)) setPaidStatuses([...paidStatuses, status]);
+        } else {
+            if (!unpaidStatuses.includes(status)) setUnpaidStatuses([...unpaidStatuses, status]);
+        }
+        setNewStatus('');
+    };
 
     useEffect(() => {
         fetchSalaries();
@@ -460,6 +472,32 @@ const SalaryManagement = () => {
                     </div>
                 </div>
 
+                {/* Period Selection (Moved to Top) */}
+                <div className="bg-white p-8 rounded-[32px] shadow-xl shadow-sky-50/50 border border-sky-50 mb-10 no-print">
+                    <div className="flex flex-col lg:flex-row gap-8 items-start lg:items-center">
+                        <div className="flex flex-wrap items-center gap-6">
+                            <h2 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] flex items-center gap-3">
+                                <FaFilter className="text-sky-600" /> Select Period
+                            </h2>
+                            <div className="flex items-center gap-4">
+                                <input
+                                    type="date"
+                                    value={fromDate}
+                                    onChange={(e) => setFromDate(e.target.value)}
+                                    className="p-3 bg-gray-50 border border-gray-100 rounded-xl outline-none focus:ring-4 focus:ring-sky-100 focus:border-sky-500 transition-all font-black text-gray-700 text-[10px] uppercase shadow-inner"
+                                />
+                                <span className="text-gray-300 font-bold">to</span>
+                                <input
+                                    type="date"
+                                    value={toDate}
+                                    onChange={(e) => setToDate(e.target.value)}
+                                    className="p-3 bg-gray-50 border border-gray-100 rounded-xl outline-none focus:ring-4 focus:ring-sky-100 focus:border-sky-500 transition-all font-black text-gray-700 text-[10px] uppercase shadow-inner"
+                                />
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 {/* Role Tabs - Only for Admin */}
                 {user.role === 'admin' && (
                     <div className="flex flex-wrap gap-4 mb-6 no-print">
@@ -559,100 +597,98 @@ const SalaryManagement = () => {
                     </motion.div>
                 </div>
 
-                {/* Top Selection Row: Period & Attendance Rules */}
-                <div className="flex flex-col gap-8 mb-10 no-print">
-                    <div className="bg-white p-8 rounded-[32px] shadow-xl shadow-sky-50/50 border border-sky-50">
-                        <div className="flex flex-col lg:flex-row gap-8 items-start lg:items-center">
-                            {/* Period Select */}
-                            <div className="flex flex-wrap items-center gap-6 pb-6 lg:pb-0 lg:border-r border-gray-100 pr-8">
-                                <h2 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] flex items-center gap-3">
-                                    <FaFilter className="text-sky-600" /> Period
-                                </h2>
-                                <div className="flex items-center gap-4">
-                                    <input
-                                        type="date"
-                                        value={fromDate}
-                                        onChange={(e) => setFromDate(e.target.value)}
-                                        className="p-3 bg-gray-50 border border-gray-100 rounded-xl outline-none focus:ring-4 focus:ring-sky-100 focus:border-sky-500 transition-all font-black text-gray-700 text-[10px] uppercase"
-                                    />
-                                    <span className="text-gray-300 font-bold">to</span>
-                                    <input
-                                        type="date"
-                                        value={toDate}
-                                        onChange={(e) => setToDate(e.target.value)}
-                                        className="p-3 bg-gray-50 border border-gray-100 rounded-xl outline-none focus:ring-4 focus:ring-sky-100 focus:border-sky-500 transition-all font-black text-gray-700 text-[10px] uppercase"
-                                    />
+                {/* Attendance Rules (Modified Concept) */}
+                <div className="bg-white p-8 rounded-[32px] shadow-xl shadow-sky-50/50 border border-sky-50 mb-10 no-print">
+                    <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-10 gap-6">
+                        <div>
+                            <h2 className="text-xl font-black text-gray-800 tracking-tight">Attendance Configuration</h2>
+                            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">Configure Payable vs Deduction statuses</p>
+                        </div>
+                        {user.role === 'admin' && (
+                            <div className="flex items-center gap-3 bg-gray-50 p-2 rounded-2xl border border-gray-100">
+                                <input 
+                                    type="text" 
+                                    placeholder="Add Custom Type..." 
+                                    className="bg-transparent border-none outline-none px-4 py-2 text-[10px] font-black uppercase tracking-wider w-40"
+                                    value={newStatus}
+                                    onChange={(e) => setNewStatus(e.target.value)}
+                                />
+                                <div className="flex gap-1">
+                                    <button 
+                                        onClick={() => handleAddStatus(true)}
+                                        className="bg-emerald-500 text-white p-2 rounded-xl border border-emerald-400 hover:bg-emerald-600 transition-all shadow-lg shadow-emerald-100"
+                                        title="Add to With Pay"
+                                    >
+                                        <FaCheckCircle size={14} />
+                                    </button>
+                                    <button 
+                                        onClick={() => handleAddStatus(false)}
+                                        className="bg-rose-500 text-white p-2 rounded-xl border border-rose-400 hover:bg-rose-600 transition-all shadow-lg shadow-rose-100"
+                                        title="Add to Without Pay"
+                                    >
+                                        <FaClock size={14} />
+                                    </button>
                                 </div>
                             </div>
+                        )}
+                    </div>
 
-                            {/* Attendance Rules (Row Wise) */}
-                            <div className="flex-1">
-                                <h2 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-4 flex items-center gap-3">
-                                    <FaCheckCircle className="text-emerald-500" /> Paid Attendance Statuses
-                                </h2>
-                                <div className="flex flex-wrap gap-2">
-                                    {attendanceOptions.map(status => (
-                                        <label
-                                            key={status}
-                                            className={`flex items-center gap-2 px-3 py-2 rounded-xl transition-all border ${user.role === 'admin' ? 'cursor-pointer' : 'cursor-default opacity-75'} ${paidStatuses.includes(status)
-                                                ? 'bg-sky-50 border-sky-100 text-sky-700'
-                                                : 'bg-gray-50 border-gray-100 text-gray-300 hover:bg-gray-100'
-                                                }`}
-                                        >
-                                            <input
-                                                type="checkbox"
-                                                className="hidden"
-                                                checked={paidStatuses.includes(status)}
-                                                disabled={user.role !== 'admin'}
-                                                onChange={(e) => {
-                                                    if (user.role !== 'admin') return;
-                                                    if (e.target.checked) {
-                                                        setPaidStatuses([...paidStatuses, status]);
-                                                    } else {
-                                                        setPaidStatuses(paidStatuses.filter(s => s !== status));
-                                                    }
-                                                }}
-                                            />
-                                            <div className={`w-3.5 h-3.5 rounded-md border flex items-center justify-center transition-all ${paidStatuses.includes(status)
-                                                ? 'bg-sky-600 border-sky-600 text-white'
-                                                : 'border-gray-300 bg-white'
-                                                }`}>
-                                                {paidStatuses.includes(status) && <FaCheckCircle size={8} />}
-                                            </div>
-                                            <span className="text-[9px] font-black uppercase tracking-wider">{status}</span>
-                                        </label>
-                                    ))}
-                                </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
+                        {/* With Pay Section */}
+                        <div className="bg-emerald-50/30 p-6 rounded-3xl border border-emerald-100">
+                            <h3 className="text-[10px] font-black text-emerald-600 uppercase tracking-[0.2em] mb-6 flex items-center gap-3">
+                                <div className="h-6 w-6 bg-emerald-500 rounded-lg flex items-center justify-center text-white">1</div>
+                                With Pay (Payable)
+                            </h3>
+                            <div className="flex flex-wrap gap-2">
+                                {paidStatuses.map(status => (
+                                    <div 
+                                        key={status} 
+                                        className="bg-white px-4 py-2 rounded-xl border border-emerald-100 text-[10px] font-black uppercase text-emerald-700 flex items-center gap-2 group shadow-sm"
+                                    >
+                                        <FaCheckCircle className="text-emerald-400" />
+                                        {status}
+                                        {user.role === 'admin' && (
+                                            <button 
+                                                onClick={() => setPaidStatuses(paidStatuses.filter(s => s !== status))}
+                                                className="ml-2 text-emerald-300 hover:text-rose-500 transition-colors opacity-0 group-hover:opacity-100"
+                                            >
+                                                ×
+                                            </button>
+                                        )}
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* Without Pay Section */}
+                        <div className="bg-rose-50/30 p-6 rounded-3xl border border-rose-100">
+                            <h3 className="text-[10px] font-black text-rose-600 uppercase tracking-[0.2em] mb-6 flex items-center gap-3">
+                                <div className="h-6 w-6 bg-rose-500 rounded-lg flex items-center justify-center text-white">2</div>
+                                Without Pay (Deduction/LOP)
+                            </h3>
+                            <div className="flex flex-wrap gap-2">
+                                {unpaidStatuses.map(status => (
+                                    <div 
+                                        key={status} 
+                                        className="bg-white px-4 py-2 rounded-xl border border-rose-100 text-[10px] font-black uppercase text-rose-700 flex items-center gap-2 group shadow-sm"
+                                    >
+                                        <FaClock className="text-rose-400" />
+                                        {status}
+                                        {user.role === 'admin' && (
+                                            <button 
+                                                onClick={() => setUnpaidStatuses(unpaidStatuses.filter(s => s !== status))}
+                                                className="ml-2 text-rose-300 hover:text-rose-500 transition-colors opacity-0 group-hover:opacity-100"
+                                            >
+                                                ×
+                                            </button>
+                                        )}
+                                    </div>
+                                ))}
                             </div>
                         </div>
                     </div>
                 </div>
-
-                {/* Role Tabs - Only for Admin */}
-                {user.role === 'admin' && (
-                    <div className="flex flex-wrap gap-4 mb-10 no-print">
-                        {[
-                            { id: 'all', label: 'All Personnel', icon: <FaChartLine /> },
-                            { id: 'principal', label: 'Principal', icon: <FaShieldAlt /> },
-                            { id: 'hod', label: 'HODs', icon: <FaShieldAlt /> },
-                            { id: 'staff', label: 'Staff members', icon: <FaFileAlt /> }
-                        ].map((tab) => (
-                            <button
-                                key={tab.id}
-                                onClick={() => setActiveRole(tab.id)}
-                                className={`flex items-center gap-3 px-8 py-4 rounded-2xl font-black uppercase tracking-[0.2em] text-[10px] transition-all ${activeRole === tab.id
-                                    ? 'bg-sky-600 text-white shadow-xl shadow-sky-200 ring-4 ring-sky-50'
-                                    : 'bg-white text-gray-400 hover:bg-gray-50 border border-sky-50'
-                                    }`}
-                            >
-                                <span className={`${activeRole === tab.id ? 'text-white' : 'text-sky-500'}`}>
-                                    {tab.icon}
-                                </span>
-                                {tab.label}
-                            </button>
-                        ))}
-                    </div>
-                )}
 
                 {/* Table Section */}
                 <div className="mb-12">
