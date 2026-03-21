@@ -551,6 +551,8 @@ exports.getEligibleCompDates = async (req, res) => {
             FROM attendance_records a
             WHERE a.emp_id = $1
               AND a.status = 'Present'
+              AND a.in_time IS NOT NULL 
+              AND a.out_time IS NOT NULL
               AND EXTRACT(YEAR FROM a.date) = $2
               AND (
                 EXTRACT(DOW FROM a.date) IN (0, 6)
