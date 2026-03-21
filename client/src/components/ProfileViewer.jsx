@@ -586,16 +586,18 @@ const ProfileViewer = ({ user, onClose }) => {
                                 name="emp_id"
                                 onChange={handleChange}
                             />
-                            <InfoRow icon={<FaUser />} label="Full Name" value={user.name} />
-                            <InfoRow 
-                                icon={<FaIdBadge />} 
-                                label="PIN" 
-                                value={isEditingProfile ? (formData.pin || user.pin) : (user.pin || '****')} 
-                                editing={isEditingProfile && (authUser.role === 'admin' || (authUser.role === 'management' && user.role === 'management'))}
-                                name="pin"
-                                onChange={handleChange}
-                                type="text"
-                            />
+                             <InfoRow icon={<FaUser />} label="Full Name" value={user.name} />
+                            {(isOwnProfile || authUser.role === 'admin' || authUser.role === 'management') && (
+                                <InfoRow 
+                                    icon={<FaIdBadge />} 
+                                    label="PIN" 
+                                    value={isEditingProfile ? (formData.pin || user.pin) : (user.pin || '****')} 
+                                    editing={isEditingProfile && (authUser.role === 'admin' || (authUser.role === 'management' && user.role === 'management'))}
+                                    name="pin"
+                                    onChange={handleChange}
+                                    type="text"
+                                />
+                            )}
                             <InfoRow icon={<FaEnvelope />} label="Email Address" value={isEditingProfile ? formData.email : user.email} editing={isEditingProfile} name="email" onChange={handleChange} />
                             <InfoRow icon={<FaBuilding />} label="Department" value={user.department_name} />
                             <InfoRow icon={<FaBriefcase />} label="Designation" value={user.designation || user.role} />
@@ -609,18 +611,22 @@ const ProfileViewer = ({ user, onClose }) => {
                                     </div>
                                     <InfoRow icon={<FaCalendarAlt />} label="Date of Birth" value={user.dob} />
                                     <InfoRow icon={<FaVenusMars />} label="Gender" value={user.gender} />
-                                    <InfoRow icon={<FaPhone />} label="Mobile Number" value={isEditingProfile ? formData.mobile : user.mobile} editing={isEditingProfile} name="mobile" onChange={handleChange} />
+                                     <InfoRow icon={<FaPhone />} label="Mobile Number" value={isEditingProfile ? formData.mobile : user.mobile} editing={isEditingProfile} name="mobile" onChange={handleChange} />
                                     <InfoRow icon={<FaWhatsapp />} label="WhatsApp" value={isEditingProfile ? formData.whatsapp : user.whatsapp} editing={isEditingProfile} name="whatsapp" onChange={handleChange} />
                                     <InfoRow icon={<FaTint />} label="Blood Group" value={isEditingProfile ? formData.blood_group : user.blood_group} editing={isEditingProfile} name="blood_group" onChange={handleChange} />
                                     <InfoRow icon={<FaGlobe />} label="Nationality" value={isEditingProfile ? formData.nationality : user.nationality} editing={isEditingProfile} name="nationality" onChange={handleChange} />
-                                    <InfoRow icon={<FaHandsHelping />} label="Religion" value={isEditingProfile ? formData.religion : user.religion} editing={isEditingProfile} name="religion" onChange={handleChange} />
+                                    {(isOwnProfile || authUser.role === 'admin' || authUser.role === 'management') && (
+                                        <InfoRow icon={<FaHandsHelping />} label="Religion" value={isEditingProfile ? formData.religion : user.religion} editing={isEditingProfile} name="religion" onChange={handleChange} />
+                                    )}
                                     {isEditingProfile ? (
                                         <>
                                             <InfoRow icon={<FaUsers />} label="Community" value={formData.community} editing={true} name="community" onChange={handleChange} />
                                             <InfoRow icon={<FaUsers />} label="Caste" value={formData.caste} editing={true} name="caste" onChange={handleChange} />
                                         </>
                                     ) : (
-                                        <InfoRow icon={<FaUsers />} label="Community / Caste" value={`${user.community || ''} ${user.caste ? `(${user.caste})` : ''}`} />
+                                        (isOwnProfile || authUser.role === 'admin' || authUser.role === 'management') && (
+                                            <InfoRow icon={<FaUsers />} label="Community / Caste" value={`${user.community || ''} ${user.caste ? `(${user.caste})` : ''}`} />
+                                        )
                                     )}
 
                                     {/* Family & Marital */}
