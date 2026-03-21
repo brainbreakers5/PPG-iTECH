@@ -28,6 +28,15 @@ exports.calculateSalary = async (req, res) => {
     } = req.body;
 
     try {
+        // Ensure table schema is up to date
+        await pool.query(`
+            ALTER TABLE salary_records 
+            ADD COLUMN IF NOT EXISTS with_pay_count NUMERIC(10, 2) DEFAULT 0,
+            ADD COLUMN IF NOT EXISTS without_pay_count NUMERIC(10, 2) DEFAULT 0,
+            ADD COLUMN IF NOT EXISTS deductions_applied NUMERIC(10, 2) DEFAULT 0,
+            ADD COLUMN IF NOT EXISTS gross_salary NUMERIC(12, 2) DEFAULT 0,
+            ADD COLUMN IF NOT EXISTS total_days_in_period INTEGER DEFAULT 0
+        `).catch(err => console.error('Silent migration failed (might be ok if already exists):', err.message));
         // Determine date range for attendance lookup
         // Use provided fromDate/toDate if available, else fallback to full month
         const rangeFrom = fromDate || `${year}-${String(month).padStart(2, '0')}-01`;
@@ -134,7 +143,7 @@ exports.calculateSalary = async (req, res) => {
             let totalDeductions = 0;
             if (user.deductions) {
                 try {
-                    const parsedDeductions = JSON.parse(user.deductions);
+                    const parsedDeductions = typeof user.deductions === 'string' ? JSON.parse(user.deductions) : user.deductions;
                     if (Array.isArray(parsedDeductions)) {
                         totalDeductions = parsedDeductions.reduce((sum, d) => sum + (parseFloat(d.amount) || 0), 0);
                     }
@@ -151,33 +160,49 @@ exports.calculateSalary = async (req, res) => {
             let grossAmount = dailyRate * payableDays;
             
             // Subtract manual fixed monthly deductions (floor at 0)
-            // Ensure calculatedAmount is a valid number, fallback to 0 if NaN.
             let calcAmountRaw = Math.max(0, grossAmount - totalDeductions);
             if (isNaN(calcAmountRaw)) calcAmountRaw = 0;
-            let calculatedAmount = calcAmountRaw.toFixed(2);
+            let netSalary = calcAmountRaw.toFixed(2);
             
             const totalLop = unpaidDays;
 
             await pool.query(`
-                INSERT INTO salary_records (emp_id, month, year, total_present, total_leave, total_lop, calculated_salary, status)
-                VALUES ($1, $2, $3, $4, $5, $6, $7, 'Pending')
+                INSERT INTO salary_records (
+                    emp_id, month, year, total_present, total_leave, total_lop, 
+                    calculated_salary, status, with_pay_count, without_pay_count, 
+                    deductions_applied, gross_salary, total_days_in_period
+                )
+                VALUES ($1, $2, $3, $4, $5, $6, $7, 'Pending', $8, $9, $10, $11, $12)
                 ON CONFLICT (emp_id, month, year) DO UPDATE SET
                     total_present = EXCLUDED.total_present,
                     total_leave = EXCLUDED.total_leave,
                     total_lop = EXCLUDED.total_lop,
                     calculated_salary = EXCLUDED.calculated_salary,
+                    with_pay_count = EXCLUDED.with_pay_count,
+                    without_pay_count = EXCLUDED.without_pay_count,
+                    deductions_applied = EXCLUDED.deductions_applied,
+                    gross_salary = EXCLUDED.gross_salary,
+                    total_days_in_period = EXCLUDED.total_days_in_period,
                     status = CASE WHEN salary_records.status = 'Paid' THEN salary_records.status ELSE EXCLUDED.status END
-            `, [userEmpId, month, year, payableDays, 0, totalLop, calculatedAmount]);
+            `, [
+                userEmpId, month, year, 
+                payableDays, 0, totalLop, 
+                netSalary,
+                payableDays, totalLop,
+                totalDeductions.toFixed(2), grossAmount.toFixed(2), totalDaysInRange
+            ]);
 
             results.push({
                 emp_id: userEmpId,
                 name: user.name,
                 role: user.role,
                 monthly_salary: baseSalary,
-                calculated_salary: calculatedAmount,
+                calculated_salary: netSalary,
                 payable_days: payableDays,
                 total_lop: totalLop,
-                range_days: totalDaysInRange
+                range_days: totalDaysInRange,
+                gross_salary: grossAmount.toFixed(2),
+                deductions_applied: totalDeductions.toFixed(2)
             });
         }
 
