@@ -5,7 +5,8 @@ const {
     getSalaryRecords,
     getDailyBreakdown,
     updateSalaryStatus,
-    publishSalaries
+    publishSalaries,
+    notifyPaid
 } = require('../controllers/salaryController');
 const { protect, restrictTo } = require('../middleware/authMiddleware');
 
@@ -13,6 +14,7 @@ router.use(protect);
 
 router.post('/calculate', restrictTo('admin'), calculateSalary);
 router.post('/publish', restrictTo('admin'), publishSalaries);
+router.post('/notify-paid', restrictTo('admin'), notifyPaid);
 router.get('/daily', getDailyBreakdown);
 router.get('/', getSalaryRecords);
 router.put('/:id/status', restrictTo('admin'), updateSalaryStatus);
