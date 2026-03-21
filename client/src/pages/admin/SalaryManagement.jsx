@@ -191,21 +191,22 @@ const SalaryManagement = () => {
         const currentM = dForContext.getMonth() + 1;
         const currentY = dForContext.getFullYear();
 
-        // MERGE: All employees (base list) + Salaries (calculated data)
         return allEmployees.map(emp => {
             const calc = salaries.find(s => s.emp_id === emp.emp_id);
-            const displaySalary = emp.monthly_salary || emp.base_salary || 0;
+            // Use the salary record's monthly_salary first (it's joined fresh from users table in /salary API)
+            // Then fallback to allEmployees monthly_salary (now also included after backend fix)
+            const grossPay = parseFloat(calc?.monthly_salary) || parseFloat(emp.monthly_salary) || parseFloat(emp.base_salary) || 0;
+
             if (calc) {
                 return {
                     ...calc,
-                    // Use fresh monthly_salary from employee record for accurate gross pay display
-                    monthly_salary: displaySalary || calc.monthly_salary 
+                    monthly_salary: grossPay
                 };
             }
             return {
                 ...emp,
                 id: `temp_${emp.emp_id}`,
-                monthly_salary: displaySalary,
+                monthly_salary: grossPay,
                 calculated_salary: 0,
                 total_present: 0,
                 total_lop: 0,
