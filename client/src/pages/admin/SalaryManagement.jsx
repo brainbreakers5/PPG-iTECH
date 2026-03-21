@@ -30,17 +30,17 @@ const SalaryManagement = () => {
         const year = d.getFullYear();
         const month = d.getMonth(); // 0-indexed
 
-        // FROM: 24th of current month
-        const fromDateStr = `${year}-${String(month + 1).padStart(2, '0')}-24`;
-
-        // TO: 25th of next month
-        let nextMonth = month + 2; // +2 because month is 0-indexed and we want next month (1-indexed)
-        let nextYear = year;
-        if (nextMonth > 12) {
-            nextMonth = 1;
-            nextYear++;
+        // FROM: 26th of past month
+        let pastMonth = month; // 0-indexed
+        let pastYear = year;
+        if (pastMonth === 0) {
+            pastMonth = 12; // 1-indexed Dec
+            pastYear--;
         }
-        const toDateStr = `${nextYear}-${String(nextMonth).padStart(2, '0')}-25`;
+        const fromDateStr = `${pastYear}-${String(pastMonth).padStart(2, '0')}-26`;
+
+        // TO: 25th of current month
+        const toDateStr = `${year}-${String(month + 1).padStart(2, '0')}-25`;
 
         return { from: fromDateStr, to: toDateStr };
     };
@@ -78,7 +78,7 @@ const SalaryManagement = () => {
     };
 
     useEffect(() => {
-        const d = new Date(fromDate);
+        const d = new Date(toDate); // Month is defined by the end date
         const month = d.getMonth() + 1;
         const year = d.getFullYear();
         
@@ -166,7 +166,7 @@ const SalaryManagement = () => {
     const fetchSalaries = async () => {
         setLoading(true);
         try {
-            const d = new Date(fromDate);
+            const d = new Date(toDate); // Target month is defined by the end date
             const m = d.getMonth() + 1;
             const y = d.getFullYear();
             const { data } = await api.get(`/salary?month=${m}&year=${y}&fromDate=${fromDate}&toDate=${toDate}`);
@@ -188,7 +188,7 @@ const SalaryManagement = () => {
         const isAdmin = user.role === 'admin' || user.role === 'management';
         if (!isAdmin) return salaries;
 
-        const dForContext = new Date(fromDate);
+        const dForContext = new Date(toDate); // Uses toDate to ensure arrays align
         const currentM = dForContext.getMonth() + 1;
         const currentY = dForContext.getFullYear();
 
@@ -357,7 +357,23 @@ const SalaryManagement = () => {
         }
     };
 
-
+    const handleMarkUnpaid = async (s) => {
+        const result = await Swal.fire({
+            title: `Revert to Unpaid?`,
+            text: `This will revert ${s.name}'s salary for this period back to a pending state.`,
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#f59e0b',
+            confirmButtonText: 'Yes, Revert'
+        });
+        if (!result.isConfirmed) return;
+        try {
+            await api.put(`/salary/${s.id}/status`, { status: 'Pending' });
+            fetchSalaries();
+        } catch (error) {
+            Swal.fire('Error', 'Failed to revert status.', 'error');
+        }
+    };
 
     const handleStatusUpdate = async (id, status) => {
         try {
@@ -864,11 +880,11 @@ const SalaryManagement = () => {
                             </div>
                         </div>
 
-                        {/* Row 2 – Without Pay (Deduction/LOP) */}
+                        {/* Row 2 – Without Pay (Deduction) */}
                         <div className="bg-rose-50/30 p-5 rounded-3xl border border-rose-100">
                             <h3 className="text-[10px] font-black text-rose-600 uppercase tracking-[0.2em] mb-4 flex items-center gap-3">
                                 <div className="h-6 w-6 bg-rose-500 rounded-lg flex items-center justify-center text-white text-xs">✗</div>
-                                Without Pay (Deduction / LOP)
+                                Without Pay (Deduction)
                             </h3>
                             <div className="flex flex-wrap gap-2">
                                 {unpaidStatuses.map(status => (
@@ -1029,12 +1045,13 @@ const SalaryManagement = () => {
                                                         >
                                                             <FaFileAlt size={16} />
                                                         </button>
-                                                        {user.role === 'admin' && s.status !== 'Paid' && (
+                                                        {user.role === 'admin' && s.status === 'Paid' && (
                                                             <button
-                                                                onClick={() => handleMarkPaid(s)}
-                                                                className="inline-flex items-center gap-2 text-[9px] font-black uppercase tracking-[0.2em] text-white bg-emerald-600 px-5 py-3 rounded-2xl hover:bg-emerald-700 transition-all shadow-xl shadow-emerald-50 active:scale-95"
+                                                                onClick={() => handleMarkUnpaid(s)}
+                                                                className="inline-flex items-center gap-2 text-[9px] font-black uppercase tracking-[0.1em] text-amber-600 bg-amber-50 border border-amber-200 px-4 py-2 rounded-xl hover:bg-amber-100 transition-all shadow-sm active:scale-95"
+                                                                title="Edit: Revert to Unpaid"
                                                             >
-                                                                <FaCheckCircle size={12} /> Mark Paid
+                                                                Edit
                                                             </button>
                                                         )}
                                                     </td>
