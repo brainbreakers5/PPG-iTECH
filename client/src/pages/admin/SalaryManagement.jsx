@@ -358,6 +358,75 @@ const SalaryManagement = () => {
                     </div>
                 </div>
 
+                {/* Top Selection Row: Period & Attendance Rules */}
+                <div className="flex flex-col gap-8 mb-10 no-print">
+                    <div className="bg-white p-8 rounded-[32px] shadow-xl shadow-sky-50/50 border border-sky-50">
+                        <div className="flex flex-col lg:flex-row gap-8 items-start lg:items-center">
+                            {/* Period Select */}
+                            <div className="flex flex-wrap items-center gap-6 pb-6 lg:pb-0 lg:border-r border-gray-100 pr-8">
+                                <h2 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] flex items-center gap-3">
+                                    <FaFilter className="text-sky-600" /> Period
+                                </h2>
+                                <div className="flex items-center gap-4">
+                                    <input
+                                        type="date"
+                                        value={fromDate}
+                                        onChange={(e) => setFromDate(e.target.value)}
+                                        className="p-3 bg-gray-50 border border-gray-100 rounded-xl outline-none focus:ring-4 focus:ring-sky-100 focus:border-sky-500 transition-all font-black text-gray-700 text-[10px] uppercase"
+                                    />
+                                    <span className="text-gray-300 font-bold">to</span>
+                                    <input
+                                        type="date"
+                                        value={toDate}
+                                        onChange={(e) => setToDate(e.target.value)}
+                                        className="p-3 bg-gray-50 border border-gray-100 rounded-xl outline-none focus:ring-4 focus:ring-sky-100 focus:border-sky-500 transition-all font-black text-gray-700 text-[10px] uppercase"
+                                    />
+                                </div>
+                            </div>
+
+                            {/* Attendance Rules (Row Wise) */}
+                            <div className="flex-1">
+                                <h2 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-4 flex items-center gap-3">
+                                    <FaCheckCircle className="text-emerald-500" /> Paid Attendance Statuses
+                                </h2>
+                                <div className="flex flex-wrap gap-2">
+                                    {attendanceOptions.map(status => (
+                                        <label
+                                            key={status}
+                                            className={`flex items-center gap-2 px-3 py-2 rounded-xl transition-all border ${user.role === 'admin' ? 'cursor-pointer' : 'cursor-default opacity-75'} ${paidStatuses.includes(status)
+                                                ? 'bg-sky-50 border-sky-100 text-sky-700'
+                                                : 'bg-gray-50 border-gray-100 text-gray-300 hover:bg-gray-100'
+                                                }`}
+                                        >
+                                            <input
+                                                type="checkbox"
+                                                className="hidden"
+                                                checked={paidStatuses.includes(status)}
+                                                disabled={user.role !== 'admin'}
+                                                onChange={(e) => {
+                                                    if (user.role !== 'admin') return;
+                                                    if (e.target.checked) {
+                                                        setPaidStatuses([...paidStatuses, status]);
+                                                    } else {
+                                                        setPaidStatuses(paidStatuses.filter(s => s !== status));
+                                                    }
+                                                }}
+                                            />
+                                            <div className={`w-3.5 h-3.5 rounded-md border flex items-center justify-center transition-all ${paidStatuses.includes(status)
+                                                ? 'bg-sky-600 border-sky-600 text-white'
+                                                : 'border-gray-300 bg-white'
+                                                }`}>
+                                                {paidStatuses.includes(status) && <FaCheckCircle size={8} />}
+                                            </div>
+                                            <span className="text-[9px] font-black uppercase tracking-wider">{status}</span>
+                                        </label>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 {/* Role Tabs - Only for Admin */}
                 {user.role === 'admin' && (
                     <div className="flex flex-wrap gap-4 mb-10 no-print">
@@ -384,265 +453,182 @@ const SalaryManagement = () => {
                     </div>
                 )}
 
-                {/* Filters & Table Grid */}
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 mb-12">
-                    {/* Period Selector Sidebar */}
-                    <div className="lg:col-span-3">
-                        <div className="bg-white p-10 rounded-[40px] shadow-xl shadow-sky-50/50 border border-sky-50 sticky top-6">
-                            <h2 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-8 flex items-center gap-3">
-                                <FaFilter className="text-sky-600" /> Select Period
-                            </h2>
-                            <div className="space-y-8">
-                                <div>
-                                    <label className="block text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-4 ml-1">From Date</label>
-                                    <input
-                                        type="date"
-                                        value={fromDate}
-                                        onChange={(e) => setFromDate(e.target.value)}
-                                        className="w-full p-5 bg-gray-50 border border-gray-100 rounded-2xl outline-none focus:ring-4 focus:ring-sky-100 focus:border-sky-500 transition-all font-black text-gray-700 text-sm"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-4 ml-1">To Date</label>
-                                    <input
-                                        type="date"
-                                        value={toDate}
-                                        onChange={(e) => setToDate(e.target.value)}
-                                        className="w-full p-5 bg-gray-50 border border-gray-100 rounded-2xl outline-none focus:ring-4 focus:ring-sky-100 focus:border-sky-500 transition-all font-black text-gray-700 text-sm"
-                                    />
-                                </div>
-                            </div>
-
-                            {/* Attendance Rules Section */}
-                            <div className="mt-12 pt-10 border-t border-gray-100">
-                                <h2 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-8 flex items-center gap-3">
-                                    <FaCheckCircle className="text-emerald-500" /> Paid Attendance
-                                </h2>
-                                <div className="grid grid-cols-1 gap-3">
-                                    {attendanceOptions.map(status => (
-                                        <label
-                                            key={status}
-                                            className={`flex items-center gap-4 p-4 rounded-2xl transition-all border ${user.role === 'admin' ? 'cursor-pointer' : 'cursor-default opacity-75'} ${paidStatuses.includes(status)
-                                                ? 'bg-sky-50 border-sky-100 text-sky-700'
-                                                : 'bg-gray-50 border-gray-100 text-gray-400' + (user.role === 'admin' ? ' hover:bg-gray-100' : '')
-                                                }`}
-                                        >
-                                            <input
-                                                type="checkbox"
-                                                className="hidden"
-                                                checked={paidStatuses.includes(status)}
-                                                disabled={user.role !== 'admin'}
-                                                onChange={(e) => {
-                                                    if (user.role !== 'admin') return;
-                                                    if (e.target.checked) {
-                                                        setPaidStatuses([...paidStatuses, status]);
-                                                    } else {
-                                                        setPaidStatuses(paidStatuses.filter(s => s !== status));
-                                                    }
-                                                }}
-                                            />
-                                            <div className={`w-5 h-5 rounded-lg border-2 flex items-center justify-center transition-all ${paidStatuses.includes(status)
-                                                ? 'bg-sky-600 border-sky-600 text-white'
-                                                : 'border-gray-300 bg-white'
-                                                }`}>
-                                                {paidStatuses.includes(status) && <FaCheckCircle size={10} />}
-                                            </div>
-                                            <span className="text-[10px] font-black uppercase tracking-widest">{status}</span>
-                                        </label>
-                                    ))}
-                                </div>
-                                <p className="text-[9px] font-bold text-gray-400 uppercase mt-6 leading-relaxed bg-amber-50 p-4 rounded-xl border border-amber-100 italic">
-                                    {user.role === 'admin'
-                                        ? 'Selected statuses will count as 100% paid days.'
-                                        : 'Only admin can modify paid attendance rules. View only.'}
-                                </p>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Master Ledger Table */}
-                    <div className="lg:col-span-9">
-                        <div className="bg-white rounded-[40px] shadow-2xl shadow-sky-50/50 border border-sky-50 overflow-hidden">
-                            <div className="overflow-x-auto">
-                                <table className="w-full">
-                                    <thead>
-                                        <tr className="bg-gray-50/50 border-b border-gray-100">
-                                            <th className="p-8 text-[10px] font-black uppercase tracking-[0.2em] text-gray-400 text-left">Employee</th>
-                                            <th className="p-8 text-[10px] font-black uppercase tracking-[0.2em] text-gray-400 text-center">Attendance</th>
-                                            <th className="p-8 text-[10px] font-black uppercase tracking-[0.2em] text-gray-400 text-right">Computed Pay</th>
-                                            <th className="p-8 text-[10px] font-black uppercase tracking-[0.2em] text-gray-400 text-center">Status</th>
-                                            <th className="p-8 text-[10px] font-black uppercase tracking-[0.2em] text-gray-400 text-right">Actions</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-gray-50/50">
-                                        <AnimatePresence mode="popLayout">
-                                            {salaries
-                                                .filter(s => activeRole === 'all' || (s.role || '').toLowerCase() === activeRole.toLowerCase())
-                                                .map((s, idx) => (
-                                                    <motion.tr
-                                                        key={s.id}
-                                                        initial={{ opacity: 0, x: 20 }}
-                                                        animate={{ opacity: 1, x: 0 }}
-                                                        exit={{ opacity: 0, x: -20 }}
-                                                        transition={{ delay: idx * 0.03 }}
-                                                        className="hover:bg-sky-50/30 transition-all group"
-                                                    >
-                                                        <td className="p-8">
-                                                            <div className="flex items-center gap-5">
-                                                                <div className="h-14 w-14 rounded-[20px] bg-gradient-to-br from-sky-50 to-white border border-sky-50 flex items-center justify-center text-sky-600 font-black text-lg shadow-sm group-hover:scale-110 group-hover:rotate-3 transition-all duration-500 overflow-hidden">
-                                                                    <img src={s.profile_pic || `https://ui-avatars.com/api/?name=${encodeURIComponent(s.name || '?')}&size=100&background=0ea5e9&color=fff&bold=true`} alt="" className="h-full w-full object-cover" />
-                                                                </div>
-                                                                <div>
-                                                                    <p className="text-sm font-black text-gray-800 tracking-tight group-hover:text-sky-600 transition-colors">{s.name}</p>
-                                                                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mt-0.5">{s.department_name}</p>
-                                                                </div>
+                {/* Table Section */}
+                <div className="mb-12">
+                    <div className="bg-white rounded-[40px] shadow-2xl shadow-sky-50/50 border border-sky-50 overflow-hidden">
+                        <div className="overflow-x-auto">
+                            <table className="w-full">
+                                <thead>
+                                    <tr className="bg-gray-50/50 border-b border-gray-100">
+                                        <th className="p-8 text-[10px] font-black uppercase tracking-[0.2em] text-gray-400 text-left">Employee</th>
+                                        <th className="p-8 text-[10px] font-black uppercase tracking-[0.2em] text-gray-400 text-center">Attendance</th>
+                                        <th className="p-8 text-[10px] font-black uppercase tracking-[0.2em] text-gray-400 text-right">Computed Pay</th>
+                                        <th className="p-8 text-[10px] font-black uppercase tracking-[0.2em] text-gray-400 text-center">Status</th>
+                                        <th className="p-8 text-[10px] font-black uppercase tracking-[0.2em] text-gray-400 text-right">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-gray-50/50">
+                                    <AnimatePresence mode="popLayout">
+                                        {salaries
+                                            .filter(s => activeRole === 'all' || (s.role || '').toLowerCase() === activeRole.toLowerCase())
+                                            .map((s, idx) => (
+                                                <motion.tr
+                                                    key={s.id}
+                                                    initial={{ opacity: 0, x: 20 }}
+                                                    animate={{ opacity: 1, x: 0 }}
+                                                    exit={{ opacity: 0, x: -20 }}
+                                                    transition={{ delay: idx * 0.03 }}
+                                                    className="hover:bg-sky-50/30 transition-all group"
+                                                >
+                                                    <td className="p-8">
+                                                        <div className="flex items-center gap-5">
+                                                            <div className="h-14 w-14 rounded-[20px] bg-gradient-to-br from-sky-50 to-white border border-sky-50 flex items-center justify-center text-sky-600 font-black text-lg shadow-sm group-hover:scale-110 group-hover:rotate-3 transition-all duration-500 overflow-hidden">
+                                                                <img src={s.profile_pic || `https://ui-avatars.com/api/?name=${encodeURIComponent(s.name || '?')}&size=100&background=0ea5e9&color=fff&bold=true`} alt="" className="h-full w-full object-cover" />
                                                             </div>
-                                                        </td>
-                                                        <td className="p-8">
-                                                            <div className="flex flex-col items-center gap-3">
-                                                                 <div className="flex gap-4 text-[9px] font-black uppercase tracking-widest">
-                                                                     <span className="text-sky-500 bg-sky-50 px-2 py-1 rounded-md" title="Total Payable Days">PAID: {s.total_present}</span>
-                                                                     <span className="text-gray-400 bg-gray-50 px-2 py-1 rounded-md" title="Total Days in Month">MONTH: {new Date(s.year, s.month, 0).getDate()}</span>
-                                                                     <span className="text-rose-500 bg-rose-50 px-2 py-1 rounded-md" title="Loss of Pay Days">LOP: {s.total_lop || 0}</span>
-                                                                 </div>
-                                                                 <div className="w-40 bg-gray-100 h-1.5 rounded-full overflow-hidden shadow-inner p-px">
-                                                                     <motion.div
-                                                                         initial={{ width: 0 }}
-                                                                         animate={{ width: `${(s.total_present / new Date(s.year, s.month, 0).getDate()) * 100}%` }}
-                                                                         className="bg-gradient-to-r from-sky-400 to-sky-600 h-full rounded-full shadow-[0_0_12px_rgba(59,130,246,0.3)]"
-                                                                     ></motion.div>
-                                                                 </div>
+                                                            <div>
+                                                                <p className="text-sm font-black text-gray-800 tracking-tight group-hover:text-sky-600 transition-colors">{s.name}</p>
+                                                                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mt-0.5">{s.department_name || 'N/A'}</p>
                                                             </div>
-                                                        </td>
-                                                        <td className="p-8 text-right font-black text-gray-800">
-                                                            <div className="flex flex-col items-end">
-                                                                 <span className="text-[9px] text-gray-300 line-through font-bold tracking-widest mb-1">₹{Number(s.monthly_salary || 0).toLocaleString()}</span>
-                                                                 <span className="text-lg text-sky-600 tracking-tighter font-black">₹{Number(s.calculated_salary || 0).toLocaleString()}</span>
-                                                            </div>
-                                                        </td>
-                                                        <td className="p-8 text-center">
-                                                            <span className={`text-[9px] font-black uppercase px-4 py-2 rounded-2xl tracking-widest border ${s.status === 'Paid'
-                                                                ? 'bg-emerald-50 text-emerald-600 border-emerald-100'
-                                                                : 'bg-amber-50 text-amber-600 border-amber-100 animate-pulse'
-                                                                }`}>
-                                                                {s.status}
-                                                            </span>
-                                                        </td>
-                                                        <td className="p-8 text-right">
-                                                            {user.role === 'admin' && s.status === 'Pending' ? (
-                                                                <button
-                                                                    onClick={() => handleStatusUpdate(s.id, 'Paid')}
-                                                                    className="inline-flex items-center gap-3 text-[9px] font-black uppercase tracking-[0.2em] text-white bg-sky-600 px-6 py-3 rounded-2xl hover:bg-sky-800 transition-all shadow-xl shadow-sky-100 group active:scale-95"
-                                                                >
-                                                                    <FaCheckCircle className="group-hover:scale-125 transition-transform" /> Mark Paid
-                                                                </button>
-                                                            ) : (
-                                                                <button className="h-12 w-12 bg-gray-50 text-gray-400 rounded-2xl flex items-center justify-center hover:bg-sky-50 hover:text-sky-600 transition-all active:scale-90 shadow-sm border border-gray-100">
-                                                                    <FaFileAlt size={16} title="View Detailed Breakdown" />
-                                                                </button>
-                                                            )}
-                                                        </td>
-                                                    </motion.tr>
-                                                ))}
-                                        </AnimatePresence>
-                                        {salaries.filter(s => activeRole === 'all' || s.role === activeRole).length === 0 && !loading && (
-                                            <tr>
-                                                <td colSpan="5" className="p-32 text-center">
-                                                    <div className="flex flex-col items-center gap-6 text-gray-300">
-                                                        <div className="h-24 w-24 rounded-[40px] bg-gray-50 flex items-center justify-center border border-gray-100">
-                                                            <FaMoneyBillWave size={40} className="opacity-20 translate-y-2" />
                                                         </div>
-                                                        <div>
-                                                            <p className="font-black text-gray-400 uppercase tracking-[0.3em] text-xs">No Records Found</p>
-                                                            <p className="text-[10px] font-bold text-gray-400 mt-2 italic">No salary data available for this role.</p>
+                                                    </td>
+                                                    <td className="p-8">
+                                                        <div className="flex flex-col items-center gap-3">
+                                                            <div className="flex gap-4 text-[9px] font-black uppercase tracking-widest">
+                                                                <span className="text-sky-500 bg-sky-50 px-2 py-1 rounded-md" title="Total Payable Days">PAID: {s.total_present}</span>
+                                                                <span className="text-gray-400 bg-gray-50 px-2 py-1 rounded-md" title="Total Days in Month">MONTH: {new Date(s.year, s.month, 0).getDate()}</span>
+                                                                <span className="text-rose-500 bg-rose-50 px-2 py-1 rounded-md" title="Loss of Pay Days">LOP: {s.total_lop || 0}</span>
+                                                            </div>
+                                                            <div className="w-40 bg-gray-100 h-1.5 rounded-full overflow-hidden shadow-inner p-px">
+                                                                <motion.div
+                                                                    initial={{ width: 0 }}
+                                                                    animate={{ width: `${(s.total_present / new Date(s.year, s.month, 0).getDate()) * 100}%` }}
+                                                                    className="bg-gradient-to-r from-sky-400 to-sky-600 h-full rounded-full shadow-[0_0_12px_rgba(59,130,246,0.3)]"
+                                                                ></motion.div>
+                                                            </div>
                                                         </div>
+                                                    </td>
+                                                    <td className="p-8 text-right font-black text-gray-800">
+                                                        <div className="flex flex-col items-end">
+                                                            <span className="text-[9px] text-gray-300 line-through font-bold tracking-widest mb-1">₹{Number(s.monthly_salary || 0).toLocaleString()}</span>
+                                                            <span className="text-lg text-sky-600 tracking-tighter font-black">₹{Number(s.calculated_salary || 0).toLocaleString()}</span>
+                                                        </div>
+                                                    </td>
+                                                    <td className="p-8 text-center">
+                                                        <span className={`text-[9px] font-black uppercase px-4 py-2 rounded-2xl tracking-widest border ${s.status === 'Paid'
+                                                            ? 'bg-emerald-50 text-emerald-600 border-emerald-100'
+                                                            : 'bg-amber-50 text-amber-600 border-amber-100 animate-pulse'
+                                                            }`}>
+                                                            {s.status}
+                                                        </span>
+                                                    </td>
+                                                    <td className="p-8 text-right">
+                                                        {user.role === 'admin' && s.status === 'Pending' ? (
+                                                            <button
+                                                                onClick={() => handleStatusUpdate(s.id, 'Paid')}
+                                                                className="inline-flex items-center gap-3 text-[9px] font-black uppercase tracking-[0.2em] text-white bg-sky-600 px-6 py-3 rounded-2xl hover:bg-sky-800 transition-all shadow-xl shadow-sky-100 group active:scale-95"
+                                                            >
+                                                                <FaCheckCircle className="group-hover:scale-125 transition-transform" /> Mark Paid
+                                                            </button>
+                                                        ) : (
+                                                            <button className="h-12 w-12 bg-gray-50 text-gray-400 rounded-2xl flex items-center justify-center hover:bg-sky-50 hover:text-sky-600 transition-all active:scale-90 shadow-sm border border-gray-100">
+                                                                <FaFileAlt size={16} title="View Detailed Breakdown" />
+                                                            </button>
+                                                        )}
+                                                    </td>
+                                                </motion.tr>
+                                            ))}
+                                    </AnimatePresence>
+                                    {salaries.filter(s => activeRole === 'all' || (s.role || '').toLowerCase() === activeRole.toLowerCase()).length === 0 && !loading && (
+                                        <tr>
+                                            <td colSpan="5" className="p-32 text-center">
+                                                <div className="flex flex-col items-center gap-6 text-gray-300">
+                                                    <div className="h-24 w-24 rounded-[40px] bg-gray-50 flex items-center justify-center border border-gray-100">
+                                                        <FaMoneyBillWave size={40} className="opacity-20 translate-y-2" />
                                                     </div>
-                                                </td>
-                                            </tr>
-                                        )}
-                                    </tbody>
-                                </table>
-                            </div>
+                                                    <div>
+                                                        <p className="font-black text-gray-400 uppercase tracking-[0.3em] text-xs">No Records Found</p>
+                                                        <p className="text-[10px] font-bold text-gray-400 mt-2 italic">No salary data available for this role.</p>
+                                                    </div>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    )}
+                                </tbody>
+                            </table>
                         </div>
                     </div>
                 </div>
 
-                {/* Analytical Matrix */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-10 pb-16">
+                {/* Analytical Matrix (Now below table and compact) */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pb-16">
                     <motion.div
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: 0.1 }}
-                        className="bg-white p-10 rounded-[40px] shadow-2xl shadow-sky-50/50 border-t-8 border-sky-600 relative group overflow-hidden"
+                        initial={{ opacity: 0, y: 10 }}
+                        whileInView={{ opacity: 1, y: 0 }}
+                        className="bg-white p-6 rounded-3xl shadow-lg shadow-sky-50/50 border border-sky-50 relative group overflow-hidden"
                     >
-                        <div className="absolute top-0 right-0 w-48 h-48 bg-sky-50 rounded-full -mr-24 -mt-24 opacity-30 group-hover:scale-125 transition-transform duration-700"></div>
-                        <div className="flex items-center justify-between mb-12 relative z-10">
-                            <div>
-                                <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Gross Total</h3>
-                                <p className="text-[10px] font-bold text-sky-500 mt-2 uppercase tracking-widest flex items-center gap-2">
-                                    <FaChartLine size={10} /> Total Salary
-                                </p>
+                        <div className="flex items-center justify-between gap-4">
+                            <div className="flex items-center gap-4">
+                                <div className="h-10 w-10 rounded-xl bg-sky-600 flex items-center justify-center text-white shadow-lg shadow-sky-100">
+                                    <FaMoneyBillWave size={16} />
+                                </div>
+                                <div>
+                                    <h3 className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Gross Total</h3>
+                                    <p className="text-lg font-black text-gray-800 tracking-tighter">
+                                        ₹{salaries
+                                            .filter(s => activeRole === 'all' || (s.role || '').toLowerCase() === activeRole.toLowerCase())
+                                            .reduce((acc, curr) => acc + Number(curr.calculated_salary || 0), 0)
+                                            .toLocaleString()}
+                                    </p>
+                                </div>
                             </div>
-                            <div className="h-14 w-14 rounded-2xl bg-sky-600 flex items-center justify-center text-white shadow-xl shadow-sky-200 group-hover:rotate-6 transition-transform">
-                                <FaMoneyBillWave size={22} />
-                            </div>
+                            <div className="text-[9px] font-bold text-sky-500 uppercase tracking-widest opacity-40 group-hover:opacity-100 transition-opacity">Total Salary</div>
                         </div>
-                        <h3 className="text-4xl font-black text-gray-800 tracking-tighter relative z-10">
-                             ₹{salaries
-                                 .filter(s => activeRole === 'all' || (s.role || '').toLowerCase() === activeRole.toLowerCase())
-                                 .reduce((acc, curr) => acc + Number(curr.calculated_salary || 0), 0)
-                                 .toLocaleString()}
-                        </h3>
                     </motion.div>
 
                     <motion.div
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: 0.2 }}
-                        className="bg-white p-10 rounded-[40px] shadow-2xl shadow-sky-50/50 border-t-8 border-emerald-500 relative group overflow-hidden"
+                        initial={{ opacity: 0, y: 10 }}
+                        whileInView={{ opacity: 1, y: 0 }}
+                        className="bg-white p-6 rounded-3xl shadow-lg shadow-sky-50/50 border border-sky-50 relative group overflow-hidden"
                     >
-                        <div className="absolute top-0 right-0 w-48 h-48 bg-emerald-50 rounded-full -mr-24 -mt-24 opacity-30 group-hover:scale-125 transition-transform duration-700"></div>
-                        <div className="flex items-center justify-between mb-12 relative z-10">
-                            <div>
-                                <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Paid Amount</h3>
-                                <p className="text-[10px] font-bold text-emerald-500 mt-2 uppercase tracking-widest flex items-center gap-2">
-                                    <FaCheckCircle size={10} /> Paid
-                                </p>
+                        <div className="flex items-center justify-between gap-4">
+                            <div className="flex items-center gap-4">
+                                <div className="h-10 w-10 rounded-xl bg-emerald-500 flex items-center justify-center text-white shadow-lg shadow-emerald-100">
+                                    <FaWallet size={16} />
+                                </div>
+                                <div>
+                                    <h3 className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Paid Amount</h3>
+                                    <p className="text-lg font-black text-gray-800 tracking-tighter">
+                                        ₹{salaries
+                                            .filter(s => (activeRole === 'all' || (s.role || '').toLowerCase() === activeRole.toLowerCase()) && s.status === 'Paid')
+                                            .reduce((acc, curr) => acc + parseFloat(curr.calculated_salary), 0).toLocaleString()}
+                                    </p>
+                                </div>
                             </div>
-                            <div className="h-14 w-14 rounded-2xl bg-emerald-500 flex items-center justify-center text-white shadow-xl shadow-emerald-100 group-hover:rotate-6 transition-transform">
-                                <FaWallet size={22} />
-                            </div>
+                            <div className="text-[9px] font-bold text-emerald-500 uppercase tracking-widest opacity-40 group-hover:opacity-100 transition-opacity">Paid</div>
                         </div>
-                        <h3 className="text-4xl font-black text-gray-800 tracking-tighter relative z-10">
-                            ₹{salaries
-                                .filter(s => (activeRole === 'all' || (s.role || '').toLowerCase() === activeRole.toLowerCase()) && s.status === 'Paid')
-                                .reduce((acc, curr) => acc + parseFloat(curr.calculated_salary), 0).toLocaleString()}
-                        </h3>
                     </motion.div>
 
                     <motion.div
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: 0.3 }}
-                        className="bg-white p-10 rounded-[40px] shadow-2xl shadow-sky-50/50 border-t-8 border-amber-400 relative group overflow-hidden"
+                        initial={{ opacity: 0, y: 10 }}
+                        whileInView={{ opacity: 1, y: 0 }}
+                        className="bg-white p-6 rounded-3xl shadow-lg shadow-sky-50/50 border border-sky-50 relative group overflow-hidden"
                     >
-                        <div className="absolute top-0 right-0 w-48 h-48 bg-amber-50 rounded-full -mr-24 -mt-24 opacity-30 group-hover:scale-125 transition-transform duration-700"></div>
-                        <div className="flex items-center justify-between mb-12 relative z-10">
-                            <div>
-                                <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Pending Amount</h3>
-                                <p className="text-[10px] font-bold text-amber-500 mt-2 uppercase tracking-widest flex items-center gap-2">
-                                    <FaClock size={10} /> Unpaid
-                                </p>
+                        <div className="flex items-center justify-between gap-4">
+                            <div className="flex items-center gap-4">
+                                <div className="h-10 w-10 rounded-xl bg-amber-400 flex items-center justify-center text-white shadow-lg shadow-amber-100">
+                                    <FaClock size={16} />
+                                </div>
+                                <div>
+                                    <h3 className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Pending Amount</h3>
+                                    <p className="text-lg font-black text-gray-800 tracking-tighter">
+                                        ₹{salaries
+                                            .filter(s => (activeRole === 'all' || (s.role || '').toLowerCase() === activeRole.toLowerCase()) && s.status === 'Pending')
+                                            .reduce((acc, curr) => acc + parseFloat(curr.calculated_salary), 0).toLocaleString()}
+                                    </p>
+                                </div>
                             </div>
-                            <div className="h-14 w-14 rounded-2xl bg-amber-400 flex items-center justify-center text-white shadow-xl shadow-amber-100 group-hover:rotate-6 transition-transform">
-                                <FaShieldAlt size={22} />
-                            </div>
+                            <div className="text-[9px] font-bold text-amber-500 uppercase tracking-widest opacity-40 group-hover:opacity-100 transition-opacity">Unpaid</div>
                         </div>
-                        <h3 className="text-4xl font-black text-gray-800 tracking-tighter relative z-10">
-                            ₹{salaries
-                                .filter(s => (activeRole === 'all' || (s.role || '').toLowerCase() === activeRole.toLowerCase()) && s.status === 'Pending')
-                                .reduce((acc, curr) => acc + parseFloat(curr.calculated_salary), 0).toLocaleString()}
-                        </h3>
                     </motion.div>
                 </div>
             </motion.div>
