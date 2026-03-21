@@ -7,62 +7,70 @@ exports.calculateSalary = async (req, res) => {
     const { month, year, emp_id, paidStatuses = ['Present', 'CL', 'ML', 'Comp Leave', 'OD', 'Leave', 'Holiday', 'Weekend'] } = req.body;
 
     try {
-        // Get actual days in the specified month
+        console.log(`Starting calculation for ${month}/${year}`);
         const daysInMonth = new Date(year, month, 0).getDate();
         
-        let usersQuery = `SELECT id, emp_id, name, monthly_salary, role, department_id FROM users WHERE role != 'admin'`;
+        // 1. Fetch all eligible employees (all except admin)
+        let usersQuery = `
+            SELECT id, emp_id, name, monthly_salary, role 
+            FROM users 
+            WHERE role IN ('principal', 'hod', 'staff')
+        `;
         const usersParams = [];
-
         if (emp_id) {
             usersQuery += ' AND emp_id = $1';
             usersParams.push(emp_id);
         }
-
         const { rows: users } = await pool.query(usersQuery, usersParams);
+        console.log(`Found ${users.length} eligible employees`);
+
+        if (users.length === 0) {
+            return res.json({ message: 'No eligible employees found for calculation', results: [] });
+        }
+
+        // 2. Aggregate attendance data for all users in one query for efficiency
+        const { rows: attendanceStats } = await pool.query(`
+            SELECT 
+                emp_id,
+                SUM(
+                    CASE 
+                        -- Combined status (e.g., 'Present + CL')
+                        WHEN status::text LIKE '%+%' THEN
+                            (CASE WHEN split_part(status::text, ' + ', 1) = ANY($3::text[]) THEN 0.5 ELSE 0 END +
+                             CASE WHEN split_part(status::text, ' + ', 2) = ANY($3::text[]) THEN 0.5 ELSE 0 END)
+                        
+                        -- Standard paid status
+                        WHEN status::text = ANY($3::text[]) THEN
+                            CASE 
+                                WHEN remarks ILIKE '%Half Day%' OR 
+                                     remarks ILIKE '%0.5 day%' OR 
+                                     remarks ILIKE '%1/2 day%' OR
+                                     status::text ILIKE '%Half%' THEN 0.5
+                                ELSE 1.0
+                            END
+                        ELSE 0 
+                    END
+                ) as payable_days
+            FROM attendance_records
+            WHERE EXTRACT(MONTH FROM date) = $1 AND EXTRACT(YEAR FROM date) = $2
+            GROUP BY emp_id
+        `, [month, year, paidStatuses]);
+
+        // Map stats by emp_id for quick lookup
+        const statsMap = attendanceStats.reduce((acc, curr) => {
+            acc[curr.emp_id] = parseFloat(curr.payable_days) || 0;
+            return acc;
+        }, {});
+
+        // 3. Process and persist each record
         const results = [];
-
         for (const user of users) {
-             // Precise attendance query
-             const { rows: stats } = await pool.query(`
-                SELECT 
-                    SUM(
-                        CASE 
-                            -- Case 1: Combined status like "Present + CL" or "Present + OD"
-                            WHEN status::text LIKE '%+%' THEN
-                                (
-                                    -- Calculate 0.5 for each part of the combined status that is in paidStatuses
-                                    SELECT COALESCE(SUM(0.5), 0) 
-                                    FROM unnest(string_to_array(status::text, ' + ')) AS s 
-                                    WHERE s = ANY($4::text[])
-                                )
-                            
-                            -- Case 2: Standard status check
-                            WHEN status::text = ANY($4::text[]) THEN
-                                CASE 
-                                    -- Half-day detection in remarks or status
-                                    WHEN remarks ILIKE '%Half Day%' OR 
-                                         remarks ILIKE '%0.5 day%' OR 
-                                         remarks ILIKE '%1/2 day%' OR
-                                         status::text ILIKE '%Half%' THEN 0.5
-                                    ELSE 1.0
-                                END
-                            ELSE 0 
-                        END
-                    ) as payable_days
-                FROM attendance_records
-                WHERE emp_id = $1 AND EXTRACT(MONTH FROM date) = $2 AND EXTRACT(YEAR FROM date) = $3
-             `, [user.emp_id, month, year, paidStatuses]);
-
-            const payableDays = parseFloat(stats[0].payable_days) || 0;
+            const payableDays = statsMap[user.emp_id] || 0;
             const baseSalary = parseFloat(user.monthly_salary) || 0;
             
-            // Accurate calculation: (Monthly Salary / Days in Month) * Payable Days
+            // Core Formula: (Base Salary / Actual Month Days) * Payable Days
             const calculatedAmount = ((baseSalary / daysInMonth) * payableDays).toFixed(2);
-            
-            // Total LOP for reporting
             const totalLop = Math.max(0, daysInMonth - payableDays);
-            
-            // Ensure we don't insert "NaN"
             const finalPay = isNaN(calculatedAmount) ? "0.00" : calculatedAmount;
 
             await pool.query(`
@@ -72,22 +80,27 @@ exports.calculateSalary = async (req, res) => {
                 total_present = EXCLUDED.total_present,
                 total_leave = EXCLUDED.total_leave, 
                 total_lop = EXCLUDED.total_lop,
-                calculated_salary = EXCLUDED.calculated_salary
-             `, [user.emp_id, month, year, payableDays, 0, totalLop, finalPay]);
+                calculated_salary = EXCLUDED.calculated_salary,
+                status = EXCLUDED.status
+            `, [user.emp_id, month, year, payableDays, 0, totalLop, finalPay]);
 
             results.push({
                 emp_id: user.emp_id,
                 name: user.name,
+                role: user.role,
                 calculated_salary: finalPay,
-                payable_days: payableDays,
-                total_lop: totalLop
+                payable_days: payableDays
             });
         }
 
-        res.json({ message: `Salary calculated for ${users.length} employees`, results });
+        console.log(`Successfully processed ${results.length} salary records.`);
+        res.json({ message: `Successfully recalculated salaries for ${results.length} personnel.`, results });
     } catch (error) {
-        console.error('CalculateSalary Error:', error);
-        res.status(500).json({ message: 'Server Error during calculation' });
+        console.error('FATAL CALCULATION ERROR:', error);
+        res.status(500).json({ 
+            message: 'Payroll calculation failed due to an internal server error.',
+            details: error.message 
+        });
     }
 };
 
