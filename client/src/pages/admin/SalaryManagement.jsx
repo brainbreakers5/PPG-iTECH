@@ -894,12 +894,16 @@ const SalaryManagement = () => {
                                                     </td>
                                                     <td className="p-8 text-right font-black text-gray-800">
                                                         <div className="flex flex-col items-end">
-                                                            <span className="text-[10px] text-gray-400 font-bold tracking-widest mb-1">₹{Number(s.monthly_salary || 0).toLocaleString()}</span>
+                                                            <span className="text-lg text-gray-800 tracking-tighter font-black">₹{Number(s.monthly_salary || 0).toLocaleString()}</span>
+                                                            <span className="text-[9px] text-gray-400 font-bold tracking-widest mt-1">Monthly Salary</span>
                                                         </div>
                                                     </td>
                                                     <td className="p-8 text-right font-black">
                                                         <div className="flex flex-col items-end">
                                                             <span className="text-lg text-emerald-600 tracking-tighter font-black">₹{Number(s.calculated_salary || 0).toLocaleString()}</span>
+                                                            {Number(s.total_lop) > 0 && (
+                                                                <span className="text-[9px] text-rose-400 font-bold tracking-widest mt-1">- ₹{(Number(s.monthly_salary || 0) - Number(s.calculated_salary || 0)).toLocaleString()} LOP</span>
+                                                            )}
                                                         </div>
                                                     </td>
                                                     <td className="p-8 text-center">
