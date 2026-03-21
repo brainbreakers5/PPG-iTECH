@@ -11,18 +11,49 @@ const SalaryManagement = () => {
     const { user } = useAuth();
     const [salaries, setSalaries] = useState([]);
     const now = new Date();
-    const firstDay = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
-    const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
-    const [fromDate, setFromDate] = useState(firstDay);
-    const [toDate, setToDate] = useState(lastDay);
+    
+    // Default period: Current month 25th to Next month 25th
+    const getDefaultFrom = () => {
+        const d = new Date(now.getFullYear(), now.getMonth(), 25);
+        return d.toISOString().split('T')[0];
+    };
+    const getDefaultTo = () => {
+        const d = new Date(now.getFullYear(), now.getMonth() + 1, 25);
+        return d.toISOString().split('T')[0];
+    };
+
+    const [fromDate, setFromDate] = useState(getDefaultFrom());
+    const [toDate, setToDate] = useState(getDefaultTo());
     const [loading, setLoading] = useState(true);
     const [isCalculating, setIsCalculating] = useState(false);
+    const [isHistoryMode, setIsHistoryMode] = useState(false);
     const [activeRole, setActiveRole] = useState('all');
-    const [paidStatuses, setPaidStatuses] = useState(['Present', 'CL', 'ML', 'Comp Leave', 'OD', 'Holiday']);
-    const [unpaidStatuses, setUnpaidStatuses] = useState(['Absent', 'LOP']);
+    const [paidStatuses, setPaidStatuses] = useState(() => {
+        const saved = localStorage.getItem('salary_paid_statuses');
+        return saved ? JSON.parse(saved) : ['Present', 'CL', 'ML', 'Comp Leave', 'OD', 'Holiday'];
+    });
+    const [unpaidStatuses, setUnpaidStatuses] = useState(() => {
+        const saved = localStorage.getItem('salary_unpaid_statuses');
+        return saved ? JSON.parse(saved) : ['Absent', 'LOP'];
+    });
     const [newStatus, setNewStatus] = useState('');
-    const [isAddingPaid, setIsAddingPaid] = useState(true);
     const socket = useSocket();
+
+    const saveAttendanceConfig = () => {
+        localStorage.setItem('salary_paid_statuses', JSON.stringify(paidStatuses));
+        localStorage.setItem('salary_unpaid_statuses', JSON.stringify(unpaidStatuses));
+        Swal.fire({
+            title: 'Settings Saved',
+            text: 'Attendance configuration has been updated and saved.',
+            icon: 'success',
+            toast: true,
+            position: 'top-end',
+            showConfirmButton: false,
+            timer: 3000
+        });
+        // Trigger re-calculation if needed or just fetch
+        fetchSalaries();
+    };
 
     const handleAddStatus = (isPaid) => {
         if (!newStatus.trim()) return;
@@ -434,10 +465,26 @@ const SalaryManagement = () => {
                 {/* Header Section */}
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-12 gap-8">
                     <div>
-                        <h1 className="text-4xl font-black text-gray-800 tracking-tighter">Salary Management</h1>
+                        <h1 className="text-4xl font-black text-gray-800 tracking-tighter">
+                            {isHistoryMode ? 'Salary History' : 'Salary Management'}
+                        </h1>
+                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-2">
+                            {isHistoryMode ? 'Viewing published payroll records' : 'Manage employee payroll & attendance rules'}
+                        </p>
                     </div>
-                    <div className="flex items-center gap-4 w-full md:w-auto">
-                        {user.role === 'admin' && (
+                    <div className="flex flex-wrap items-center gap-4 w-full md:w-auto">
+                        <button
+                            onClick={() => setIsHistoryMode(!isHistoryMode)}
+                            className={`flex-1 md:flex-none px-8 py-5 rounded-2xl shadow-xl transition-all font-black uppercase tracking-[0.2em] text-[10px] flex items-center justify-center border no-print ${
+                                isHistoryMode 
+                                ? 'bg-amber-500 text-white border-amber-400 shadow-amber-100' 
+                                : 'bg-white text-gray-500 border-sky-50 shadow-sky-50/50 hover:bg-gray-50'
+                            }`}
+                        >
+                            <FaClock className={`mr-3 ${isHistoryMode ? 'text-white' : 'text-amber-400'}`} /> 
+                            {isHistoryMode ? 'Live Management' : 'Salary History'}
+                        </button>
+                        {user.role === 'admin' && !isHistoryMode && (
                             <button
                                 onClick={handlePrint}
                                 className="flex-1 md:flex-none bg-white text-gray-500 px-8 py-5 rounded-2xl shadow-xl shadow-sky-50/50 hover:bg-gray-50 transition-all font-black uppercase tracking-[0.2em] text-[10px] flex items-center justify-center border border-sky-50 no-print"
@@ -445,7 +492,7 @@ const SalaryManagement = () => {
                                 <FaFileAlt className="mr-3 text-sky-400" /> Print
                             </button>
                         )}
-                        {user.role === 'admin' && (
+                        {user.role === 'admin' && !isHistoryMode && (
                             <button
                                 onClick={handleCalculate}
                                 disabled={isCalculating}
@@ -457,51 +504,26 @@ const SalaryManagement = () => {
                                     transition={isCalculating ? { repeat: Infinity, duration: 1.5, ease: "linear" } : {}}
                                 />
                                 <FaCalculator className={`mr-3 ${isCalculating ? 'animate-spin' : 'group-hover:rotate-12 transition-transform'}`} />
-                                {isCalculating ? 'Calculating...' : 'Calculate All Salaries'}
+                                {isCalculating ? 'Calculating...' : 'Calculate All'}
                             </button>
                         )}
-                        {user.role === 'admin' && salaries.some(s => s.status === 'Pending') && (
+                        {user.role === 'admin' && !isHistoryMode && salaries.some(s => s.status === 'Pending') && (
                             <button
                                 onClick={handlePublish}
                                 className="flex-1 md:flex-none bg-emerald-600 text-white px-10 py-5 rounded-2xl shadow-xl shadow-emerald-200 hover:bg-emerald-800 transition-all flex items-center justify-center font-black uppercase tracking-[0.2em] text-[10px] group"
                             >
                                 <FaBullhorn className="mr-3 group-hover:scale-125 transition-transform" />
-                                Publish All
+                                Publish
                             </button>
                         )}
                     </div>
                 </div>
 
-                {/* Period Selection (Moved to Top) */}
-                <div className="bg-white p-8 rounded-[32px] shadow-xl shadow-sky-50/50 border border-sky-50 mb-10 no-print">
-                    <div className="flex flex-col lg:flex-row gap-8 items-start lg:items-center">
-                        <div className="flex flex-wrap items-center gap-6">
-                            <h2 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] flex items-center gap-3">
-                                <FaFilter className="text-sky-600" /> Select Period
-                            </h2>
-                            <div className="flex items-center gap-4">
-                                <input
-                                    type="date"
-                                    value={fromDate}
-                                    onChange={(e) => setFromDate(e.target.value)}
-                                    className="p-3 bg-gray-50 border border-gray-100 rounded-xl outline-none focus:ring-4 focus:ring-sky-100 focus:border-sky-500 transition-all font-black text-gray-700 text-[10px] uppercase shadow-inner"
-                                />
-                                <span className="text-gray-300 font-bold">to</span>
-                                <input
-                                    type="date"
-                                    value={toDate}
-                                    onChange={(e) => setToDate(e.target.value)}
-                                    className="p-3 bg-gray-50 border border-gray-100 rounded-xl outline-none focus:ring-4 focus:ring-sky-100 focus:border-sky-500 transition-all font-black text-gray-700 text-[10px] uppercase shadow-inner"
-                                />
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                {/* Role Tabs - Only for Admin */}
-                {user.role === 'admin' && (
-                    <div className="flex flex-wrap gap-4 mb-6 no-print">
-                        {[
+                {/* Role Tabs and Period Selection Combined */}
+                <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-6 mb-10 no-print">
+                    {/* Role Selection (Cards Style) */}
+                    <div className="flex flex-wrap gap-3">
+                        {user.role === 'admin' && [
                             { id: 'all', label: 'All Personnel', icon: <FaChartLine /> },
                             { id: 'principal', label: 'Principal', icon: <FaShieldAlt /> },
                             { id: 'hod', label: 'HODs', icon: <FaShieldAlt /> },
@@ -510,9 +532,9 @@ const SalaryManagement = () => {
                             <button
                                 key={tab.id}
                                 onClick={() => setActiveRole(tab.id)}
-                                className={`flex items-center gap-3 px-8 py-4 rounded-2xl font-black uppercase tracking-[0.2em] text-[10px] transition-all ${activeRole === tab.id
-                                    ? 'bg-sky-600 text-white shadow-xl shadow-sky-200 ring-4 ring-sky-50'
-                                    : 'bg-white text-gray-400 hover:bg-gray-50 border border-sky-50'
+                                className={`flex items-center gap-3 px-6 py-4 rounded-2xl font-black uppercase tracking-[0.15em] text-[10px] transition-all border ${activeRole === tab.id
+                                    ? 'bg-sky-600 text-white shadow-xl shadow-sky-200 border-sky-500 scale-105 z-10'
+                                    : 'bg-white text-gray-400 hover:bg-gray-50 border-sky-50 shadow-sm'
                                     }`}
                             >
                                 <span className={`${activeRole === tab.id ? 'text-white' : 'text-sky-500'}`}>
@@ -522,7 +544,29 @@ const SalaryManagement = () => {
                             </button>
                         ))}
                     </div>
-                )}
+
+                    {/* Period Select (Right Corner) */}
+                    <div className="bg-white p-4 lg:p-2 rounded-[24px] shadow-lg shadow-sky-50/50 border border-sky-50 flex items-center gap-4">
+                        <div className="h-10 w-10 rounded-[18px] bg-sky-50 flex items-center justify-center text-sky-600">
+                            <FaFilter size={14} />
+                        </div>
+                        <div className="flex items-center gap-2 pr-4">
+                            <input
+                                type="date"
+                                value={fromDate}
+                                onChange={(e) => setFromDate(e.target.value)}
+                                className="p-2.5 bg-gray-50 border border-gray-100 rounded-xl outline-none focus:ring-4 focus:ring-sky-100 focus:border-sky-500 transition-all font-black text-gray-700 text-[10px] uppercase shadow-inner"
+                            />
+                            <span className="text-gray-300 font-bold px-1">/</span>
+                            <input
+                                type="date"
+                                value={toDate}
+                                onChange={(e) => setToDate(e.target.value)}
+                                className="p-2.5 bg-gray-50 border border-gray-100 rounded-xl outline-none focus:ring-4 focus:ring-sky-100 focus:border-sky-500 transition-all font-black text-gray-700 text-[10px] uppercase shadow-inner"
+                            />
+                        </div>
+                    </div>
+                </div>
 
                 {/* Analytical Matrix (Now below Role Tabs) */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10 no-print">
@@ -600,12 +644,22 @@ const SalaryManagement = () => {
                 {/* Attendance Rules (Modified Concept) */}
                 <div className="bg-white p-8 rounded-[32px] shadow-xl shadow-sky-50/50 border border-sky-50 mb-10 no-print">
                     <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-10 gap-6">
-                        <div>
-                            <h2 className="text-xl font-black text-gray-800 tracking-tight">Attendance Configuration</h2>
-                            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">Configure Payable vs Deduction statuses</p>
+                        <div className="flex items-center gap-6">
+                            <div className="hidden lg:block">
+                                <h2 className="text-xl font-black text-gray-800 tracking-tight">Attendance Configuration</h2>
+                                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">Configure Payable vs Deduction statuses</p>
+                            </div>
+                            {user.role === 'admin' && (
+                                <button 
+                                    onClick={saveAttendanceConfig}
+                                    className="bg-sky-600 text-white px-6 py-2.5 rounded-xl font-black text-[9px] uppercase tracking-widest hover:bg-sky-700 transition-all shadow-lg shadow-sky-100 flex items-center gap-2 no-print"
+                                >
+                                    <FaCheckCircle size={10} /> Save Configuration
+                                </button>
+                            )}
                         </div>
                         {user.role === 'admin' && (
-                            <div className="flex items-center gap-3 bg-gray-50 p-2 rounded-2xl border border-gray-100">
+                            <div className="flex items-center gap-3 bg-gray-50 p-2 rounded-2xl border border-gray-100 shadow-inner">
                                 <input 
                                     type="text" 
                                     placeholder="Add Custom Type..." 
@@ -707,7 +761,11 @@ const SalaryManagement = () => {
                                 <tbody className="divide-y divide-gray-50/50">
                                     <AnimatePresence mode="popLayout">
                                         {salaries
-                                            .filter(s => activeRole === 'all' || (s.role || '').toLowerCase() === activeRole.toLowerCase())
+                                            .filter(s => {
+                                                const roleMatch = activeRole === 'all' || (s.role || '').toLowerCase() === activeRole.toLowerCase();
+                                                const historyMatch = isHistoryMode ? s.status === 'Paid' : true;
+                                                return roleMatch && historyMatch;
+                                            })
                                             .map((s, idx) => (
                                                 <motion.tr
                                                     key={s.id}
@@ -778,7 +836,11 @@ const SalaryManagement = () => {
                                                 </motion.tr>
                                             ))}
                                     </AnimatePresence>
-                                    {salaries.filter(s => activeRole === 'all' || (s.role || '').toLowerCase() === activeRole.toLowerCase()).length === 0 && !loading && (
+                                    {salaries.filter(s => {
+                                        const roleMatch = activeRole === 'all' || (s.role || '').toLowerCase() === activeRole.toLowerCase();
+                                        const historyMatch = isHistoryMode ? s.status === 'Paid' : true;
+                                        return roleMatch && historyMatch;
+                                    }).length === 0 && !loading && (
                                         <tr>
                                             <td colSpan="5" className="p-32 text-center">
                                                 <div className="flex flex-col items-center gap-6 text-gray-300">
@@ -787,7 +849,19 @@ const SalaryManagement = () => {
                                                     </div>
                                                     <div>
                                                         <p className="font-black text-gray-400 uppercase tracking-[0.3em] text-xs">No Records Found</p>
-                                                        <p className="text-[10px] font-bold text-gray-400 mt-2 italic">No salary data available for this role.</p>
+                                                        <p className="text-[10px] font-bold text-gray-400 mt-2 italic">
+                                                            {isHistoryMode 
+                                                                ? "No published results found for this selection." 
+                                                                : `No salary details displayed for ${activeRole === 'all' ? 'any personnel' : activeRole} in this period.`}
+                                                        </p>
+                                                        {activeRole !== 'all' && (
+                                                            <button 
+                                                                onClick={() => setActiveRole('all')}
+                                                                className="mt-6 text-[9px] font-black uppercase tracking-widest text-sky-600 hover:text-sky-800 transition-colors"
+                                                            >
+                                                                View All Role Salary Details
+                                                            </button>
+                                                        )}
                                                     </div>
                                                 </div>
                                             </td>
