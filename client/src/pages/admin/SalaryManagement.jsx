@@ -646,7 +646,7 @@ const SalaryManagement = () => {
                                     <p className="text-lg font-black text-gray-800 tracking-tighter">
                                         ₹{getMergedSalaries()
                                             .filter(s => activeRole === 'all' || (s.role || '').toLowerCase() === activeRole.toLowerCase())
-                                            .reduce((acc, curr) => acc + Number(curr.calculated_salary || 0), 0)
+                                            .reduce((acc, curr) => acc + Number(curr.monthly_salary || 0), 0)
                                             .toLocaleString()}
                                     </p>
                                 </div>
