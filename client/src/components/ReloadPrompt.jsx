@@ -36,6 +36,7 @@ function ReloadPrompt() {
   useEffect(() => {
     if (localStorage.getItem('pwa_update_success') === 'true') {
       localStorage.removeItem('pwa_update_success');
+      /*
       Swal.fire({
         icon: 'success',
         title: 'System Updated!',
@@ -48,6 +49,7 @@ function ReloadPrompt() {
         color: '#0369a1',
         iconColor: '#0ea5e9'
       });
+      */
     }
   }, []);
 
