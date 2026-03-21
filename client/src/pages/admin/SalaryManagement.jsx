@@ -12,18 +12,19 @@ const SalaryManagement = () => {
     const [salaries, setSalaries] = useState([]);
     const now = new Date();
     
-    // Default period: Current month 25th to Next month 25th
-    const getDefaultFrom = () => {
-        const d = new Date(now.getFullYear(), now.getMonth(), 25);
-        return d.toISOString().split('T')[0];
-    };
-    const getDefaultTo = () => {
-        const d = new Date(now.getFullYear(), now.getMonth() + 1, 25);
-        return d.toISOString().split('T')[0];
+    const getDefaultDates = () => {
+        const d = new Date();
+        const from = new Date(d.getFullYear(), d.getMonth(), 25);
+        const to = new Date(d.getFullYear(), d.getMonth() + 1, 25);
+        return {
+            from: from.toISOString().split('T')[0],
+            to: to.toISOString().split('T')[0]
+        };
     };
 
-    const [fromDate, setFromDate] = useState(getDefaultFrom());
-    const [toDate, setToDate] = useState(getDefaultTo());
+    const { from: defaultFrom, to: defaultTo } = getDefaultDates();
+    const [fromDate, setFromDate] = useState(defaultFrom);
+    const [toDate, setToDate] = useState(defaultTo);
     const [loading, setLoading] = useState(true);
     const [isCalculating, setIsCalculating] = useState(false);
     const [isHistoryMode, setIsHistoryMode] = useState(false);
@@ -99,15 +100,18 @@ const SalaryManagement = () => {
             const m = d.getMonth() + 1;
             const y = d.getFullYear();
             const { data } = await api.get(`/salary?month=${m}&year=${y}`);
-            // Staff, HOD, and Principal should only see their own salary
-            if (user.role === 'staff' || user.role === 'hod' || user.role === 'principal') {
+            
+            // Allow Admin, Management, Principal, and HOD to see everyone's salary (or relevant subset)
+            // But restrict Staff to only their own.
+            if (user.role === 'staff') {
                 setSalaries(data.filter(s => s.emp_id === user.emp_id));
             } else {
+                // Admin, Management, Principal, HOD can see all results from the API
                 setSalaries(data);
             }
             setLoading(false);
         } catch (error) {
-            console.error(error);
+            console.error("Fetch Salaries Error:", error);
             setLoading(false);
         }
     };
@@ -131,24 +135,35 @@ const SalaryManagement = () => {
             setIsCalculating(true);
             try {
                 // Step 1: Calculate
+                console.log("Starting calculation for:", month, year);
                 await api.post('/salary/calculate', { month, year, paidStatuses });
                 
                 // Step 2: Publish
+                console.log("Starting publish for:", month, year);
                 const { data } = await api.post('/salary/publish', { month, year });
                 
                 Swal.fire({
                     title: 'Action Successful',
                     text: `${data.count} salary slips have been published and marked as PAID.`,
                     icon: 'success',
-                    confirmButtonColor: '#0ea5e9'
+                    confirmButtonColor: '#0ea5e9',
+                    customClass: {
+                        popup: 'rounded-[32px]',
+                        container: 'z-[10000]'
+                    }
                 });
                 fetchSalaries();
             } catch (error) {
+                console.error("Publish & Pay Failed:", error.response?.data || error.message);
                 Swal.fire({
                     title: 'Action Failed',
-                    text: 'There was an error during the publish & pay process.',
+                    text: error.response?.data?.message || 'There was an error during the publish & pay process. Please ensure all data is calculated correctly.',
                     icon: 'error',
-                    confirmButtonColor: '#0ea5e9'
+                    confirmButtonColor: '#e11d48',
+                    customClass: {
+                        popup: 'rounded-[32px]',
+                        container: 'z-[10000]'
+                    }
                 });
             } finally {
                 setIsCalculating(false);
