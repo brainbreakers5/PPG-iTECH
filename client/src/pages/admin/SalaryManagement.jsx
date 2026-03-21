@@ -158,24 +158,32 @@ const SalaryManagement = () => {
     const getMergedSalaries = () => {
         const isAdmin = user.role === 'admin' || user.role === 'management';
         if (!isAdmin) return salaries;
+
+        const dForContext = new Date(fromDate);
+        const currentM = dForContext.getMonth() + 1;
+        const currentY = dForContext.getFullYear();
+
         // MERGE: All employees (base list) + Salaries (calculated data)
         return allEmployees.map(emp => {
             const calc = salaries.find(s => s.emp_id === emp.emp_id);
+            const displaySalary = emp.monthly_salary || emp.base_salary || 0;
             if (calc) {
                 return {
                     ...calc,
                     // Use fresh monthly_salary from employee record for accurate gross pay display
-                    monthly_salary: emp.monthly_salary || calc.monthly_salary 
+                    monthly_salary: displaySalary || calc.monthly_salary 
                 };
             }
             return {
                 ...emp,
                 id: `temp_${emp.emp_id}`,
-                monthly_salary: emp.monthly_salary || 0,
+                monthly_salary: displaySalary,
                 calculated_salary: 0,
                 total_present: 0,
                 total_lop: 0,
-                status: 'Uncalculated'
+                status: 'Uncalculated',
+                month: currentM,
+                year: currentY
             };
         });
     };
