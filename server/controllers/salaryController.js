@@ -125,9 +125,10 @@ exports.calculateSalary = async (req, res) => {
             }
 
             const stats = statsMap[userEmpId] || { payable_days: 0, unpaid_days: 0 };
-            const payableDays = stats.payable_days;
-            const unpaidDays = stats.unpaid_days;
-            const baseSalary = parseFloat(user.monthly_salary) || 0;
+            // Ensure numbers, default to 0
+            const payableDays = isNaN(stats.payable_days) ? 0 : stats.payable_days;
+            const unpaidDays = isNaN(stats.unpaid_days) ? 0 : stats.unpaid_days;
+            const baseSalary = isNaN(parseFloat(user.monthly_salary)) ? 0 : parseFloat(user.monthly_salary);
 
             // Compute total deductions
             let totalDeductions = 0;
@@ -143,14 +144,17 @@ exports.calculateSalary = async (req, res) => {
             }
 
             // Real-time calculation logic:
-            // Calculate daily rate based on total days in range.
-            // Deduct the exact 'unpaid_days' from the full base salary.
-            // Empty days (e.g. pending punches) are automatically considered normal calendar days, preventing mid-month net drops.
+            // "based on attendance - with pay, without pay total counts"
+            // Use Positive Accrual: Employee earns their salary based on days present/with pay.
+            // If they are marked Present, they earn `dailyRate` for that day.
             const dailyRate = totalDaysInRange > 0 ? baseSalary / totalDaysInRange : 0;
-            let grossAmount = baseSalary - (dailyRate * unpaidDays);
+            let grossAmount = dailyRate * payableDays;
             
             // Subtract manual fixed monthly deductions (floor at 0)
-            let calculatedAmount = Math.max(0, grossAmount - totalDeductions).toFixed(2);
+            // Ensure calculatedAmount is a valid number, fallback to 0 if NaN.
+            let calcAmountRaw = Math.max(0, grossAmount - totalDeductions);
+            if (isNaN(calcAmountRaw)) calcAmountRaw = 0;
+            let calculatedAmount = calcAmountRaw.toFixed(2);
             
             const totalLop = unpaidDays;
 
@@ -162,7 +166,7 @@ exports.calculateSalary = async (req, res) => {
                     total_leave = EXCLUDED.total_leave,
                     total_lop = EXCLUDED.total_lop,
                     calculated_salary = EXCLUDED.calculated_salary,
-                    status = EXCLUDED.status
+                    status = CASE WHEN salary_records.status = 'Paid' THEN salary_records.status ELSE EXCLUDED.status END
             `, [userEmpId, month, year, payableDays, 0, totalLop, calculatedAmount]);
 
             results.push({
