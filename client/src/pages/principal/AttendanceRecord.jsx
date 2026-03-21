@@ -478,24 +478,28 @@ const AttendanceRecord = () => {
                         >
                             Summary View
                         </button>
-                        <button
-                            onClick={() => {
-                                setViewMode('detailed');
-                                document.querySelector('main')?.scrollTo({ top: 0, behavior: 'smooth' });
-                            }}
-                            className={`px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${viewMode === 'detailed' ? 'bg-white text-sky-600 shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
-                        >
-                            Detailed Logs
-                        </button>
-                        <button
-                            onClick={() => {
-                                setViewMode('biometric');
-                                document.querySelector('main')?.scrollTo({ top: 0, behavior: 'smooth' });
-                            }}
-                            className={`px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${viewMode === 'biometric' ? 'bg-white text-emerald-600 shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
-                        >
-                            Biometric Sync
-                        </button>
+                        {(user?.role === 'admin' || user?.role === 'management') && (
+                            <>
+                                <button
+                                    onClick={() => {
+                                        setViewMode('detailed');
+                                        document.querySelector('main')?.scrollTo({ top: 0, behavior: 'smooth' });
+                                    }}
+                                    className={`px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${viewMode === 'detailed' ? 'bg-white text-sky-600 shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
+                                >
+                                    Detailed Logs
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        setViewMode('biometric');
+                                        document.querySelector('main')?.scrollTo({ top: 0, behavior: 'smooth' });
+                                    }}
+                                    className={`px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${viewMode === 'biometric' ? 'bg-white text-emerald-600 shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
+                                >
+                                    Biometric Sync
+                                </button>
+                            </>
+                        )}
                     </div>
                 </div>
 
