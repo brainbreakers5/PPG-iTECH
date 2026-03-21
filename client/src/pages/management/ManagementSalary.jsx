@@ -212,7 +212,7 @@ const ManagementSalary = () => {
                                     <tbody className="divide-y divide-gray-50/50">
                                         <AnimatePresence mode="popLayout">
                                             {salaries
-                                                .filter(s => activeRole === 'all' || s.role === activeRole)
+                                                .filter(s => activeRole === 'all' || (s.role || '').toLowerCase() === activeRole.toLowerCase())
                                                 .map((s, idx) => (
                                                     <motion.tr
                                                         key={s.id}
@@ -229,19 +229,21 @@ const ManagementSalary = () => {
                                                                 </div>
                                                                 <div>
                                                                     <p className="text-sm font-black text-gray-800 tracking-tight group-hover:text-purple-600 transition-colors">{s.name}</p>
-                                                                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mt-0.5">{s.department_name}</p>
+                                                                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mt-0.5">{s.department_name || 'N/A'}</p>
                                                                 </div>
                                                             </div>
                                                         </td>
                                                         <td className="p-8">
                                                             <div className="flex flex-col items-center gap-3">
                                                                 <div className="flex gap-4 text-[9px] font-black uppercase tracking-widest">
-                                                                    <span className="text-purple-500 bg-purple-50 px-2 py-1 rounded-md">PRESENT: {s.total_present}</span>
+                                                                    <span className="text-purple-500 bg-purple-50 px-2 py-1 rounded-md" title="Total Payable Days">PAID: {s.total_present}</span>
+                                                                    <span className="text-gray-400 bg-gray-50 px-2 py-1 rounded-md" title="Total Days in Month">MONTH: {new Date(s.year, s.month, 0).getDate()}</span>
+                                                                    <span className="text-rose-500 bg-rose-50 px-2 py-1 rounded-md" title="Loss of Pay Days">LOP: {s.total_lop || 0}</span>
                                                                 </div>
                                                                 <div className="w-32 bg-gray-100 h-1.5 rounded-full overflow-hidden shadow-inner p-px">
                                                                     <motion.div
                                                                         initial={{ width: 0 }}
-                                                                        animate={{ width: `${(s.total_present / 30) * 100}%` }}
+                                                                        animate={{ width: `${(s.total_present / new Date(s.year, s.month, 0).getDate()) * 100}%` }}
                                                                         className="bg-gradient-to-r from-purple-400 to-purple-600 h-full rounded-full shadow-[0_0_12px_rgba(124,58,237,0.3)]"
                                                                     ></motion.div>
                                                                 </div>
@@ -249,8 +251,8 @@ const ManagementSalary = () => {
                                                         </td>
                                                         <td className="p-8 text-right font-black text-gray-800">
                                                             <div className="flex flex-col items-end">
-                                                                <span className="text-[9px] text-gray-300 line-through font-bold tracking-widest mb-1">₹{s.monthly_salary}</span>
-                                                                <span className="text-lg text-purple-600 tracking-tighter font-black">₹{s.calculated_salary.toLocaleString()}</span>
+                                                                <span className="text-[9px] text-gray-300 line-through font-bold tracking-widest mb-1">₹{Number(s.monthly_salary || 0).toLocaleString()}</span>
+                                                                <span className="text-lg text-purple-600 tracking-tighter font-black">₹{Number(s.calculated_salary || 0).toLocaleString()}</span>
                                                             </div>
                                                         </td>
                                                         <td className="p-8 text-center">
@@ -264,7 +266,7 @@ const ManagementSalary = () => {
                                                     </motion.tr>
                                                 ))}
                                         </AnimatePresence>
-                                        {salaries.filter(s => activeRole === 'all' || s.role === activeRole).length === 0 && !loading && (
+                                        {salaries.filter(s => activeRole === 'all' || (s.role || '').toLowerCase() === activeRole.toLowerCase()).length === 0 && !loading && (
                                             <tr>
                                                 <td colSpan="4" className="p-32 text-center">
                                                     <div className="flex flex-col items-center gap-6 text-gray-300">
