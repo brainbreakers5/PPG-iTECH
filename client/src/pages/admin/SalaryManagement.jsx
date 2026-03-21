@@ -1,18 +1,19 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import Layout from '../../components/Layout';
 import api from '../../utils/api';
 import Swal from 'sweetalert2';
 import { useAuth } from '../../context/AuthContext';
 import { useSocket } from '../../context/SocketContext';
-import { FaCalculator, FaCheckCircle, FaFilter, FaFileAlt, FaClock, FaMoneyBillWave, FaArrowRight, FaShieldAlt, FaChartLine, FaWallet, FaBullhorn } from 'react-icons/fa';
+import { FaCalculator, FaCheckCircle, FaTimesCircle, FaFilter, FaFileAlt, FaClock, FaMoneyBillWave, FaArrowRight, FaShieldAlt, FaChartLine, FaWallet, FaBullhorn, FaCheckSquare, FaSquare } from 'react-icons/fa';
 import { motion, AnimatePresence } from 'framer-motion';
 
 const SalaryManagement = () => {
     const { user } = useAuth();
     const [salaries, setSalaries] = useState([]);
     const [allEmployees, setAllEmployees] = useState([]);
-    const [dailyBreakdown, setDailyBreakdown] = useState(null); // { emp, data }
+    const [dailyBreakdown, setDailyBreakdown] = useState(null);
     const [loadingBreakdown, setLoadingBreakdown] = useState(false);
+    const [selectedIds, setSelectedIds] = useState([]); // for bulk mark paid
     const now = new Date();
     const socket = useSocket();
 
@@ -27,20 +28,20 @@ const SalaryManagement = () => {
     const getDefaultDates = () => {
         const d = new Date();
         const year = d.getFullYear();
-        const month = d.getMonth(); // 0-indexed (e.g., March is 2)
-        
-        // First Date: Current Month 25th
-        const fromDateStr = `${year}-${String(month + 1).padStart(2, '0')}-25`;
-        
-        // Second Date: Next Month 25th
-        let nextMonth = month + 1;
+        const month = d.getMonth(); // 0-indexed
+
+        // FROM: 24th of current month
+        const fromDateStr = `${year}-${String(month + 1).padStart(2, '0')}-24`;
+
+        // TO: 25th of next month
+        let nextMonth = month + 2; // +2 because month is 0-indexed and we want next month (1-indexed)
         let nextYear = year;
-        if (nextMonth > 11) {
-            nextMonth = 0;
+        if (nextMonth > 12) {
+            nextMonth = 1;
             nextYear++;
         }
-        const toDateStr = `${nextYear}-${String(nextMonth + 1).padStart(2, '0')}-25`;
-        
+        const toDateStr = `${nextYear}-${String(nextMonth).padStart(2, '0')}-25`;
+
         return { from: fromDateStr, to: toDateStr };
     };
 
@@ -272,6 +273,52 @@ const SalaryManagement = () => {
         }
     };
 
+    // ─── Bulk Mark Paid ─────────────────────────────────────────────────
+    const handleBulkMarkPaid = async () => {
+        const unpaidSelected = getMergedSalaries().filter(
+            s => selectedIds.includes(s.id) && s.status !== 'Paid'
+        );
+        if (unpaidSelected.length === 0) {
+            return Swal.fire('Nothing to pay', 'All selected employees are already marked as Paid.', 'info');
+        }
+        const result = await Swal.fire({
+            title: `Mark ${unpaidSelected.length} Employee(s) as Paid?`,
+            text: `Period: ${fromDate} – ${toDate}`,
+            icon: 'question',
+            showCancelButton: true,
+            confirmButtonColor: '#10b981',
+            confirmButtonText: `Yes, Mark All Paid`,
+            cancelButtonColor: '#64748b',
+            customClass: { popup: 'rounded-[32px]', container: 'z-[10000]' }
+        });
+        if (!result.isConfirmed) return;
+        try {
+            for (const s of unpaidSelected) {
+                await api.put(`/salary/${s.id}/status`, { status: 'Paid' });
+                await api.post('/salary/notify-paid', {
+                    emp_id: s.emp_id, name: s.name, email: s.email,
+                    fromDate, toDate, amount: s.calculated_salary
+                });
+            }
+            setSelectedIds([]);
+            fetchSalaries();
+            Swal.fire({ title: 'All Paid!', text: `${unpaidSelected.length} employees marked as Paid.`, icon: 'success', timer: 2000, showConfirmButton: false, customClass: { popup: 'rounded-[32px]', container: 'z-[10000]' } });
+        } catch (err) {
+            console.error(err);
+            Swal.fire('Error', 'Some payments could not be processed.', 'error');
+        }
+    };
+
+    const toggleSelectId = (id) => setSelectedIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+    const toggleSelectAll = () => {
+        const visible = getMergedSalaries().filter(s => {
+            const roleMatch = activeRole === 'all' || (s.role||'').toLowerCase() === activeRole.toLowerCase();
+            return roleMatch && s.status !== 'Paid';
+        });
+        if (selectedIds.length === visible.length) setSelectedIds([]);
+        else setSelectedIds(visible.map(s => s.id));
+    };
+
     const handleMarkPaid = async (s) => {
         const result = await Swal.fire({
             title: `Mark ${s.name} as Paid?`,
@@ -309,6 +356,8 @@ const SalaryManagement = () => {
             Swal.fire('Error', error.response?.data?.message || 'Failed to mark as paid.', 'error');
         }
     };
+
+
 
     const handleStatusUpdate = async (id, status) => {
         try {
@@ -748,16 +797,16 @@ const SalaryManagement = () => {
                     </motion.div>
                 </div>
 
-                {/* Attendance Rules (Modified Concept) */}
+                {/* Attendance Rules (Row-wise Layout) */}
                 <div className="bg-white p-8 rounded-[32px] shadow-xl shadow-sky-50/50 border border-sky-50 mb-10 no-print">
-                    <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-10 gap-6">
+                    <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-8 gap-6">
                         <div className="flex items-center gap-6">
                             <div className="hidden lg:block">
                                 <h2 className="text-xl font-black text-gray-800 tracking-tight">Attendance Configuration</h2>
-                                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">Configure Payable vs Deduction statuses</p>
+                                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">Configure Payable vs Deduction statuses · Row-wise</p>
                             </div>
                             {user.role === 'admin' && (
-                                <button 
+                                <button
                                     onClick={saveAttendanceConfig}
                                     className="bg-sky-600 text-white px-6 py-2.5 rounded-xl font-black text-[9px] uppercase tracking-widest hover:bg-sky-700 transition-all shadow-lg shadow-sky-100 flex items-center gap-2 no-print"
                                 >
@@ -767,82 +816,67 @@ const SalaryManagement = () => {
                         </div>
                         {user.role === 'admin' && (
                             <div className="flex items-center gap-3 bg-gray-50 p-2 rounded-2xl border border-gray-100 shadow-inner">
-                                <input 
-                                    type="text" 
-                                    placeholder="Add Custom Type..." 
+                                <input
+                                    type="text"
+                                    placeholder="Add Custom Type..."
                                     className="bg-transparent border-none outline-none px-4 py-2 text-[10px] font-black uppercase tracking-wider w-40"
                                     value={newStatus}
                                     onChange={(e) => setNewStatus(e.target.value)}
                                 />
                                 <div className="flex gap-1">
-                                    <button 
+                                    <button
                                         onClick={() => handleAddStatus(true)}
                                         className="bg-emerald-500 text-white p-2 rounded-xl border border-emerald-400 hover:bg-emerald-600 transition-all shadow-lg shadow-emerald-100"
                                         title="Add to With Pay"
                                     >
                                         <FaCheckCircle size={14} />
                                     </button>
-                                    <button 
+                                    <button
                                         onClick={() => handleAddStatus(false)}
                                         className="bg-rose-500 text-white p-2 rounded-xl border border-rose-400 hover:bg-rose-600 transition-all shadow-lg shadow-rose-100"
                                         title="Add to Without Pay"
                                     >
-                                        <FaClock size={14} />
+                                        <FaTimesCircle size={14} />
                                     </button>
                                 </div>
                             </div>
                         )}
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
-                        {/* With Pay Section */}
-                        <div className="bg-emerald-50/30 p-6 rounded-3xl border border-emerald-100">
-                            <h3 className="text-[10px] font-black text-emerald-600 uppercase tracking-[0.2em] mb-6 flex items-center gap-3">
-                                <div className="h-6 w-6 bg-emerald-500 rounded-lg flex items-center justify-center text-white">1</div>
+                    {/* ROW-WISE: With Pay on top, Without Pay below */}
+                    <div className="flex flex-col gap-6">
+                        {/* Row 1 – With Pay (Payable) */}
+                        <div className="bg-emerald-50/30 p-5 rounded-3xl border border-emerald-100">
+                            <h3 className="text-[10px] font-black text-emerald-600 uppercase tracking-[0.2em] mb-4 flex items-center gap-3">
+                                <div className="h-6 w-6 bg-emerald-500 rounded-lg flex items-center justify-center text-white text-xs">✓</div>
                                 With Pay (Payable)
                             </h3>
                             <div className="flex flex-wrap gap-2">
                                 {paidStatuses.map(status => (
-                                    <div 
-                                        key={status} 
-                                        className="bg-white px-4 py-2 rounded-xl border border-emerald-100 text-[10px] font-black uppercase text-emerald-700 flex items-center gap-2 group shadow-sm"
-                                    >
-                                        <FaCheckCircle className="text-emerald-400" />
+                                    <div key={status} className="bg-white px-4 py-2 rounded-xl border border-emerald-100 text-[10px] font-black uppercase text-emerald-700 flex items-center gap-2 group shadow-sm">
+                                        <FaCheckCircle className="text-emerald-400" size={10} />
                                         {status}
                                         {user.role === 'admin' && (
-                                            <button 
-                                                onClick={() => setPaidStatuses(paidStatuses.filter(s => s !== status))}
-                                                className="ml-2 text-emerald-300 hover:text-rose-500 transition-colors opacity-0 group-hover:opacity-100"
-                                            >
-                                                ×
-                                            </button>
+                                            <button onClick={() => setPaidStatuses(paidStatuses.filter(s => s !== status))} className="ml-1 text-emerald-300 hover:text-rose-500 transition-colors opacity-0 group-hover:opacity-100">×</button>
                                         )}
                                     </div>
                                 ))}
                             </div>
                         </div>
 
-                        {/* Without Pay Section */}
-                        <div className="bg-rose-50/30 p-6 rounded-3xl border border-rose-100">
-                            <h3 className="text-[10px] font-black text-rose-600 uppercase tracking-[0.2em] mb-6 flex items-center gap-3">
-                                <div className="h-6 w-6 bg-rose-500 rounded-lg flex items-center justify-center text-white">2</div>
-                                Without Pay (Deduction/LOP)
+                        {/* Row 2 – Without Pay (Deduction/LOP) */}
+                        <div className="bg-rose-50/30 p-5 rounded-3xl border border-rose-100">
+                            <h3 className="text-[10px] font-black text-rose-600 uppercase tracking-[0.2em] mb-4 flex items-center gap-3">
+                                <div className="h-6 w-6 bg-rose-500 rounded-lg flex items-center justify-center text-white text-xs">✗</div>
+                                Without Pay (Deduction / LOP)
                             </h3>
                             <div className="flex flex-wrap gap-2">
                                 {unpaidStatuses.map(status => (
-                                    <div 
-                                        key={status} 
-                                        className="bg-white px-4 py-2 rounded-xl border border-rose-100 text-[10px] font-black uppercase text-rose-700 flex items-center gap-2 group shadow-sm"
-                                    >
-                                        <FaClock className="text-rose-400" />
+                                    <div key={status} className="bg-white px-4 py-2 rounded-xl border border-rose-100 text-[10px] font-black uppercase text-rose-700 flex items-center gap-2 group shadow-sm">
+                                        <FaTimesCircle className="text-rose-400" size={10} />
                                         {status}
                                         {user.role === 'admin' && (
-                                            <button 
-                                                onClick={() => setUnpaidStatuses(unpaidStatuses.filter(s => s !== status))}
-                                                className="ml-2 text-rose-300 hover:text-rose-500 transition-colors opacity-0 group-hover:opacity-100"
-                                            >
-                                                ×
-                                            </button>
+                                            <button onClick={() => setUnpaidStatuses(unpaidStatuses.filter(s => s !== status))} className="ml-1 text-rose-300 hover:text-rose-500 transition-colors opacity-0 group-hover:opacity-100">×</button>
                                         )}
                                     </div>
                                 ))}
@@ -853,11 +887,34 @@ const SalaryManagement = () => {
 
                 {/* Table Section */}
                 <div className="mb-12">
+                    {/* Bulk Action Bar */}
+                    {user.role === 'admin' && !isHistoryMode && (
+                        <div className="flex items-center justify-between mb-4 px-2">
+                            <div className="flex items-center gap-3">
+                                <button onClick={toggleSelectAll} className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-gray-500 hover:text-sky-600 transition-colors">
+                                    {selectedIds.length > 0 ? <FaCheckSquare className="text-sky-600" size={16} /> : <FaSquare className="text-gray-300" size={16} />}
+                                    {selectedIds.length > 0 ? `${selectedIds.length} Selected` : 'Select All Unpaid'}
+                                </button>
+                                {selectedIds.length > 0 && (
+                                    <button
+                                        onClick={handleBulkMarkPaid}
+                                        className="flex items-center gap-2 bg-emerald-600 text-white text-[9px] font-black uppercase tracking-widest px-5 py-2.5 rounded-2xl hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-100 active:scale-95"
+                                    >
+                                        <FaCheckCircle size={12} /> Mark All Paid ({selectedIds.length})
+                                    </button>
+                                )}
+                            </div>
+                            <span className="text-[9px] text-gray-400 font-bold uppercase tracking-widest">
+                                {getMergedSalaries().filter(s => s.status !== 'Paid').length} Unpaid Remaining
+                            </span>
+                        </div>
+                    )}
                     <div className="bg-white rounded-[40px] shadow-2xl shadow-sky-50/50 border border-sky-50 overflow-hidden">
                         <div className="overflow-x-auto">
                             <table className="w-full">
                                 <thead>
                                     <tr className="bg-gray-50/50 border-b border-gray-100">
+                                        {user.role === 'admin' && !isHistoryMode && <th className="p-4 pl-8 w-10"></th>}
                                         <th className="p-8 text-[10px] font-black uppercase tracking-[0.2em] text-gray-400 text-left">Employee</th>
                                         <th className="p-8 text-[10px] font-black uppercase tracking-[0.2em] text-gray-400 text-center">Attendance</th>
                                         <th className="p-8 text-[10px] font-black uppercase tracking-[0.2em] text-gray-400 text-right">Gross Pay</th>
@@ -881,8 +938,20 @@ const SalaryManagement = () => {
                                                     animate={{ opacity: 1, x: 0 }}
                                                     exit={{ opacity: 0, x: -20 }}
                                                     transition={{ delay: idx * 0.03 }}
-                                                    className="hover:bg-sky-50/30 transition-all group"
+                                                    className={`hover:bg-sky-50/30 transition-all group ${selectedIds.includes(s.id) ? 'bg-emerald-50/30' : ''}`}
                                                 >
+                                                    {/* Checkbox column – admin only */}
+                                                    {user.role === 'admin' && !isHistoryMode && (
+                                                        <td className="p-4 pl-8">
+                                                            {s.status !== 'Paid' && (
+                                                                <button onClick={() => toggleSelectId(s.id)} className="text-gray-300 hover:text-emerald-500 transition-colors">
+                                                                    {selectedIds.includes(s.id)
+                                                                        ? <FaCheckSquare className="text-emerald-500" size={18} />
+                                                                        : <FaSquare size={18} />}
+                                                                </button>
+                                                            )}
+                                                        </td>
+                                                    )}
                                                     <td className="p-8">
                                                         <div className="flex items-center gap-5">
                                                             <div className="h-14 w-14 rounded-[20px] bg-gradient-to-br from-sky-50 to-white border border-sky-50 flex items-center justify-center text-sky-600 font-black text-lg shadow-sm group-hover:scale-110 group-hover:rotate-3 transition-all duration-500 overflow-hidden">
@@ -930,18 +999,27 @@ const SalaryManagement = () => {
                                                     <td className="p-8 text-right font-black">
                                                         <div className="flex flex-col items-end">
                                                             <span className="text-lg text-emerald-600 tracking-tighter font-black">₹{Number(s.calculated_salary || 0).toLocaleString()}</span>
-                                                            {Number(s.total_lop) > 0 && (
-                                                                <span className="text-[9px] text-rose-400 font-bold tracking-widest mt-1">- ₹{(Number(s.monthly_salary || 0) - Number(s.calculated_salary || 0)).toLocaleString()} LOP</span>
+                                                            {(Number(s.monthly_salary || 0) > Number(s.calculated_salary || 0)) && (
+                                                                <span className="text-[9px] text-rose-400 font-bold tracking-widest mt-1">
+                                                                    - ₹{(Number(s.monthly_salary || 0) - Number(s.calculated_salary || 0)).toLocaleString()} DEDUCTED
+                                                                </span>
                                                             )}
                                                         </div>
                                                     </td>
                                                     <td className="p-8 text-center">
-                                                        <span className={`text-[9px] font-black uppercase px-4 py-2 rounded-2xl tracking-widest border ${s.status === 'Paid'
-                                                            ? 'bg-emerald-50 text-emerald-600 border-emerald-100'
-                                                            : 'bg-amber-50 text-amber-600 border-amber-100 animate-pulse'
-                                                            }`}>
-                                                            {s.status}
-                                                        </span>
+                                                        {s.status === 'Paid' ? (
+                                                            <span className="inline-flex items-center gap-1.5 text-[9px] font-black uppercase px-4 py-2 rounded-2xl tracking-widest border bg-emerald-50 text-emerald-600 border-emerald-100">
+                                                                <FaCheckCircle size={10} /> Paid
+                                                            </span>
+                                                        ) : s.status === 'Uncalculated' ? (
+                                                            <span className="inline-flex items-center gap-1.5 text-[9px] font-black uppercase px-4 py-2 rounded-2xl tracking-widest border bg-gray-50 text-gray-400 border-gray-100">
+                                                                <FaTimesCircle size={10} /> Unpaid
+                                                            </span>
+                                                        ) : (
+                                                            <span className="inline-flex items-center gap-1.5 text-[9px] font-black uppercase px-4 py-2 rounded-2xl tracking-widest border bg-amber-50 text-amber-600 border-amber-100 animate-pulse">
+                                                                <FaTimesCircle size={10} /> Unpaid
+                                                            </span>
+                                                        )}
                                                     </td>
                                                     <td className="p-8 text-right flex justify-end gap-2">
                                                         <button
