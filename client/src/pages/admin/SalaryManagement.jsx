@@ -516,8 +516,8 @@ const SalaryManagement = () => {
                                                         </td>
                                                         <td className="p-8 text-right font-black text-gray-800">
                                                             <div className="flex flex-col items-end">
-                                                                <span className="text-[9px] text-gray-300 line-through font-bold tracking-widest mb-1">₹{s.monthly_salary}</span>
-                                                                <span className="text-lg text-sky-600 tracking-tighter font-black">₹{s.calculated_salary.toLocaleString()}</span>
+                                                                 <span className="text-[9px] text-gray-300 line-through font-bold tracking-widest mb-1">₹{Number(s.monthly_salary || 0).toLocaleString()}</span>
+                                                                 <span className="text-lg text-sky-600 tracking-tighter font-black">₹{Number(s.calculated_salary || 0).toLocaleString()}</span>
                                                             </div>
                                                         </td>
                                                         <td className="p-8 text-center">
@@ -588,9 +588,10 @@ const SalaryManagement = () => {
                             </div>
                         </div>
                         <h3 className="text-4xl font-black text-gray-800 tracking-tighter relative z-10">
-                            ₹{salaries
-                                .filter(s => activeRole === 'all' || (s.role || '').toLowerCase() === activeRole.toLowerCase())
-                                .reduce((acc, curr) => acc + parseFloat(curr.calculated_salary), 0).toLocaleString()}
+                             ₹{salaries
+                                 .filter(s => activeRole === 'all' || (s.role || '').toLowerCase() === activeRole.toLowerCase())
+                                 .reduce((acc, curr) => acc + Number(curr.calculated_salary || 0), 0)
+                                 .toLocaleString()}
                         </h3>
                     </motion.div>
 
