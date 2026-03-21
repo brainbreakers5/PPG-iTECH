@@ -51,9 +51,28 @@ const SalaryManagement = () => {
             showConfirmButton: false,
             timer: 3000
         });
-        // Trigger re-calculation if needed or just fetch
-        fetchSalaries();
+        // Trigger re-calculation if needed    
     };
+
+    useEffect(() => {
+        const d = new Date(fromDate);
+        const month = d.getMonth() + 1;
+        const year = d.getFullYear();
+        
+        // Auto-calculate on period change or status config change
+        const silentCalculate = async () => {
+            if (user.role !== 'admin') return; // Only admin can trigger auto-calc
+            try {
+                await api.post('/salary/calculate', { month, year, paidStatuses });
+                fetchSalaries();
+            } catch (error) {
+                console.error("Auto-calculation failed:", error);
+                fetchSalaries();
+            }
+        };
+        const timer = setTimeout(silentCalculate, 800); // Debounce for 800ms
+        return () => clearTimeout(timer);
+    }, [fromDate, toDate, paidStatuses, unpaidStatuses, user.role]);
 
     const handleAddStatus = (isPaid) => {
         if (!newStatus.trim()) return;
@@ -65,10 +84,6 @@ const SalaryManagement = () => {
         }
         setNewStatus('');
     };
-
-    useEffect(() => {
-        fetchSalaries();
-    }, [fromDate, toDate]);
 
     useEffect(() => {
         if (!socket) return;
@@ -97,78 +112,46 @@ const SalaryManagement = () => {
         }
     };
 
-    const handleCalculate = async () => {
+    const handlePublishAndPay = async () => {
         const d = new Date(fromDate);
         const month = d.getMonth() + 1;
         const year = d.getFullYear();
 
         const result = await Swal.fire({
-            title: 'Calculate Salaries?',
-            text: `Calculate payroll for: ${String(month).padStart(2, '0')}/${year}. This will process attendance records and calculate net pay.`,
-            icon: 'question',
+            title: 'Publish & Pay All?',
+            text: `This will calculate the final amounts for ${String(month).padStart(2, '0')}/${year} and publish the salary slips to all employees.`,
+            icon: 'warning',
             showCancelButton: true,
-            confirmButtonColor: '#2563eb',
-            confirmButtonText: 'Start Calculation',
+            confirmButtonColor: '#0ea5e9',
+            confirmButtonText: 'Proceed',
             cancelButtonColor: '#64748b',
-            background: '#fff',
-            customClass: {
-                popup: 'rounded-[40px]',
-                title: 'font-black text-gray-800 tracking-tight'
-            }
         });
 
         if (result.isConfirmed) {
             setIsCalculating(true);
             try {
+                // Step 1: Calculate
                 await api.post('/salary/calculate', { month, year, paidStatuses });
+                
+                // Step 2: Publish
+                const { data } = await api.post('/salary/publish', { month, year });
+                
                 Swal.fire({
-                    title: 'Calculation Complete',
-                    text: 'Payroll has been successfully calculated.',
+                    title: 'Action Successful',
+                    text: `${data.count} salary slips have been published and marked as PAID.`,
                     icon: 'success',
-                    confirmButtonColor: '#2563eb'
+                    confirmButtonColor: '#0ea5e9'
                 });
                 fetchSalaries();
             } catch (error) {
                 Swal.fire({
-                    title: 'Calculation Failed',
-                    text: 'There was an error calculating salaries.',
+                    title: 'Action Failed',
+                    text: 'There was an error during the publish & pay process.',
                     icon: 'error',
-                    confirmButtonColor: '#2563eb'
+                    confirmButtonColor: '#0ea5e9'
                 });
             } finally {
                 setIsCalculating(false);
-            }
-        }
-    };
-
-    const handlePublish = async () => {
-        const d = new Date(fromDate);
-        const month = d.getMonth() + 1;
-        const year = d.getFullYear();
-        const pendingCount = salaries.filter(s => s.status === 'Pending').length;
-
-        if (pendingCount === 0) {
-            Swal.fire({ title: 'No Pending Salaries', text: 'All salaries have already been published.', icon: 'info', confirmButtonColor: '#2563eb' });
-            return;
-        }
-
-        const result = await Swal.fire({
-            title: 'Publish All Salaries?',
-            text: `This will mark ${pendingCount} pending salary records as Paid for ${String(month).padStart(2, '0')}/${year} and notify all employees.`,
-            icon: 'warning',
-            showCancelButton: true,
-            confirmButtonColor: '#059669',
-            confirmButtonText: 'Publish Now',
-            cancelButtonColor: '#64748b',
-        });
-
-        if (result.isConfirmed) {
-            try {
-                const { data } = await api.post('/salary/publish', { month, year });
-                Swal.fire({ title: 'Published!', text: `${data.count} salary records have been published to all employees.`, icon: 'success', confirmButtonColor: '#2563eb' });
-                fetchSalaries();
-            } catch (error) {
-                Swal.fire({ title: 'Publish Failed', text: 'There was an error publishing salaries.', icon: 'error', confirmButtonColor: '#2563eb' });
             }
         }
     };
@@ -494,7 +477,7 @@ const SalaryManagement = () => {
                         )}
                         {user.role === 'admin' && !isHistoryMode && (
                             <button
-                                onClick={handleCalculate}
+                                onClick={handlePublishAndPay}
                                 disabled={isCalculating}
                                 className={`flex-1 md:flex-none bg-sky-600 text-white px-10 py-5 rounded-2xl shadow-xl shadow-sky-200 hover:bg-sky-800 transition-all flex items-center justify-center font-black uppercase tracking-[0.2em] text-[10px] relative overflow-hidden group ${isCalculating ? 'opacity-50 cursor-not-allowed' : ''}`}
                             >
@@ -504,16 +487,7 @@ const SalaryManagement = () => {
                                     transition={isCalculating ? { repeat: Infinity, duration: 1.5, ease: "linear" } : {}}
                                 />
                                 <FaCalculator className={`mr-3 ${isCalculating ? 'animate-spin' : 'group-hover:rotate-12 transition-transform'}`} />
-                                {isCalculating ? 'Calculating...' : 'Calculate All'}
-                            </button>
-                        )}
-                        {user.role === 'admin' && !isHistoryMode && salaries.some(s => s.status === 'Pending') && (
-                            <button
-                                onClick={handlePublish}
-                                className="flex-1 md:flex-none bg-emerald-600 text-white px-10 py-5 rounded-2xl shadow-xl shadow-emerald-200 hover:bg-emerald-800 transition-all flex items-center justify-center font-black uppercase tracking-[0.2em] text-[10px] group"
-                            >
-                                <FaBullhorn className="mr-3 group-hover:scale-125 transition-transform" />
-                                Publish
+                                {isCalculating ? 'Processing...' : 'Publish & Pay'}
                             </button>
                         )}
                     </div>
