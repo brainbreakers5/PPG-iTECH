@@ -65,6 +65,10 @@ const initDB = async () => {
             )
         `);
         console.log('--- Push Subscriptions Table Verified ---');
+        
+        // Ensure users table has deductions column
+        await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS deductions JSONB DEFAULT \'[]\'');
+        console.log('--- Users Table Deductions Column Verified ---');
     } catch (err) {
         console.error('Database Initialization Error:', err);
     }
