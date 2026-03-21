@@ -91,6 +91,7 @@ const SalaryManagement = () => {
                     month, 
                     year, 
                     paidStatuses,
+                    unpaidStatuses,
                     fromDate,
                     toDate
                 });
@@ -238,7 +239,7 @@ const SalaryManagement = () => {
             try {
                 // Step 1: Calculate
                 console.log("Starting calculation for:", month, year);
-                await api.post('/salary/calculate', { month, year, paidStatuses });
+                await api.post('/salary/calculate', { month, year, paidStatuses, unpaidStatuses, fromDate, toDate });
                 
                 // Step 2: Publish
                 console.log("Starting publish for:", month, year);
