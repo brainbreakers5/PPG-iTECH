@@ -161,7 +161,13 @@ const SalaryManagement = () => {
         // MERGE: All employees (base list) + Salaries (calculated data)
         return allEmployees.map(emp => {
             const calc = salaries.find(s => s.emp_id === emp.emp_id);
-            if (calc) return calc;
+            if (calc) {
+                return {
+                    ...calc,
+                    // Use fresh base_salary from employee record for accurate gross pay display
+                    monthly_salary: emp.base_salary || calc.monthly_salary 
+                };
+            }
             return {
                 ...emp,
                 id: `temp_${emp.emp_id}`,
