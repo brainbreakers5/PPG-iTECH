@@ -1,19 +1,47 @@
 const { pool } = require('../config/db');
 
-// @desc    Calculate Salary
+// Helper: count working days in a date range excluding weekends
+const getWorkingDays = (from, to) => {
+    let count = 0;
+    const cur = new Date(from);
+    const end = new Date(to);
+    while (cur <= end) {
+        const day = cur.getDay();
+        if (day !== 0 && day !== 6) count++; // Exclude Sunday(0) and Saturday(6)
+        cur.setDate(cur.getDate() + 1);
+    }
+    return count;
+};
+
+// @desc    Calculate Salary (supports exact date range)
 // @route   POST /api/salary/calculate
 // @access  Private (Admin)
 exports.calculateSalary = async (req, res) => {
-    const { month, year, emp_id, paidStatuses = ['Present', 'CL', 'ML', 'Comp Leave', 'OD', 'Leave', 'Holiday', 'Weekend'] } = req.body;
+    const {
+        month,
+        year,
+        emp_id,
+        paidStatuses = ['Present', 'CL', 'ML', 'Comp Leave', 'OD', 'Leave', 'Holiday'],
+        fromDate,
+        toDate
+    } = req.body;
 
     try {
-        console.log(`Starting calculation for ${month}/${year}`);
-        const daysInMonth = new Date(year, month, 0).getDate();
-        
-        // 1. Fetch all eligible employees (all except admin) - Case-insensitive role check
+        // Determine date range for attendance lookup
+        // Use provided fromDate/toDate if available, else fallback to full month
+        const rangeFrom = fromDate || `${year}-${String(month).padStart(2, '0')}-01`;
+        const rangeTo   = toDate   || `${year}-${String(month).padStart(2, '0')}-${new Date(year, month, 0).getDate()}`;
+
+        // Total calendar days in range (for proration denominator)
+        const diffTime = new Date(rangeTo) - new Date(rangeFrom);
+        const totalDaysInRange = Math.round(diffTime / (1000 * 60 * 60 * 24)) + 1;
+
+        console.log(`Calculating salaries for range ${rangeFrom} → ${rangeTo} (${totalDaysInRange} days)`);
+
+        // 1. Fetch all eligible employees
         let usersQuery = `
-            SELECT id, emp_id, name, monthly_salary, role 
-            FROM users 
+            SELECT id, emp_id, name, monthly_salary, role
+            FROM users
             WHERE LOWER(role) IN ('principal', 'hod', 'staff', 'management')
         `;
         const usersParams = [];
@@ -22,84 +50,101 @@ exports.calculateSalary = async (req, res) => {
             usersParams.push(emp_id.trim());
         }
         const { rows: users } = await pool.query(usersQuery, usersParams);
-        console.log(`Found ${users.length} eligible employees`);
-
         if (users.length === 0) {
-            return res.json({ message: 'No eligible employees found for calculation', results: [] });
+            return res.json({ message: 'No eligible employees found', results: [] });
         }
 
-        // 2. Aggregate attendance data for all users. Explicitly cast date to date type.
+        // 2. Fetch attendance within the exact date range
         const { rows: attendanceStats } = await pool.query(`
-            SELECT 
+            SELECT
                 TRIM(emp_id) as emp_id,
                 SUM(
-                    CASE 
+                    CASE
                         WHEN status::text LIKE '%+%' THEN
                             (CASE WHEN split_part(status::text, ' + ', 1) = ANY($3::text[]) THEN 0.5 ELSE 0 END +
                              CASE WHEN split_part(status::text, ' + ', 2) = ANY($3::text[]) THEN 0.5 ELSE 0 END)
-                        
                         WHEN status::text = ANY($3::text[]) THEN
-                            CASE 
-                                WHEN remarks ILIKE '%Half Day%' OR 
-                                     remarks ILIKE '%0.5 day%' OR 
-                                     remarks ILIKE '%1/2 day%' OR
-                                     status::text ILIKE '%Half%' THEN 0.5
+                            CASE
+                                WHEN remarks ILIKE '%Half Day%' OR
+                                     remarks ILIKE '%half%' OR
+                                     remarks ILIKE '%0.5%' OR
+                                     remarks ILIKE '%1/2%'
+                                THEN 0.5
                                 ELSE 1.0
                             END
-                        ELSE 0 
+                        ELSE 0
                     END
-                ) as payable_days
+                ) as payable_days,
+                COUNT(*) as total_records
             FROM attendance_records
-            WHERE EXTRACT(MONTH FROM date::date) = $1 AND EXTRACT(YEAR FROM date::date) = $2
+            WHERE date::date >= $1::date AND date::date <= $2::date
             GROUP BY TRIM(emp_id)
-        `, [month, year, paidStatuses]);
+        `, [rangeFrom, rangeTo, paidStatuses]);
 
-        const statsMap = attendanceStats.reduce((acc, curr) => {
-            acc[curr.emp_id] = parseFloat(curr.payable_days) || 0;
-            return acc;
-        }, {});
+        const statsMap = {};
+        attendanceStats.forEach(row => {
+            statsMap[row.emp_id] = {
+                payable_days: parseFloat(row.payable_days) || 0,
+                total_records: parseInt(row.total_records) || 0
+            };
+        });
 
-        // 3. Process and persist records
+        // 3. Calculate and persist — SKIP records already marked as Paid
         const results = [];
         for (const user of users) {
             const userEmpId = (user.emp_id || '').trim();
             if (!userEmpId) continue;
 
-            const payableDays = statsMap[userEmpId] || 0;
+            // Check if already published (Paid) — do NOT overwrite paid records
+            const { rows: existing } = await pool.query(
+                `SELECT status FROM salary_records WHERE TRIM(emp_id) = $1 AND month = $2 AND year = $3`,
+                [userEmpId, month, year]
+            );
+            if (existing.length > 0 && existing[0].status === 'Paid') {
+                // Skip: protect paid records from drift
+                continue;
+            }
+
+            const stats = statsMap[userEmpId] || { payable_days: 0 };
+            const payableDays = stats.payable_days;
             const baseSalary = parseFloat(user.monthly_salary) || 0;
-            
-            const calculatedAmount = ((baseSalary / daysInMonth) * payableDays).toFixed(2);
-            const totalLop = Math.max(0, daysInMonth - payableDays);
-            const finalPay = isNaN(calculatedAmount) ? "0.00" : calculatedAmount;
+
+            // Prorated: daily rate × payable days within the range
+            const dailyRate = totalDaysInRange > 0 ? baseSalary / totalDaysInRange : 0;
+            const calculatedAmount = (dailyRate * payableDays).toFixed(2);
+            const totalLop = Math.max(0, totalDaysInRange - payableDays);
 
             await pool.query(`
                 INSERT INTO salary_records (emp_id, month, year, total_present, total_leave, total_lop, calculated_salary, status)
                 VALUES ($1, $2, $3, $4, $5, $6, $7, 'Pending')
-                ON CONFLICT (emp_id, month, year) DO UPDATE SET 
-                total_present = EXCLUDED.total_present,
-                total_leave = EXCLUDED.total_leave, 
-                total_lop = EXCLUDED.total_lop,
-                calculated_salary = EXCLUDED.calculated_salary,
-                status = EXCLUDED.status
-            `, [userEmpId, month, year, payableDays, 0, totalLop, finalPay]);
+                ON CONFLICT (emp_id, month, year) DO UPDATE SET
+                    total_present = EXCLUDED.total_present,
+                    total_leave = EXCLUDED.total_leave,
+                    total_lop = EXCLUDED.total_lop,
+                    calculated_salary = EXCLUDED.calculated_salary,
+                    status = EXCLUDED.status
+            `, [userEmpId, month, year, payableDays, 0, totalLop, calculatedAmount]);
 
             results.push({
-                emp_id: user.emp_id,
+                emp_id: userEmpId,
                 name: user.name,
                 role: user.role,
-                calculated_salary: finalPay,
+                monthly_salary: baseSalary,
+                calculated_salary: calculatedAmount,
                 payable_days: payableDays,
-                total_lop: totalLop
+                total_lop: totalLop,
+                range_days: totalDaysInRange
             });
         }
 
-        res.json({ message: `Successfully recalculated salaries for ${results.length} personnel.`, results });
+        // Emit real-time update to all connected clients
+        const io = req.app.get('io');
+        if (io) io.emit('salary_calculated', { month, year, count: results.length });
+
+        res.json({ message: `Recalculated salaries for ${results.length} employees.`, results });
     } catch (error) {
-        console.error('FATAL CALCULATION ERROR:', error);
-        res.status(500).json({ 
-            message: 'Payroll calculation failed.',
-            details: error.message 
-        });
+        console.error('SALARY CALCULATION ERROR:', error);
+        res.status(500).json({ message: 'Payroll calculation failed.', details: error.message });
     }
 };
 
@@ -111,7 +156,13 @@ exports.getSalaryRecords = async (req, res) => {
         const { month, year } = req.query;
 
         let query = `
-            SELECT s.*, u.name, u.role, u.profile_pic, d.name as department_name, u.monthly_salary
+            SELECT 
+                s.*,
+                u.name,
+                u.role,
+                u.profile_pic,
+                u.monthly_salary,
+                d.name as department_name
             FROM salary_records s
             JOIN users u ON TRIM(s.emp_id) = TRIM(u.emp_id)
             LEFT JOIN departments d ON u.department_id = d.id
@@ -120,27 +171,111 @@ exports.getSalaryRecords = async (req, res) => {
         const params = [];
 
         if (month) { query += ' AND s.month = $' + (params.push(month)); }
-        if (year) { query += ' AND s.year = $' + (params.push(year)); }
+        if (year)  { query += ' AND s.year = $'  + (params.push(year));  }
 
-        if (req.user.role === 'staff' || req.user.role === 'principal') {
+        // Role-based filter: restrict non-admin users to their own records only
+        const role = req.user.role;
+        if (role === 'staff' || role === 'principal') {
             query += ' AND TRIM(s.emp_id) = TRIM($' + (params.push(req.user.emp_id)) + ')';
-        } else if (req.user.role === 'hod') {
+        } else if (role === 'hod') {
             query += ' AND u.department_id = $' + (params.push(req.user.department_id));
         }
+        // admin and management: no additional filter — see all
 
-        query += ` ORDER BY 
-            CASE LOWER(u.role) 
-                WHEN 'principal' THEN 1 
-                WHEN 'hod' THEN 2 
-                WHEN 'staff' THEN 3 
-                ELSE 4 
-            END, 
-            u.name ASC`;
+        query += `
+            ORDER BY
+                CASE LOWER(u.role)
+                    WHEN 'principal' THEN 1
+                    WHEN 'hod'       THEN 2
+                    WHEN 'staff'     THEN 3
+                    ELSE 4
+                END,
+                u.name ASC
+        `;
 
         const { rows } = await pool.query(query, params);
         res.json(rows);
     } catch (error) {
-        console.error(error);
+        console.error('GET SALARY ERROR:', error);
+        res.status(500).json({ message: 'Server Error' });
+    }
+};
+
+// @desc    Get Daily Salary Breakdown for a specific employee + period
+// @route   GET /api/salary/daily?emp_id=&fromDate=&toDate=&paidStatuses=
+// @access  Private
+exports.getDailyBreakdown = async (req, res) => {
+    try {
+        const { emp_id, fromDate, toDate } = req.query;
+        const paidStatuses = req.query.paidStatuses
+            ? JSON.parse(req.query.paidStatuses)
+            : ['Present', 'CL', 'ML', 'Comp Leave', 'OD', 'Leave', 'Holiday'];
+
+        if (!emp_id || !fromDate || !toDate) {
+            return res.status(400).json({ message: 'emp_id, fromDate, toDate are required' });
+        }
+
+        // Fetch employee base salary
+        const { rows: empRows } = await pool.query(
+            `SELECT monthly_salary FROM users WHERE TRIM(emp_id) = $1`,
+            [emp_id.trim()]
+        );
+        if (!empRows.length) return res.status(404).json({ message: 'Employee not found' });
+        const baseSalary = parseFloat(empRows[0].monthly_salary) || 0;
+
+        // Total days in range
+        const diffTime = new Date(toDate) - new Date(fromDate);
+        const totalDays = Math.round(diffTime / (1000 * 60 * 60 * 24)) + 1;
+        const dailyRate = totalDays > 0 ? baseSalary / totalDays : 0;
+
+        // Fetch daily attendance
+        const { rows: attendance } = await pool.query(`
+            SELECT date, status, remarks, punch_in, punch_out
+            FROM attendance_records
+            WHERE TRIM(emp_id) = $1 AND date::date >= $2::date AND date::date <= $3::date
+            ORDER BY date ASC
+        `, [emp_id.trim(), fromDate, toDate]);
+
+        // Build day-wise breakdown
+        const breakdown = attendance.map(a => {
+            let dayFactor = 0;
+            const st = (a.status || '').trim();
+            if (st.includes('+')) {
+                const parts = st.split('+').map(p => p.trim());
+                parts.forEach(p => { if (paidStatuses.includes(p)) dayFactor += 0.5; });
+            } else if (paidStatuses.includes(st)) {
+                const isHalf = (a.remarks || '').toLowerCase().includes('half') ||
+                               (a.remarks || '').includes('0.5') ||
+                               st.toLowerCase().includes('half');
+                dayFactor = isHalf ? 0.5 : 1.0;
+            }
+
+            const grossEarned = (dailyRate * dayFactor).toFixed(2);
+            return {
+                date: a.date,
+                status: st,
+                punch_in: a.punch_in,
+                punch_out: a.punch_out,
+                day_factor: dayFactor,
+                gross_earned: grossEarned,
+                net_earned: grossEarned // Currently no per-day deductions beyond LOP
+            };
+        });
+
+        const totalGross = breakdown.reduce((acc, d) => acc + parseFloat(d.gross_earned), 0);
+        res.json({
+            emp_id,
+            fromDate,
+            toDate,
+            total_days: totalDays,
+            daily_rate: dailyRate.toFixed(2),
+            base_salary: baseSalary,
+            days_recorded: breakdown.length,
+            total_gross: totalGross.toFixed(2),
+            breakdown
+        });
+    } catch (error) {
+        console.error('DAILY BREAKDOWN ERROR:', error);
         res.status(500).json({ message: 'Server Error' });
     }
 };
