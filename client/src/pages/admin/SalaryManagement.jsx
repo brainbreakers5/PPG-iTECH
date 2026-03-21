@@ -592,10 +592,10 @@ const SalaryManagement = () => {
 
                 <div class="grid">
                     <div class="box">
-                        <div class="label">Employee Name</div>
-                        <div class="value">${escapeHtml(s.name)}</div>
-                        <div class="label" style="margin-top:10px">Employee ID</div>
+                        <div class="label">Employee ID</div>
                         <div class="value">${escapeHtml(s.emp_id)}</div>
+                        <div class="label" style="margin-top:10px">Employee Name</div>
+                        <div class="value">${escapeHtml(s.name)}</div>
                     </div>
                     <div class="box">
                         <div class="label">Department</div>
