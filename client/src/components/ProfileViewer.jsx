@@ -57,12 +57,16 @@ const ProfileViewer = ({ user, onClose }) => {
         authUser.emp_id === user.emp_id
     );
 
+    // HOD & Principal are restricted when viewing OTHERS' profiles
     const canViewSensitiveInfo = isOwnProfile || authUser.role === 'admin' || authUser.role === 'management';
 
     const parsedDeductions = (() => {
         try {
-            return user?.deductions ? JSON.parse(user.deductions) : [];
-        } catch {
+            if (!user?.deductions) return [];
+            // Handle both string and pre-parsed object from DB
+            return typeof user.deductions === 'string' ? JSON.parse(user.deductions) : user.deductions;
+        } catch (e) {
+            console.error('Error parsing deductions:', e);
             return [];
         }
     })();
@@ -527,7 +531,7 @@ const ProfileViewer = ({ user, onClose }) => {
                                     <FaPrint size={12} className="group-hover:scale-110 transition-transform" /> Print
                                 </button>
                             )}
-                            {isOwnProfile && !isEditingProfile && (authUser.role === 'admin' || authUser.role === 'management') && (
+                            {(authUser.role === 'admin' || authUser.role === 'management') && !isEditingProfile && (
                                 <button
                                     onClick={() => setIsEditingProfile(true)}
                                     className="flex items-center gap-2 px-5 py-2.5 bg-sky-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-sky-700 transition-all shadow-lg shadow-sky-200"
