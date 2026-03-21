@@ -78,7 +78,10 @@ const EmployeeFormPage = () => {
             setFormData({ ...data, confirm_pin: data.pin });
             // Load existing deductions if stored
             if (data.deductions) {
-                try { setDeductions(JSON.parse(data.deductions)); } catch(_) {}
+                const loadedDeductions = typeof data.deductions === 'string' 
+                    ? JSON.parse(data.deductions) 
+                    : data.deductions;
+                setDeductions(Array.isArray(loadedDeductions) ? loadedDeductions : []);
             }
             setLoading(false);
         } catch (error) {
