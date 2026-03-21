@@ -5,8 +5,9 @@ import Layout from '../../components/Layout';
 import api from '../../utils/api';
 import Swal from 'sweetalert2';
 import { motion } from 'framer-motion';
+import { useAuth } from '../../context/AuthContext';
 
-const inputClass = "w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl outline-none focus:ring-4 focus:ring-sky-100 focus:border-sky-500 transition-all font-bold text-gray-700 text-sm";
+const inputClass = "w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl outline-none focus:ring-4 focus:ring-sky-100 focus:border-sky-500 transition-all font-bold text-gray-700 text-sm disabled:opacity-70 disabled:bg-gray-100/60 disabled:cursor-not-allowed disabled:text-gray-500 disabled:border-gray-50";
 const labelClass = "block text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-3 ml-1";
 
 const FormSection = ({ title, icon, children }) => (
@@ -24,6 +25,9 @@ const FormSection = ({ title, icon, children }) => (
 const EmployeeFormPage = () => {
     const { id } = useParams();
     const navigate = useNavigate();
+    const { user } = useAuth();
+    const isAdmin = user?.role === 'admin' || user?.role === 'management';
+
     const [departments, setDepartments] = useState([]);
     const [loading, setLoading] = useState(true);
 
@@ -297,7 +301,8 @@ const EmployeeFormPage = () => {
                                                 type="file"
                                                 accept="image/*"
                                                 onChange={handleFileChange}
-                                                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                                                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10 disabled:cursor-not-allowed"
+                                                disabled={!isAdmin}
                                             />
                                             <div className={inputClass + " flex items-center justify-between group-hover/input:border-sky-400 group-hover/input:ring-4 group-hover/input:ring-sky-50 transition-all"}>
                                                 <span className="text-gray-400 font-medium truncate">
@@ -313,16 +318,16 @@ const EmployeeFormPage = () => {
                                 </div>
                                 <div>
                                     <label className={labelClass}>Employee Name</label>
-                                    <input name="name" value={formData.name || ''} onChange={handleChange} className={inputClass} required />
+                                    <input name="name" value={formData.name || ''} onChange={handleChange} className={inputClass} required disabled={!isAdmin} />
                                 </div>
                                 <div>
                                     <label className={labelClass}>Employee ID (Unique)</label>
-                                    <input name="emp_id" value={formData.emp_id || ''} onChange={handleChange} className={inputClass} required disabled={!!id} />
+                                    <input name="emp_id" value={formData.emp_id || ''} onChange={handleChange} className={inputClass} required disabled={!!id || !isAdmin} />
                                 </div>
 
                                 <div>
                                     <label className={labelClass}>User Role</label>
-                                    <select name="role" value={formData.role || 'staff'} onChange={handleChange} className={inputClass}>
+                                    <select name="role" value={formData.role || 'staff'} onChange={handleChange} className={inputClass} disabled={!isAdmin}>
                                         <option value="staff">Staff</option>
                                         <option value="hod">HOD</option>
                                         <option value="principal">Principal</option>
@@ -331,7 +336,7 @@ const EmployeeFormPage = () => {
                                 </div>
                                 <div>
                                     <label className={labelClass}>Department</label>
-                                    <select name="department_id" value={formData.department_id || ''} onChange={handleChange} className={inputClass}>
+                                    <select name="department_id" value={formData.department_id || ''} onChange={handleChange} className={inputClass} disabled={!isAdmin}>
                                         <option value="">Select Department</option>
                                         {departments.map(d => (
                                             <option key={d.id} value={d.id}>
@@ -342,27 +347,27 @@ const EmployeeFormPage = () => {
                                 </div>
                                 <div>
                                     <label className={labelClass}>Designation</label>
-                                    <input name="designation" value={formData.designation || ''} onChange={handleChange} className={inputClass} />
+                                    <input name="designation" value={formData.designation || ''} onChange={handleChange} className={inputClass} disabled={!isAdmin} />
                                 </div>
                                 <div>
                                     <label className={labelClass}>Email Address</label>
-                                    <input name="email" type="email" value={formData.email || ''} onChange={handleChange} className={inputClass} />
+                                    <input name="email" type="email" value={formData.email || ''} onChange={handleChange} className={inputClass} disabled={!isAdmin} />
                                 </div>
                                 <div>
                                     <label className={labelClass}>Mobile Number</label>
-                                    <input name="mobile" value={formData.mobile || ''} onChange={handleChange} className={inputClass} />
+                                    <input name="mobile" value={formData.mobile || ''} onChange={handleChange} className={inputClass} disabled={!isAdmin} />
                                 </div>
                                 <div>
                                     <label className={labelClass}>WhatsApp Number</label>
-                                    <input name="whatsapp" value={formData.whatsapp || ''} onChange={handleChange} className={inputClass} />
+                                    <input name="whatsapp" value={formData.whatsapp || ''} onChange={handleChange} className={inputClass} disabled={!isAdmin} />
                                 </div>
                                 <div>
                                     <label className={labelClass}>Date of Birth</label>
-                                    <input name="dob" type="date" value={formData.dob || ''} onChange={handleChange} className={inputClass} />
+                                    <input name="dob" type="date" value={formData.dob || ''} onChange={handleChange} className={inputClass} disabled={!isAdmin} />
                                 </div>
                                 <div>
                                     <label className={labelClass}>Gender</label>
-                                    <select name="gender" value={formData.gender || 'Male'} onChange={handleChange} className={inputClass}>
+                                    <select name="gender" value={formData.gender || 'Male'} onChange={handleChange} className={inputClass} disabled={!isAdmin}>
                                         <option value="Male">Male</option>
                                         <option value="Female">Female</option>
                                         <option value="Other">Other</option>
@@ -370,19 +375,19 @@ const EmployeeFormPage = () => {
                                 </div>
                                 <div>
                                     <label className={labelClass}>Blood Group</label>
-                                    <input name="blood_group" value={formData.blood_group || ''} onChange={handleChange} className={inputClass} />
+                                    <input name="blood_group" value={formData.blood_group || ''} onChange={handleChange} className={inputClass} disabled={!isAdmin} />
                                 </div>
                                 <div>
                                     <label className={labelClass}>Religion</label>
-                                    <input name="religion" value={formData.religion || ''} onChange={handleChange} className={inputClass} />
+                                    <input name="religion" value={formData.religion || ''} onChange={handleChange} className={inputClass} disabled={!isAdmin} />
                                 </div>
                                 <div>
                                     <label className={labelClass}>Caste</label>
-                                    <input name="caste" value={formData.caste || ''} onChange={handleChange} className={inputClass} />
+                                    <input name="caste" value={formData.caste || ''} onChange={handleChange} className={inputClass} disabled={!isAdmin} />
                                 </div>
                                 <div>
                                     <label className={labelClass}>Community</label>
-                                    <input name="community" value={formData.community || ''} onChange={handleChange} className={inputClass} />
+                                    <input name="community" value={formData.community || ''} onChange={handleChange} className={inputClass} disabled={!isAdmin} />
                                 </div>
                             </div>
                         </FormSection>
@@ -391,27 +396,27 @@ const EmployeeFormPage = () => {
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                                 <div>
                                     <label className={labelClass}>Aadhar Card Number</label>
-                                    <input name="aadhar" value={formData.aadhar || ''} onChange={handleChange} className={inputClass} />
+                                    <input name="aadhar" value={formData.aadhar || ''} onChange={handleChange} className={inputClass} disabled={!isAdmin} />
                                 </div>
                                 <div>
                                     <label className={labelClass}>PAN Card Number</label>
-                                    <input name="pan" value={formData.pan || ''} onChange={handleChange} className={inputClass} />
+                                    <input name="pan" value={formData.pan || ''} onChange={handleChange} className={inputClass} disabled={!isAdmin} />
                                 </div>
                                 <div className="md:col-span-2">
                                     <label className={labelClass}>Permanent Address</label>
-                                    <textarea name="permanent_address" value={formData.permanent_address || ''} onChange={handleChange} className={inputClass + " h-32 pt-4 resize-none"} />
+                                    <textarea name="permanent_address" value={formData.permanent_address || ''} onChange={handleChange} className={inputClass + " h-32 pt-4 resize-none"} disabled={!isAdmin} />
                                 </div>
                                 <div className="md:col-span-2">
                                     <label className={labelClass}>Communication Address</label>
-                                    <textarea name="communication_address" value={formData.communication_address || ''} onChange={handleChange} className={inputClass + " h-32 pt-4 resize-none"} />
+                                    <textarea name="communication_address" value={formData.communication_address || ''} onChange={handleChange} className={inputClass + " h-32 pt-4 resize-none"} disabled={!isAdmin} />
                                 </div>
                                 <div>
                                     <label className={labelClass}>PIN Code</label>
-                                    <input name="pin_code" value={formData.pin_code || ''} onChange={handleChange} className={inputClass} />
+                                    <input name="pin_code" value={formData.pin_code || ''} onChange={handleChange} className={inputClass} disabled={!isAdmin} />
                                 </div>
                                 <div>
                                     <label className={labelClass}>Nationality</label>
-                                    <input name="nationality" value={formData.nationality || 'Indian'} onChange={handleChange} className={inputClass} />
+                                    <input name="nationality" value={formData.nationality || 'Indian'} onChange={handleChange} className={inputClass} disabled={!isAdmin} />
                                 </div>
                             </div>
                         </FormSection>
@@ -420,40 +425,40 @@ const EmployeeFormPage = () => {
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                                 <div>
                                     <label className={labelClass}>Bank Name</label>
-                                    <input name="bank_name" value={formData.bank_name || ''} onChange={handleChange} className={inputClass} />
+                                    <input name="bank_name" value={formData.bank_name || ''} onChange={handleChange} className={inputClass} disabled={!isAdmin} />
                                 </div>
                                 <div>
                                     <label className={labelClass}>Account Number</label>
-                                    <input name="account_no" value={formData.account_no || ''} onChange={handleChange} className={inputClass} />
+                                    <input name="account_no" value={formData.account_no || ''} onChange={handleChange} className={inputClass} disabled={!isAdmin} />
                                 </div>
                                 <div>
                                     <label className={labelClass}>Branch Name</label>
-                                    <input name="branch" value={formData.branch || ''} onChange={handleChange} className={inputClass} />
+                                    <input name="branch" value={formData.branch || ''} onChange={handleChange} className={inputClass} disabled={!isAdmin} />
                                 </div>
                                 <div>
                                     <label className={labelClass}>IFSC Code</label>
-                                    <input name="ifsc" value={formData.ifsc || ''} onChange={handleChange} className={inputClass} />
+                                    <input name="ifsc" value={formData.ifsc || ''} onChange={handleChange} className={inputClass} disabled={!isAdmin} />
                                 </div>
                                 <div>
                                     <label className={labelClass}>PF Number</label>
-                                    <input name="pf_number" value={formData.pf_number || ''} onChange={handleChange} className={inputClass} />
+                                    <input name="pf_number" value={formData.pf_number || ''} onChange={handleChange} className={inputClass} disabled={!isAdmin} />
                                 </div>
                                 <div>
                                     <label className={labelClass}>UAN Number</label>
-                                    <input name="uan_number" value={formData.uan_number || ''} onChange={handleChange} className={inputClass} />
+                                    <input name="uan_number" value={formData.uan_number || ''} onChange={handleChange} className={inputClass} disabled={!isAdmin} />
                                 </div>
                                 <div className="md:col-span-2 h-px bg-gray-100 my-4"></div>
                                 <div>
                                     <label className={labelClass}>Date of Joining</label>
-                                    <input name="doj" type="date" value={formData.doj || ''} onChange={handleChange} className={inputClass} />
+                                    <input name="doj" type="date" value={formData.doj || ''} onChange={handleChange} className={inputClass} disabled={!isAdmin} />
                                 </div>
                                 <div>
                                     <label className={labelClass}>Monthly Salary</label>
-                                    <input name="monthly_salary" type="number" value={formData.monthly_salary || ''} onChange={handleChange} className={inputClass} />
+                                    <input name="monthly_salary" type="number" value={formData.monthly_salary || ''} onChange={handleChange} className={inputClass} disabled={!isAdmin} />
                                 </div>
                                 <div className="md:col-span-2">
                                     <label className={labelClass}>Experience Description</label>
-                                    <input name="experience" value={formData.experience || ''} onChange={handleChange} className={inputClass} />
+                                    <input name="experience" value={formData.experience || ''} onChange={handleChange} className={inputClass} disabled={!isAdmin} />
                                 </div>
                             </div>
                         </FormSection>
@@ -476,6 +481,7 @@ const EmployeeFormPage = () => {
                                                 value={DEDUCTION_PRESETS.includes(d.type) ? d.type : 'Other'}
                                                 onChange={(e) => updateDeduction(i, 'type', e.target.value === 'Other' ? '' : e.target.value)}
                                                 className={inputClass}
+                                                disabled={!isAdmin}
                                             >
                                                 <option value="">Select type...</option>
                                                 {DEDUCTION_PRESETS.map(p => <option key={p} value={p}>{p}</option>)}
@@ -486,6 +492,7 @@ const EmployeeFormPage = () => {
                                                     placeholder="Or type custom deduction name..."
                                                     value={d.type}
                                                     onChange={(e) => updateDeduction(i, 'type', e.target.value)}
+                                                    disabled={!isAdmin}
                                                 />
                                             )}
                                         </div>
@@ -499,27 +506,32 @@ const EmployeeFormPage = () => {
                                                 onChange={(e) => updateDeduction(i, 'amount', e.target.value)}
                                                 className={inputClass}
                                                 placeholder="e.g. 1800"
+                                                disabled={!isAdmin}
                                             />
                                         </div>
                                         {/* Remove */}
-                                        <button
-                                            type="button"
-                                            onClick={() => removeDeduction(i)}
-                                            className="mt-5 h-10 w-10 rounded-xl bg-rose-50 text-rose-500 flex items-center justify-center hover:bg-rose-100 transition-colors shrink-0"
-                                        >
-                                            <FaTrash size={12} />
-                                        </button>
+                                        {isAdmin && (
+                                            <button
+                                                type="button"
+                                                onClick={() => removeDeduction(i)}
+                                                className="mt-5 h-10 w-10 rounded-xl bg-rose-50 text-rose-500 flex items-center justify-center hover:bg-rose-100 transition-colors shrink-0"
+                                            >
+                                                <FaTrash size={12} />
+                                            </button>
+                                        )}
                                     </div>
                                 ))}
                             </div>
 
-                            <button
-                                type="button"
-                                onClick={addDeduction}
-                                className="mt-6 px-6 py-3 bg-rose-50 text-rose-600 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-rose-100 transition-colors flex items-center gap-2"
-                            >
-                                <FaPlus size={10} /> Add Deduction
-                            </button>
+                            {isAdmin && (
+                                <button
+                                    type="button"
+                                    onClick={addDeduction}
+                                    className="mt-6 px-6 py-3 bg-rose-50 text-rose-600 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-rose-100 transition-colors flex items-center gap-2"
+                                >
+                                    <FaPlus size={10} /> Add Deduction
+                                </button>
+                            )}
 
                             {deductions.length > 0 && (
                                 <div className="mt-6 bg-sky-50 border border-sky-100 rounded-2xl p-4 flex items-center justify-between">
@@ -535,15 +547,15 @@ const EmployeeFormPage = () => {
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                                 <div>
                                     <label className={labelClass}>Father's Name</label>
-                                    <input name="father_name" value={formData.father_name || ''} onChange={handleChange} className={inputClass} />
+                                    <input name="father_name" value={formData.father_name || ''} onChange={handleChange} className={inputClass} disabled={!isAdmin} />
                                 </div>
                                 <div>
                                     <label className={labelClass}>Mother's Name</label>
-                                    <input name="mother_name" value={formData.mother_name || ''} onChange={handleChange} className={inputClass} />
+                                    <input name="mother_name" value={formData.mother_name || ''} onChange={handleChange} className={inputClass} disabled={!isAdmin} />
                                 </div>
                                 <div>
                                     <label className={labelClass}>Marital Status</label>
-                                    <select name="marital_status" value={formData.marital_status || 'Single'} onChange={handleChange} className={inputClass}>
+                                    <select name="marital_status" value={formData.marital_status || 'Single'} onChange={handleChange} className={inputClass} disabled={!isAdmin}>
                                         <option value="Single">Single</option>
                                         <option value="Married">Married</option>
                                         <option value="Divorced">Divorced</option>
