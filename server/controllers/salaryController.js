@@ -7,7 +7,10 @@ exports.calculateSalary = async (req, res) => {
     const { month, year, emp_id, paidStatuses = ['Present', 'CL', 'ML', 'Comp Leave', 'OD', 'Leave', 'Holiday', 'Weekend'] } = req.body;
 
     try {
-        let usersQuery = `SELECT id, emp_id, monthly_salary FROM users WHERE role != 'admin'`;
+        // Get actual days in the specified month
+        const daysInMonth = new Date(year, month, 0).getDate();
+        
+        let usersQuery = `SELECT id, emp_id, name, monthly_salary, role, department_id FROM users WHERE role != 'admin'`;
         const usersParams = [];
 
         if (emp_id) {
@@ -19,31 +22,45 @@ exports.calculateSalary = async (req, res) => {
         const results = [];
 
         for (const user of users) {
-             // Updated query to handle 0.5 days for half-days/partial leaves
+             // Precise attendance query
              const { rows: stats } = await pool.query(`
                 SELECT 
                     SUM(
                         CASE 
+                            -- Case 1: Combined status like "Present + CL" or "Present + OD"
+                            WHEN status::text LIKE '%+%' THEN
+                                (
+                                    -- Calculate 0.5 for each part of the combined status that is in paidStatuses
+                                    SELECT COALESCE(SUM(0.5), 0) 
+                                    FROM unnest(string_to_array(status::text, ' + ')) AS s 
+                                    WHERE s = ANY($4::text[])
+                                )
+                            
+                            -- Case 2: Standard status check
                             WHEN status::text = ANY($4::text[]) THEN
                                 CASE 
-                                    WHEN remarks LIKE '%Half Day%' OR remarks LIKE '%0.5 days%' OR remarks LIKE '%: %-% (%)%' THEN 0.5
+                                    -- Half-day detection in remarks or status
+                                    WHEN remarks ILIKE '%Half Day%' OR 
+                                         remarks ILIKE '%0.5 day%' OR 
+                                         remarks ILIKE '%1/2 day%' OR
+                                         status::text ILIKE '%Half%' THEN 0.5
                                     ELSE 1.0
                                 END
                             ELSE 0 
                         END
-                    ) as payable_days,
-                    SUM(CASE WHEN status = 'LOP' THEN 1 ELSE 0 END) as total_lop
+                    ) as payable_days
                 FROM attendance_records
                 WHERE emp_id = $1 AND EXTRACT(MONTH FROM date) = $2 AND EXTRACT(YEAR FROM date) = $3
              `, [user.emp_id, month, year, paidStatuses]);
 
             const payableDays = parseFloat(stats[0].payable_days) || 0;
-            const totalLop = parseInt(stats[0].total_lop) || 0;
-
-            const totalDays = 30; // Standard month
             const baseSalary = parseFloat(user.monthly_salary) || 0;
-            const salaryPerDay = baseSalary / totalDays;
-            const calculatedAmount = (salaryPerDay * payableDays).toFixed(2);
+            
+            // Accurate calculation: (Monthly Salary / Days in Month) * Payable Days
+            const calculatedAmount = ((baseSalary / daysInMonth) * payableDays).toFixed(2);
+            
+            // Total LOP for reporting
+            const totalLop = Math.max(0, daysInMonth - payableDays);
             
             // Ensure we don't insert "NaN"
             const finalPay = isNaN(calculatedAmount) ? "0.00" : calculatedAmount;
@@ -60,14 +77,17 @@ exports.calculateSalary = async (req, res) => {
 
             results.push({
                 emp_id: user.emp_id,
-                calculated_salary: calculatedAmount
+                name: user.name,
+                calculated_salary: finalPay,
+                payable_days: payableDays,
+                total_lop: totalLop
             });
         }
 
-        res.json({ message: 'Salary calculated', results });
+        res.json({ message: `Salary calculated for ${users.length} employees`, results });
     } catch (error) {
-        console.error(error);
-        res.status(500).json({ message: 'Server Error' });
+        console.error('CalculateSalary Error:', error);
+        res.status(500).json({ message: 'Server Error during calculation' });
     }
 };
 
