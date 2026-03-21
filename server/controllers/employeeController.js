@@ -209,6 +209,7 @@ exports.getEmployeeById = async (req, res) => {
 
         let query, values;
         if (isNumeric) {
+            // Prioritize emp_id over database id to avoid conflicts when emp_id is numeric
             query = `
                 SELECT u.*, 
                        TO_CHAR(u.dob, 'YYYY-MM-DD') as dob,
@@ -216,9 +217,11 @@ exports.getEmployeeById = async (req, res) => {
                        d.name as department_name
                 FROM users u
                 LEFT JOIN departments d ON u.department_id = d.id
-                WHERE u.id = $1 OR u.emp_id = $2
+                WHERE u.emp_id = $1 OR u.id = $2
+                ORDER BY CASE WHEN u.emp_id = $1 THEN 0 ELSE 1 END ASC
+                LIMIT 1
             `;
-            values = [paramId, paramId];
+            values = [paramId, parseInt(paramId)];
         } else {
             query = `
                 SELECT u.*, 
