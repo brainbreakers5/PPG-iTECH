@@ -505,7 +505,7 @@ const Header = ({ toggleSidebar, sidebarOpen }) => {
                     {/* AI Assistant Trigger */}
                     <button
                         onClick={() => window.dispatchEvent(new CustomEvent('TOGGLE_AI_ASSISTANT'))}
-                        className="bg-sky-50/50 hover:bg-sky-100/80 h-11 px-4 rounded-2xl border border-sky-100 hover:border-sky-300 transition-all shadow-sm flex items-center justify-center group active:scale-95 relative overflow-hidden"
+                        className="bg-sky-50/50 hover:bg-sky-100/80 h-9 lg:h-11 px-3 lg:px-4 rounded-xl lg:rounded-2xl border border-sky-100 hover:border-sky-300 transition-all shadow-sm flex items-center justify-center group active:scale-95 relative overflow-hidden"
                         title="Zorvian AI Assistant"
                     >
                         <motion.div 
@@ -515,10 +515,10 @@ const Header = ({ toggleSidebar, sidebarOpen }) => {
                                 scale: [1, 1.05, 1]
                             }}
                             transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
-                            className="bg-white px-3 py-1.5 rounded-xl shadow-[0_4px_12px_rgba(14,165,233,0.15)] border border-sky-100 flex items-center gap-2"
+                            className="bg-white px-2 lg:px-3 py-1 lg:py-1.5 rounded-lg lg:rounded-xl shadow-[0_4px_12px_rgba(14,165,233,0.15)] border border-sky-100 flex items-center gap-1.5 lg:gap-2"
                         >
-                            <div className="h-2 w-2 bg-emerald-400 rounded-full animate-pulse shadow-[0_0_10px_rgba(52,211,153,1)]" />
-                            <span className="text-[9px] font-black text-sky-600 uppercase tracking-widest leading-none">AI ASSISTANT</span>
+                            <div className="h-1.5 lg:h-2 w-1.5 lg:w-2 bg-emerald-400 rounded-full animate-pulse shadow-[0_0_10px_rgba(52,211,153,1)]" />
+                            <span className="text-[7.5px] lg:text-[9px] font-black text-sky-600 uppercase tracking-widest leading-none">AI ASSISTANT</span>
                         </motion.div>
                     </button>
 
