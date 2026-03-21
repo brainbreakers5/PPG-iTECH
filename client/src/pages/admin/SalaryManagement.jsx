@@ -11,13 +11,15 @@ const SalaryManagement = () => {
     const { user } = useAuth();
     const [salaries, setSalaries] = useState([]);
     const [allEmployees, setAllEmployees] = useState([]);
+    const [dailyBreakdown, setDailyBreakdown] = useState(null); // { emp, data }
+    const [loadingBreakdown, setLoadingBreakdown] = useState(false);
     const now = new Date();
-    
     const socket = useSocket();
 
-    // Fetch all employees to ensure everyone is displayed
+    // Fetch all employees
     useEffect(() => {
-        if (user.role !== 'staff') {
+        const isAdmin = user.role === 'admin' || user.role === 'management';
+        if (isAdmin) {
             api.get('/employees').then(res => setAllEmployees(res.data)).catch(e => console.error(e));
         }
     }, [user.role]);
@@ -131,8 +133,34 @@ const SalaryManagement = () => {
         if (!socket) return;
         const handler = () => fetchSalaries();
         socket.on('salary_published', handler);
-        return () => socket.off('salary_published', handler);
+        socket.on('salary_calculated', handler); // Also refresh on background calc
+        return () => {
+            socket.off('salary_published', handler);
+            socket.off('salary_calculated', handler);
+        };
     }, [socket, fromDate, toDate]);
+
+    // Fetch daily breakdown for a specific employee
+    const fetchDailyBreakdown = async (emp) => {
+        setLoadingBreakdown(true);
+        setDailyBreakdown({ emp, data: null });
+        try {
+            const { data } = await api.get(`/salary/daily`, {
+                params: {
+                    emp_id: emp.emp_id,
+                    fromDate,
+                    toDate,
+                    paidStatuses: JSON.stringify(paidStatuses)
+                }
+            });
+            setDailyBreakdown({ emp, data });
+        } catch (err) {
+            console.error('Daily breakdown fetch failed:', err);
+            setDailyBreakdown({ emp, data: null });
+        } finally {
+            setLoadingBreakdown(false);
+        }
+    };
 
     const fetchSalaries = async () => {
         setLoading(true);
@@ -851,16 +879,16 @@ const SalaryManagement = () => {
                                                     <td className="p-8">
                                                         <div className="flex flex-col items-center gap-3">
                                                             <div className="flex gap-4 text-[9px] font-black uppercase tracking-widest">
-                                                                <span className="text-sky-500 bg-sky-50 px-2 py-1 rounded-md" title="Total Payable Days">PAID: {s.total_present}</span>
-                                                                <span className="text-gray-400 bg-gray-50 px-2 py-1 rounded-md" title="Total Days in Month">MONTH: {new Date(s.year, s.month, 0).getDate()}</span>
-                                                                <span className="text-rose-500 bg-rose-50 px-2 py-1 rounded-md" title="Loss of Pay Days">LOP: {s.total_lop || 0}</span>
+                                                                <span className="text-sky-500 bg-sky-50 px-2 py-1 rounded-md" title="Paid Days">PAID: {s.total_present}</span>
+                                                                <span className="text-gray-400 bg-gray-50 px-2 py-1 rounded-md" title="Period Days">DAYS: {(() => { const d1=new Date(fromDate); const d2=new Date(toDate); return Math.round((d2-d1)/(1000*60*60*24))+1; })()}</span>
+                                                                <span className="text-rose-500 bg-rose-50 px-2 py-1 rounded-md" title="LOP">LOP: {s.total_lop || 0}</span>
                                                             </div>
                                                             <div className="w-40 bg-gray-100 h-1.5 rounded-full overflow-hidden shadow-inner p-px">
                                                                 <motion.div
-                                                                    initial={{ width: 0 }}
-                                                                    animate={{ width: `${(s.total_present / new Date(s.year, s.month, 0).getDate()) * 100}%` }}
-                                                                    className="bg-gradient-to-r from-sky-400 to-sky-600 h-full rounded-full shadow-[0_0_12px_rgba(59,130,246,0.3)]"
-                                                                ></motion.div>
+                                                                initial={{ width: 0 }}
+                                                                animate={{ width: `${Math.min(100, (s.total_present / (Math.round((new Date(toDate)-new Date(fromDate))/(1000*60*60*24))+1)) * 100)}%` }}
+                                                                className="bg-gradient-to-r from-sky-400 to-sky-600 h-full rounded-full shadow-[0_0_12px_rgba(59,130,246,0.3)]"
+                                                            ></motion.div>
                                                             </div>
                                                         </div>
                                                     </td>
@@ -883,6 +911,13 @@ const SalaryManagement = () => {
                                                         </span>
                                                     </td>
                                                     <td className="p-8 text-right flex justify-end gap-2">
+                                                        <button
+                                                            onClick={() => fetchDailyBreakdown(s)}
+                                                            className="h-12 w-12 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center hover:bg-indigo-100 transition-all active:scale-90 shadow-sm border border-indigo-100"
+                                                            title="View Day-Wise Breakdown"
+                                                        >
+                                                            <FaChartLine size={14} />
+                                                        </button>
                                                         <button
                                                             onClick={() => handlePrintSlip(s)}
                                                             className="h-12 w-12 bg-sky-50 text-sky-600 rounded-2xl flex items-center justify-center hover:bg-sky-100 transition-all active:scale-90 shadow-sm border border-sky-100"
@@ -939,6 +974,115 @@ const SalaryManagement = () => {
                     </div>
                 </div>
             </motion.div>
+
+            {/* Daily Breakdown Modal */}
+            <AnimatePresence>
+                {dailyBreakdown && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[9999] flex items-center justify-center p-4"
+                        onClick={() => setDailyBreakdown(null)}
+                    >
+                        <motion.div
+                            initial={{ scale: 0.9, y: 40 }}
+                            animate={{ scale: 1, y: 0 }}
+                            exit={{ scale: 0.9, y: 40 }}
+                            onClick={e => e.stopPropagation()}
+                            className="bg-white rounded-[32px] shadow-2xl w-full max-w-3xl max-h-[85vh] overflow-hidden flex flex-col"
+                        >
+                            {/* Modal Header */}
+                            <div className="p-8 border-b border-gray-50 flex items-center justify-between">
+                                <div className="flex items-center gap-4">
+                                    <div className="h-12 w-12 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
+                                        <FaChartLine size={18} />
+                                    </div>
+                                    <div>
+                                        <h2 className="text-lg font-black text-gray-800 tracking-tight">{dailyBreakdown.emp.name}</h2>
+                                        <p className="text-[10px] font-black text-indigo-500 uppercase tracking-widest mt-0.5">Day-Wise Salary Breakdown · {fromDate} → {toDate}</p>
+                                    </div>
+                                </div>
+                                <button onClick={() => setDailyBreakdown(null)} className="h-10 w-10 rounded-2xl bg-gray-100 text-gray-500 flex items-center justify-center hover:bg-rose-50 hover:text-rose-500 transition-all text-lg font-black">×</button>
+                            </div>
+
+                            {/* Modal Body */}
+                            <div className="flex-1 overflow-y-auto p-8">
+                                {loadingBreakdown ? (
+                                    <div className="flex items-center justify-center h-40"><div className="animate-spin h-8 w-8 rounded-full border-2 border-indigo-500 border-t-transparent"></div></div>
+                                ) : dailyBreakdown.data ? (
+                                    <>
+                                        {/* Summary Cards */}
+                                        <div className="grid grid-cols-3 gap-4 mb-8">
+                                            <div className="bg-gray-50 p-4 rounded-2xl border border-gray-100">
+                                                <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Base Salary</p>
+                                                <p className="text-lg font-black text-gray-800">₹{Number(dailyBreakdown.data.base_salary).toLocaleString()}</p>
+                                            </div>
+                                            <div className="bg-sky-50 p-4 rounded-2xl border border-sky-100">
+                                                <p className="text-[9px] font-black text-sky-500 uppercase tracking-widest">Daily Rate</p>
+                                                <p className="text-lg font-black text-sky-700">₹{Number(dailyBreakdown.data.daily_rate).toLocaleString()}</p>
+                                            </div>
+                                            <div className="bg-emerald-50 p-4 rounded-2xl border border-emerald-100">
+                                                <p className="text-[9px] font-black text-emerald-500 uppercase tracking-widest">Total Earned</p>
+                                                <p className="text-lg font-black text-emerald-700">₹{Number(dailyBreakdown.data.total_gross).toLocaleString()}</p>
+                                            </div>
+                                        </div>
+
+                                        {/* Day Table */}
+                                        {dailyBreakdown.data.breakdown.length > 0 ? (
+                                            <div className="overflow-x-auto rounded-2xl border border-gray-100">
+                                                <table className="w-full">
+                                                    <thead>
+                                                        <tr className="bg-gray-50 border-b border-gray-100">
+                                                            <th className="p-4 text-[9px] font-black text-gray-400 uppercase tracking-widest text-left">Date</th>
+                                                            <th className="p-4 text-[9px] font-black text-gray-400 uppercase tracking-widest text-center">Status</th>
+                                                            <th className="p-4 text-[9px] font-black text-gray-400 uppercase tracking-widest text-center">Punch In</th>
+                                                            <th className="p-4 text-[9px] font-black text-gray-400 uppercase tracking-widest text-center">Punch Out</th>
+                                                            <th className="p-4 text-[9px] font-black text-gray-400 uppercase tracking-widest text-right">Gross Earned</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody className="divide-y divide-gray-50">
+                                                        {dailyBreakdown.data.breakdown.map((day, i) => (
+                                                            <tr key={i} className={`${day.day_factor > 0 ? 'bg-emerald-50/30' : 'bg-rose-50/20'}`}>
+                                                                <td className="p-4 text-xs font-bold text-gray-700">{new Date(day.date).toLocaleDateString('en-IN', { weekday:'short', day:'2-digit', month:'short' })}</td>
+                                                                <td className="p-4 text-center">
+                                                                    <span className={`text-[9px] font-black uppercase px-3 py-1 rounded-xl tracking-widest ${
+                                                                        day.day_factor >= 1 ? 'bg-emerald-100 text-emerald-700'
+                                                                        : day.day_factor === 0.5 ? 'bg-amber-100 text-amber-700'
+                                                                        : 'bg-rose-100 text-rose-700'
+                                                                    }`}>{day.status}{day.day_factor === 0.5 ? ' (Half)' : ''}</span>
+                                                                </td>
+                                                                <td className="p-4 text-center text-xs text-gray-500 font-bold">{day.punch_in || '—'}</td>
+                                                                <td className="p-4 text-center text-xs text-gray-500 font-bold">{day.punch_out || '—'}</td>
+                                                                <td className="p-4 text-right font-black text-emerald-600">₹{Number(day.gross_earned).toLocaleString()}</td>
+                                                            </tr>
+                                                        ))}
+                                                    </tbody>
+                                                    <tfoot>
+                                                        <tr className="bg-gray-50 border-t-2 border-gray-200">
+                                                            <td colSpan="4" className="p-4 text-[10px] font-black text-gray-600 uppercase tracking-widest">Total Earned ({dailyBreakdown.data.days_recorded} Days Recorded)</td>
+                                                            <td className="p-4 text-right font-black text-lg text-emerald-700">₹{Number(dailyBreakdown.data.total_gross).toLocaleString()}</td>
+                                                        </tr>
+                                                    </tfoot>
+                                                </table>
+                                            </div>
+                                        ) : (
+                                            <div className="text-center py-16 text-gray-400">
+                                                <FaMoneyBillWave size={32} className="mx-auto mb-4 opacity-20" />
+                                                <p className="font-black text-sm uppercase tracking-widest">No Attendance Records in This Period</p>
+                                            </div>
+                                        )}
+                                    </>
+                                ) : (
+                                    <div className="text-center py-16 text-gray-400">
+                                        <p className="font-black text-sm">Could not load breakdown.</p>
+                                    </div>
+                                )}
+                            </div>
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
         </Layout>
     );
 };
