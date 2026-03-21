@@ -569,7 +569,6 @@ const AiAssistant = ({ isSidebar, onClose, userRole, isAiMinimized }) => {
                             animate={{ y: 0, opacity: 1 }}
                             transition={{ delay: 0.4, duration: 0.6 }}
                         >
-                            <h2 className="text-slate-900 font-black text-xl tracking-tighter mb-2">Zorvian AI</h2>
                             <p className="text-sky-600 text-[9px] font-black uppercase tracking-[0.3em]">Powered by ZORVIAN TECHNOLOGIES</p>
                         </motion.div>
                         <motion.div 
