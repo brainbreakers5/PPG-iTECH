@@ -591,14 +591,12 @@ const SalaryManagement = () => {
                 <div class="slip-title">SALARY SLIP FOR ${escapeHtml(periodLabel).toUpperCase()}</div>
 
                 <div class="grid">
-                    <div class="box">
+                    <div class="box" style="grid-column: span 2;">
                         <div class="label">Employee ID</div>
                         <div class="value">${escapeHtml(s.emp_id)}</div>
                         <div class="label" style="margin-top:10px">Employee Name</div>
                         <div class="value">${escapeHtml(s.name)}</div>
-                    </div>
-                    <div class="box">
-                        <div class="label">Department</div>
+                        <div class="label" style="margin-top:10px">Department</div>
                         <div class="value">${escapeHtml(s.department_name || 'N/A')}</div>
                         <div class="label" style="margin-top:10px">Designation</div>
                         <div class="value">${escapeHtml(s.role)}</div>
@@ -625,8 +623,8 @@ const SalaryManagement = () => {
                             <td style="text-align:right">-</td>
                         </tr>
                         <tr>
-                            <td>Loss of Pay (LOP) Deduction</td>
-                            <td style="text-align:right">${s.total_lop || 0} Days</td>
+                            <td>Deduction</td>
+                            <td style="text-align:right">${s.total_lop || 0} LOP Days</td>
                             <td style="text-align:right; color:#e11d48">- ₹${(Number(s.monthly_salary) - Number(s.calculated_salary)).toLocaleString()}</td>
                         </tr>
                         <tr class="total-row">
