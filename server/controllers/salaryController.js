@@ -1,318 +1,408 @@
 const { pool } = require('../config/db');
+const bcrypt = require('bcryptjs');
+const sendEmail = require('../utils/sendEmail');
+const logActivity = require('../utils/activityLogger');
+const { createNotification } = require('./notificationController');
 
-// Helper: count working days in a date range excluding weekends
-const getWorkingDays = (from, to) => {
-    let count = 0;
-    const cur = new Date(from);
-    const end = new Date(to);
-    while (cur <= end) {
-        const day = cur.getDay();
-        if (day !== 0 && day !== 6) count++; // Exclude Sunday(0) and Saturday(6)
-        cur.setDate(cur.getDate() + 1);
+// @desc    Check all birthdays and send notifications (Internal use)
+exports.checkAllBirthdaysAndNotify = async () => {
+    try {
+        const { rows: birthdayPeople } = await pool.query(`
+            SELECT id, name, emp_id, dob, email
+            FROM users
+            WHERE dob IS NOT NULL
+              AND EXTRACT(MONTH FROM dob) = EXTRACT(MONTH FROM CURRENT_DATE) 
+              AND EXTRACT(DAY FROM dob) = EXTRACT(DAY FROM CURRENT_DATE)
+        `);
+
+        for (const person of birthdayPeople) {
+            const message = `🎉 Happy Birthday, ${person.name}! Have a wonderful day! 🎂`;
+            // This will send both in-app and email
+            await createNotification(person.emp_id, message, 'birthday', { emp_id: person.emp_id });
+            console.log(`Birthday wish sent to ${person.name} (${person.emp_id})`);
+        }
+    } catch (error) {
+        console.error('Birthday Job Error:', error);
     }
-    return count;
 };
 
-// @desc    Calculate Salary (supports exact date range)
-// @route   POST /api/salary/calculate
+// @desc    Get employees with birthday today
+// @route   GET /api/employees/birthdays/today
+// @access  Private
+exports.getTodayBirthdays = async (req, res) => {
+    try {
+        const { rows } = await pool.query(`
+            SELECT id, name, emp_id, profile_pic, role, department_id, dob
+            FROM users
+            WHERE EXTRACT(MONTH FROM dob) = EXTRACT(MONTH FROM CURRENT_DATE) 
+              AND EXTRACT(DAY FROM dob) = EXTRACT(DAY FROM CURRENT_DATE)
+        `);
+        res.json(rows);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Server Error' });
+    }
+};
+
+// @desc    Create a new employee
+// @route   POST /api/employees
 // @access  Private (Admin)
-exports.calculateSalary = async (req, res) => {
+exports.createEmployee = async (req, res) => {
     const {
-        month,
-        year,
-        emp_id,
-        paidStatuses = ['Present', 'CL', 'ML', 'Comp Leave', 'OD', 'Leave', 'Holiday'],
-        fromDate,
-        toDate
+        emp_id, emp_code, pin, role, name, email, department_id, designation,
+        dob, doj, gender, mobile, profile_pic,
+        blood_group, religion, nationality, caste, community, whatsapp,
+        aadhar, pan, account_no, bank_name, branch, ifsc, pin_code,
+        pf_number, uan_number, permanent_address, communication_address,
+        father_name, mother_name, marital_status, monthly_salary, experience
     } = req.body;
 
+    // Trim critical fields
+    const trimmedEmpId = emp_id?.trim();
+    const trimmedPin = pin?.trim();
+
+    // Validation
+    if (!trimmedEmpId || !role || !name) {
+        return res.status(400).json({ message: 'Please provide required fields (Emp ID, Role, Name)' });
+    }
+
     try {
-        // Determine date range for attendance lookup
-        // Use provided fromDate/toDate if available, else fallback to full month
-        const rangeFrom = fromDate || `${year}-${String(month).padStart(2, '0')}-01`;
-        const rangeTo   = toDate   || `${year}-${String(month).padStart(2, '0')}-${new Date(year, month, 0).getDate()}`;
+        const { rows: existing } = await pool.query('SELECT emp_id FROM users WHERE emp_id = $1', [trimmedEmpId]);
+        if (existing.length > 0) {
+            return res.status(400).json({ message: 'Employee with this ID already exists' });
+        }
 
-        // Total calendar days in range (for proration denominator)
-        const diffTime = new Date(rangeTo) - new Date(rangeFrom);
-        const totalDaysInRange = Math.round(diffTime / (1000 * 60 * 60 * 24)) + 1;
+        const hashedPassword = await bcrypt.hash(trimmedPin || '1234', 10);
 
-        console.log(`Calculating salaries for range ${rangeFrom} → ${rangeTo} (${totalDaysInRange} days)`);
-
-        // 1. Fetch all eligible employees
-        let usersQuery = `
-            SELECT id, emp_id, name, monthly_salary, role
-            FROM users
-            WHERE LOWER(role) IN ('principal', 'hod', 'staff', 'management')
+        const query = `
+            INSERT INTO users (
+                emp_id, emp_code, pin, role, name, email, department_id, designation,
+                dob, doj, gender, mobile, profile_pic,
+                blood_group, religion, nationality, caste, community, whatsapp,
+                aadhar, pan, account_no, bank_name, branch, ifsc, pin_code,
+                pf_number, uan_number, permanent_address, communication_address,
+                father_name, mother_name, marital_status, monthly_salary, experience, password
+            ) VALUES (
+                $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, 
+                $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33, $34, $35, $36
+            )
         `;
-        const usersParams = [];
-        if (emp_id) {
-            usersQuery += ' AND TRIM(emp_id) = $1';
-            usersParams.push(emp_id.trim());
-        }
-        const { rows: users } = await pool.query(usersQuery, usersParams);
-        if (users.length === 0) {
-            return res.json({ message: 'No eligible employees found', results: [] });
-        }
 
-        // 2. Fetch attendance within the exact date range
-        const { rows: attendanceStats } = await pool.query(`
-            SELECT
-                TRIM(emp_id) as emp_id,
-                SUM(
-                    CASE
-                        WHEN status::text LIKE '%+%' THEN
-                            (CASE WHEN split_part(status::text, ' + ', 1) = ANY($3::text[]) THEN 0.5 ELSE 0 END +
-                             CASE WHEN split_part(status::text, ' + ', 2) = ANY($3::text[]) THEN 0.5 ELSE 0 END)
-                        WHEN status::text = ANY($3::text[]) THEN
-                            CASE
-                                WHEN remarks ILIKE '%Half Day%' OR
-                                     remarks ILIKE '%half%' OR
-                                     remarks ILIKE '%0.5%' OR
-                                     remarks ILIKE '%1/2%'
-                                THEN 0.5
-                                ELSE 1.0
-                            END
-                        ELSE 0
-                    END
-                ) as payable_days,
-                COUNT(*) as total_records
-            FROM attendance_records
-            WHERE date::date >= $1::date AND date::date <= $2::date
-            GROUP BY TRIM(emp_id)
-        `, [rangeFrom, rangeTo, paidStatuses]);
+        await pool.query(query, [
+            trimmedEmpId, emp_code || null, trimmedPin, role, name, email || null, department_id || null, designation || null,
+            dob || null, doj || null, gender || 'Male', mobile || null, profile_pic || null,
+            blood_group || null, religion || null, nationality || 'Indian', caste || null, community || null, whatsapp || null,
+            aadhar || null, pan || null, account_no || null, bank_name || null, branch || null, ifsc || null, pin_code || null,
+            pf_number || null, uan_number || null, permanent_address || null, communication_address || null,
+            father_name || null, mother_name || null, marital_status || 'Single', monthly_salary || 0, experience || null, hashedPassword
+        ]);
 
-        const statsMap = {};
-        attendanceStats.forEach(row => {
-            statsMap[row.emp_id] = {
-                payable_days: parseFloat(row.payable_days) || 0,
-                total_records: parseInt(row.total_records) || 0
-            };
-        });
-
-        // 3. Calculate and persist — SKIP records already marked as Paid
-        const results = [];
-        for (const user of users) {
-            const userEmpId = (user.emp_id || '').trim();
-            if (!userEmpId) continue;
-
-            // Check if already published (Paid) — do NOT overwrite paid records
-            const { rows: existing } = await pool.query(
-                `SELECT status FROM salary_records WHERE TRIM(emp_id) = $1 AND month = $2 AND year = $3`,
-                [userEmpId, month, year]
-            );
-            if (existing.length > 0 && existing[0].status === 'Paid') {
-                // Skip: protect paid records from drift
-                continue;
-            }
-
-            const stats = statsMap[userEmpId] || { payable_days: 0 };
-            const payableDays = stats.payable_days;
-            const baseSalary = parseFloat(user.monthly_salary) || 0;
-
-            // Prorated: daily rate × payable days within the range
-            const dailyRate = totalDaysInRange > 0 ? baseSalary / totalDaysInRange : 0;
-            const calculatedAmount = (dailyRate * payableDays).toFixed(2);
-            const totalLop = Math.max(0, totalDaysInRange - payableDays);
-
-            await pool.query(`
-                INSERT INTO salary_records (emp_id, month, year, total_present, total_leave, total_lop, calculated_salary, status)
-                VALUES ($1, $2, $3, $4, $5, $6, $7, 'Pending')
-                ON CONFLICT (emp_id, month, year) DO UPDATE SET
-                    total_present = EXCLUDED.total_present,
-                    total_leave = EXCLUDED.total_leave,
-                    total_lop = EXCLUDED.total_lop,
-                    calculated_salary = EXCLUDED.calculated_salary,
-                    status = EXCLUDED.status
-            `, [userEmpId, month, year, payableDays, 0, totalLop, calculatedAmount]);
-
-            results.push({
-                emp_id: userEmpId,
-                name: user.name,
-                role: user.role,
-                monthly_salary: baseSalary,
-                calculated_salary: calculatedAmount,
-                payable_days: payableDays,
-                total_lop: totalLop,
-                range_days: totalDaysInRange
-            });
-        }
-
-        // Emit real-time update to all connected clients
+        // Broadcast real-time employee update to all connected clients
         const io = req.app.get('io');
-        if (io) io.emit('salary_calculated', { month, year, count: results.length });
+        if (io) io.emit('employee_updated', { action: 'created', role, name });
 
-        res.json({ message: `Recalculated salaries for ${results.length} employees.`, results });
+        res.status(201).json({ message: 'Employee created successfully' });
+        await logActivity(req.user.id, 'CREATE_EMPLOYEE', { 
+            emp_id: trimmedEmpId, 
+            name, 
+            role, 
+            department_id, 
+            designation 
+        }, req.ip);
+
+        // Send Email Notification
+        if (email) {
+            try {
+                const message = `
+Welcome to PPG EMP HUB!
+
+Your employee account has been successfully created.
+--------------------------------------------------
+Employee ID: ${emp_id}
+Login PIN/Password: ${pin || '1234'}
+--------------------------------------------------
+Please log in to the portal using these credentials.
+`;
+                const html = `
+                    <div style="font-family: sans-serif; padding: 20px; border: 1px solid #e2e8f0; border-radius: 10px;">
+                        <h2 style="color: #2563eb;">Welcome to PPG EMP HUB!</h2>
+                        <p>Your employee account has been successfully created.</p>
+                        <div style="background-color: #f8fafc; padding: 15px; border-radius: 8px; margin: 20px 0;">
+                            <p><strong>Employee ID:</strong> ${emp_id}</p>
+                            <p><strong>Login PIN/Password:</strong> ${pin || '1234'}</p>
+                        </div>
+                        <p style="color: #64748b; font-size: 14px;">Please log in to the portal using these credentials.</p>
+                    </div>
+                `;
+
+                await sendEmail({
+                    email: email,
+                    subject: 'Welcome to PPG EMP HUB - Your Account Credentials',
+                    message: message,
+                    html: html
+                });
+            } catch (mailError) {
+                console.error('FAILED TO SEND WELCOME EMAIL:', mailError);
+                // We don't fail the request if email fails, but we log it
+            }
+        }
     } catch (error) {
-        console.error('SALARY CALCULATION ERROR:', error);
-        res.status(500).json({ message: 'Payroll calculation failed.', details: error.message });
+        console.error('CREATE EMPLOYEE ERROR:', error);
+        res.status(500).json({ message: 'Server Error: ' + error.message });
     }
 };
 
-// @desc    Get Salary Records
-// @route   GET /api/salary
-// @access  Private
-exports.getSalaryRecords = async (req, res) => {
+// @desc    Get all employees
+// @route   GET /api/employees
+// @access  Private (Admin, Principal, HOD)
+exports.getEmployees = async (req, res) => {
     try {
-        const { month, year } = req.query;
-
         let query = `
-            SELECT 
-                s.*,
-                u.name,
-                u.role,
-                u.profile_pic,
-                u.monthly_salary,
-                d.name as department_name
-            FROM salary_records s
-            JOIN users u ON TRIM(s.emp_id) = TRIM(u.emp_id)
+            SELECT u.id, u.emp_id, u.emp_code, u.name, u.role, u.email, u.mobile,
+                   u.department_id, u.designation, u.profile_pic,
+                   u.monthly_salary,
+                   TO_CHAR(u.dob, 'YYYY-MM-DD') as dob,
+                   TO_CHAR(u.doj, 'YYYY-MM-DD') as doj,
+                   d.name as department_name 
+            FROM users u
             LEFT JOIN departments d ON u.department_id = d.id
-            WHERE LOWER(u.role) != 'admin'
         `;
         const params = [];
 
-        if (month) { query += ' AND s.month = $' + (params.push(month)); }
-        if (year)  { query += ' AND s.year = $'  + (params.push(year));  }
-
-        // Role-based filter: restrict non-admin users to their own records only
-        const role = req.user.role;
-        if (role === 'staff' || role === 'principal') {
-            query += ' AND TRIM(s.emp_id) = TRIM($' + (params.push(req.user.emp_id)) + ')';
-        } else if (role === 'hod') {
-            query += ' AND u.department_id = $' + (params.push(req.user.department_id));
+        // Role-based filtering
+        if (req.user.role === 'hod' || req.user.role === 'staff') {
+            // If ?all=true is passed, HOD/Staff can see all staff/hod/principal profiles (e.g. for conversation participant selection)
+            if (req.query.all === 'true') {
+                query += ` WHERE u.role NOT IN ('admin')`;
+            } else if (req.user.department_id) {
+                query += ` WHERE u.department_id = $1 AND u.role NOT IN ('admin', 'principal')`;
+                params.push(req.user.department_id);
+            } else {
+                // Return an empty list if HOD/Staff is not assigned a department (for security)
+                return res.status(200).json([]);
+            }
         }
-        // admin and management: no additional filter — see all
+        // Admin and Principal still see everyone
 
-        query += `
-            ORDER BY
-                CASE LOWER(u.role)
-                    WHEN 'principal' THEN 1
-                    WHEN 'hod'       THEN 2
-                    WHEN 'staff'     THEN 3
-                    ELSE 4
-                END,
-                u.name ASC
-        `;
+        query += ` ORDER BY u.name ASC`;
 
         const { rows } = await pool.query(query, params);
         res.json(rows);
     } catch (error) {
-        console.error('GET SALARY ERROR:', error);
+        console.error(error);
         res.status(500).json({ message: 'Server Error' });
     }
 };
 
-// @desc    Get Daily Salary Breakdown for a specific employee + period
-// @route   GET /api/salary/daily?emp_id=&fromDate=&toDate=&paidStatuses=
+// @desc    Get employee by ID or Emp ID
+// @route   GET /api/employees/:id
 // @access  Private
-exports.getDailyBreakdown = async (req, res) => {
+exports.getEmployeeById = async (req, res) => {
     try {
-        const { emp_id, fromDate, toDate } = req.query;
-        const paidStatuses = req.query.paidStatuses
-            ? JSON.parse(req.query.paidStatuses)
-            : ['Present', 'CL', 'ML', 'Comp Leave', 'OD', 'Leave', 'Holiday'];
+        const paramId = req.params.id;
 
-        if (!emp_id || !fromDate || !toDate) {
-            return res.status(400).json({ message: 'emp_id, fromDate, toDate are required' });
+        // Build a safe query: only compare to u.id if the param looks like a number
+        // to avoid a PostgreSQL integer cast error on string emp_ids like '@PPG ZORVIAN'
+        const isNumeric = /^\d+$/.test(paramId);
+
+        let query, values;
+        if (isNumeric) {
+            query = `
+                SELECT u.*, 
+                       TO_CHAR(u.dob, 'YYYY-MM-DD') as dob,
+                       TO_CHAR(u.doj, 'YYYY-MM-DD') as doj,
+                       d.name as department_name
+                FROM users u
+                LEFT JOIN departments d ON u.department_id = d.id
+                WHERE u.id = $1 OR u.emp_id = $2
+            `;
+            values = [paramId, paramId];
+        } else {
+            query = `
+                SELECT u.*, 
+                       TO_CHAR(u.dob, 'YYYY-MM-DD') as dob,
+                       TO_CHAR(u.doj, 'YYYY-MM-DD') as doj,
+                       d.name as department_name
+                FROM users u
+                LEFT JOIN departments d ON u.department_id = d.id
+                WHERE u.emp_id = $1
+            `;
+            values = [paramId];
         }
 
-        // Fetch employee base salary
-        const { rows: empRows } = await pool.query(
-            `SELECT monthly_salary FROM users WHERE TRIM(emp_id) = $1`,
-            [emp_id.trim()]
-        );
-        if (!empRows.length) return res.status(404).json({ message: 'Employee not found' });
-        const baseSalary = parseFloat(empRows[0].monthly_salary) || 0;
+        const { rows } = await pool.query(query, values);
 
-        // Total days in range
-        const diffTime = new Date(toDate) - new Date(fromDate);
-        const totalDays = Math.round(diffTime / (1000 * 60 * 60 * 24)) + 1;
-        const dailyRate = totalDays > 0 ? baseSalary / totalDays : 0;
+        if (rows.length === 0) {
+            return res.status(404).json({ message: 'Employee not found' });
+        }
 
-        // Fetch daily attendance
-        const { rows: attendance } = await pool.query(`
-            SELECT date, status, remarks, punch_in, punch_out
-            FROM attendance_records
-            WHERE TRIM(emp_id) = $1 AND date::date >= $2::date AND date::date <= $3::date
-            ORDER BY date ASC
-        `, [emp_id.trim(), fromDate, toDate]);
+        const targetUser = rows[0];
+        // Allow users to see their own profile, or allow higher roles to see any
+        if (req.user.role === 'staff' && req.user.id !== targetUser.id) {
+            return res.status(403).json({ message: 'Not authorized to view this profile' });
+        }
 
-        // Build day-wise breakdown
-        const breakdown = attendance.map(a => {
-            let dayFactor = 0;
-            const st = (a.status || '').trim();
-            if (st.includes('+')) {
-                const parts = st.split('+').map(p => p.trim());
-                parts.forEach(p => { if (paidStatuses.includes(p)) dayFactor += 0.5; });
-            } else if (paidStatuses.includes(st)) {
-                const isHalf = (a.remarks || '').toLowerCase().includes('half') ||
-                               (a.remarks || '').includes('0.5') ||
-                               st.toLowerCase().includes('half');
-                dayFactor = isHalf ? 0.5 : 1.0;
-            }
-
-            const grossEarned = (dailyRate * dayFactor).toFixed(2);
-            return {
-                date: a.date,
-                status: st,
-                punch_in: a.punch_in,
-                punch_out: a.punch_out,
-                day_factor: dayFactor,
-                gross_earned: grossEarned,
-                net_earned: grossEarned // Currently no per-day deductions beyond LOP
-            };
-        });
-
-        const totalGross = breakdown.reduce((acc, d) => acc + parseFloat(d.gross_earned), 0);
-        res.json({
-            emp_id,
-            fromDate,
-            toDate,
-            total_days: totalDays,
-            daily_rate: dailyRate.toFixed(2),
-            base_salary: baseSalary,
-            days_recorded: breakdown.length,
-            total_gross: totalGross.toFixed(2),
-            breakdown
-        });
+        delete targetUser.password;
+        res.json(targetUser);
     } catch (error) {
-        console.error('DAILY BREAKDOWN ERROR:', error);
-        res.status(500).json({ message: 'Server Error' });
+        console.error('getEmployeeById ERROR:', error);
+        res.status(500).json({ message: 'Internal Server Error', error: error.message });
     }
 };
 
-// @desc    Update Salary Status (Mark as Paid)
-// @route   PUT /api/salary/:id/status
+// @desc    Update employee
+// @route   PUT /api/employees/:id
 // @access  Private (Admin)
-exports.updateSalaryStatus = async (req, res) => {
-    try {
-        const { status } = req.body;
-        await pool.query('UPDATE salary_records SET status = $1 WHERE id = $2', [status, req.params.id]);
-        res.json({ message: `Salary marked as ${status}` });
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ message: 'Server Error' });
-    }
-};
-
-// @desc    Publish all pending salaries for a month/year
-// @route   POST /api/salary/publish
-// @access  Private (Admin)
-exports.publishSalaries = async (req, res) => {
-    const { month, year } = req.body;
-    if (!month || !year) return res.status(400).json({ message: 'Month and year are required' });
+exports.updateEmployee = async (req, res) => {
+    const {
+        name, emp_code, role, department_id, designation,
+        mobile, email, dob, doj, gender, profile_pic,
+        blood_group, religion, nationality, caste, community, whatsapp,
+        aadhar, pan, account_no, bank_name, branch, ifsc, pin_code,
+        pf_number, uan_number, permanent_address, communication_address,
+        father_name, mother_name, marital_status, monthly_salary, experience, pin
+    } = req.body;
 
     try {
-        const { rowCount } = await pool.query(
-            `UPDATE salary_records SET status = 'Paid' WHERE month = $1 AND year = $2 AND status = 'Pending'`,
-            [month, year]
-        );
+        let hashedPassword;
+        if (pin) {
+            hashedPassword = await bcrypt.hash(pin, 10);
+        }
+
+        // Fetch the emp_id for audit logging before update
+        const { rows: targetUser } = await pool.query('SELECT emp_id FROM users WHERE id = $1', [req.params.id]);
+        const target_emp_id = targetUser[0]?.emp_id || 'Unknown';
+
+        const query = `
+            UPDATE users SET 
+                name = $1, emp_code = $2, role = $3, department_id = $4, designation = $5, 
+                mobile = $6, email = $7, dob = $8, doj = $9, gender = $10, profile_pic = $11,
+                blood_group = $12, religion = $13, nationality = $14, caste = $15, community = $16, whatsapp = $17,
+                aadhar = $18, pan = $19, account_no = $20, bank_name = $21, branch = $22, ifsc = $23, pin_code = $24,
+                pf_number = $25, uan_number = $26, permanent_address = $27, communication_address = $28,
+                father_name = $29, mother_name = $30, marital_status = $31, monthly_salary = $32, experience = $33, 
+                pin = $34, password = COALESCE($35, password)
+            WHERE id = $36
+        `;
+
+        await pool.query(query, [
+            name, emp_code || null, role, department_id || null, designation || null,
+            mobile || null, email || null, dob || null, doj || null, gender || 'Male', profile_pic || null,
+            blood_group || null, religion || null, nationality || 'Indian', caste || null, community || null, whatsapp || null,
+            aadhar || null, pan || null, account_no || null, bank_name || null, branch || null, ifsc || null, pin_code || null,
+            pf_number || null, uan_number || null, permanent_address || null, communication_address || null,
+            father_name || null, mother_name || null, marital_status || 'Single', monthly_salary || 0, experience || null,
+            pin || null, hashedPassword || null,
+            req.params.id
+        ]);
 
         const io = req.app.get('io');
-        if (io) io.emit('salary_published', { month, year });
+        if (io) io.emit('employee_updated', { action: 'updated' });
 
-        res.json({ message: `${rowCount} salary records published`, count: rowCount });
+        res.json({ message: 'Employee updated successfully' });
+        await logActivity(req.user.id, 'UPDATE_EMPLOYEE', { 
+            target_id: req.params.id, 
+            emp_id: target_emp_id,
+            name, 
+            role, 
+            department_id, 
+            designation 
+        }, req.ip);
     } catch (error) {
-        console.error(error);
-        res.status(500).json({ message: 'Server Error' });
+        console.error('UPDATE ERROR:', error);
+        res.status(500).json({ message: 'Server Error: ' + error.message });
+    }
+};
+
+// @desc    Delete employee
+// @route   DELETE /api/employees/:id
+// @access  Private (Admin)
+exports.deleteEmployee = async (req, res) => {
+    const client = await pool.connect();
+    try {
+        await client.query('BEGIN');
+
+        const { rows: userRows } = await client.query(
+            'SELECT emp_id, name, role FROM users WHERE id = $1',
+            [req.params.id]
+        );
+
+        if (userRows.length === 0) {
+            await client.query('ROLLBACK');
+            return res.status(404).json({ message: 'Employee not found' });
+        }
+        const { emp_id, name, role } = userRows[0];
+
+        // Protection for @ppg zorvian
+        if (emp_id.toLowerCase() === '@ppg zorvian') {
+            const { rows: otherAdmins } = await client.query(
+                "SELECT id FROM users WHERE role = 'admin' AND emp_id != $1",
+                [emp_id]
+            );
+            if (otherAdmins.length === 0) {
+                await client.query('ROLLBACK');
+                return res.status(403).json({ 
+                    message: 'Cannot delete the primary admin account (@ppg zorvian) unless another admin account exists.' 
+                });
+            }
+        }
+
+        // For HOD and Staff: auto-reject any pending leave requests before deletion
+        if (role === 'hod' || role === 'staff') {
+            // Get all pending leave requests by this user
+            const { rows: pendingLeaves } = await client.query(
+                "SELECT id FROM leave_requests WHERE emp_id = $1 AND status = 'Pending'",
+                [emp_id]
+            );
+
+            for (const leave of pendingLeaves) {
+                // Mark the leave request as Rejected
+                await client.query(
+                    "UPDATE leave_requests SET status = 'Rejected' WHERE id = $1",
+                    [leave.id]
+                );
+
+                // Mark any pending approval steps as Rejected too
+                await client.query(
+                    "UPDATE leave_approvals SET status = 'Rejected', comments = 'Employee account deleted by admin' WHERE leave_request_id = $1 AND status = 'Pending'",
+                    [leave.id]
+                );
+            }
+
+            // Also reject pending requests where this user is an approver
+            const { rows: pendingAsApprover } = await client.query(
+                "SELECT leave_request_id FROM leave_approvals WHERE approver_id = $1 AND status = 'Pending'",
+                [emp_id]
+            );
+
+            for (const item of pendingAsApprover) {
+                await client.query(
+                    "UPDATE leave_approvals SET status = 'Rejected', comments = 'Approver account deleted by admin' WHERE leave_request_id = $1 AND approver_id = $2 AND status = 'Pending'",
+                    [item.leave_request_id, emp_id]
+                );
+                // Also mark parent leave request as Rejected so it doesn't stay stuck
+                await client.query(
+                    "UPDATE leave_requests SET status = 'Rejected' WHERE id = $1 AND status = 'Pending'",
+                    [item.leave_request_id]
+                );
+            }
+        }
+
+        // Now delete the user (CASCADE will clean up related records)
+        await client.query('DELETE FROM users WHERE id = $1', [req.params.id]);
+
+        await client.query('COMMIT');
+
+        const io = req.app.get('io');
+        if (io) io.emit('employee_updated', { action: 'deleted' });
+
+        res.json({ message: `Employee ${name} deleted successfully. Any pending leave requests have been cancelled.` });
+        await logActivity(req.user.id, 'DELETE_EMPLOYEE', { emp_id, name }, req.ip);
+    } catch (error) {
+        await client.query('ROLLBACK');
+        console.error('DELETE EMPLOYEE ERROR:', error);
+        res.status(500).json({ message: 'Server Error: ' + error.message });
+    } finally {
+        client.release();
     }
 };
