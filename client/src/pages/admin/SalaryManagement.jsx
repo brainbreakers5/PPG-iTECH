@@ -135,7 +135,8 @@ const SalaryManagement = () => {
             const y = d.getFullYear();
             const { data } = await api.get(`/salary?month=${m}&year=${y}`);
             
-            if (user.role === 'staff') {
+            const isAdmin = user.role === 'admin' || user.role === 'management';
+            if (!isAdmin) {
                 setSalaries(data.filter(s => s.emp_id === user.emp_id));
             } else {
                 setSalaries(data);
@@ -148,7 +149,8 @@ const SalaryManagement = () => {
     };
 
     const getMergedSalaries = () => {
-        if (user.role === 'staff') return salaries;
+        const isAdmin = user.role === 'admin' || user.role === 'management';
+        if (!isAdmin) return salaries;
         // MERGE: All employees (base list) + Salaries (calculated data)
         return allEmployees.map(emp => {
             const calc = salaries.find(s => s.emp_id === emp.emp_id);
