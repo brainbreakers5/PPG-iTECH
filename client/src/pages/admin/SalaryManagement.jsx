@@ -590,45 +590,57 @@ const SalaryManagement = () => {
                 
                 <div class="slip-title">SALARY SLIP FOR ${escapeHtml(periodLabel).toUpperCase()}</div>
 
-                <div class="grid">
-                    <div class="box" style="grid-column: span 2;">
-                        <div class="label">Employee ID</div>
-                        <div class="value">${escapeHtml(s.emp_id)}</div>
-                        <div class="label" style="margin-top:10px">Employee Name</div>
-                        <div class="value">${escapeHtml(s.name)}</div>
-                        <div class="label" style="margin-top:10px">Department</div>
-                        <div class="value">${escapeHtml(s.department_name || 'N/A')}</div>
-                        <div class="label" style="margin-top:10px">Designation</div>
-                        <div class="value">${escapeHtml(s.role)}</div>
-                    </div>
-                </div>
+                <table class="table" style="margin-bottom: 30px;">
+                    <tr>
+                        <td style="width: 25%; font-weight: bold; background: #f8fafc; font-size: 11px;">EMPLOYEE ID</td>
+                        <td style="width: 25%; font-size: 13px; font-weight: bold;">${escapeHtml(s.emp_id)}</td>
+                        <td style="width: 25%; font-weight: bold; background: #f8fafc; font-size: 11px;">DEPARTMENT</td>
+                        <td style="width: 25%; font-size: 13px; font-weight: bold;">${escapeHtml(s.department_name || 'N/A')}</td>
+                    </tr>
+                    <tr>
+                        <td style="font-weight: bold; background: #f8fafc; font-size: 11px;">NAME</td>
+                        <td style="font-size: 13px; font-weight: bold;">${escapeHtml(s.name)}</td>
+                        <td style="font-weight: bold; background: #f8fafc; font-size: 11px;">DESIGNATION</td>
+                        <td style="font-size: 13px; font-weight: bold;">${escapeHtml(s.role)}</td>
+                    </tr>
+                    <tr>
+                        <td style="font-weight: bold; background: #f8fafc; font-size: 11px;">PAID DAYS</td>
+                        <td style="font-size: 13px; font-weight: bold;">${s.total_present} / ${s.total_days_in_period || new Date(s.year, s.month, 0).getDate()}</td>
+                        <td style="font-weight: bold; background: #f8fafc; font-size: 11px;">ABSENT/LOP</td>
+                        <td style="font-size: 13px; font-weight: bold;">${s.total_lop || 0} Days</td>
+                    </tr>
+                    <tr>
+                        <td style="font-weight: bold; background: #f8fafc; font-size: 11px;">PERIOD</td>
+                        <td style="font-size: 13px; font-weight: bold;">${escapeHtml(periodLabel)}</td>
+                        <td style="font-weight: bold; background: #f8fafc; font-size: 11px;">SALARY STATUS</td>
+                        <td style="font-size: 13px; font-weight: bold;">${escapeHtml(s.status).toUpperCase()}</td>
+                    </tr>
+                </table>
 
                 <table class="table">
                     <thead>
                         <tr>
-                            <th>Description</th>
-                            <th style="text-align:right">Details</th>
+                            <th>Earnings</th>
+                            <th style="text-align:right">Amount</th>
+                            <th>Deductions</th>
                             <th style="text-align:right">Amount</th>
                         </tr>
                     </thead>
                     <tbody>
                         <tr>
-                            <td>Basic Monthly Salary</td>
-                            <td style="text-align:right">-</td>
+                            <td>Basic Salary</td>
                             <td style="text-align:right">₹${Number(s.monthly_salary).toLocaleString()}</td>
+                            <td>Loss Of Pay</td>
+                            <td style="text-align:right; color:#e11d48">₹${(Number(s.gross_salary || s.monthly_salary) < Number(s.monthly_salary) ? Number(s.monthly_salary) - Number(s.gross_salary || s.monthly_salary) : 0).toLocaleString()}</td>
                         </tr>
                         <tr>
-                            <td>Attendance Details</td>
-                            <td style="text-align:right">Paid Days: ${s.total_present} / ${new Date(s.year, s.month, 0).getDate()}</td>
-                            <td style="text-align:right">-</td>
-                        </tr>
-                        <tr>
-                            <td>Deduction</td>
-                            <td style="text-align:right">${s.total_lop || 0} LOP Days</td>
-                            <td style="text-align:right; color:#e11d48">- ₹${(Number(s.monthly_salary) - Number(s.calculated_salary)).toLocaleString()}</td>
+                            <td>Gross Earned</td>
+                            <td style="text-align:right">₹${Number(s.gross_salary || s.calculated_salary).toLocaleString()}</td>
+                            <td>Other Deductions</td>
+                            <td style="text-align:right; color:#e11d48">₹${Number(s.deductions_applied || 0).toLocaleString()}</td>
                         </tr>
                         <tr class="total-row">
-                            <td colspan="2" style="text-align:right">NET PAYABLE AMOUNT</td>
+                            <td colspan="3" style="text-align:right">NET PAYABLE AMOUNT</td>
                             <td style="text-align:right">₹${Number(s.calculated_salary).toLocaleString()}</td>
                         </tr>
                     </tbody>
@@ -927,17 +939,18 @@ const SalaryManagement = () => {
                     <div className="bg-white rounded-[40px] shadow-2xl shadow-sky-50/50 border border-sky-50 overflow-hidden">
                         <div className="overflow-x-auto">
                             <table className="w-full">
-                                <thead>
-                                    <tr className="bg-gray-50/50 border-b border-gray-100">
-                                        {user.role === 'admin' && !isHistoryMode && <th className="p-4 pl-8 w-10"></th>}
-                                        <th className="p-8 text-[10px] font-black uppercase tracking-[0.2em] text-gray-400 text-left">Employee</th>
-                                        <th className="p-8 text-[10px] font-black uppercase tracking-[0.2em] text-gray-400 text-center">Attendance</th>
-                                        <th className="p-8 text-[10px] font-black uppercase tracking-[0.2em] text-gray-400 text-right">Gross Pay</th>
-                                        <th className="p-8 text-[10px] font-black uppercase tracking-[0.2em] text-gray-400 text-right">Net Salary</th>
-                                        <th className="p-8 text-[10px] font-black uppercase tracking-[0.2em] text-gray-400 text-center">Status</th>
-                                        <th className="p-8 text-[10px] font-black uppercase tracking-[0.2em] text-gray-400 text-right">Actions</th>
-                                    </tr>
-                                </thead>
+                <thead>
+                    <tr className="bg-gray-50/50 border-b border-gray-100">
+                        {user.role === 'admin' && !isHistoryMode && <th className="p-4 pl-8 w-10"></th>}
+                        <th className="p-8 text-[10px] font-black uppercase tracking-[0.2em] text-gray-400 text-left">Employee</th>
+                        <th className="p-8 text-[10px] font-black uppercase tracking-[0.2em] text-gray-400 text-center">Attendance (With/Without Pay)</th>
+                        <th className="p-8 text-[10px] font-black uppercase tracking-[0.2em] text-gray-400 text-right">Gross Pay</th>
+                        <th className="p-8 text-[10px] font-black uppercase tracking-[0.2em] text-gray-400 text-right">Deductions</th>
+                        <th className="p-8 text-[10px] font-black uppercase tracking-[0.2em] text-gray-400 text-right">Net Salary</th>
+                        <th className="p-8 text-[10px] font-black uppercase tracking-[0.2em] text-gray-400 text-center">Status</th>
+                        <th className="p-8 text-[10px] font-black uppercase tracking-[0.2em] text-gray-400 text-right">Actions</th>
+                    </tr>
+                </thead>
                                 <tbody className="divide-y divide-gray-50/50">
                                     <AnimatePresence mode="popLayout">
                                         { getMergedSalaries()
@@ -1007,18 +1020,20 @@ const SalaryManagement = () => {
                                                     </td>
                                                     <td className="p-8 text-right font-black text-gray-800">
                                                         <div className="flex flex-col items-end">
-                                                            <span className="text-lg text-gray-800 tracking-tighter font-black">₹{Number(s.monthly_salary || 0).toLocaleString()}</span>
-                                                            <span className="text-[9px] text-gray-400 font-bold tracking-widest mt-1">Monthly Salary</span>
+                                                            <span className="text-lg text-gray-800 tracking-tighter font-black">₹{Number(s.gross_salary || s.monthly_salary || 0).toLocaleString()}</span>
+                                                            <span className="text-[9px] text-gray-400 font-bold tracking-widest mt-1">Earnings</span>
+                                                        </div>
+                                                    </td>
+                                                    <td className="p-8 text-right font-black text-rose-500">
+                                                        <div className="flex flex-col items-end">
+                                                            <span className="text-lg text-rose-600 tracking-tighter font-black">- ₹{Number(s.deductions_applied || 0).toLocaleString()}</span>
+                                                            <span className="text-[9px] text-gray-400 font-bold tracking-widest mt-1">Total Deductions</span>
                                                         </div>
                                                     </td>
                                                     <td className="p-8 text-right font-black">
                                                         <div className="flex flex-col items-end">
                                                             <span className="text-lg text-emerald-600 tracking-tighter font-black">₹{Number(s.calculated_salary || 0).toLocaleString()}</span>
-                                                            {(Number(s.monthly_salary || 0) > Number(s.calculated_salary || 0)) && (
-                                                                <span className="text-[9px] text-rose-400 font-bold tracking-widest mt-1">
-                                                                    - ₹{(Number(s.monthly_salary || 0) - Number(s.calculated_salary || 0)).toLocaleString()} DEDUCTED
-                                                                </span>
-                                                            )}
+                                                            <span className="text-[9px] text-gray-400 font-bold tracking-widest mt-1">Net Payable</span>
                                                         </div>
                                                     </td>
                                                     <td className="p-8 text-center">
