@@ -22,6 +22,7 @@ exports.calculateSalary = async (req, res) => {
         year,
         emp_id,
         paidStatuses = ['Present', 'CL', 'ML', 'Comp Leave', 'OD', 'Leave', 'Holiday'],
+        unpaidStatuses = ['Absent', 'LOP'],
         fromDate,
         toDate
     } = req.body;
@@ -75,16 +76,34 @@ exports.calculateSalary = async (req, res) => {
                         ELSE 0
                     END
                 ) as payable_days,
+                SUM(
+                    CASE
+                        WHEN status::text LIKE '%+%' THEN
+                            (CASE WHEN split_part(status::text, ' + ', 1) = ANY($4::text[]) THEN 0.5 ELSE 0 END +
+                             CASE WHEN split_part(status::text, ' + ', 2) = ANY($4::text[]) THEN 0.5 ELSE 0 END)
+                        WHEN status::text = ANY($4::text[]) THEN
+                            CASE
+                                WHEN remarks ILIKE '%Half Day%' OR
+                                     remarks ILIKE '%half%' OR
+                                     remarks ILIKE '%0.5%' OR
+                                     remarks ILIKE '%1/2%'
+                                THEN 0.5
+                                ELSE 1.0
+                            END
+                        ELSE 0
+                    END
+                ) as unpaid_days,
                 COUNT(*) as total_records
             FROM attendance_records
             WHERE date::date >= $1::date AND date::date <= $2::date
             GROUP BY TRIM(emp_id)
-        `, [rangeFrom, rangeTo, paidStatuses]);
+        `, [rangeFrom, rangeTo, paidStatuses, unpaidStatuses]);
 
         const statsMap = {};
         attendanceStats.forEach(row => {
             statsMap[row.emp_id] = {
                 payable_days: parseFloat(row.payable_days) || 0,
+                unpaid_days: parseFloat(row.unpaid_days) || 0,
                 total_records: parseInt(row.total_records) || 0
             };
         });
@@ -105,8 +124,9 @@ exports.calculateSalary = async (req, res) => {
                 continue;
             }
 
-            const stats = statsMap[userEmpId] || { payable_days: 0 };
+            const stats = statsMap[userEmpId] || { payable_days: 0, unpaid_days: 0 };
             const payableDays = stats.payable_days;
+            const unpaidDays = stats.unpaid_days;
             const baseSalary = parseFloat(user.monthly_salary) || 0;
 
             // Compute total deductions
@@ -122,14 +142,17 @@ exports.calculateSalary = async (req, res) => {
                 }
             }
 
-            // Prorated: daily rate × payable days within the range
+            // Real-time calculation logic:
+            // Calculate daily rate based on total days in range.
+            // Deduct the exact 'unpaid_days' from the full base salary.
+            // Empty days (e.g. pending punches) are automatically considered normal calendar days, preventing mid-month net drops.
             const dailyRate = totalDaysInRange > 0 ? baseSalary / totalDaysInRange : 0;
-            let calculatedAmount = dailyRate * payableDays;
+            let grossAmount = baseSalary - (dailyRate * unpaidDays);
             
-            // Subtract deductions (floor at 0)
-            calculatedAmount = Math.max(0, calculatedAmount - totalDeductions).toFixed(2);
+            // Subtract manual fixed monthly deductions (floor at 0)
+            let calculatedAmount = Math.max(0, grossAmount - totalDeductions).toFixed(2);
             
-            const totalLop = Math.max(0, totalDaysInRange - payableDays);
+            const totalLop = unpaidDays;
 
             await pool.query(`
                 INSERT INTO salary_records (emp_id, month, year, total_present, total_leave, total_lop, calculated_salary, status)
