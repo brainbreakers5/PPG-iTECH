@@ -160,6 +160,7 @@ exports.getEmployees = async (req, res) => {
         let query = `
             SELECT u.id, u.emp_id, u.emp_code, u.name, u.role, u.email, u.mobile,
                    u.department_id, u.designation, u.profile_pic,
+                   u.monthly_salary,
                    TO_CHAR(u.dob, 'YYYY-MM-DD') as dob,
                    TO_CHAR(u.doj, 'YYYY-MM-DD') as doj,
                    d.name as department_name 
