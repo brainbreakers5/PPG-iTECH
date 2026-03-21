@@ -630,14 +630,24 @@ const SalaryManagement = () => {
                         <tr>
                             <td>Basic Salary</td>
                             <td style="text-align:right">₹${Number(s.monthly_salary).toLocaleString()}</td>
-                            <td>Loss Of Pay</td>
-                            <td style="text-align:right; color:#e11d48">₹${(Number(s.gross_salary || s.monthly_salary) < Number(s.monthly_salary) ? Number(s.monthly_salary) - Number(s.gross_salary || s.monthly_salary) : 0).toLocaleString()}</td>
+                            <td>Loss Of Pay (${s.without_pay_count || 0} Days)</td>
+                            <td style="text-align:right; color:#e11d48">₹${(() => {
+                                const totalDays = s.total_days_in_period || new Date(s.year, s.month, 0).getDate();
+                                const daily = Number(s.monthly_salary) / totalDays;
+                                return Math.round(daily * (Number(s.without_pay_count) || 0)).toLocaleString();
+                            })()}</td>
                         </tr>
                         <tr>
-                            <td>Gross Earned</td>
-                            <td style="text-align:right">₹${Number(s.gross_salary || s.calculated_salary).toLocaleString()}</td>
+                            <td>Gross Earnings</td>
+                            <td style="text-align:right">₹${Number(s.monthly_salary).toLocaleString()}</td>
                             <td>Other Deductions</td>
-                            <td style="text-align:right; color:#e11d48">₹${Number(s.deductions_applied || 0).toLocaleString()}</td>
+                            <td style="text-align:right; color:#e11d48">₹${(() => {
+                                const totalDays = s.total_days_in_period || new Date(s.year, s.month, 0).getDate();
+                                const daily = Number(s.monthly_salary) / totalDays;
+                                const lop = daily * (Number(s.without_pay_count) || 0);
+                                const other = Number(s.deductions_applied || 0) - lop;
+                                return Math.max(0, Math.round(other)).toLocaleString();
+                            })()}</td>
                         </tr>
                         <tr class="total-row">
                             <td colspan="3" style="text-align:right">NET PAYABLE AMOUNT</td>
