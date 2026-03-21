@@ -209,7 +209,8 @@ exports.getEmployeeById = async (req, res) => {
 
         let query, values;
         if (isNumeric) {
-            // Prioritize emp_id over database id to avoid conflicts when emp_id is numeric
+            // Priority 1: Exact emp_id match (trimmed)
+            // Priority 2: Database ID match (numeric)
             query = `
                 SELECT u.*, 
                        TO_CHAR(u.dob, 'YYYY-MM-DD') as dob,
@@ -217,11 +218,11 @@ exports.getEmployeeById = async (req, res) => {
                        d.name as department_name
                 FROM users u
                 LEFT JOIN departments d ON u.department_id = d.id
-                WHERE u.emp_id = $1 OR u.id = $2
-                ORDER BY CASE WHEN u.emp_id = $1 THEN 0 ELSE 1 END ASC
+                WHERE TRIM(u.emp_id) = $1 OR u.id = $2
+                ORDER BY CASE WHEN TRIM(u.emp_id) = $1 THEN 0 ELSE 1 END ASC
                 LIMIT 1
             `;
-            values = [paramId, parseInt(paramId)];
+            values = [paramId.trim(), parseInt(paramId)];
         } else {
             query = `
                 SELECT u.*, 
@@ -230,9 +231,9 @@ exports.getEmployeeById = async (req, res) => {
                        d.name as department_name
                 FROM users u
                 LEFT JOIN departments d ON u.department_id = d.id
-                WHERE u.emp_id = $1
+                WHERE TRIM(u.emp_id) = $1
             `;
-            values = [paramId];
+            values = [paramId.trim()];
         }
 
         const { rows } = await pool.query(query, values);
