@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FaTimes, FaCheckCircle, FaIdBadge, FaBuilding, FaPhone, FaEnvelope, FaUser, FaCalendarAlt, FaVenusMars, FaTint, FaGlobe, FaHandsHelping, FaWhatsapp, FaMapMarkerAlt, FaUsers, FaHeart, FaBriefcase, FaMoneyBillWave, FaUniversity, FaCreditCard, FaLock, FaUserCircle, FaSuitcase, FaCamera, FaEdit, FaSave, FaCertificate, FaDownload, FaEye, FaPlus, FaTrash, FaKey, FaPrint } from 'react-icons/fa';
+import { FaTimes, FaCheckCircle, FaIdBadge, FaBuilding, FaPhone, FaEnvelope, FaUser, FaCalendarAlt, FaVenusMars, FaTint, FaGlobe, FaHandsHelping, FaWhatsapp, FaMapMarkerAlt, FaUsers, FaHeart, FaBriefcase, FaMoneyBillWave, FaUniversity, FaCreditCard, FaLock, FaUserCircle, FaSuitcase, FaCamera, FaEdit, FaSave, FaCertificate, FaDownload, FaEye, FaPlus, FaTrash, FaKey, FaPrint, FaMinusCircle } from 'react-icons/fa';
 import api from '../utils/api';
 import Swal from 'sweetalert2';
 import { useAuth } from '../context/AuthContext';
@@ -56,6 +56,16 @@ const ProfileViewer = ({ user, onClose }) => {
         String(authUser.id) === String(user.id) || 
         authUser.emp_id === user.emp_id
     );
+
+    const canViewSensitiveInfo = isOwnProfile || authUser.role === 'admin' || authUser.role === 'management';
+
+    const parsedDeductions = (() => {
+        try {
+            return user?.deductions ? JSON.parse(user.deductions) : [];
+        } catch {
+            return [];
+        }
+    })();
 
     useEffect(() => {
         setPicUrl(user?.profile_pic || '');
@@ -517,7 +527,7 @@ const ProfileViewer = ({ user, onClose }) => {
                                     <FaPrint size={12} className="group-hover:scale-110 transition-transform" /> Print
                                 </button>
                             )}
-                            {isOwnProfile && !isEditingProfile && (
+                            {isOwnProfile && !isEditingProfile && (authUser.role === 'admin' || authUser.role === 'management') && (
                                 <button
                                     onClick={() => setIsEditingProfile(true)}
                                     className="flex items-center gap-2 px-5 py-2.5 bg-sky-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-sky-700 transition-all shadow-lg shadow-sky-200"
@@ -610,39 +620,65 @@ const ProfileViewer = ({ user, onClose }) => {
                                     )}
 
                                     {/* Family & Marital */}
-                                    <div className="col-span-full">
-                                        <SectionHeader title="Family & Social" />
-                                    </div>
-                                    <InfoRow icon={<FaUser />} label="Father's Name" value={isEditingProfile ? formData.father_name : user.father_name} editing={isEditingProfile} name="father_name" onChange={handleChange} />
-                                    <InfoRow icon={<FaUser />} label="Mother's Name" value={isEditingProfile ? formData.mother_name : user.mother_name} editing={isEditingProfile} name="mother_name" onChange={handleChange} />
-                                    <InfoRow icon={<FaHeart />} label="Marital Status" value={isEditingProfile ? formData.marital_status : user.marital_status} editing={isEditingProfile} name="marital_status" onChange={handleChange} />
+                                    {canViewSensitiveInfo && (
+                                        <>
+                                            <div className="col-span-full">
+                                                <SectionHeader title="Family & Social" />
+                                            </div>
+                                            <InfoRow icon={<FaUser />} label="Father's Name" value={isEditingProfile ? formData.father_name : user.father_name} editing={isEditingProfile} name="father_name" onChange={handleChange} />
+                                            <InfoRow icon={<FaUser />} label="Mother's Name" value={isEditingProfile ? formData.mother_name : user.mother_name} editing={isEditingProfile} name="mother_name" onChange={handleChange} />
+                                            <InfoRow icon={<FaHeart />} label="Marital Status" value={isEditingProfile ? formData.marital_status : user.marital_status} editing={isEditingProfile} name="marital_status" onChange={handleChange} />
 
-                                    {/* Career & Financial */}
-                                    <div className="col-span-full">
-                                        <SectionHeader title="Career & Financials" />
-                                    </div>
-                                    <InfoRow icon={<FaCalendarAlt />} label="Date of Joining" value={user.doj} />
-                                    <InfoRow icon={<FaSuitcase />} label="Experience" value={user.experience} />
-                                    <InfoRow icon={<FaMoneyBillWave />} label="Monthly Salary" value={user.monthly_salary ? `₹${parseFloat(user.monthly_salary).toLocaleString()}` : 'N/A'} />
-                                    <InfoRow icon={<FaUniversity />} label="Bank Name" value={isEditingProfile ? formData.bank_name : user.bank_name} editing={isEditingProfile} name="bank_name" onChange={handleChange} />
-                                    <InfoRow icon={<FaCreditCard />} label="Account Number" value={isEditingProfile ? formData.account_no : user.account_no} editing={isEditingProfile} name="account_no" onChange={handleChange} />
-                                    {isEditingProfile ? (
-                                        <>
-                                            <InfoRow icon={<FaUniversity />} label="Branch" value={formData.branch} editing={true} name="branch" onChange={handleChange} />
-                                            <InfoRow icon={<FaUniversity />} label="IFSC Code" value={formData.ifsc} editing={true} name="ifsc" onChange={handleChange} />
+                                            {/* Career & Financial */}
+                                            <div className="col-span-full">
+                                                <SectionHeader title="Career & Financials" />
+                                            </div>
+                                            <InfoRow icon={<FaCalendarAlt />} label="Date of Joining" value={user.doj} />
+                                            <InfoRow icon={<FaSuitcase />} label="Experience" value={user.experience} />
+                                            <InfoRow icon={<FaMoneyBillWave />} label="Monthly Salary" value={user.monthly_salary ? `₹${parseFloat(user.monthly_salary).toLocaleString()}` : 'N/A'} />
+                                            <InfoRow icon={<FaUniversity />} label="Bank Name" value={isEditingProfile ? formData.bank_name : user.bank_name} editing={isEditingProfile} name="bank_name" onChange={handleChange} />
+                                            <InfoRow icon={<FaCreditCard />} label="Account Number" value={isEditingProfile ? formData.account_no : user.account_no} editing={isEditingProfile} name="account_no" onChange={handleChange} />
+                                            {isEditingProfile ? (
+                                                <>
+                                                    <InfoRow icon={<FaUniversity />} label="Branch" value={formData.branch} editing={true} name="branch" onChange={handleChange} />
+                                                    <InfoRow icon={<FaUniversity />} label="IFSC Code" value={formData.ifsc} editing={true} name="ifsc" onChange={handleChange} />
+                                                </>
+                                            ) : (
+                                                <InfoRow icon={<FaUniversity />} label="Branch / IFSC" value={`${user.branch || ''} ${user.ifsc ? `(${user.ifsc})` : ''}`} />
+                                            )}
+                                            <InfoRow icon={<FaIdBadge />} label="Aadhar Card" value={isEditingProfile ? formData.aadhar : user.aadhar} editing={isEditingProfile} name="aadhar" onChange={handleChange} />
+                                            <InfoRow icon={<FaIdBadge />} label="PAN Number" value={isEditingProfile ? formData.pan : user.pan} editing={isEditingProfile} name="pan" onChange={handleChange} />
+                                            {isEditingProfile ? (
+                                                <>
+                                                    <InfoRow icon={<FaUserCircle />} label="PF Number" value={formData.pf_number} editing={true} name="pf_number" onChange={handleChange} />
+                                                    <InfoRow icon={<FaUserCircle />} label="UAN Number" value={formData.uan_number} editing={true} name="uan_number" onChange={handleChange} />
+                                                </>
+                                            ) : (
+                                                <InfoRow icon={<FaUserCircle />} label="PF / UAN" value={`${user.pf_number || ''} ${user.uan_number ? `/ ${user.uan_number}` : ''}`} />
+                                            )}
+
+                                            {parsedDeductions.length > 0 && (
+                                                <div className="col-span-full mt-4">
+                                                    <div className="p-5 rounded-3xl bg-rose-50/50 border border-transparent">
+                                                        <p className="text-[9px] font-black text-rose-500 uppercase tracking-widest leading-none mb-3 flex items-center gap-2">
+                                                            <FaMinusCircle size={10} /> Monthly Deductions
+                                                        </p>
+                                                        <div className="space-y-2 max-w-sm">
+                                                            {parsedDeductions.map((d, i) => (
+                                                                <div key={i} className="flex justify-between items-center bg-white p-3 rounded-2xl shadow-sm border border-rose-100/50">
+                                                                    <span className="text-xs font-black text-gray-600 uppercase tracking-widest">{d.type}</span>
+                                                                    <span className="text-sm font-bold text-rose-600 tracking-tight">₹{Number(d.amount).toLocaleString()}</span>
+                                                                </div>
+                                                            ))}
+                                                            <div className="flex justify-between items-center bg-rose-100 p-3 rounded-2xl !mt-3">
+                                                                <span className="text-[10px] font-black text-rose-700 uppercase tracking-widest">Total Deductions</span>
+                                                                <span className="text-sm font-black text-rose-700 tracking-tight">₹{parsedDeductions.reduce((a, b) => a + Number(b.amount || 0), 0).toLocaleString()}</span>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            )}
                                         </>
-                                    ) : (
-                                        <InfoRow icon={<FaUniversity />} label="Branch / IFSC" value={`${user.branch || ''} ${user.ifsc ? `(${user.ifsc})` : ''}`} />
-                                    )}
-                                    <InfoRow icon={<FaIdBadge />} label="Aadhar Card" value={isEditingProfile ? formData.aadhar : user.aadhar} editing={isEditingProfile} name="aadhar" onChange={handleChange} />
-                                    <InfoRow icon={<FaIdBadge />} label="PAN Number" value={isEditingProfile ? formData.pan : user.pan} editing={isEditingProfile} name="pan" onChange={handleChange} />
-                                    {isEditingProfile ? (
-                                        <>
-                                            <InfoRow icon={<FaUserCircle />} label="PF Number" value={formData.pf_number} editing={true} name="pf_number" onChange={handleChange} />
-                                            <InfoRow icon={<FaUserCircle />} label="UAN Number" value={formData.uan_number} editing={true} name="uan_number" onChange={handleChange} />
-                                        </>
-                                    ) : (
-                                        <InfoRow icon={<FaUserCircle />} label="PF / UAN" value={`${user.pf_number || ''} ${user.uan_number ? `/ ${user.uan_number}` : ''}`} />
                                     )}
 
                                     {/* Address */}
@@ -684,7 +720,7 @@ const ProfileViewer = ({ user, onClose }) => {
                             )}
 
                             {/* Certificates Section (only for employees) */}
-                            {user.role !== 'management' && (
+                            {user.role !== 'management' && canViewSensitiveInfo && (
                                 <>
                                     <div className="col-span-full">
                                         <SectionHeader title="Certificates" />
