@@ -58,7 +58,8 @@ const ProfileViewer = ({ user, onClose }) => {
     );
 
     // HOD & Principal are restricted when viewing OTHERS' profiles
-    const canViewSensitiveInfo = isOwnProfile || authUser.role === 'admin' || authUser.role === 'management';
+    // Principal & HOD can view sensitive info for others they are authorized to view
+    const canViewSensitiveInfo = isOwnProfile || ['admin', 'management', 'principal', 'hod'].includes(authUser.role);
 
     const parsedDeductions = (() => {
         try {
