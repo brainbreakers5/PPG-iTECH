@@ -316,3 +316,63 @@ exports.publishSalaries = async (req, res) => {
         res.status(500).json({ message: 'Server Error' });
     }
 };
+
+// @desc    Notify employee via email when salary is marked as Paid
+// @route   POST /api/salary/notify-paid
+// @access  Private (Admin)
+exports.notifyPaid = async (req, res) => {
+    const { emp_id, name, email, fromDate, toDate, amount } = req.body;
+
+    try {
+        // Fetch employee email if not provided in body
+        let recipientEmail = email;
+        if (!recipientEmail) {
+            const { rows } = await pool.query('SELECT email FROM users WHERE TRIM(emp_id) = $1', [emp_id?.trim()]);
+            recipientEmail = rows[0]?.email;
+        }
+
+        if (recipientEmail) {
+            const sendEmail = require('../utils/sendEmail');
+            const periodText = `${fromDate} to ${toDate}`;
+            const amountFormatted = Number(amount || 0).toLocaleString('en-IN', { style: 'currency', currency: 'INR' });
+
+            await sendEmail({
+                email: recipientEmail,
+                subject: `Salary Credited – PPG Management (${periodText})`,
+                message: `Dear ${name},\n\nYour salary for the period ${periodText} has been credited.\nAmount: ${amountFormatted}\n\nPlease check your bank account.\n\nRegards,\nPPG Management`,
+                html: `
+                    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 30px; border: 1px solid #e2e8f0; border-radius: 16px;">
+                        <div style="text-align:center; margin-bottom:24px;">
+                            <h2 style="color:#1e3a8a; margin:0;">PPG EMP HUB</h2>
+                            <p style="color:#64748b; font-size:13px; margin:4px 0;">Salary Management System</p>
+                        </div>
+                        <div style="background: linear-gradient(135deg, #10b981, #059669); border-radius:12px; padding:20px; text-align:center; margin-bottom:24px;">
+                            <p style="color:white; font-size:13px; margin:0; font-weight:600;">✅ SALARY CREDITED</p>
+                            <h1 style="color:white; font-size:32px; margin:8px 0;">${amountFormatted}</h1>
+                        </div>
+                        <p style="color:#374151;">Dear <strong>${name}</strong>,</p>
+                        <p style="color:#374151;">Your salary for the period <strong>${periodText}</strong> has been credited to your registered bank account.</p>
+                        <div style="background:#f8fafc; border-radius:8px; padding:16px; margin:20px 0;">
+                            <table style="width:100%; font-size:13px;">
+                                <tr><td style="color:#64748b; padding:4px 0;">Period</td><td style="font-weight:600; text-align:right;">${periodText}</td></tr>
+                                <tr><td style="color:#64748b; padding:4px 0;">Net Amount</td><td style="font-weight:600; color:#10b981; text-align:right;">${amountFormatted}</td></tr>
+                                <tr><td style="color:#64748b; padding:4px 0;">Status</td><td style="font-weight:600; color:#10b981; text-align:right;">✅ PAID</td></tr>
+                            </table>
+                        </div>
+                        <p style="color:#374151;">Please check your bank account and verify the credit. For any queries, contact PPG Management.</p>
+                        <div style="text-align:center; margin-top:30px; padding-top:20px; border-top:1px solid #e2e8f0;">
+                            <p style="color:#94a3b8; font-size:11px;">PPG Education Institutions · Powered by ZORVIAN TECHNOLOGIES</p>
+                        </div>
+                    </div>
+                `
+            });
+        }
+
+        res.json({ message: 'Notification sent successfully' });
+    } catch (error) {
+        console.error('NOTIFY PAID ERROR:', error);
+        // Don't fail if email bounces – just log and return OK
+        res.json({ message: 'Salary marked paid (email notification may have failed)' });
+    }
+};
+
