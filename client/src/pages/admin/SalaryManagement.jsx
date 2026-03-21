@@ -164,14 +164,14 @@ const SalaryManagement = () => {
             if (calc) {
                 return {
                     ...calc,
-                    // Use fresh base_salary from employee record for accurate gross pay display
-                    monthly_salary: emp.base_salary || calc.monthly_salary 
+                    // Use fresh monthly_salary from employee record for accurate gross pay display
+                    monthly_salary: emp.monthly_salary || calc.monthly_salary 
                 };
             }
             return {
                 ...emp,
                 id: `temp_${emp.emp_id}`,
-                monthly_salary: emp.base_salary || 0,
+                monthly_salary: emp.monthly_salary || 0,
                 calculated_salary: 0,
                 total_present: 0,
                 total_lop: 0,
