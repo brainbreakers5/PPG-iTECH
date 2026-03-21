@@ -126,6 +126,104 @@ const ManagementSalary = () => {
         setTimeout(() => printWindow.print(), 250);
     };
 
+    const handlePrintSlip = (s) => {
+        const printWindow = window.open('', '_blank', 'width=800,height=600');
+        if (!printWindow) return;
+
+        const d = new Date(fromDate);
+        const periodLabel = d.toLocaleString('default', { month: 'long', year: 'numeric' });
+
+        printWindow.document.write(`
+            <!doctype html>
+            <html>
+            <head>
+                <meta charset="UTF-8">
+                <title>Salary Slip - ${escapeHtml(s.name)}</title>
+                <style>
+                    body { font-family: Arial, sans-serif; padding: 40px; color: #333; line-height: 1.6; }
+                    .header { text-align: center; border-bottom: 2px solid #7c3aed; padding-bottom: 20px; margin-bottom: 30px; }
+                    .header h1 { margin: 0; color: #5b21b6; font-size: 24px; }
+                    .header p { margin: 5px 0; color: #6b7280; font-size: 14px; }
+                    .slip-title { text-align: center; font-size: 18px; font-weight: bold; margin-bottom: 30px; text-decoration: underline; }
+                    .grid { display: grid; grid-template-cols: 1fr 1fr; gap: 20px; margin-bottom: 30px; }
+                    .box { border: 1px solid #e5e7eb; padding: 15px; border-radius: 8px; }
+                    .label { font-weight: bold; color: #6b7280; font-size: 12px; text-transform: uppercase; }
+                    .value { font-size: 16px; font-weight: bold; margin-top: 5px; }
+                    .table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+                    .table th, .table td { border: 1px solid #e5e7eb; padding: 12px; text-align: left; }
+                    .table th { background: #f9fafb; color: #6b7280; font-size: 12px; }
+                    .total-row { background: #f3f4f6; font-weight: bold; }
+                    .footer { margin-top: 50px; display: flex; justify-content: space-between; }
+                    .sig { border-top: 1px solid #333; width: 200px; text-align: center; padding-top: 10px; font-size: 12px; }
+                    @media print { body { padding: 0; } .no-print { display: none; } }
+                </style>
+            </head>
+            <body>
+                <div class="header">
+                    <h1>PPG EDUCATION INSTITUTIONS</h1>
+                    <p>Management Payroll - Pay Slip</p>
+                </div>
+                
+                <div class="slip-title">SALARY SLIP FOR ${escapeHtml(periodLabel).toUpperCase()}</div>
+
+                <div class="grid">
+                    <div class="box">
+                        <div class="label">Employee Name</div>
+                        <div class="value">${escapeHtml(s.name)}</div>
+                        <div class="label" style="margin-top:10px">Employee ID</div>
+                        <div class="value">${escapeHtml(s.emp_id)}</div>
+                    </div>
+                    <div class="box">
+                        <div class="label">Department</div>
+                        <div class="value">${escapeHtml(s.department_name || 'N/A')}</div>
+                        <div class="label" style="margin-top:10px">Designation</div>
+                        <div class="value">${escapeHtml(s.role)}</div>
+                    </div>
+                </div>
+
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Description</th>
+                            <th style="text-align:right">Details</th>
+                            <th style="text-align:right">Amount</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>Basic Monthly Salary</td>
+                            <td style="text-align:right">-</td>
+                            <td style="text-align:right">₹${Number(s.monthly_salary).toLocaleString()}</td>
+                        </tr>
+                        <tr>
+                            <td>Attendance Details</td>
+                            <td style="text-align:right">Paid Days: ${s.total_present} / ${new Date(s.year, s.month, 0).getDate()}</td>
+                            <td style="text-align:right">-</td>
+                        </tr>
+                        <tr>
+                            <td>Loss of Pay (LOP) Deduction</td>
+                            <td style="text-align:right">${s.total_lop || 0} Days</td>
+                            <td style="text-align:right; color:#e11d48">- ₹${(Number(s.monthly_salary) - Number(s.calculated_salary)).toLocaleString()}</td>
+                        </tr>
+                        <tr class="total-row">
+                            <td colspan="2" style="text-align:right">NET PAYROLL AMOUNT</td>
+                            <td style="text-align:right">₹${Number(s.calculated_salary).toLocaleString()}</td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <div class="footer">
+                    <div class="sig">Staff Signature</div>
+                    <div class="sig">Management Authority</div>
+                </div>
+            </body>
+            </html>
+        `);
+        printWindow.document.close();
+        printWindow.focus();
+        setTimeout(() => printWindow.print(), 500);
+    };
+
     return (
         <Layout>
             <motion.div
@@ -140,130 +238,8 @@ const ManagementSalary = () => {
                     </div>
                 </div>
 
-                {/* Period Select Row at Top */}
-                <div className="bg-white p-8 rounded-[32px] shadow-xl shadow-purple-50/50 border border-purple-50 mb-10 flex flex-wrap items-center gap-8 no-print">
-                    <h2 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] flex items-center gap-3">
-                        <FaFilter className="text-purple-600" /> Period
-                    </h2>
-                    <div className="flex items-center gap-4">
-                        <input
-                            type="date"
-                            value={fromDate}
-                            onChange={(e) => setFromDate(e.target.value)}
-                            className="p-3 bg-gray-50 border border-gray-100 rounded-xl outline-none focus:ring-4 focus:ring-purple-100 focus:border-purple-500 transition-all font-black text-gray-700 text-[10px] uppercase"
-                        />
-                        <span className="text-gray-300 font-bold">to</span>
-                        <input
-                            type="date"
-                            value={toDate}
-                            onChange={(e) => setToDate(e.target.value)}
-                            className="p-3 bg-gray-50 border border-gray-100 rounded-xl outline-none focus:ring-4 focus:ring-purple-100 focus:border-purple-500 transition-all font-black text-gray-700 text-[10px] uppercase"
-                        />
-                    </div>
-                </div>
-
-                {/* Role Tabs */}
-                <div className="flex flex-wrap gap-4 mb-10 no-print">
-                    {[
-                        { id: 'all', label: 'All Personnel', icon: <FaChartLine /> },
-                        { id: 'principal', label: 'Principal', icon: <FaShieldAlt /> },
-                        { id: 'hod', label: 'HODs', icon: <FaShieldAlt /> },
-                        { id: 'staff', label: 'Staff members', icon: <FaFileAlt /> }
-                    ].map((tab) => (
-                        <button
-                            key={tab.id}
-                            onClick={() => setActiveRole(tab.id)}
-                            className={`flex items-center gap-3 px-8 py-4 rounded-2xl font-black uppercase tracking-[0.2em] text-[10px] transition-all ${activeRole === tab.id
-                                ? 'bg-purple-600 text-white shadow-xl shadow-purple-200 ring-4 ring-purple-50'
-                                : 'bg-white text-gray-400 hover:bg-gray-50 border border-purple-50'
-                                }`}
-                        >
-                            <span className={`${activeRole === tab.id ? 'text-white' : 'text-purple-500'}`}>
-                                {tab.icon}
-                            </span>
-                            {tab.label}
-                        </button>
-                    ))}
-                </div>
-
-                {/* Master Ledger Table */}
-                <div className="mb-10">
-                    <div className="bg-white rounded-[40px] shadow-2xl shadow-purple-50/50 border border-purple-50 overflow-hidden">
-                        <div className="overflow-x-auto">
-                            <table className="w-full">
-                                <thead>
-                                    <tr className="bg-gray-50/50 border-b border-gray-100">
-                                        <th className="p-8 text-[10px] font-black uppercase tracking-[0.2em] text-gray-400 text-left">Employee</th>
-                                        <th className="p-8 text-[10px] font-black uppercase tracking-[0.2em] text-gray-400 text-center">Attendance</th>
-                                        <th className="p-8 text-[10px] font-black uppercase tracking-[0.2em] text-gray-400 text-right">Computed Pay</th>
-                                        <th className="p-8 text-[10px] font-black uppercase tracking-[0.2em] text-gray-400 text-center">Status</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-gray-50/50">
-                                    <AnimatePresence mode="popLayout">
-                                        {salaries
-                                            .filter(s => activeRole === 'all' || (s.role || '').toLowerCase() === activeRole.toLowerCase())
-                                            .map((s, idx) => (
-                                                <motion.tr
-                                                    key={s.id}
-                                                    initial={{ opacity: 0, x: 20 }}
-                                                    animate={{ opacity: 1, x: 0 }}
-                                                    exit={{ opacity: 0, x: -20 }}
-                                                    transition={{ delay: idx * 0.03 }}
-                                                    className="hover:bg-purple-50/30 transition-all group"
-                                                >
-                                                    <td className="p-8">
-                                                        <div className="flex items-center gap-5">
-                                                            <div className="h-14 w-14 rounded-[20px] bg-gradient-to-br from-purple-50 to-white border border-purple-50 flex items-center justify-center text-purple-600 font-black text-lg shadow-sm group-hover:scale-110 group-hover:rotate-3 transition-all duration-500 overflow-hidden">
-                                                                <img src={s.profile_pic || `https://ui-avatars.com/api/?name=${encodeURIComponent(s.name || '?')}&size=100&background=9333ea&color=fff&bold=true`} alt="" className="h-full w-full object-cover" />
-                                                            </div>
-                                                            <div>
-                                                                <p className="text-sm font-black text-gray-800 tracking-tight group-hover:text-purple-600 transition-colors">{s.name}</p>
-                                                                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mt-0.5">{s.department_name || 'N/A'}</p>
-                                                            </div>
-                                                        </div>
-                                                    </td>
-                                                    <td className="p-8">
-                                                        <div className="flex flex-col items-center gap-3">
-                                                            <div className="flex gap-4 text-[9px] font-black uppercase tracking-widest">
-                                                                <span className="text-purple-500 bg-purple-50 px-2 py-1 rounded-md" title="Total Payable Days">PAID: {s.total_present}</span>
-                                                                <span className="text-gray-400 bg-gray-50 px-2 py-1 rounded-md" title="Total Days in Month">MONTH: {new Date(s.year, s.month, 0).getDate()}</span>
-                                                                <span className="text-rose-500 bg-rose-50 px-2 py-1 rounded-md" title="Loss of Pay Days">LOP: {s.total_lop || 0}</span>
-                                                            </div>
-                                                            <div className="w-32 bg-gray-100 h-1.5 rounded-full overflow-hidden shadow-inner p-px">
-                                                                <motion.div
-                                                                    initial={{ width: 0 }}
-                                                                    animate={{ width: `${(s.total_present / new Date(s.year, s.month, 0).getDate()) * 100}%` }}
-                                                                    className="bg-gradient-to-r from-purple-400 to-purple-600 h-full rounded-full shadow-[0_0_12px_rgba(124,58,237,0.3)]"
-                                                                ></motion.div>
-                                                            </div>
-                                                        </div>
-                                                    </td>
-                                                    <td className="p-8 text-right font-black text-gray-800">
-                                                        <div className="flex flex-col items-end">
-                                                            <span className="text-[9px] text-gray-300 line-through font-bold tracking-widest mb-1">₹{Number(s.monthly_salary || 0).toLocaleString()}</span>
-                                                            <span className="text-lg text-purple-600 tracking-tighter font-black">₹{Number(s.calculated_salary || 0).toLocaleString()}</span>
-                                                        </div>
-                                                    </td>
-                                                    <td className="p-8 text-center">
-                                                        <span className={`text-[9px] font-black uppercase px-4 py-2 rounded-2xl tracking-widest border ${s.status === 'Paid'
-                                                            ? 'bg-emerald-50 text-emerald-600 border-emerald-100'
-                                                            : 'bg-amber-50 text-amber-600 border-amber-100 animate-pulse'
-                                                            }`}>
-                                                            {s.status}
-                                                        </span>
-                                                    </td>
-                                                </motion.tr>
-                                            ))}
-                                    </AnimatePresence>
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>
-
-                {/* Analytical Matrix (Resized and moved below table) */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pb-16">
+                {/* Master Analytical Matrix (Now at top) */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10 no-print">
                     <motion.div
                         initial={{ opacity: 0, y: 10 }}
                         whileInView={{ opacity: 1, y: 0 }}
@@ -332,6 +308,138 @@ const ManagementSalary = () => {
                             <div className="text-[9px] font-bold text-amber-500 uppercase tracking-widest opacity-40 group-hover:opacity-100 transition-opacity">Unpaid</div>
                         </div>
                     </motion.div>
+                </div>
+
+                {/* Period Select Row at Top */}
+                <div className="bg-white p-8 rounded-[32px] shadow-xl shadow-purple-50/50 border border-purple-50 mb-10 flex flex-wrap items-center gap-8 no-print">
+                    <h2 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] flex items-center gap-3">
+                        <FaFilter className="text-purple-600" /> Period
+                    </h2>
+                    <div className="flex items-center gap-4">
+                        <input
+                            type="date"
+                            value={fromDate}
+                            onChange={(e) => setFromDate(e.target.value)}
+                            className="p-3 bg-gray-50 border border-gray-100 rounded-xl outline-none focus:ring-4 focus:ring-purple-100 focus:border-purple-500 transition-all font-black text-gray-700 text-[10px] uppercase"
+                        />
+                        <span className="text-gray-300 font-bold">to</span>
+                        <input
+                            type="date"
+                            value={toDate}
+                            onChange={(e) => setToDate(e.target.value)}
+                            className="p-3 bg-gray-50 border border-gray-100 rounded-xl outline-none focus:ring-4 focus:ring-purple-100 focus:border-purple-500 transition-all font-black text-gray-700 text-[10px] uppercase"
+                        />
+                    </div>
+                </div>
+
+                {/* Role Tabs */}
+                <div className="flex flex-wrap gap-4 mb-10 no-print">
+                    {[
+                        { id: 'all', label: 'All Personnel', icon: <FaChartLine /> },
+                        { id: 'principal', label: 'Principal', icon: <FaShieldAlt /> },
+                        { id: 'hod', label: 'HODs', icon: <FaShieldAlt /> },
+                        { id: 'staff', label: 'Staff members', icon: <FaFileAlt /> }
+                    ].map((tab) => (
+                        <button
+                            key={tab.id}
+                            onClick={() => setActiveRole(tab.id)}
+                            className={`flex items-center gap-3 px-8 py-4 rounded-2xl font-black uppercase tracking-[0.2em] text-[10px] transition-all ${activeRole === tab.id
+                                ? 'bg-purple-600 text-white shadow-xl shadow-purple-200 ring-4 ring-purple-50'
+                                : 'bg-white text-gray-400 hover:bg-gray-50 border border-purple-50'
+                                }`}
+                        >
+                            <span className={`${activeRole === tab.id ? 'text-white' : 'text-purple-500'}`}>
+                                {tab.icon}
+                            </span>
+                            {tab.label}
+                        </button>
+                    ))}
+                </div>
+
+                {/* Master Ledger Table */}
+                <div className="mb-10">
+                    <div className="bg-white rounded-[40px] shadow-2xl shadow-purple-50/50 border border-purple-50 overflow-hidden">
+                        <div className="overflow-x-auto">
+                            <table className="w-full">
+                                <thead>
+                                    <tr className="bg-gray-50/50 border-b border-gray-100">
+                                        <th className="p-8 text-[10px] font-black uppercase tracking-[0.2em] text-gray-400 text-left">Employee</th>
+                                        <th className="p-8 text-[10px] font-black uppercase tracking-[0.2em] text-gray-400 text-center">Attendance</th>
+                                        <th className="p-8 text-[10px] font-black uppercase tracking-[0.2em] text-gray-400 text-right">Computed Pay</th>
+                                        <th className="p-8 text-[10px] font-black uppercase tracking-[0.2em] text-gray-400 text-center">Status</th>
+                                        <th className="p-8 text-[10px] font-black uppercase tracking-[0.2em] text-gray-400 text-right">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-gray-50/50">
+                                    <AnimatePresence mode="popLayout">
+                                        {salaries
+                                            .filter(s => activeRole === 'all' || (s.role || '').toLowerCase() === activeRole.toLowerCase())
+                                            .map((s, idx) => (
+                                                <motion.tr
+                                                    key={s.id}
+                                                    initial={{ opacity: 0, x: 20 }}
+                                                    animate={{ opacity: 1, x: 0 }}
+                                                    exit={{ opacity: 0, x: -20 }}
+                                                    transition={{ delay: idx * 0.03 }}
+                                                    className="hover:bg-purple-50/30 transition-all group"
+                                                >
+                                                    <td className="p-8">
+                                                        <div className="flex items-center gap-5">
+                                                            <div className="h-14 w-14 rounded-[20px] bg-gradient-to-br from-purple-50 to-white border border-purple-50 flex items-center justify-center text-purple-600 font-black text-lg shadow-sm group-hover:scale-110 group-hover:rotate-3 transition-all duration-500 overflow-hidden">
+                                                                <img src={s.profile_pic || `https://ui-avatars.com/api/?name=${encodeURIComponent(s.name || '?')}&size=100&background=9333ea&color=fff&bold=true`} alt="" className="h-full w-full object-cover" />
+                                                            </div>
+                                                            <div>
+                                                                <p className="text-sm font-black text-gray-800 tracking-tight group-hover:text-purple-600 transition-colors">{s.name}</p>
+                                                                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mt-0.5">{s.department_name || 'N/A'}</p>
+                                                            </div>
+                                                        </div>
+                                                    </td>
+                                                    <td className="p-8">
+                                                        <div className="flex flex-col items-center gap-3">
+                                                            <div className="flex gap-4 text-[9px] font-black uppercase tracking-widest">
+                                                                <span className="text-purple-500 bg-purple-50 px-2 py-1 rounded-md" title="Total Payable Days">PAID: {s.total_present}</span>
+                                                                <span className="text-gray-400 bg-gray-50 px-2 py-1 rounded-md" title="Total Days in Month">MONTH: {new Date(s.year, s.month, 0).getDate()}</span>
+                                                                <span className="text-rose-500 bg-rose-50 px-2 py-1 rounded-md" title="Loss of Pay Days">LOP: {s.total_lop || 0}</span>
+                                                            </div>
+                                                            <div className="w-32 bg-gray-100 h-1.5 rounded-full overflow-hidden shadow-inner p-px">
+                                                                <motion.div
+                                                                    initial={{ width: 0 }}
+                                                                    animate={{ width: `${(s.total_present / new Date(s.year, s.month, 0).getDate()) * 100}%` }}
+                                                                    className="bg-gradient-to-r from-purple-400 to-purple-600 h-full rounded-full shadow-[0_0_12px_rgba(124,58,237,0.3)]"
+                                                                ></motion.div>
+                                                            </div>
+                                                        </div>
+                                                    </td>
+                                                    <td className="p-8 text-right font-black text-gray-800">
+                                                        <div className="flex flex-col items-end">
+                                                            <span className="text-[9px] text-gray-300 line-through font-bold tracking-widest mb-1">₹{Number(s.monthly_salary || 0).toLocaleString()}</span>
+                                                            <span className="text-lg text-purple-600 tracking-tighter font-black">₹{Number(s.calculated_salary || 0).toLocaleString()}</span>
+                                                        </div>
+                                                    </td>
+                                                    <td className="p-8 text-center">
+                                                        <span className={`text-[9px] font-black uppercase px-4 py-2 rounded-2xl tracking-widest border ${s.status === 'Paid'
+                                                            ? 'bg-emerald-50 text-emerald-600 border-emerald-100'
+                                                            : 'bg-amber-50 text-amber-600 border-amber-100 animate-pulse'
+                                                            }`}>
+                                                            {s.status}
+                                                        </span>
+                                                    </td>
+                                                    <td className="p-8 text-right">
+                                                        <button
+                                                            onClick={() => handlePrintSlip(s)}
+                                                            className="h-12 w-12 bg-purple-50 text-purple-600 rounded-2xl flex items-center justify-center hover:bg-purple-100 transition-all active:scale-95 shadow-sm border border-purple-100 mx-auto lg:ml-auto lg:mr-0"
+                                                            title="Print Slip"
+                                                        >
+                                                            <FaFileAlt size={16} />
+                                                        </button>
+                                                    </td>
+                                                </motion.tr>
+                                            ))}
+                                    </AnimatePresence>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
                 </div>
             </motion.div>
         </Layout>
