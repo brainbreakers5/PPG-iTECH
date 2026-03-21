@@ -141,9 +141,9 @@ const AiAssistant = ({ isSidebar, onClose, userRole, isAiMinimized }) => {
     const role = (userRole || user?.role || 'staff').toLowerCase();
     const allowedKIs = AI_KNOWLEDGE_BASE[role] || [];
 
-    // Splash timer
+    // Splash timer - Updated to 2 seconds
     useEffect(() => {
-        const timer = setTimeout(() => setShowSplash(false), 3000);
+        const timer = setTimeout(() => setShowSplash(false), 2000);
         return () => clearTimeout(timer);
     }, []);
 
@@ -548,41 +548,41 @@ const AiAssistant = ({ isSidebar, onClose, userRole, isAiMinimized }) => {
                  </div>
             </div>
 
-            {/* Splash Screen Overlay */}
+            {/* Splash Screen Overlay - Updated to White Background */}
             <AnimatePresence>
                 {showSplash && (
                     <motion.div
                         initial={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
-                        className="absolute inset-0 z-[100] bg-slate-900 flex flex-col items-center justify-center p-8 text-center"
+                        className="absolute inset-0 z-[100] bg-white flex flex-col items-center justify-center p-8 text-center"
                     >
                         <motion.div
                             initial={{ scale: 0.8, opacity: 0 }}
                             animate={{ scale: 1, opacity: 1 }}
-                            transition={{ duration: 1, ease: "easeOut" }}
-                            className="w-32 h-32 mb-8 rounded-3xl overflow-hidden shadow-2xl shadow-sky-500/20"
+                            transition={{ duration: 0.8, ease: "easeOut" }}
+                            className="w-32 h-32 mb-8 rounded-3xl overflow-hidden shadow-2xl shadow-sky-100/50 border border-sky-50"
                         >
                             <img src="/Zorvian ai logo.jpeg" alt="Zorvian AI" className="w-full h-full object-cover" />
                         </motion.div>
                         <motion.div
                             initial={{ y: 20, opacity: 0 }}
                             animate={{ y: 0, opacity: 1 }}
-                            transition={{ delay: 0.5, duration: 0.8 }}
+                            transition={{ delay: 0.4, duration: 0.6 }}
                         >
-                            <h2 className="text-white font-black text-xl tracking-tighter mb-2">Zorvian AI</h2>
-                            <p className="text-sky-400 text-[9px] font-black uppercase tracking-[0.3em]">Powered by ZORVIAN TECHNOLOGIES</p>
+                            <h2 className="text-slate-900 font-black text-xl tracking-tighter mb-2">Zorvian AI</h2>
+                            <p className="text-sky-600 text-[9px] font-black uppercase tracking-[0.3em]">Powered by ZORVIAN TECHNOLOGIES</p>
                         </motion.div>
                         <motion.div 
-                            className="mt-12 w-48 h-1 bg-white/10 rounded-full overflow-hidden"
+                            className="mt-12 w-48 h-1 bg-sky-50 rounded-full overflow-hidden"
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}
-                            transition={{ delay: 1 }}
+                            transition={{ delay: 0.8 }}
                         >
                             <motion.div 
                                 className="h-full bg-sky-500"
                                 initial={{ width: 0 }}
                                 animate={{ width: "100%" }}
-                                transition={{ duration: 2.5, ease: "easeInOut" }}
+                                transition={{ duration: 1.2, ease: "easeInOut" }}
                             />
                         </motion.div>
                     </motion.div>
