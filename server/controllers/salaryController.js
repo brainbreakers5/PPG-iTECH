@@ -154,13 +154,18 @@ exports.calculateSalary = async (req, res) => {
 
             // Real-time calculation logic:
             // "based on attendance - with pay, without pay total counts"
-            // Use Positive Accrual: Employee earns their salary based on days present/with pay.
-            // If they are marked Present, they earn `dailyRate` for that day.
+            // Use Earnings vs. Deductions approach:
+            // Gross = Base Monthly Salary
+            // Deductions = (Loss of Pay Amount) + (Fixed Profile Deductions)
             const dailyRate = totalDaysInRange > 0 ? baseSalary / totalDaysInRange : 0;
-            let grossAmount = dailyRate * payableDays;
+            const lopAmount = dailyRate * unpaidDays;
             
-            // Subtract manual fixed monthly deductions (floor at 0)
-            let calcAmountRaw = Math.max(0, grossAmount - totalDeductions);
+            // Total deductions = LOP based on attendance + Fixed deductions from profile
+            const totalDeductionsApplied = lopAmount + totalDeductions;
+            
+            // Result amounts
+            const grossAmount = baseSalary;
+            let calcAmountRaw = Math.max(0, grossAmount - totalDeductionsApplied);
             if (isNaN(calcAmountRaw)) calcAmountRaw = 0;
             let netSalary = calcAmountRaw.toFixed(2);
             
@@ -189,7 +194,7 @@ exports.calculateSalary = async (req, res) => {
                 payableDays, 0, totalLop, 
                 netSalary,
                 payableDays, totalLop,
-                totalDeductions.toFixed(2), grossAmount.toFixed(2), totalDaysInRange
+                totalDeductionsApplied.toFixed(2), grossAmount.toFixed(2), totalDaysInRange
             ]);
 
             results.push({
@@ -202,7 +207,7 @@ exports.calculateSalary = async (req, res) => {
                 total_lop: totalLop,
                 range_days: totalDaysInRange,
                 gross_salary: grossAmount.toFixed(2),
-                deductions_applied: totalDeductions.toFixed(2)
+                deductions_applied: totalDeductionsApplied.toFixed(2)
             });
         }
 
