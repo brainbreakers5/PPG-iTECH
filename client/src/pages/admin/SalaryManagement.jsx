@@ -272,16 +272,48 @@ const SalaryManagement = () => {
         }
     };
 
+    const handleMarkPaid = async (s) => {
+        const result = await Swal.fire({
+            title: `Mark ${s.name} as Paid?`,
+            text: `This will mark the salary for ${fromDate} – ${toDate} as Paid and notify the employee via email.`,
+            icon: 'question',
+            showCancelButton: true,
+            confirmButtonColor: '#10b981',
+            confirmButtonText: 'Yes, Mark Paid',
+            cancelButtonColor: '#64748b',
+            customClass: { popup: 'rounded-[32px]', container: 'z-[10000]' }
+        });
+        if (!result.isConfirmed) return;
+        try {
+            await api.put(`/salary/${s.id}/status`, { status: 'Paid' });
+            // Send email notification to employee
+            await api.post('/salary/notify-paid', {
+                emp_id: s.emp_id,
+                name: s.name,
+                email: s.email,
+                fromDate,
+                toDate,
+                amount: s.calculated_salary
+            });
+            fetchSalaries();
+            Swal.fire({
+                title: 'Marked as Paid',
+                text: `${s.name}'s salary has been marked as Paid and a notification email has been sent.`,
+                icon: 'success',
+                timer: 2500,
+                showConfirmButton: false,
+                customClass: { popup: 'rounded-[32px]', container: 'z-[10000]' }
+            });
+        } catch (error) {
+            console.error('Mark Paid Error:', error);
+            Swal.fire('Error', error.response?.data?.message || 'Failed to mark as paid.', 'error');
+        }
+    };
+
     const handleStatusUpdate = async (id, status) => {
         try {
             await api.put(`/salary/${id}/status`, { status });
             fetchSalaries();
-            Swal.fire({
-                title: 'Status Updated',
-                text: `Salary record has been marked as ${status.toUpperCase()}.`,
-                icon: 'success',
-                confirmButtonColor: '#2563eb'
-            });
         } catch (error) {
             console.error(error);
         }
@@ -591,21 +623,6 @@ const SalaryManagement = () => {
                                 <FaFileAlt className="mr-3 text-sky-400" /> Print
                             </button>
                         )}
-                        {user.role === 'admin' && !isHistoryMode && (
-                            <button
-                                onClick={handlePublishAndPay}
-                                disabled={isCalculating}
-                                className={`flex-1 md:flex-none bg-sky-600 text-white px-10 py-5 rounded-2xl shadow-xl shadow-sky-200 hover:bg-sky-800 transition-all flex items-center justify-center font-black uppercase tracking-[0.2em] text-[10px] relative overflow-hidden group ${isCalculating ? 'opacity-50 cursor-not-allowed' : ''}`}
-                            >
-                                <motion.div
-                                    className="absolute inset-0 bg-white/20 -translate-x-full group-hover:translate-x-full transition-transform duration-1000"
-                                    animate={isCalculating ? { x: ["-100%", "100%"] } : {}}
-                                    transition={isCalculating ? { repeat: Infinity, duration: 1.5, ease: "linear" } : {}}
-                                />
-                                <FaCalculator className={`mr-3 ${isCalculating ? 'animate-spin' : 'group-hover:rotate-12 transition-transform'}`} />
-                                {isCalculating ? 'Processing...' : 'Publish & Pay'}
-                            </button>
-                        )}
                     </div>
                 </div>
 
@@ -879,16 +896,27 @@ const SalaryManagement = () => {
                                                     </td>
                                                     <td className="p-8">
                                                         <div className="flex flex-col items-center gap-3">
-                                                            <div className="flex gap-4 text-[9px] font-black uppercase tracking-widest">
-                                                                <span className="text-sky-500 bg-sky-50 px-2 py-1 rounded-md" title="Paid Days">PAID: {s.total_present}</span>
-                                                                <span className="text-gray-400 bg-gray-50 px-2 py-1 rounded-md" title="Period Days">DAYS: {(() => { const d1=new Date(fromDate); const d2=new Date(toDate); return Math.round((d2-d1)/(1000*60*60*24))+1; })()}</span>
-                                                                <span className="text-rose-500 bg-rose-50 px-2 py-1 rounded-md" title="LOP">LOP: {s.total_lop || 0}</span>
+                                                            <div className="flex gap-2 flex-wrap text-[9px] font-black uppercase tracking-widest justify-center">
+                                                                <span className="text-emerald-600 bg-emerald-50 px-2 py-1 rounded-md border border-emerald-100" title="With Pay Days">
+                                                                    ✓ {Number(s.total_present || 0).toFixed(1)}
+                                                                </span>
+                                                                <span className="text-gray-400 bg-gray-50 px-2 py-1 rounded-md" title="Period Days">
+                                                                    DAYS: {(() => { const d1=new Date(fromDate); const d2=new Date(toDate); return Math.round((d2-d1)/(1000*60*60*24))+1; })()}
+                                                                </span>
+                                                                <span className="text-rose-500 bg-rose-50 px-2 py-1 rounded-md border border-rose-100" title="Without Pay Days">
+                                                                    ✗ {Number(s.total_lop || 0).toFixed(1)}
+                                                                </span>
+                                                            </div>
+                                                            <div className="flex gap-2 text-[8px] font-bold text-gray-400 tracking-widest">
+                                                                <span>WITH PAY</span>
+                                                                <span>·</span>
+                                                                <span>WITHOUT PAY</span>
                                                             </div>
                                                             <div className="w-40 bg-gray-100 h-1.5 rounded-full overflow-hidden shadow-inner p-px">
                                                                 <motion.div
                                                                 initial={{ width: 0 }}
                                                                 animate={{ width: `${Math.min(100, (s.total_present / (Math.round((new Date(toDate)-new Date(fromDate))/(1000*60*60*24))+1)) * 100)}%` }}
-                                                                className="bg-gradient-to-r from-sky-400 to-sky-600 h-full rounded-full shadow-[0_0_12px_rgba(59,130,246,0.3)]"
+                                                                className="bg-gradient-to-r from-emerald-400 to-emerald-600 h-full rounded-full"
                                                             ></motion.div>
                                                             </div>
                                                         </div>
@@ -917,25 +945,18 @@ const SalaryManagement = () => {
                                                     </td>
                                                     <td className="p-8 text-right flex justify-end gap-2">
                                                         <button
-                                                            onClick={() => fetchDailyBreakdown(s)}
-                                                            className="h-12 w-12 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center hover:bg-indigo-100 transition-all active:scale-90 shadow-sm border border-indigo-100"
-                                                            title="View Day-Wise Breakdown"
-                                                        >
-                                                            <FaChartLine size={14} />
-                                                        </button>
-                                                        <button
                                                             onClick={() => handlePrintSlip(s)}
                                                             className="h-12 w-12 bg-sky-50 text-sky-600 rounded-2xl flex items-center justify-center hover:bg-sky-100 transition-all active:scale-90 shadow-sm border border-sky-100"
                                                             title="Print Salary Slip"
                                                         >
                                                             <FaFileAlt size={16} />
                                                         </button>
-                                                        {user.role === 'admin' && s.status === 'Pending' && (
+                                                        {user.role === 'admin' && s.status !== 'Paid' && (
                                                             <button
-                                                                onClick={() => handleStatusUpdate(s.id, 'Paid')}
-                                                                className="inline-flex items-center gap-3 text-[9px] font-black uppercase tracking-[0.2em] text-white bg-emerald-600 px-6 py-3 rounded-2xl hover:bg-emerald-800 transition-all shadow-xl shadow-emerald-50 active:scale-95"
+                                                                onClick={() => handleMarkPaid(s)}
+                                                                className="inline-flex items-center gap-2 text-[9px] font-black uppercase tracking-[0.2em] text-white bg-emerald-600 px-5 py-3 rounded-2xl hover:bg-emerald-700 transition-all shadow-xl shadow-emerald-50 active:scale-95"
                                                             >
-                                                                <FaCheckCircle /> Pay
+                                                                <FaCheckCircle size={12} /> Mark Paid
                                                             </button>
                                                         )}
                                                     </td>
