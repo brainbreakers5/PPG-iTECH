@@ -18,10 +18,10 @@ const SalaryManagement = () => {
     const [loading, setLoading] = useState(true);
     const [isCalculating, setIsCalculating] = useState(false);
     const [activeRole, setActiveRole] = useState('all');
-    const [paidStatuses, setPaidStatuses] = useState(['Present', 'CL', 'ML', 'Comp Leave', 'OD', 'Holiday', 'Weekend']);
+    const [paidStatuses, setPaidStatuses] = useState(['Present', 'CL', 'ML', 'Comp Leave', 'OD', 'Holiday']);
     const socket = useSocket();
 
-    const attendanceOptions = ['Present', 'OD', 'CL', 'ML', 'Comp Leave', 'Holiday', 'Weekend', 'Absent', 'LOP'];
+    const attendanceOptions = ['Present', 'OD', 'CL', 'ML', 'Comp Leave', 'Holiday', 'Absent', 'LOP'];
 
     useEffect(() => {
         fetchSalaries();
@@ -310,6 +310,108 @@ const SalaryManagement = () => {
         setTimeout(() => printWindow.print(), 250);
     };
 
+    const handlePrintSlip = (s) => {
+        const printWindow = window.open('', '_blank', 'width=800,height=600');
+        if (!printWindow) return;
+
+        const d = new Date(fromDate);
+        const periodLabel = d.toLocaleString('default', { month: 'long', year: 'numeric' });
+
+        printWindow.document.write(`
+            <!doctype html>
+            <html>
+            <head>
+                <meta charset="UTF-8">
+                <title>Salary Slip - ${escapeHtml(s.name)}</title>
+                <style>
+                    body { font-family: Arial, sans-serif; padding: 40px; color: #333; line-height: 1.6; }
+                    .header { text-align: center; border-bottom: 2px solid #2563eb; padding-bottom: 20px; margin-bottom: 30px; }
+                    .header h1 { margin: 0; color: #1e3a8a; font-size: 24px; }
+                    .header p { margin: 5px 0; color: #64748b; font-size: 14px; }
+                    .slip-title { text-align: center; font-size: 18px; font-weight: bold; margin-bottom: 30px; text-decoration: underline; }
+                    .grid { display: grid; grid-template-cols: 1fr 1fr; gap: 20px; margin-bottom: 30px; }
+                    .box { border: 1px solid #e2e8f0; padding: 15px; rounded: 8px; }
+                    .label { font-weight: bold; color: #64748b; font-size: 12px; text-transform: uppercase; }
+                    .value { font-size: 16px; font-weight: bold; margin-top: 5px; }
+                    .table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+                    .table th, .table td { border: 1px solid #e2e8f0; padding: 12px; text-align: left; }
+                    .table th { background: #f8fafc; color: #64748b; font-size: 12px; }
+                    .total-row { background: #f1f5f9; font-weight: bold; }
+                    .footer { margin-top: 50px; display: flex; justify-content: space-between; }
+                    .sig { border-top: 1px solid #333; width: 200px; text-align: center; padding-top: 10px; font-size: 12px; }
+                    @media print { body { padding: 0; } .no-print { display: none; } }
+                </style>
+            </head>
+            <body>
+                <div class="header">
+                    <h1>PPG EDUCATION INSTITUTIONS</h1>
+                    <p>Salary Management System - Pay Slip</p>
+                </div>
+                
+                <div class="slip-title">SALARY SLIP FOR ${escapeHtml(periodLabel).toUpperCase()}</div>
+
+                <div class="grid">
+                    <div class="box">
+                        <div class="label">Employee Name</div>
+                        <div class="value">${escapeHtml(s.name)}</div>
+                        <div class="label" style="margin-top:10px">Employee ID</div>
+                        <div class="value">${escapeHtml(s.emp_id)}</div>
+                    </div>
+                    <div class="box">
+                        <div class="label">Department</div>
+                        <div class="value">${escapeHtml(s.department_name || 'N/A')}</div>
+                        <div class="label" style="margin-top:10px">Designation</div>
+                        <div class="value">${escapeHtml(s.role)}</div>
+                    </div>
+                </div>
+
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Description</th>
+                            <th style="text-align:right">Details</th>
+                            <th style="text-align:right">Amount</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>Basic Monthly Salary</td>
+                            <td style="text-align:right">-</td>
+                            <td style="text-align:right">₹${Number(s.monthly_salary).toLocaleString()}</td>
+                        </tr>
+                        <tr>
+                            <td>Attendance Details</td>
+                            <td style="text-align:right">Paid Days: ${s.total_present} / ${new Date(s.year, s.month, 0).getDate()}</td>
+                            <td style="text-align:right">-</td>
+                        </tr>
+                        <tr>
+                            <td>Loss of Pay (LOP) Deduction</td>
+                            <td style="text-align:right">${s.total_lop || 0} Days</td>
+                            <td style="text-align:right; color:#e11d48">- ₹${(Number(s.monthly_salary) - Number(s.calculated_salary)).toLocaleString()}</td>
+                        </tr>
+                        <tr class="total-row">
+                            <td colspan="2" style="text-align:right">NET PAYABLE AMOUNT</td>
+                            <td style="text-align:right">₹${Number(s.calculated_salary).toLocaleString()}</td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <div class="footer">
+                    <div class="sig">Employee Signature</div>
+                    <div class="sig">Authorized Signatory</div>
+                </div>
+
+                <div style="text-align:center; margin-top:40px; font-size:10px; color:#94a3b8;" class="no-print">
+                    Generated on ${new Date().toLocaleString()}
+                </div>
+            </body>
+            </html>
+        `);
+        printWindow.document.close();
+        printWindow.focus();
+        setTimeout(() => printWindow.print(), 500);
+    };
+
     return (
         <Layout>
             <motion.div
@@ -356,6 +458,105 @@ const SalaryManagement = () => {
                             </button>
                         )}
                     </div>
+                </div>
+
+                {/* Role Tabs - Only for Admin */}
+                {user.role === 'admin' && (
+                    <div className="flex flex-wrap gap-4 mb-6 no-print">
+                        {[
+                            { id: 'all', label: 'All Personnel', icon: <FaChartLine /> },
+                            { id: 'principal', label: 'Principal', icon: <FaShieldAlt /> },
+                            { id: 'hod', label: 'HODs', icon: <FaShieldAlt /> },
+                            { id: 'staff', label: 'Staff members', icon: <FaFileAlt /> }
+                        ].map((tab) => (
+                            <button
+                                key={tab.id}
+                                onClick={() => setActiveRole(tab.id)}
+                                className={`flex items-center gap-3 px-8 py-4 rounded-2xl font-black uppercase tracking-[0.2em] text-[10px] transition-all ${activeRole === tab.id
+                                    ? 'bg-sky-600 text-white shadow-xl shadow-sky-200 ring-4 ring-sky-50'
+                                    : 'bg-white text-gray-400 hover:bg-gray-50 border border-sky-50'
+                                    }`}
+                            >
+                                <span className={`${activeRole === tab.id ? 'text-white' : 'text-sky-500'}`}>
+                                    {tab.icon}
+                                </span>
+                                {tab.label}
+                            </button>
+                        ))}
+                    </div>
+                )}
+
+                {/* Analytical Matrix (Now below Role Tabs) */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10 no-print">
+                    <motion.div
+                        initial={{ opacity: 0, y: 10 }}
+                        whileInView={{ opacity: 1, y: 0 }}
+                        className="bg-white p-6 rounded-3xl shadow-lg shadow-sky-50/50 border border-sky-50 relative group overflow-hidden"
+                    >
+                        <div className="flex items-center justify-between gap-4">
+                            <div className="flex items-center gap-4">
+                                <div className="h-10 w-10 rounded-xl bg-sky-600 flex items-center justify-center text-white shadow-lg shadow-sky-100">
+                                    <FaMoneyBillWave size={16} />
+                                </div>
+                                <div>
+                                    <h3 className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Gross Total</h3>
+                                    <p className="text-lg font-black text-gray-800 tracking-tighter">
+                                        ₹{salaries
+                                            .filter(s => activeRole === 'all' || (s.role || '').toLowerCase() === activeRole.toLowerCase())
+                                            .reduce((acc, curr) => acc + Number(curr.calculated_salary || 0), 0)
+                                            .toLocaleString()}
+                                    </p>
+                                </div>
+                            </div>
+                            <div className="text-[9px] font-bold text-sky-500 uppercase tracking-widest opacity-40 group-hover:opacity-100 transition-opacity">Total Salary</div>
+                        </div>
+                    </motion.div>
+
+                    <motion.div
+                        initial={{ opacity: 0, y: 10 }}
+                        whileInView={{ opacity: 1, y: 0 }}
+                        className="bg-white p-6 rounded-3xl shadow-lg shadow-sky-50/50 border border-sky-50 relative group overflow-hidden"
+                    >
+                        <div className="flex items-center justify-between gap-4">
+                            <div className="flex items-center gap-4">
+                                <div className="h-10 w-10 rounded-xl bg-emerald-500 flex items-center justify-center text-white shadow-lg shadow-emerald-100">
+                                    <FaWallet size={16} />
+                                </div>
+                                <div>
+                                    <h3 className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Paid Amount</h3>
+                                    <p className="text-lg font-black text-gray-800 tracking-tighter">
+                                        ₹{salaries
+                                            .filter(s => (activeRole === 'all' || (s.role || '').toLowerCase() === activeRole.toLowerCase()) && s.status === 'Paid')
+                                            .reduce((acc, curr) => acc + parseFloat(curr.calculated_salary), 0).toLocaleString()}
+                                    </p>
+                                </div>
+                            </div>
+                            <div className="text-[9px] font-bold text-emerald-500 uppercase tracking-widest opacity-40 group-hover:opacity-100 transition-opacity">Paid</div>
+                        </div>
+                    </motion.div>
+
+                    <motion.div
+                        initial={{ opacity: 0, y: 10 }}
+                        whileInView={{ opacity: 1, y: 0 }}
+                        className="bg-white p-6 rounded-3xl shadow-lg shadow-sky-50/50 border border-sky-50 relative group overflow-hidden"
+                    >
+                        <div className="flex items-center justify-between gap-4">
+                            <div className="flex items-center gap-4">
+                                <div className="h-10 w-10 rounded-xl bg-amber-400 flex items-center justify-center text-white shadow-lg shadow-amber-100">
+                                    <FaClock size={16} />
+                                </div>
+                                <div>
+                                    <h3 className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Pending Amount</h3>
+                                    <p className="text-lg font-black text-gray-800 tracking-tighter">
+                                        ₹{salaries
+                                            .filter(s => (activeRole === 'all' || (s.role || '').toLowerCase() === activeRole.toLowerCase()) && s.status === 'Pending')
+                                            .reduce((acc, curr) => acc + parseFloat(curr.calculated_salary), 0).toLocaleString()}
+                                    </p>
+                                </div>
+                            </div>
+                            <div className="text-[9px] font-bold text-amber-500 uppercase tracking-widest opacity-40 group-hover:opacity-100 transition-opacity">Unpaid</div>
+                        </div>
+                    </motion.div>
                 </div>
 
                 {/* Top Selection Row: Period & Attendance Rules */}
@@ -521,17 +722,20 @@ const SalaryManagement = () => {
                                                             {s.status}
                                                         </span>
                                                     </td>
-                                                    <td className="p-8 text-right">
-                                                        {user.role === 'admin' && s.status === 'Pending' ? (
+                                                    <td className="p-8 text-right flex justify-end gap-2">
+                                                        <button
+                                                            onClick={() => handlePrintSlip(s)}
+                                                            className="h-12 w-12 bg-sky-50 text-sky-600 rounded-2xl flex items-center justify-center hover:bg-sky-100 transition-all active:scale-90 shadow-sm border border-sky-100"
+                                                            title="Print Salary Slip"
+                                                        >
+                                                            <FaFileAlt size={16} />
+                                                        </button>
+                                                        {user.role === 'admin' && s.status === 'Pending' && (
                                                             <button
                                                                 onClick={() => handleStatusUpdate(s.id, 'Paid')}
-                                                                className="inline-flex items-center gap-3 text-[9px] font-black uppercase tracking-[0.2em] text-white bg-sky-600 px-6 py-3 rounded-2xl hover:bg-sky-800 transition-all shadow-xl shadow-sky-100 group active:scale-95"
+                                                                className="inline-flex items-center gap-3 text-[9px] font-black uppercase tracking-[0.2em] text-white bg-emerald-600 px-6 py-3 rounded-2xl hover:bg-emerald-800 transition-all shadow-xl shadow-emerald-50 active:scale-95"
                                                             >
-                                                                <FaCheckCircle className="group-hover:scale-125 transition-transform" /> Mark Paid
-                                                            </button>
-                                                        ) : (
-                                                            <button className="h-12 w-12 bg-gray-50 text-gray-400 rounded-2xl flex items-center justify-center hover:bg-sky-50 hover:text-sky-600 transition-all active:scale-90 shadow-sm border border-gray-100">
-                                                                <FaFileAlt size={16} title="View Detailed Breakdown" />
+                                                                <FaCheckCircle /> Pay
                                                             </button>
                                                         )}
                                                     </td>
@@ -557,79 +761,6 @@ const SalaryManagement = () => {
                             </table>
                         </div>
                     </div>
-                </div>
-
-                {/* Analytical Matrix (Now below table and compact) */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pb-16">
-                    <motion.div
-                        initial={{ opacity: 0, y: 10 }}
-                        whileInView={{ opacity: 1, y: 0 }}
-                        className="bg-white p-6 rounded-3xl shadow-lg shadow-sky-50/50 border border-sky-50 relative group overflow-hidden"
-                    >
-                        <div className="flex items-center justify-between gap-4">
-                            <div className="flex items-center gap-4">
-                                <div className="h-10 w-10 rounded-xl bg-sky-600 flex items-center justify-center text-white shadow-lg shadow-sky-100">
-                                    <FaMoneyBillWave size={16} />
-                                </div>
-                                <div>
-                                    <h3 className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Gross Total</h3>
-                                    <p className="text-lg font-black text-gray-800 tracking-tighter">
-                                        ₹{salaries
-                                            .filter(s => activeRole === 'all' || (s.role || '').toLowerCase() === activeRole.toLowerCase())
-                                            .reduce((acc, curr) => acc + Number(curr.calculated_salary || 0), 0)
-                                            .toLocaleString()}
-                                    </p>
-                                </div>
-                            </div>
-                            <div className="text-[9px] font-bold text-sky-500 uppercase tracking-widest opacity-40 group-hover:opacity-100 transition-opacity">Total Salary</div>
-                        </div>
-                    </motion.div>
-
-                    <motion.div
-                        initial={{ opacity: 0, y: 10 }}
-                        whileInView={{ opacity: 1, y: 0 }}
-                        className="bg-white p-6 rounded-3xl shadow-lg shadow-sky-50/50 border border-sky-50 relative group overflow-hidden"
-                    >
-                        <div className="flex items-center justify-between gap-4">
-                            <div className="flex items-center gap-4">
-                                <div className="h-10 w-10 rounded-xl bg-emerald-500 flex items-center justify-center text-white shadow-lg shadow-emerald-100">
-                                    <FaWallet size={16} />
-                                </div>
-                                <div>
-                                    <h3 className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Paid Amount</h3>
-                                    <p className="text-lg font-black text-gray-800 tracking-tighter">
-                                        ₹{salaries
-                                            .filter(s => (activeRole === 'all' || (s.role || '').toLowerCase() === activeRole.toLowerCase()) && s.status === 'Paid')
-                                            .reduce((acc, curr) => acc + parseFloat(curr.calculated_salary), 0).toLocaleString()}
-                                    </p>
-                                </div>
-                            </div>
-                            <div className="text-[9px] font-bold text-emerald-500 uppercase tracking-widest opacity-40 group-hover:opacity-100 transition-opacity">Paid</div>
-                        </div>
-                    </motion.div>
-
-                    <motion.div
-                        initial={{ opacity: 0, y: 10 }}
-                        whileInView={{ opacity: 1, y: 0 }}
-                        className="bg-white p-6 rounded-3xl shadow-lg shadow-sky-50/50 border border-sky-50 relative group overflow-hidden"
-                    >
-                        <div className="flex items-center justify-between gap-4">
-                            <div className="flex items-center gap-4">
-                                <div className="h-10 w-10 rounded-xl bg-amber-400 flex items-center justify-center text-white shadow-lg shadow-amber-100">
-                                    <FaClock size={16} />
-                                </div>
-                                <div>
-                                    <h3 className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Pending Amount</h3>
-                                    <p className="text-lg font-black text-gray-800 tracking-tighter">
-                                        ₹{salaries
-                                            .filter(s => (activeRole === 'all' || (s.role || '').toLowerCase() === activeRole.toLowerCase()) && s.status === 'Pending')
-                                            .reduce((acc, curr) => acc + parseFloat(curr.calculated_salary), 0).toLocaleString()}
-                                    </p>
-                                </div>
-                            </div>
-                            <div className="text-[9px] font-bold text-amber-500 uppercase tracking-widest opacity-40 group-hover:opacity-100 transition-opacity">Unpaid</div>
-                        </div>
-                    </motion.div>
                 </div>
             </motion.div>
         </Layout>
