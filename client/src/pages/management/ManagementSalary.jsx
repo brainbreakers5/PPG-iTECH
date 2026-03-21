@@ -238,7 +238,53 @@ const ManagementSalary = () => {
                     </div>
                 </div>
 
-                {/* Master Analytical Matrix (Now at top) */}
+                {/* Period Select Row at Top */}
+                <div className="bg-white p-8 rounded-[32px] shadow-xl shadow-purple-50/50 border border-purple-50 mb-10 flex flex-wrap items-center gap-8 no-print">
+                    <h2 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] flex items-center gap-3">
+                        <FaFilter className="text-purple-600" /> Period
+                    </h2>
+                    <div className="flex items-center gap-4">
+                        <input
+                            type="date"
+                            value={fromDate}
+                            onChange={(e) => setFromDate(e.target.value)}
+                            className="p-3 bg-gray-50 border border-gray-100 rounded-xl outline-none focus:ring-4 focus:ring-purple-100 focus:border-purple-500 transition-all font-black text-gray-700 text-[10px] uppercase shadow-inner"
+                        />
+                        <span className="text-gray-300 font-bold">to</span>
+                        <input
+                            type="date"
+                            value={toDate}
+                            onChange={(e) => setToDate(e.target.value)}
+                            className="p-3 bg-gray-50 border border-gray-100 rounded-xl outline-none focus:ring-4 focus:ring-purple-100 focus:border-purple-500 transition-all font-black text-gray-700 text-[10px] uppercase shadow-inner"
+                        />
+                    </div>
+                </div>
+
+                {/* Role Tabs */}
+                <div className="flex flex-wrap gap-4 mb-6 no-print">
+                    {[
+                        { id: 'all', label: 'All Personnel', icon: <FaChartLine /> },
+                        { id: 'principal', label: 'Principal', icon: <FaShieldAlt /> },
+                        { id: 'hod', label: 'HODs', icon: <FaShieldAlt /> },
+                        { id: 'staff', label: 'Staff members', icon: <FaFileAlt /> }
+                    ].map((tab) => (
+                        <button
+                            key={tab.id}
+                            onClick={() => setActiveRole(tab.id)}
+                            className={`flex items-center gap-3 px-8 py-4 rounded-2xl font-black uppercase tracking-[0.2em] text-[10px] transition-all ${activeRole === tab.id
+                                ? 'bg-purple-600 text-white shadow-xl shadow-purple-200 ring-4 ring-purple-50'
+                                : 'bg-white text-gray-400 hover:bg-gray-50 border border-purple-50'
+                                }`}
+                        >
+                            <span className={`${activeRole === tab.id ? 'text-white' : 'text-purple-500'}`}>
+                                {tab.icon}
+                            </span>
+                            {tab.label}
+                        </button>
+                    ))}
+                </div>
+
+                {/* Master Analytical Matrix */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10 no-print">
                     <motion.div
                         initial={{ opacity: 0, y: 10 }}
@@ -308,52 +354,6 @@ const ManagementSalary = () => {
                             <div className="text-[9px] font-bold text-amber-500 uppercase tracking-widest opacity-40 group-hover:opacity-100 transition-opacity">Unpaid</div>
                         </div>
                     </motion.div>
-                </div>
-
-                {/* Period Select Row at Top */}
-                <div className="bg-white p-8 rounded-[32px] shadow-xl shadow-purple-50/50 border border-purple-50 mb-10 flex flex-wrap items-center gap-8 no-print">
-                    <h2 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] flex items-center gap-3">
-                        <FaFilter className="text-purple-600" /> Period
-                    </h2>
-                    <div className="flex items-center gap-4">
-                        <input
-                            type="date"
-                            value={fromDate}
-                            onChange={(e) => setFromDate(e.target.value)}
-                            className="p-3 bg-gray-50 border border-gray-100 rounded-xl outline-none focus:ring-4 focus:ring-purple-100 focus:border-purple-500 transition-all font-black text-gray-700 text-[10px] uppercase"
-                        />
-                        <span className="text-gray-300 font-bold">to</span>
-                        <input
-                            type="date"
-                            value={toDate}
-                            onChange={(e) => setToDate(e.target.value)}
-                            className="p-3 bg-gray-50 border border-gray-100 rounded-xl outline-none focus:ring-4 focus:ring-purple-100 focus:border-purple-500 transition-all font-black text-gray-700 text-[10px] uppercase"
-                        />
-                    </div>
-                </div>
-
-                {/* Role Tabs */}
-                <div className="flex flex-wrap gap-4 mb-10 no-print">
-                    {[
-                        { id: 'all', label: 'All Personnel', icon: <FaChartLine /> },
-                        { id: 'principal', label: 'Principal', icon: <FaShieldAlt /> },
-                        { id: 'hod', label: 'HODs', icon: <FaShieldAlt /> },
-                        { id: 'staff', label: 'Staff members', icon: <FaFileAlt /> }
-                    ].map((tab) => (
-                        <button
-                            key={tab.id}
-                            onClick={() => setActiveRole(tab.id)}
-                            className={`flex items-center gap-3 px-8 py-4 rounded-2xl font-black uppercase tracking-[0.2em] text-[10px] transition-all ${activeRole === tab.id
-                                ? 'bg-purple-600 text-white shadow-xl shadow-purple-200 ring-4 ring-purple-50'
-                                : 'bg-white text-gray-400 hover:bg-gray-50 border border-purple-50'
-                                }`}
-                        >
-                            <span className={`${activeRole === tab.id ? 'text-white' : 'text-purple-500'}`}>
-                                {tab.icon}
-                            </span>
-                            {tab.label}
-                        </button>
-                    ))}
                 </div>
 
                 {/* Master Ledger Table */}
