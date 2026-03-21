@@ -10,16 +10,16 @@ exports.calculateSalary = async (req, res) => {
         console.log(`Starting calculation for ${month}/${year}`);
         const daysInMonth = new Date(year, month, 0).getDate();
         
-        // 1. Fetch all eligible employees (all except admin)
+        // 1. Fetch all eligible employees (all except admin) - Case-insensitive role check
         let usersQuery = `
             SELECT id, emp_id, name, monthly_salary, role 
             FROM users 
-            WHERE role IN ('principal', 'hod', 'staff')
+            WHERE LOWER(role) IN ('principal', 'hod', 'staff')
         `;
         const usersParams = [];
         if (emp_id) {
-            usersQuery += ' AND emp_id = $1';
-            usersParams.push(emp_id);
+            usersQuery += ' AND TRIM(emp_id) = $1';
+            usersParams.push(emp_id.trim());
         }
         const { rows: users } = await pool.query(usersQuery, usersParams);
         console.log(`Found ${users.length} eligible employees`);
@@ -28,18 +28,16 @@ exports.calculateSalary = async (req, res) => {
             return res.json({ message: 'No eligible employees found for calculation', results: [] });
         }
 
-        // 2. Aggregate attendance data for all users in one query for efficiency
+        // 2. Aggregate attendance data for all users. Explicitly cast date to date type.
         const { rows: attendanceStats } = await pool.query(`
             SELECT 
-                emp_id,
+                TRIM(emp_id) as emp_id,
                 SUM(
                     CASE 
-                        -- Combined status (e.g., 'Present + CL')
                         WHEN status::text LIKE '%+%' THEN
                             (CASE WHEN split_part(status::text, ' + ', 1) = ANY($3::text[]) THEN 0.5 ELSE 0 END +
                              CASE WHEN split_part(status::text, ' + ', 2) = ANY($3::text[]) THEN 0.5 ELSE 0 END)
                         
-                        -- Standard paid status
                         WHEN status::text = ANY($3::text[]) THEN
                             CASE 
                                 WHEN remarks ILIKE '%Half Day%' OR 
@@ -52,23 +50,21 @@ exports.calculateSalary = async (req, res) => {
                     END
                 ) as payable_days
             FROM attendance_records
-            WHERE EXTRACT(MONTH FROM date) = $1 AND EXTRACT(YEAR FROM date) = $2
-            GROUP BY emp_id
+            WHERE EXTRACT(MONTH FROM date::date) = $1 AND EXTRACT(YEAR FROM date::date) = $2
+            GROUP BY TRIM(emp_id)
         `, [month, year, paidStatuses]);
 
-        // Map stats by emp_id for quick lookup
         const statsMap = attendanceStats.reduce((acc, curr) => {
             acc[curr.emp_id] = parseFloat(curr.payable_days) || 0;
             return acc;
         }, {});
 
-        // 3. Process and persist each record
+        // 3. Process and persist records
         const results = [];
         for (const user of users) {
-            const payableDays = statsMap[user.emp_id] || 0;
+            const payableDays = statsMap[user.emp_id.trim()] || 0;
             const baseSalary = parseFloat(user.monthly_salary) || 0;
             
-            // Core Formula: (Base Salary / Actual Month Days) * Payable Days
             const calculatedAmount = ((baseSalary / daysInMonth) * payableDays).toFixed(2);
             const totalLop = Math.max(0, daysInMonth - payableDays);
             const finalPay = isNaN(calculatedAmount) ? "0.00" : calculatedAmount;
@@ -82,23 +78,23 @@ exports.calculateSalary = async (req, res) => {
                 total_lop = EXCLUDED.total_lop,
                 calculated_salary = EXCLUDED.calculated_salary,
                 status = EXCLUDED.status
-            `, [user.emp_id, month, year, payableDays, 0, totalLop, finalPay]);
+            `, [user.emp_id.trim(), month, year, payableDays, 0, totalLop, finalPay]);
 
             results.push({
                 emp_id: user.emp_id,
                 name: user.name,
                 role: user.role,
                 calculated_salary: finalPay,
-                payable_days: payableDays
+                payable_days: payableDays,
+                total_lop: totalLop
             });
         }
 
-        console.log(`Successfully processed ${results.length} salary records.`);
         res.json({ message: `Successfully recalculated salaries for ${results.length} personnel.`, results });
     } catch (error) {
         console.error('FATAL CALCULATION ERROR:', error);
         res.status(500).json({ 
-            message: 'Payroll calculation failed due to an internal server error.',
+            message: 'Payroll calculation failed.',
             details: error.message 
         });
     }
