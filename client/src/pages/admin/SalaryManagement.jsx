@@ -18,10 +18,10 @@ const SalaryManagement = () => {
     const [loading, setLoading] = useState(true);
     const [isCalculating, setIsCalculating] = useState(false);
     const [activeRole, setActiveRole] = useState('all');
-    const [paidStatuses, setPaidStatuses] = useState(['Present', 'CL', 'ML', 'Comp Leave', 'OD', 'Holiday']);
+    const [paidStatuses, setPaidStatuses] = useState(['Present', 'CL', 'ML', 'Comp Leave', 'OD', 'Holiday', 'Weekend']);
     const socket = useSocket();
 
-    const attendanceOptions = ['Present', 'OD', 'CL', 'ML', 'Comp Leave', 'Holiday', 'Absent', 'LOP'];
+    const attendanceOptions = ['Present', 'OD', 'CL', 'ML', 'Comp Leave', 'Holiday', 'Weekend', 'Absent', 'LOP'];
 
     useEffect(() => {
         fetchSalaries();
@@ -500,17 +500,18 @@ const SalaryManagement = () => {
                                                         </td>
                                                         <td className="p-8">
                                                             <div className="flex flex-col items-center gap-3">
-                                                                <div className="flex gap-4 text-[9px] font-black uppercase tracking-widest">
-                                                                    <span className="text-sky-500 bg-sky-50 px-2 py-1 rounded-md">PAID DAYS: {s.total_present}</span>
-                                                                    <span className="text-rose-500 bg-rose-50 px-2 py-1 rounded-md">LOP: {s.total_lop || 0}</span>
-                                                                </div>
-                                                                <div className="w-32 bg-gray-100 h-1.5 rounded-full overflow-hidden shadow-inner p-px">
-                                                                    <motion.div
-                                                                        initial={{ width: 0 }}
-                                                                        animate={{ width: `${(s.total_present / 30) * 100}%` }}
-                                                                        className="bg-gradient-to-r from-sky-400 to-sky-600 h-full rounded-full shadow-[0_0_12px_rgba(59,130,246,0.3)]"
-                                                                    ></motion.div>
-                                                                </div>
+                                                                 <div className="flex gap-4 text-[9px] font-black uppercase tracking-widest">
+                                                                     <span className="text-sky-500 bg-sky-50 px-2 py-1 rounded-md" title="Total Payable Days">PAID: {s.total_present}</span>
+                                                                     <span className="text-gray-400 bg-gray-50 px-2 py-1 rounded-md" title="Total Days in Month">MONTH: {new Date(s.year, s.month, 0).getDate()}</span>
+                                                                     <span className="text-rose-500 bg-rose-50 px-2 py-1 rounded-md" title="Loss of Pay Days">LOP: {s.total_lop || 0}</span>
+                                                                 </div>
+                                                                 <div className="w-40 bg-gray-100 h-1.5 rounded-full overflow-hidden shadow-inner p-px">
+                                                                     <motion.div
+                                                                         initial={{ width: 0 }}
+                                                                         animate={{ width: `${(s.total_present / new Date(s.year, s.month, 0).getDate()) * 100}%` }}
+                                                                         className="bg-gradient-to-r from-sky-400 to-sky-600 h-full rounded-full shadow-[0_0_12px_rgba(59,130,246,0.3)]"
+                                                                     ></motion.div>
+                                                                 </div>
                                                             </div>
                                                         </td>
                                                         <td className="p-8 text-right font-black text-gray-800">
