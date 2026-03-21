@@ -10,8 +10,18 @@ import { motion, AnimatePresence } from 'framer-motion';
 const SalaryManagement = () => {
     const { user } = useAuth();
     const [salaries, setSalaries] = useState([]);
+    const [allEmployees, setAllEmployees] = useState([]);
     const now = new Date();
     
+    const socket = useSocket();
+
+    // Fetch all employees to ensure everyone is displayed
+    useEffect(() => {
+        if (user.role !== 'staff') {
+            api.get('/employees').then(res => setAllEmployees(res.data)).catch(e => console.error(e));
+        }
+    }, [user.role]);
+
     const getDefaultDates = () => {
         const d = new Date();
         const year = d.getFullYear();
@@ -48,7 +58,6 @@ const SalaryManagement = () => {
         return saved ? JSON.parse(saved) : ['Absent', 'LOP'];
     });
     const [newStatus, setNewStatus] = useState('');
-    const socket = useSocket();
 
     const saveAttendanceConfig = () => {
         localStorage.setItem('salary_paid_statuses', JSON.stringify(paidStatuses));
@@ -70,20 +79,35 @@ const SalaryManagement = () => {
         const month = d.getMonth() + 1;
         const year = d.getFullYear();
         
-        // Auto-calculate on period change or status config change
+        // Auto-calculate on period change, config change, or attendance updates
         const silentCalculate = async () => {
-            if (user.role !== 'admin') return; // Only admin can trigger auto-calc
+            if (user.role !== 'admin') return; 
             try {
                 await api.post('/salary/calculate', { month, year, paidStatuses });
                 fetchSalaries();
             } catch (error) {
-                console.error("Auto-calculation failed:", error);
                 fetchSalaries();
             }
         };
-        const timer = setTimeout(silentCalculate, 800); // Debounce for 800ms
-        return () => clearTimeout(timer);
-    }, [fromDate, toDate, paidStatuses, unpaidStatuses, user.role]);
+
+        const timer = setTimeout(silentCalculate, 800);
+        
+        // Sockets for sudden updates on punch
+        if (socket) {
+            socket.on('attendance_updated', silentCalculate);
+            socket.on('punch_in', silentCalculate);
+            socket.on('punch_out', silentCalculate);
+        }
+
+        return () => {
+            clearTimeout(timer);
+            if (socket) {
+                socket.off('attendance_updated', silentCalculate);
+                socket.off('punch_in', silentCalculate);
+                socket.off('punch_out', silentCalculate);
+            }
+        };
+    }, [fromDate, toDate, paidStatuses, unpaidStatuses, user.role, socket]);
 
     const handleAddStatus = (isPaid) => {
         if (!newStatus.trim()) return;
@@ -111,12 +135,9 @@ const SalaryManagement = () => {
             const y = d.getFullYear();
             const { data } = await api.get(`/salary?month=${m}&year=${y}`);
             
-            // Allow Admin, Management, Principal, and HOD to see everyone's salary (or relevant subset)
-            // But restrict Staff to only their own.
             if (user.role === 'staff') {
                 setSalaries(data.filter(s => s.emp_id === user.emp_id));
             } else {
-                // Admin, Management, Principal, HOD can see all results from the API
                 setSalaries(data);
             }
             setLoading(false);
@@ -124,6 +145,24 @@ const SalaryManagement = () => {
             console.error("Fetch Salaries Error:", error);
             setLoading(false);
         }
+    };
+
+    const getMergedSalaries = () => {
+        if (user.role === 'staff') return salaries;
+        // MERGE: All employees (base list) + Salaries (calculated data)
+        return allEmployees.map(emp => {
+            const calc = salaries.find(s => s.emp_id === emp.emp_id);
+            if (calc) return calc;
+            return {
+                ...emp,
+                id: `temp_${emp.emp_id}`,
+                monthly_salary: emp.base_salary || 0,
+                calculated_salary: 0,
+                total_present: 0,
+                total_lop: 0,
+                status: 'Uncalculated'
+            };
+        });
     };
 
     const handlePublishAndPay = async () => {
@@ -582,7 +621,7 @@ const SalaryManagement = () => {
                                 <div>
                                     <h3 className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Gross Total</h3>
                                     <p className="text-lg font-black text-gray-800 tracking-tighter">
-                                        ₹{salaries
+                                        ₹{getMergedSalaries()
                                             .filter(s => activeRole === 'all' || (s.role || '').toLowerCase() === activeRole.toLowerCase())
                                             .reduce((acc, curr) => acc + Number(curr.calculated_salary || 0), 0)
                                             .toLocaleString()}
@@ -606,9 +645,9 @@ const SalaryManagement = () => {
                                 <div>
                                     <h3 className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Paid Amount</h3>
                                     <p className="text-lg font-black text-gray-800 tracking-tighter">
-                                        ₹{salaries
+                                        ₹{getMergedSalaries()
                                             .filter(s => (activeRole === 'all' || (s.role || '').toLowerCase() === activeRole.toLowerCase()) && s.status === 'Paid')
-                                            .reduce((acc, curr) => acc + parseFloat(curr.calculated_salary), 0).toLocaleString()}
+                                            .reduce((acc, curr) => acc + parseFloat(curr.calculated_salary || 0), 0).toLocaleString()}
                                     </p>
                                 </div>
                             </div>
@@ -629,9 +668,9 @@ const SalaryManagement = () => {
                                 <div>
                                     <h3 className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Pending Amount</h3>
                                     <p className="text-lg font-black text-gray-800 tracking-tighter">
-                                        ₹{salaries
-                                            .filter(s => (activeRole === 'all' || (s.role || '').toLowerCase() === activeRole.toLowerCase()) && s.status === 'Pending')
-                                            .reduce((acc, curr) => acc + parseFloat(curr.calculated_salary), 0).toLocaleString()}
+                                        ₹{getMergedSalaries()
+                                            .filter(s => (activeRole === 'all' || (s.role || '').toLowerCase() === activeRole.toLowerCase()) && (s.status === 'Pending' || s.status === 'Uncalculated'))
+                                            .reduce((acc, curr) => acc + parseFloat(curr.calculated_salary || 0), 0).toLocaleString()}
                                     </p>
                                 </div>
                             </div>
@@ -759,7 +798,7 @@ const SalaryManagement = () => {
                                 </thead>
                                 <tbody className="divide-y divide-gray-50/50">
                                     <AnimatePresence mode="popLayout">
-                                        {salaries
+                                        { getMergedSalaries()
                                             .filter(s => {
                                                 const roleMatch = activeRole === 'all' || (s.role || '').toLowerCase() === activeRole.toLowerCase();
                                                 const historyMatch = isHistoryMode ? s.status === 'Paid' : true;
@@ -835,7 +874,7 @@ const SalaryManagement = () => {
                                                 </motion.tr>
                                             ))}
                                     </AnimatePresence>
-                                    {salaries.filter(s => {
+                                    {getMergedSalaries().filter(s => {
                                         const roleMatch = activeRole === 'all' || (s.role || '').toLowerCase() === activeRole.toLowerCase();
                                         const historyMatch = isHistoryMode ? s.status === 'Paid' : true;
                                         return roleMatch && historyMatch;
