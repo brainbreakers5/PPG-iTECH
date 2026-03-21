@@ -54,7 +54,8 @@ exports.createEmployee = async (req, res) => {
         blood_group, religion, nationality, caste, community, whatsapp,
         aadhar, pan, account_no, bank_name, branch, ifsc, pin_code,
         pf_number, uan_number, permanent_address, communication_address,
-        father_name, mother_name, marital_status, monthly_salary, experience
+        father_name, mother_name, marital_status, monthly_salary, experience,
+        deductions
     } = req.body;
 
     // Trim critical fields
@@ -81,10 +82,10 @@ exports.createEmployee = async (req, res) => {
                 blood_group, religion, nationality, caste, community, whatsapp,
                 aadhar, pan, account_no, bank_name, branch, ifsc, pin_code,
                 pf_number, uan_number, permanent_address, communication_address,
-                father_name, mother_name, marital_status, monthly_salary, experience, password
+                father_name, mother_name, marital_status, monthly_salary, experience, password, deductions
             ) VALUES (
                 $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, 
-                $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33, $34, $35, $36
+                $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33, $34, $35, $36, $37
             )
         `;
 
@@ -94,7 +95,8 @@ exports.createEmployee = async (req, res) => {
             blood_group || null, religion || null, nationality || 'Indian', caste || null, community || null, whatsapp || null,
             aadhar || null, pan || null, account_no || null, bank_name || null, branch || null, ifsc || null, pin_code || null,
             pf_number || null, uan_number || null, permanent_address || null, communication_address || null,
-            father_name || null, mother_name || null, marital_status || 'Single', monthly_salary || 0, experience || null, hashedPassword
+            father_name || null, mother_name || null, marital_status || 'Single', monthly_salary || 0, experience || null, hashedPassword,
+            deductions || null
         ]);
 
         // Broadcast real-time employee update to all connected clients
@@ -260,7 +262,7 @@ exports.updateEmployee = async (req, res) => {
         blood_group, religion, nationality, caste, community, whatsapp,
         aadhar, pan, account_no, bank_name, branch, ifsc, pin_code,
         pf_number, uan_number, permanent_address, communication_address,
-        father_name, mother_name, marital_status, monthly_salary, experience, pin
+        father_name, mother_name, marital_status, monthly_salary, experience, pin, deductions
     } = req.body;
 
     try {
@@ -281,8 +283,8 @@ exports.updateEmployee = async (req, res) => {
                 aadhar = $18, pan = $19, account_no = $20, bank_name = $21, branch = $22, ifsc = $23, pin_code = $24,
                 pf_number = $25, uan_number = $26, permanent_address = $27, communication_address = $28,
                 father_name = $29, mother_name = $30, marital_status = $31, monthly_salary = $32, experience = $33, 
-                pin = $34, password = COALESCE($35, password)
-            WHERE id = $36
+                pin = $34, password = COALESCE($35, password), deductions = $36
+            WHERE id = $37
         `;
 
         await pool.query(query, [
@@ -292,7 +294,7 @@ exports.updateEmployee = async (req, res) => {
             aadhar || null, pan || null, account_no || null, bank_name || null, branch || null, ifsc || null, pin_code || null,
             pf_number || null, uan_number || null, permanent_address || null, communication_address || null,
             father_name || null, mother_name || null, marital_status || 'Single', monthly_salary || 0, experience || null,
-            pin || null, hashedPassword || null,
+            pin || null, hashedPassword || null, deductions || null,
             req.params.id
         ]);
 
