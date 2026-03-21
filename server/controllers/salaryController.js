@@ -14,7 +14,7 @@ exports.calculateSalary = async (req, res) => {
         let usersQuery = `
             SELECT id, emp_id, name, monthly_salary, role 
             FROM users 
-            WHERE LOWER(role) IN ('principal', 'hod', 'staff')
+            WHERE LOWER(role) IN ('principal', 'hod', 'staff', 'management')
         `;
         const usersParams = [];
         if (emp_id) {
@@ -62,7 +62,10 @@ exports.calculateSalary = async (req, res) => {
         // 3. Process and persist records
         const results = [];
         for (const user of users) {
-            const payableDays = statsMap[user.emp_id.trim()] || 0;
+            const userEmpId = (user.emp_id || '').trim();
+            if (!userEmpId) continue;
+
+            const payableDays = statsMap[userEmpId] || 0;
             const baseSalary = parseFloat(user.monthly_salary) || 0;
             
             const calculatedAmount = ((baseSalary / daysInMonth) * payableDays).toFixed(2);
@@ -78,7 +81,7 @@ exports.calculateSalary = async (req, res) => {
                 total_lop = EXCLUDED.total_lop,
                 calculated_salary = EXCLUDED.calculated_salary,
                 status = EXCLUDED.status
-            `, [user.emp_id.trim(), month, year, payableDays, 0, totalLop, finalPay]);
+            `, [userEmpId, month, year, payableDays, 0, totalLop, finalPay]);
 
             results.push({
                 emp_id: user.emp_id,
@@ -110,9 +113,9 @@ exports.getSalaryRecords = async (req, res) => {
         let query = `
             SELECT s.*, u.name, u.role, u.profile_pic, d.name as department_name, u.monthly_salary
             FROM salary_records s
-            JOIN users u ON s.emp_id = u.emp_id
+            JOIN users u ON TRIM(s.emp_id) = TRIM(u.emp_id)
             LEFT JOIN departments d ON u.department_id = d.id
-            WHERE u.role != 'admin'
+            WHERE LOWER(u.role) != 'admin'
         `;
         const params = [];
 
@@ -120,13 +123,13 @@ exports.getSalaryRecords = async (req, res) => {
         if (year) { query += ' AND s.year = $' + (params.push(year)); }
 
         if (req.user.role === 'staff' || req.user.role === 'principal') {
-            query += ' AND s.emp_id = $' + (params.push(req.user.emp_id));
+            query += ' AND TRIM(s.emp_id) = TRIM($' + (params.push(req.user.emp_id)) + ')';
         } else if (req.user.role === 'hod') {
             query += ' AND u.department_id = $' + (params.push(req.user.department_id));
         }
 
         query += ` ORDER BY 
-            CASE u.role 
+            CASE LOWER(u.role) 
                 WHEN 'principal' THEN 1 
                 WHEN 'hod' THEN 2 
                 WHEN 'staff' THEN 3 
