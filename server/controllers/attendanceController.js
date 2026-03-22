@@ -1,0 +1,296 @@
+const { pool } = require('../config/db');
+
+// @desc    Get attendance records (with filters)
+// @route   GET /api/attendance
+// @access  Private
+exports.getAttendance = async (req, res) => {
+    try {
+        const { date, month, startDate, endDate, role, department_id, emp_id, onlyUploaded, recent, limit } = req.query;
+
+        // Return only actual uploaded records when requested (no generated absent/holiday rows).
+        if (onlyUploaded === 'true') {
+            const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
+            const safeLimit = Math.min(Math.max(parseInt(limit || '10', 10), 1), 100);
+
+            const params = [];
+            let userFilter = "u.role IN ('principal', 'hod', 'staff')";
+
+            if (role) {
+                userFilter += ` AND u.role = $${params.push(role)}`;
+            }
+            if (department_id) {
+                userFilter += ` AND u.department_id = $${params.push(department_id)}`;
+            }
+            if (emp_id) {
+                userFilter += ` AND u.emp_id = $${params.push(emp_id)}`;
+            }
+            if (req.user.role === 'staff') {
+                userFilter += ` AND u.emp_id = $${params.push(req.user.emp_id)}`;
+            }
+
+            let uploadedDateCondition = `(a.date <= (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata')::date)`;
+
+            if (recent !== 'true') {
+                let start;
+                let end;
+
+                if (date) {
+                    start = date;
+                    end = date;
+                } else if (month) {
+                    start = `${month}-01`;
+                    end = new Date(new Date(start).getFullYear(), new Date(start).getMonth() + 1, 0).toISOString().split('T')[0];
+                } else if (startDate && endDate) {
+                    start = startDate;
+                    end = endDate;
+                } else {
+                    const now = new Date();
+                    start = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+                    end = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
+                }
+
+                if (start > today) return res.json([]);
+                if (end > today) end = today;
+
+                const startIdx = params.push(start);
+                const endIdx = params.push(end);
+                uploadedDateCondition = `a.date BETWEEN $${startIdx} AND $${endIdx}`;
+            }
+
+            const limitIdx = params.push(safeLimit);
+
+            const uploadedQuery = `
+                SELECT
+                    a.date,
+                    u.emp_id,
+                    u.name,
+                    u.role,
+                    d.name as department_name,
+                    a.status::text as status,
+                    a.in_time,
+                    a.out_time,
+                    a.remarks,
+                    a.id as record_id
+                FROM attendance_records a
+                JOIN users u ON u.emp_id = a.emp_id
+                LEFT JOIN departments d ON u.department_id = d.id
+                WHERE ${userFilter} AND ${uploadedDateCondition}
+                ORDER BY a.date DESC, u.name ASC
+                LIMIT $${limitIdx}
+            `;
+
+            const { rows } = await pool.query(uploadedQuery, params);
+            return res.json(rows);
+        }
+
+        let start, end;
+        if (date) {
+            start = end = date;
+        } else if (month) {
+            start = `${month}-01`;
+            end = new Date(new Date(start).getFullYear(), new Date(start).getMonth() + 1, 0).toISOString().split('T')[0];
+        } else if (startDate && endDate) {
+            start = startDate;
+            end = endDate;
+        } else {
+            // Default to current month
+            const now = new Date();
+            start = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+            end = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
+        }
+
+        // Cap dates to current date (IST) to prevent showing future attendance
+        const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
+        if (start > today) return res.json([]);
+        if (end > today) end = today;
+
+        const params = [start, end];
+        let userFilter = 'u.role IN (\'principal\', \'hod\', \'staff\')';
+        const userParams = [];
+
+        if (role) {
+            userFilter += ' AND u.role = $' + (userParams.push(role) + 2);
+            params.push(role);
+        }
+        if (department_id) {
+            userFilter += ' AND u.department_id = $' + (userParams.push(department_id) + 2);
+            params.push(department_id);
+        }
+        if (emp_id) {
+            userFilter += ' AND u.emp_id = $' + (userParams.push(emp_id) + 2);
+            params.push(emp_id);
+        }
+
+        if (req.user.role === 'staff') {
+            userFilter += ' AND u.emp_id = $' + (userParams.push(req.user.emp_id) + 2);
+            params.push(req.user.emp_id);
+        }
+
+        // Recursive CTE to generate date sequence + CROSS JOIN with filtered users
+        // This ensures scientists get a row for EVERY day in the range.
+        const query = `
+            WITH RECURSIVE date_range AS (
+                SELECT $1::date as d
+                UNION ALL
+                SELECT (d + 1)::date FROM date_range 
+                WHERE d < $2::date AND d < (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata')::date
+            ),
+            calendar_days AS (
+                SELECT 
+                    dr.d,
+                    COALESCE(h.type, CASE WHEN EXTRACT(DOW FROM dr.d) IN (0, 6) THEN 'Holiday' ELSE 'Working Day' END) AS day_type
+                FROM date_range dr
+                LEFT JOIN holidays h ON h.h_date = dr.d
+            ),
+            target_users AS (
+                SELECT u.emp_id, u.name, u.role, u.department_id, d.name as department_name
+                FROM users u
+                LEFT JOIN departments d ON u.department_id = d.id
+                WHERE ${userFilter}
+            )
+            SELECT 
+                cd.d as date,
+                tu.emp_id,
+                tu.name,
+                tu.role,
+                tu.department_name,
+                COALESCE(a.status::text, CASE WHEN cd.day_type IN ('Holiday') THEN 'Holiday' ELSE 'Absent' END) as status,
+                a.in_time,
+                a.out_time,
+                a.remarks,
+                a.id as record_id
+            FROM calendar_days cd
+            CROSS JOIN target_users tu
+            LEFT JOIN attendance_records a ON a.emp_id = tu.emp_id AND a.date = cd.d
+            ORDER BY cd.d DESC, tu.name ASC
+        `;
+
+        const { rows } = await pool.query(query, params);
+        res.json(rows);
+    } catch (error) {
+        console.error('getAttendance ERROR:', error);
+        res.status(500).json({ message: 'Server Error', error: error.message });
+    }
+};
+
+// @desc    Get attendance summary (Counts)
+// @route   GET /api/attendance/summary
+// @access  Private
+exports.getAttendanceSummary = async (req, res) => {
+    try {
+        const { date, month, startDate, endDate, role, department_id } = req.query;
+
+        let start;
+        let end;
+
+        if (date) {
+            start = date;
+            end = date;
+        } else if (month) {
+            start = `${month}-01`;
+            end = new Date(new Date(start).getFullYear(), new Date(start).getMonth() + 1, 0).toISOString().split('T')[0];
+        } else if (startDate && endDate) {
+            start = startDate;
+            end = endDate;
+        } else {
+            return res.status(400).json({ message: 'Date, Month, or Range required' });
+        }
+
+        // Cap summary range to today (IST) so future dates are not counted.
+        const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
+        if (start > today) return res.json([]);
+        if (end > today) end = today;
+
+        const params = [start, end];
+
+        let userFilter = "u.role IN ('principal', 'hod', 'staff')";
+        if (department_id) {
+            userFilter += ' AND u.department_id = $' + (params.length + 1);
+            params.push(department_id);
+        }
+        if (role) {
+            userFilter += ' AND u.role = $' + (params.length + 1);
+            params.push(role);
+        }
+
+        const query = `
+            WITH date_window AS (
+                SELECT generate_series($1::date, $2::date, INTERVAL '1 day')::date AS d
+            ),
+            calendar_days AS (
+                SELECT
+                    dw.d,
+                    COALESCE(h.type, CASE WHEN EXTRACT(DOW FROM dw.d) IN (0, 6) THEN 'Holiday' ELSE 'Working Day' END) AS day_type
+                FROM date_window dw
+                LEFT JOIN holidays h ON h.h_date = dw.d
+            ),
+            calendar_totals AS (
+                SELECT
+                    COALESCE(SUM(CASE WHEN day_type = 'Holiday' THEN 1 ELSE 0 END), 0) AS total_holidays,
+                    COALESCE(SUM(CASE WHEN day_type IN ('Working Day', 'Special') THEN 1 ELSE 0 END), 0) AS total_working_days
+                FROM calendar_days
+            )
+            SELECT 
+                u.emp_id, u.name, u.role,
+                COALESCE(SUM(CASE WHEN a.status::text ILIKE '%Present%' THEN 1 ELSE 0 END), 0) as total_present,
+                COALESCE(SUM(CASE WHEN a.status::text ILIKE '%Absent%' THEN 1 ELSE 0 END), 0) as total_absent,
+                COALESCE(SUM(CASE WHEN 
+                    a.status::text ILIKE '%Comp Leave%' OR a.remarks ILIKE '%Comp Leave%' OR 
+                    a.status::text ILIKE '%CL%' OR a.remarks ILIKE '%CL%' OR 
+                    a.status::text ILIKE '%Casual Leave%' OR a.remarks ILIKE '%Casual Leave%' OR
+                    a.status::text ILIKE '%ML%' OR a.remarks ILIKE '%ML%' OR 
+                    a.status::text ILIKE '%Medical Leave%' OR a.remarks ILIKE '%Medical Leave%' OR
+                    a.status::text ILIKE '%Leave%' OR a.remarks ILIKE '%On Duty%' OR a.status::text ILIKE '%OD%'
+                THEN 1 ELSE 0 END), 0) as total_leave,
+                COALESCE(SUM(CASE WHEN (a.status::text ILIKE '%CL%' OR a.remarks ILIKE '%CL%' OR a.remarks ILIKE '%Casual Leave%') AND a.status::text NOT ILIKE '%Comp Leave%' AND a.remarks NOT ILIKE '%Comp Leave%' THEN 1 ELSE 0 END), 0) as total_cl,
+                COALESCE(SUM(CASE WHEN a.status::text ILIKE '%ML%' OR a.remarks ILIKE '%ML%' OR a.remarks ILIKE '%Medical Leave%' THEN 1 ELSE 0 END), 0) as total_ml,
+                COALESCE(SUM(CASE WHEN a.status::text ILIKE '%Comp Leave%' OR a.remarks ILIKE '%Comp Leave%' THEN 1 ELSE 0 END), 0) as total_comp,
+                COALESCE(SUM(CASE WHEN a.status::text ILIKE '%OD%' OR a.remarks ILIKE '%OD%' OR a.remarks ILIKE '%On Duty%' THEN 1 ELSE 0 END), 0) as total_od,
+                COALESCE(SUM(CASE WHEN a.status::text ILIKE '%LOP%' OR a.remarks ILIKE '%LOP%' OR a.remarks ILIKE '%Loss of Pay%' THEN 1 ELSE 0 END), 0) as total_lop,
+                COALESCE(SUM(CASE WHEN a.remarks ILIKE '%Late Entry%' THEN 1 ELSE 0 END), 0) as total_late,
+                ct.total_working_days,
+                ct.total_holidays
+                , GREATEST(0, ct.total_working_days - COALESCE(COUNT(a.id), 0)) as total_computed_absent
+
+            FROM public.users u
+            CROSS JOIN calendar_totals ct
+            LEFT JOIN attendance_records a ON u.emp_id = a.emp_id
+                AND a.date BETWEEN $1 AND $2
+            WHERE ${userFilter}
+            GROUP BY u.emp_id, u.name, u.role, ct.total_working_days, ct.total_holidays
+            ORDER BY u.name ASC
+        `;
+
+        const { rows } = await pool.query(query, params);
+        res.json(rows);
+    } catch (error) {
+        console.error('getAttendanceSummary ERROR:', error);
+        res.status(500).json({ message: 'Server Error' });
+    }
+};
+
+// @desc    Get 6-month attendance trend
+// @route   GET /api/attendance/stats/trend
+// @access  Private
+exports.getAttendanceTrend = async (req, res) => {
+    try {
+        const query = `
+            SELECT 
+                TO_CHAR(date, 'Mon YYYY') as month_name,
+                SUM(CASE WHEN status::text LIKE '%Present%' THEN 1 ELSE 0 END) as present,
+                SUM(CASE WHEN status::text LIKE '%Leave%' OR status::text LIKE '%Comp Leave%' OR remarks LIKE '%Comp Leave:%' OR status::text LIKE '%CL%' OR remarks LIKE '%CL:%' OR status::text LIKE '%ML%' OR remarks LIKE '%ML:%' THEN 1 ELSE 0 END) as "leave",
+                SUM(CASE WHEN status::text LIKE '%Absent%' OR status::text LIKE '%LOP%' THEN 1 ELSE 0 END) as lop
+            FROM attendance_records
+            WHERE date >= CURRENT_DATE - INTERVAL '6 months'
+            GROUP BY TO_CHAR(date, 'YYYY-MM'), month_name
+            ORDER BY TO_CHAR(date, 'YYYY-MM') ASC
+        `;
+        const { rows } = await pool.query(query);
+        res.json(rows);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Server Error' });
+    }
+};
+
+
