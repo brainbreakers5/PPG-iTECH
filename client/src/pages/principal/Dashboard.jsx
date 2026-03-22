@@ -55,6 +55,7 @@ const Dashboard = () => {
     const [employeeModal, setEmployeeModal] = useState(null);
     const [selectedEmployeeHistory, setSelectedEmployeeHistory] = useState(null); // { emp_id, name }
     const [statusFilter, setStatusFilter] = useState(null);
+    const [isNonWorkingDay, setIsNonWorkingDay] = useState(false);
     const historyRef = useRef(null);
     const socket = useSocket();
 
@@ -67,14 +68,34 @@ const Dashboard = () => {
             const { data: emps } = await api.get('/employees');
             setAllEmployees(emps);
             const month = date.slice(0, 7);
+
+            // Fetch holiday/calendar data first
+            const now = new Date();
+            const curMonth = now.getMonth() + 1;
+            const curYear = now.getFullYear();
+            const { data: holidayData } = await api.get(`holidays?month=${curMonth}&year=${curYear}`);
+            const holidayDateSet = new Set();
+            (holidayData || []).forEach(h => { holidayDateSet.add(h.h_date); });
+            
+            const isTodayHoliday = holidayDateSet.has(date);
+            const todayDOW = new Date().getDay();
+            const isTodayNonWorking = isTodayHoliday || todayDOW === 0 || todayDOW === 6;
+            setIsNonWorkingDay(isTodayNonWorking);
+
             const { data: records } = await api.get(`/attendance?month=${month}&emp_id=${user?.emp_id}`);
             setDetailedRecords(records || []);
             const counts = { present: 0, absent: 0, od: 0, cl: 0, ml: 0, comp_leave: 0, lop: 0, late_entry: 0 };
             (records || []).forEach(r => {
                 const s = (r.status || '').toUpperCase();
                 const rem = (r.remarks || '').toUpperCase();
+                const recordDate = String(r.date).slice(0, 10);
+                const isHoliday = holidayDateSet.has(recordDate);
+                const dow = new Date(recordDate).getDay();
+                const isWeekend = dow === 0 || dow === 6;
+                const isNonWorking = isHoliday || isWeekend;
+
                 if (s.includes('PRESENT')) counts.present++;
-                if (s.includes('ABSENT')) counts.absent++;
+                if (s.includes('ABSENT') && !isNonWorking) counts.absent++;
                 if (s.includes('OD') || rem.includes('OD')) counts.od++;
                 if ((s.includes('CL') || rem.includes('CL') || rem.includes('CASUAL')) && !s.includes('COMP') && !rem.includes('COMP')) counts.cl++;
                 if (s.includes('ML') || rem.includes('ML') || rem.includes('MEDICAL')) counts.ml++;
@@ -107,7 +128,13 @@ const Dashboard = () => {
                 bucket.od += o;
                 bucket.lop += lp;
                 bucket.late_entry += late;
-                if (p === 0 && l === 0 && o === 0 && lp === 0) bucket.absent += 1;
+                
+                // Only count as absent if it's a working day
+                if (!isTodayNonWorking && p === 0 && l === 0 && o === 0 && lp === 0) {
+                    bucket.absent += 1;
+                    agg.absent += 1;
+                }
+                
                 agg.present += p;
                 agg.od += o;
                 agg.lop += lp;
@@ -125,18 +152,11 @@ const Dashboard = () => {
                 if (s.includes('COMP LEAVE') || rem.includes('COMP LEAVE')) { bucket.comp_leave++; agg.comp_leave++; }
             });
             setStats(agg);
-            // Fetch holiday/calendar data for month summary and build lists for modal
-            const now = new Date();
-            const curMonth = now.getMonth() + 1;
-            const curYear = now.getFullYear();
-            const { data: holidayData } = await api.get(`holidays?month=${curMonth}&year=${curYear}`);
             const daysInMonth = new Date(curYear, curMonth, 0).getDate();
             let hCount = 0, sCount = 0;
-            const holidayDateSet = new Set();
             const holidaysArr = [];
             const specialArr = [];
             (holidayData || []).forEach(h => {
-                holidayDateSet.add(h.h_date);
                 const item = { date: h.h_date, title: h.title || h.name || 'Holiday', desc: h.note || h.type || '' };
                 if (h.type === 'Holiday') { hCount++; holidaysArr.push(item); }
                 else if (h.type === 'Special') { sCount++; specialArr.push(item); }
@@ -188,7 +208,10 @@ const Dashboard = () => {
             const s = (rec.status || '').toUpperCase();
             const rem = (rec.remarks || '').toUpperCase();
             if (statusLabel === 'Present') return s.includes('PRESENT');
-            if (statusLabel === 'Absent') return (!s || s === 'ABSENT') && s !== 'LOP';
+            if (statusLabel === 'Absent') {
+                if (isNonWorkingDay) return false;
+                return (!s || s === 'ABSENT') && s !== 'LOP';
+            }
             if (statusLabel === 'On Duty') return s === 'OD' || rem.includes('OD') || rem.includes('ON DUTY');
             if (statusLabel === 'Casual Leave') return (s.includes('CL') || rem.includes('CL') || rem.includes('CASUAL')) && !s.includes('COMP') && !rem.includes('COMP');
             if (statusLabel === 'Medical Leave') return s === 'ML' || rem.includes('ML') || rem.includes('MEDICAL');
@@ -353,7 +376,7 @@ const Dashboard = () => {
             </AnimatePresence>
 
             {/* Stats Grid - Role Breakdown */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-12">
+            <div id="attendance-cores" className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-12">
                 {[
                     { key: 'hod', title: 'HODs', color: 'amber' },
                     { key: 'staff', title: 'Staff', color: 'purple' }
