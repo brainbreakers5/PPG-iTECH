@@ -202,7 +202,7 @@ exports.calculateSalary = async (req, res) => {
 
             // Check if already published (Paid) — do NOT overwrite paid records
             const { rows: existing } = await pool.query(
-                `SELECT id, status FROM salary_records WHERE TRIM(emp_id) = $1 AND from_date = $2::date AND to_date = $3::date LIMIT 1`,
+                `SELECT id, status FROM salary_records WHERE TRIM(emp_id) = $1 AND from_date::date = $2::date AND to_date::date = $3::date LIMIT 1`,
                 [userEmpId, rangeFrom, rangeTo]
             );
             if (existing.length > 0 && existing[0].status === 'Paid') {
@@ -347,8 +347,8 @@ exports.getSalaryRecords = async (req, res) => {
             SELECT s.*
             FROM salary_records s
             WHERE TRIM(s.emp_id) = ANY($1::text[])
-              AND s.from_date = $2::date
-              AND s.to_date = $3::date
+              AND s.from_date::date = $2::date
+              AND s.to_date::date = $3::date
         `, [empIds, period.fromDate, period.toDate]);
 
         const recMap = {};
@@ -595,7 +595,7 @@ exports.publishSalaries = async (req, res) => {
         const { rowCount } = await pool.query(
             `UPDATE salary_records
              SET status = 'Paid', paid_at = COALESCE(paid_at, NOW())
-             WHERE from_date = $1::date AND to_date = $2::date AND status = 'Pending'`,
+             WHERE from_date::date = $1::date AND to_date::date = $2::date AND status = 'Pending'`,
             [period.fromDate, period.toDate]
         );
 
