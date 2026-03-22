@@ -162,7 +162,7 @@ const LeaveLimitation = () => {
     const saveEdit = async (emp_id) => {
         try {
             const year = new Date(fromDate).getFullYear();
-            await api.put(`/leave-limits/${emp_id}`, { year, fromDate, toDate, ...editValues });
+            await api.put(`/leave-limits/${encodeURIComponent(emp_id)}`, { year, fromDate, toDate, ...editValues });
             Swal.fire({
                 title: 'Limits Updated!',
                 text: 'Leave limits have been saved successfully.',
@@ -430,7 +430,7 @@ const LeaveLimitation = () => {
                     const { data: employees } = await api.get('/employees?all=true');
                     const targets = (employees || []).filter((e) => e?.emp_id);
                     const settled = await Promise.allSettled(
-                        targets.map((emp) => api.put(`/leave-limits/${emp.emp_id}`, { year, ...formValues }))
+                        targets.map((emp) => api.put(`/leave-limits/${encodeURIComponent(emp.emp_id)}`, { year, ...formValues }))
                     );
                     const successCount = settled.filter((s) => s.status === 'fulfilled').length;
                     const failCount = settled.length - successCount;

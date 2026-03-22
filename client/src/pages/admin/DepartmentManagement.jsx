@@ -91,61 +91,62 @@ const DepartmentManagement = () => {
         const escHtml = (v) => String(v ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
         const roleColors = { hod: '#0891b2', staff: '#16a34a', admin: '#7c3aed', principal: '#2563eb' };
 
-        let contentHtml = '';
+        const rows = [];
+        departments.forEach((dept) => {
+            const deptStaff = allEmployees
+                .filter((emp) => String(emp.department_id) === String(dept.id))
+                .sort((a, b) => {
+                    if (a.role === 'hod' && b.role !== 'hod') return -1;
+                    if (a.role !== 'hod' && b.role === 'hod') return 1;
+                    return String(a.name || '').localeCompare(String(b.name || ''));
+                });
 
-        departments.forEach(dept => {
-            const deptStaff = allEmployees.filter(emp => String(emp.department_id) === String(dept.id));
-            if (deptStaff.length === 0) return;
-
-            deptStaff.sort((a, b) => {
-                if (a.role === 'hod' && b.role !== 'hod') return -1;
-                if (a.role !== 'hod' && b.role === 'hod') return 1;
-                return 0;
+            deptStaff.forEach((member) => {
+                rows.push({ dept, member });
             });
-
-            contentHtml += `
-                <div style="margin-bottom: 40px; break-inside: avoid-page;">
-                    <div style="background: #f8fafc; padding: 10px 15px; border-left: 4px solid #1e3a8a; margin-bottom: 10px;">
-                        <h2 style="margin: 0; color: #1e3a8a; font-size: 14pt; font-weight: 900;">${escHtml(dept.name)} <span style="font-size: 10pt; color: #64748b; font-weight: bold;">(Code: ${escHtml(dept.code || '—')})</span></h2>
-                    </div>
-                    <table>
-                        <thead>
-                            <tr>
-                                <th style="width:50px; text-align:center;">Photo</th>
-                                <th style="width:100px;">Emp ID</th>
-                                <th>Name</th>
-                                <th style="width:80px;">Role</th>
-                                <th>Designation</th>
-                                <th>Email</th>
-                                <th style="width:110px;">Mobile</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            ${deptStaff.map((member, idx) => `
-                                <tr style="${idx % 2 === 0 ? 'background:#fff;' : 'background:#f8fafc;'}">
-                                    <td style="padding:8px 10px; text-align:center;">
-                                        <img src="${escHtml(member.profile_pic || `https://ui-avatars.com/api/?name=${encodeURIComponent(member.name)}&size=60&background=2563eb&color=fff&bold=true`)}"
-                                            style="width:36px;height:36px;border-radius:8px;object-fit:cover;" onerror="this.style.display='none'" />
-                                    </td>
-                                    <td style="padding:8px 10px; font-size:9pt; font-weight:900; color:#1e3a8a;">${escHtml(member.emp_id)}</td>
-                                    <td style="padding:8px 10px; font-size:9pt; font-weight:700; color:#1e293b;">${escHtml(member.name)}</td>
-                                    <td style="padding:8px 10px;">
-                                        <span style="background:${(roleColors[member.role] || '#475569')}22; color:${(roleColors[member.role] || '#475569')}; border:1px solid ${(roleColors[member.role] || '#475569')}44; padding:2px 6px; border-radius:10px; font-size:7.5pt; font-weight:900; text-transform:uppercase;">${escHtml(member.role)}</span>
-                                    </td>
-                                    <td style="padding:8px 10px; font-size:8.5pt; color:#334155;">${escHtml(member.designation || '—')}</td>
-                                    <td style="padding:8px 10px; font-size:8pt; color:#475569;">${escHtml(member.email || '—')}</td>
-                                    <td style="padding:8px 10px; font-size:8.5pt; color:#475569;">${escHtml(member.mobile || '—')}</td>
-                                </tr>
-                            `).join('')}
-                        </tbody>
-                    </table>
-                </div>
-            `;
         });
 
-        if (!contentHtml) {
-            contentHtml = '<p style="text-align:center; color:#64748b; font-style:italic; margin-top: 40px;">No personnel data available to print.</p>';
-        }
+        const contentHtml = rows.length > 0
+            ? `
+                <table>
+                    <thead>
+                        <tr>
+                            <th style="width:48px; text-align:center;">#</th>
+                            <th style="width:50px; text-align:center;">Photo</th>
+                            <th style="width:120px;">Department</th>
+                            <th style="width:90px;">Code</th>
+                            <th style="width:100px;">Emp ID</th>
+                            <th>Name</th>
+                            <th style="width:80px;">Role</th>
+                            <th>Designation</th>
+                            <th>Email</th>
+                            <th style="width:110px;">Mobile</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${rows.map(({ dept, member }, idx) => `
+                            <tr style="${idx % 2 === 0 ? 'background:#fff;' : 'background:#f8fafc;'}">
+                                <td style="padding:8px 10px; text-align:center; font-size:8.5pt; font-weight:800; color:#334155;">${idx + 1}</td>
+                                <td style="padding:8px 10px; text-align:center;">
+                                    <img src="${escHtml(member.profile_pic || `https://ui-avatars.com/api/?name=${encodeURIComponent(member.name)}&size=60&background=2563eb&color=fff&bold=true`)}"
+                                        style="width:36px;height:36px;border-radius:8px;object-fit:cover;" onerror="this.style.display='none'" />
+                                </td>
+                                <td style="padding:8px 10px; font-size:8.5pt; font-weight:700; color:#1e293b;">${escHtml(dept.name)}</td>
+                                <td style="padding:8px 10px; font-size:8.5pt; font-weight:700; color:#334155;">${escHtml(dept.code || '—')}</td>
+                                <td style="padding:8px 10px; font-size:9pt; font-weight:900; color:#1e3a8a;">${escHtml(member.emp_id)}</td>
+                                <td style="padding:8px 10px; font-size:9pt; font-weight:700; color:#1e293b;">${escHtml(member.name)}</td>
+                                <td style="padding:8px 10px;">
+                                    <span style="background:${(roleColors[member.role] || '#475569')}22; color:${(roleColors[member.role] || '#475569')}; border:1px solid ${(roleColors[member.role] || '#475569')}44; padding:2px 6px; border-radius:10px; font-size:7.5pt; font-weight:900; text-transform:uppercase;">${escHtml(member.role)}</span>
+                                </td>
+                                <td style="padding:8px 10px; font-size:8.5pt; color:#334155;">${escHtml(member.designation || '—')}</td>
+                                <td style="padding:8px 10px; font-size:8pt; color:#475569;">${escHtml(member.email || '—')}</td>
+                                <td style="padding:8px 10px; font-size:8.5pt; color:#475569;">${escHtml(member.mobile || '—')}</td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            `
+            : '<p style="text-align:center; color:#64748b; font-style:italic; margin-top: 40px;">No personnel data available to print.</p>';
 
         printWindow.document.write(`
             <!doctype html><html><head><meta charset="UTF-8">

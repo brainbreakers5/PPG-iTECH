@@ -219,18 +219,19 @@ const HODDashboard = () => {
 
         return roleEmps.filter(emp => {
             const rec = attendanceMap[emp.emp_id] || {};
-            const s = rec.status || '';
-            if (statusLabel === 'Present') return s === 'Present';
+            const s = String(rec.status || '').toUpperCase();
+            const remarks = String(rec.remarks || '').toUpperCase();
+            if (statusLabel === 'Present') return s.startsWith('PRESENT');
             if (statusLabel === 'Absent') {
                 if (isNonWorkingDay) return false;
-                return (!s || s === 'Absent') && s !== 'LOP';
+                return (!s || s === 'ABSENT') && s !== 'LOP';
             }
-            if (statusLabel === 'On Duty') return s === 'OD';
-            if (statusLabel === 'Casual Leave') return s === 'CL' || s === 'Leave';
-            if (statusLabel === 'Medical Leave') return s === 'ML';
-            if (statusLabel === 'Comp Leave') return s === 'Comp Leave';
-            if (statusLabel === 'Loss Of Pay') return s === 'LOP';
-            if (statusLabel === 'Late Entry') return (rec.remarks || '').includes('Late Entry');
+            if (statusLabel === 'On Duty') return s === 'OD' || remarks.includes('OD') || remarks.includes('ON DUTY');
+            if (statusLabel === 'Casual Leave') return s === 'CL' || s === 'LEAVE' || remarks.includes('CL') || remarks.includes('CASUAL');
+            if (statusLabel === 'Medical Leave') return s === 'ML' || remarks.includes('ML') || remarks.includes('MEDICAL');
+            if (statusLabel === 'Comp Leave') return s.includes('COMP LEAVE') || remarks.includes('COMP LEAVE');
+            if (statusLabel === 'Loss Of Pay') return s === 'LOP' || remarks.includes('LOP') || remarks.includes('LOSS OF PAY');
+            if (statusLabel === 'Late Entry') return remarks.includes('LATE ENTRY');
             return false;
         });
     };

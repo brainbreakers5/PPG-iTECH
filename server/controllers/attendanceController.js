@@ -231,7 +231,7 @@ exports.getAttendanceSummary = async (req, res) => {
                 FROM calendar_days
             )
             SELECT 
-                u.emp_id, u.name, u.role,
+                u.emp_id, u.name, u.role, u.department_id,
                 COALESCE(SUM(CASE WHEN a.status::text ILIKE '%Present%' THEN 1 ELSE 0 END), 0) as total_present,
                 COALESCE(SUM(CASE WHEN a.status::text ILIKE '%Absent%' THEN 1 ELSE 0 END), 0) as total_absent,
                 COALESCE(SUM(CASE WHEN 
@@ -257,7 +257,7 @@ exports.getAttendanceSummary = async (req, res) => {
             LEFT JOIN attendance_records a ON u.emp_id = a.emp_id
                 AND a.date BETWEEN $1 AND $2
             WHERE ${userFilter}
-            GROUP BY u.emp_id, u.name, u.role, ct.total_working_days, ct.total_holidays
+            GROUP BY u.emp_id, u.name, u.role, u.department_id, ct.total_working_days, ct.total_holidays
             ORDER BY u.name ASC
         `;
 

@@ -3,7 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import Layout from '../../components/Layout';
 import api from '../../utils/api';
 import Swal from 'sweetalert2';
-import { finalizePrintWindow } from '../../utils/printUtils';
+import { runPrintWindow } from '../../utils/printUtils';
 import { useAuth } from '../../context/AuthContext';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -102,7 +102,6 @@ const SalaryManagement = () => {
     const [rows, setRows] = useState([]);
     const [loading, setLoading] = useState(true);
     const [selectedIds, setSelectedIds] = useState([]);
-    const [selectionMode, setSelectionMode] = useState(false);
     const [activeRole, setActiveRole] = useState('all');
     const [activeDepartment, setActiveDepartment] = useState('all');
     const [departments, setDepartments] = useState([]);
@@ -154,8 +153,25 @@ const SalaryManagement = () => {
         setLoading(true);
         try {
             if (isPersonalView) {
-                const { data } = await api.get('/salary/timeline');
-                const normalized = (Array.isArray(data) ? data : []).slice().sort((a, b) => {
+                const [{ data: timelineData }, { data: currentCycleRows }] = await Promise.all([
+                    api.get('/salary/timeline'),
+                    api.get(`/salary?month=${currentCycle.month}&year=${currentCycle.year}&fromDate=${currentCycle.fromDate}&toDate=${currentCycle.toDate}`)
+                ]);
+
+                const normalizedTimeline = Array.isArray(timelineData) ? timelineData : [];
+                const currentRows = Array.isArray(currentCycleRows) ? currentCycleRows : [];
+                const myCurrent = currentRows.find((r) => normalizeEmpId(r.emp_id) === normalizeEmpId(user?.emp_id));
+                const hasCurrentInTimeline = normalizedTimeline.some((r) => (
+                    normalizeEmpId(r.emp_id) === normalizeEmpId(user?.emp_id)
+                    && String(r.from_date || '') === String(currentCycle.fromDate)
+                    && String(r.to_date || '') === String(currentCycle.toDate)
+                ));
+
+                const merged = hasCurrentInTimeline || !myCurrent
+                    ? normalizedTimeline
+                    : [myCurrent, ...normalizedTimeline];
+
+                const normalized = merged.slice().sort((a, b) => {
                     const aDate = new Date(a?.to_date || a?.from_date || a?.created_at || 0).getTime();
                     const bDate = new Date(b?.to_date || b?.from_date || b?.created_at || 0).getTime();
                     return bDate - aDate;
@@ -213,7 +229,7 @@ const SalaryManagement = () => {
         if (!isPersonalView) return undefined;
         const intervalId = setInterval(() => {
             refreshRows();
-        }, 30000);
+        }, 10000);
         return () => clearInterval(intervalId);
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [isPersonalView]);
@@ -313,9 +329,6 @@ const SalaryManagement = () => {
     };
 
     const printPaymentSlip = async (row) => {
-        const printWindow = window.open('', '_blank', 'width=900,height=900');
-        if (!printWindow) return;
-
         const gross = Number(row.gross_salary || row.monthly_salary || 0);
         const deduction = Number(row.deductions_applied || 0);
         const net = Number(row.calculated_salary || 0);
@@ -429,21 +442,16 @@ const SalaryManagement = () => {
             </html>
         `;
 
-        printWindow.document.open();
-        printWindow.document.write(html);
-        printWindow.document.close();
-
-        await finalizePrintWindow({
-            printWindow,
+        await runPrintWindow({
             title: `Payment Slip - ${row.name}`,
+            html,
+            windowFeatures: 'width=900,height=900',
             delay: 250,
             modeLabel: 'the payment slip'
         });
     };
 
     const printAllHistoryRows = async () => {
-        const printWindow = window.open('', '_blank', 'width=1100,height=900');
-        if (!printWindow) return;
         const generatedAt = formatGeneratedAt();
 
         const bodyRows = filteredRows.map((r, index) => `
@@ -498,9 +506,9 @@ const SalaryManagement = () => {
                                     <th>Employee</th>
                                     <th>Emp ID</th>
                                     <th>Department</th>
-                                    <th class="right">Gross</th>
+                                    <th class="right">Gross Salary</th>
                                     <th class="right">Deduction</th>
-                                    <th class="right">Net</th>
+                                    <th class="right">Net Salary</th>
                                     <th>Status</th>
                                 </tr>
                             </thead>
@@ -511,13 +519,10 @@ const SalaryManagement = () => {
             </html>
         `;
 
-        printWindow.document.open();
-        printWindow.document.write(html);
-        printWindow.document.close();
-
-        await finalizePrintWindow({
-            printWindow,
+        await runPrintWindow({
             title: 'Salary History - All Employees',
+            html,
+            windowFeatures: 'width=1100,height=900',
             delay: 250,
             modeLabel: 'the salary history report'
         });
@@ -604,7 +609,6 @@ const SalaryManagement = () => {
 
     useEffect(() => {
         if (!isHistoryPage) {
-            setSelectionMode(false);
             setSelectedIds([]);
         }
     }, [isHistoryPage]);
@@ -752,7 +756,6 @@ const SalaryManagement = () => {
                         transition={{ duration: 0.35, ease: 'easeOut' }}
                         className="modern-card p-6 border-sky-100 mb-6 flex flex-wrap gap-3 items-center"
                     >
-                        <button onClick={() => setSelectionMode((prev) => !prev)} className="bg-sky-50 text-sky-700 px-6 py-3 rounded-2xl border border-sky-100 hover:bg-sky-100 transition-all font-black uppercase tracking-[0.2em] text-[10px] active:scale-95">{selectionMode ? 'Hide Select' : 'Select'}</button>
                         <button onClick={toggleSelectAll} className="bg-gray-100 text-gray-600 px-6 py-3 rounded-2xl hover:bg-gray-200 transition-all font-black uppercase tracking-[0.2em] text-[10px] active:scale-95">{selectedIds.length === filteredRows.length ? 'Clear Selection' : 'Select All'}</button>
                         <button onClick={() => handleBulkMark('Paid')} className="bg-sky-600 text-white px-6 py-3 rounded-2xl shadow-lg shadow-sky-100 hover:bg-sky-700 transition-all font-black uppercase tracking-[0.2em] text-[10px] active:scale-95 flex items-center gap-2"><FaCheckCircle /> Mark All Paid</button>
                         <button onClick={() => handleBulkMark('Pending')} className="bg-sky-600 text-white px-6 py-3 rounded-2xl shadow-lg shadow-sky-100 hover:bg-sky-700 transition-all font-black uppercase tracking-[0.2em] text-[10px] active:scale-95 flex items-center gap-2"><FaClock /> Mark All Unpaid</button>
@@ -815,13 +818,13 @@ const SalaryManagement = () => {
                         <table className="w-full text-left border-collapse">
                             <thead>
                                 <tr className="bg-sky-50/30">
-                                    {canInstitutionWide && isHistoryPage && selectionMode && <th className="p-6 w-12 text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-sky-50"><div className="flex justify-center">Select</div></th>}
+                                    {canInstitutionWide && isHistoryPage && <th className="p-6 w-12 text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-sky-50"><div className="flex justify-center">Select</div></th>}
                                     {!isPersonalView && <th className="p-6 text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-sky-50">Employee</th>}
                                     {isPersonalView && <th className="p-6 text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-sky-50">Period</th>}
                                     <th className="p-6 text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-sky-50 text-right">With/Without Pay</th>
-                                    <th className="p-6 text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-sky-50 text-right">Gross</th>
+                                    <th className="p-6 text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-sky-50 text-right">Gross Salary</th>
                                     <th className="p-6 text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-sky-50 text-right">Deductions</th>
-                                    <th className="p-6 text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-sky-50 text-right">Net</th>
+                                    <th className="p-6 text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-sky-50 text-right">Net Salary</th>
                                     <th className="p-6 text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-sky-50 text-center">Status</th>
                                     <th className="p-6 text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-sky-50 text-center">Actions</th>
                                 </tr>
@@ -837,7 +840,7 @@ const SalaryManagement = () => {
                                     transition={{ delay: idx * 0.03 }}
                                     className="hover:bg-sky-50/20 transition-all group border-b border-sky-50/10"
                                 >
-                                    {canInstitutionWide && isHistoryPage && selectionMode && (
+                                    {canInstitutionWide && isHistoryPage && (
                                         <td className="p-6">
                                             <div className="flex justify-center">
                                                 <input
@@ -973,7 +976,7 @@ const SalaryManagement = () => {
 
                             {loading && (
                                         <tr>
-                                            <td colSpan={canInstitutionWide && isHistoryPage && selectionMode ? 8 : 7} className="p-32 text-center text-gray-500">
+                                            <td colSpan={canInstitutionWide && isHistoryPage ? 8 : 7} className="p-32 text-center text-gray-500">
                                                 <div className="flex flex-col items-center gap-4">
                                                     <div className="h-14 w-14 border-4 border-sky-100 border-t-sky-600 rounded-full animate-spin"></div>
                                                     <p className="text-[10px] font-black text-sky-500 uppercase tracking-[0.2em] mt-2">Loading payroll records...</p>
@@ -984,7 +987,7 @@ const SalaryManagement = () => {
 
                                     {!loading && filteredRows.length === 0 && (
                                         <tr>
-                                            <td colSpan={canInstitutionWide && isHistoryPage && selectionMode ? 8 : 7} className="p-32 text-center">
+                                            <td colSpan={canInstitutionWide && isHistoryPage ? 8 : 7} className="p-32 text-center">
                                                 <div className="flex flex-col items-center gap-6 opacity-20 grayscale">
                                                     <FaMoneyBillWave size={64} className="text-gray-400" />
                                                     <div>
