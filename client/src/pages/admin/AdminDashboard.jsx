@@ -310,8 +310,9 @@ const AdminDashboard = () => {
                     </motion.div>
                 )}
             </AnimatePresence>
+
             {/* Stats Grid */}
-            <div id="attendance-cores" className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-12">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10 mb-10">
                 {roleConfigs.map((role) => (
                     <motion.div
                         key={role.key}
@@ -331,8 +332,9 @@ const AdminDashboard = () => {
 
                         {/* "Total" button for HOD and Staff */}
                         {role.canViewAll && (
-                            <div
-                                className="w-full mb-6 py-3 px-4 rounded-2xl bg-gray-50 border border-gray-100 text-[10px] font-black text-gray-500 uppercase tracking-widest flex items-center justify-between relative z-10"
+                            <button
+                                onClick={() => setEmployeeModal({ role: role.key, statusLabel: 'Total', title: `Total ${role.title}` })}
+                                className="w-full mb-6 py-3 px-4 rounded-2xl bg-gray-50 border border-gray-100 text-[10px] font-black text-gray-500 uppercase tracking-widest flex items-center justify-between relative z-10 hover:bg-sky-50 transition-all hover:border-sky-200 cursor-pointer"
                             >
                                 <span>Total {role.title}</span>
                                 <div className="flex items-center gap-2">
@@ -343,7 +345,7 @@ const AdminDashboard = () => {
                                         {role.totalCount}
                                     </span>
                                 </div>
-                            </div>
+                            </button>
                         )}
 
                         {/* Attendance Stats */}
@@ -358,18 +360,19 @@ const AdminDashboard = () => {
                                 { label: 'Comp Leave', value: stats[role.key]?.comp_leave, icon: <FaStar />, color: 'text-indigo-600', bg: 'bg-indigo-50' },
                                 { label: 'Late Entry', value: stats[role.key]?.late_entry, icon: <FaClock />, color: 'text-orange-600', bg: 'bg-orange-50' }
                             ].map((stat) => (
-                                <div
+                                <button
                                     key={stat.label}
-                                    className="flex items-center justify-between p-3 rounded-2xl bg-gray-50/50 hover:bg-white transition-all border border-transparent hover:border-gray-100 group/item"
+                                    onClick={() => setEmployeeModal({ role: role.key, statusLabel: stat.label, title: `${stat.label} - ${role.title}` })}
+                                    className="w-full flex items-center justify-between p-3 rounded-2xl bg-gray-50/50 hover:bg-white transition-all border border-transparent hover:border-gray-100 group/item cursor-pointer"
                                 >
                                     <div className="flex items-center gap-3">
                                         <div className={`h-9 w-9 rounded-xl ${stat.bg} ${stat.color} flex items-center justify-center text-sm shadow-sm transition-transform group-hover/item:rotate-12`}>
                                             {stat.icon}
                                         </div>
-                                        <span className="text-[10px] font-black text-gray-500 uppercase tracking-widest">{stat.label}</span>
+                                        <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{stat.label}</span>
                                     </div>
                                     <span className="text-lg font-black text-gray-800 tracking-tighter">{stat.value || 0}</span>
-                                </div>
+                                </button>
                             ))}
                         </div>
 
@@ -378,6 +381,7 @@ const AdminDashboard = () => {
                     </motion.div>
                 ))}
             </div>
+
 
             {/* Quick Access Menu Grid Removed */}
 
