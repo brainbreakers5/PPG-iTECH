@@ -300,8 +300,7 @@ const EmployeeManagement = () => {
                                             animate={{ opacity: 1 }}
                                             exit={{ opacity: 0, scale: 0.98 }}
                                             transition={{ delay: idx * 0.03 }}
-                                            onClick={() => handleRowClick(emp)}
-                                            className="hover:bg-sky-50/20 transition-all group cursor-pointer"
+                                            className="hover:bg-sky-50/20 transition-all"
                                         >
                                             <td className="p-6">
                                                 <div className="flex items-center gap-5">
@@ -352,13 +351,6 @@ const EmployeeManagement = () => {
                                             </td>
                                             <td className="p-6">
                                                 <div className="flex justify-center gap-3">
-                                                    <button
-                                                        onClick={(e) => { e.stopPropagation(); handleRowClick(emp); }}
-                                                        className="h-10 w-10 bg-gray-50 text-gray-400 rounded-xl hover:bg-sky-600 hover:text-white transition-all shadow-sm flex items-center justify-center active:scale-90 group/btn"
-                                                        title="View Profile"
-                                                    >
-                                                        <FaEye className="group-hover/btn:scale-110 transition-transform" size={14} />
-                                                    </button>
                                                     <button
                                                         onClick={(e) => handleEdit(e, emp)}
                                                         className="h-10 w-10 bg-sky-50 text-sky-600 rounded-xl hover:bg-sky-600 hover:text-white transition-all shadow-sm flex items-center justify-center active:scale-90 group/btn"
