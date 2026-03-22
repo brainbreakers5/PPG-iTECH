@@ -56,6 +56,7 @@ const HODDashboard = () => {
     const [selectedEmployeeHistory, setSelectedEmployeeHistory] = useState(null); // { emp_id, name }
     const [todayTimetable, setTodayTimetable] = useState([]);
     const [statusFilter, setStatusFilter] = useState(null);
+    const [isNonWorkingDay, setIsNonWorkingDay] = useState(false);
     const historyRef = useRef(null);
     const { getPeriodConfig } = useTimetableConfig();
     const socket = useSocket();
@@ -91,7 +92,21 @@ const HODDashboard = () => {
             const map = {};
             (todayAtt || []).forEach(r => { map[r.emp_id] = r; });
             setAttendanceMap(map);
-            // Aggregate rows into role-based stats: All HODs vs. Staff in THIS department
+
+            // Fetch holiday/calendar data first
+            const now = new Date();
+            const curMonth = now.getMonth() + 1;
+            const curYear = now.getFullYear();
+            const { data: holidayData } = await api.get(`holidays?month=${curMonth}&year=${curYear}`);
+            const holidayDateSet = new Set();
+            (holidayData || []).forEach(h => { holidayDateSet.add(h.h_date); });
+            
+            const isTodayHoliday = holidayDateSet.has(date);
+            const todayDOW = new Date().getDay();
+            const isTodayNonWorking = isTodayHoliday || todayDOW === 0 || todayDOW === 6;
+            setIsNonWorkingDay(isTodayNonWorking);
+
+            // Aggregate rows into role-based stats
             const agg = { 
                 present: 0, absent: 0, od: 0, cl: 0, ml: 0, comp_leave: 0, lop: 0, late_entry: 0, 
                 hod: { present: 0, absent: 0, od: 0, cl: 0, ml: 0, comp_leave: 0, lop: 0, late_entry: 0 }, 
@@ -101,12 +116,7 @@ const HODDashboard = () => {
             (summary || []).forEach(r => {
                 const role = (r.role || '').toLowerCase();
                 const isHod = role === 'hod';
-                const isStaff = role === 'staff';
                 const isInDept = String(r.department_id) === String(user.department_id);
-
-                // We want: 
-                // 1. All HODs from all departments
-                // 2. Only staff from THIS HOD's department
                 if (!isHod && !isInDept) return; 
 
                 const bucket = isHod ? agg.hod : agg.staff;
@@ -120,9 +130,13 @@ const HODDashboard = () => {
                 bucket.od += o;
                 bucket.lop += lp;
                 bucket.late_entry += late;
-                if (p === 0 && l === 0 && o === 0 && lp === 0) bucket.absent += 1;
                 
-                // Overall dashboard totals only for the filtered subset
+                // Only count as absent if it's a working day
+                if (!isTodayNonWorking && p === 0 && l === 0 && o === 0 && lp === 0) {
+                    bucket.absent += 1;
+                    agg.absent += 1;
+                }
+                
                 agg.present += p;
                 agg.od += o;
                 agg.lop += lp;
@@ -146,16 +160,10 @@ const HODDashboard = () => {
                 if (s.includes('COMP LEAVE') || rem.includes('COMP LEAVE')) { bucket.comp_leave++; agg.comp_leave++; }
             });
             setStats(agg);
-            // Fetch holiday/calendar data for month summary
-            const now = new Date();
-            const curMonth = now.getMonth() + 1;
-            const curYear = now.getFullYear();
-            const { data: holidayData } = await api.get(`holidays?month=${curMonth}&year=${curYear}`);
+            
             const daysInMonth = new Date(curYear, curMonth, 0).getDate();
             let hCount = 0, sCount = 0;
-            const holidayDateSet = new Set();
             (holidayData || []).forEach(h => {
-                holidayDateSet.add(h.h_date);
                 if (h.type === 'Holiday') hCount++;
                 else if (h.type === 'Special') sCount++;
             });
@@ -209,7 +217,10 @@ const HODDashboard = () => {
             const rec = attendanceMap[emp.emp_id] || {};
             const s = rec.status || '';
             if (statusLabel === 'Present') return s === 'Present';
-            if (statusLabel === 'Absent') return (!s || s === 'Absent') && s !== 'LOP';
+            if (statusLabel === 'Absent') {
+                if (isNonWorkingDay) return false;
+                return (!s || s === 'Absent') && s !== 'LOP';
+            }
             if (statusLabel === 'On Duty') return s === 'OD';
             if (statusLabel === 'Casual Leave') return s === 'CL' || s === 'Leave';
             if (statusLabel === 'Medical Leave') return s === 'ML';
