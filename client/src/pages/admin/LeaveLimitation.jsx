@@ -322,7 +322,10 @@ const LeaveLimitation = () => {
                     <div style="border-top:2px solid #e5e7eb; padding-top:12px;">
                         ${editableTypes.map(t => `
                             <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:10px;">
-                                <label style="font-size:12px; font-weight:900; color:#6b7280; text-transform:uppercase; letter-spacing:0.1em; flex:1;">${t.full} (${t.label})</label>
+                                <label style="font-size:12px; font-weight:900; color:#6b7280; text-transform:uppercase; letter-spacing:0.1em; flex:1;">
+                                    ${t.full} (${t.label}) 
+                                    ${t.key === 'permission' ? '<span style="color:#4f46e5; font-size:9px; margin-left:8px; background:#eef2ff; padding:2px 6px; border-radius:6px; border:1px solid #c7d2fe;">Monthly Limit</span>' : ''}
+                                </label>
                                 <input id="bulk_${t.key}" type="number" min="0" max="365" value="${t.key === 'permission' ? 2 : (t.defaultDays || 12)}"
                                     style="width:80px; padding:8px 12px; border:2px solid #e5e7eb; border-radius:12px; font-weight:700; font-size:14px; text-align:center; outline:none;">
                             </div>
@@ -377,68 +380,6 @@ const LeaveLimitation = () => {
         }
     };
 
-    // Dedicated bulk-set handler for Permission Letter limit
-    const handleBulkSetPL = async () => {
-        const { value: formValues } = await Swal.fire({
-            title: '✉️ Bulk Set Permission Letter Limit',
-            html: `
-                <div style="display:grid; gap:18px; text-align:left; padding:10px 0;">
-                    <div style="background:#eef2ff; border-radius:14px; padding:14px 16px; font-size:12px; color:#4338ca; font-weight:700; line-height:1.6;">
-                        ✉️ Set the monthly permission letter allowance for <strong>all staff</strong>.
-                        Employees who reach this limit cannot apply for more permissions in that month.
-                    </div>
-                    <div>
-                        <label style="font-size:11px; font-weight:900; color:#64748b; text-transform:uppercase; letter-spacing:0.1em; display:block; margin-bottom:8px;">Monthly Permission Limit (per employee)</label>
-                        <div style="display:flex; align-items:center; gap:12px;">
-                            <input id="pl_limit_value" type="number" min="0" max="30" value="2"
-                                style="width:100px; padding:12px 16px; border:2px solid #c7d2fe; border-radius:14px; font-weight:900; font-size:24px; text-align:center; outline:none; color:#4338ca; background:#f5f3ff;"
-                            >
-                            <span style="font-size:13px; color:#6b7280; font-weight:700;">permissions / month</span>
-                        </div>
-                    </div>
-                    <div style="background:#f0fdf4; border-radius:10px; padding:10px 14px; font-size:11px; color:#16a34a; font-weight:700;">
-                        💡 Default is 2. This affects all employees. Individual limits can be edited per-employee using the edit (✏️) button.
-                    </div>
-                </div>
-            `,
-            showCancelButton: true,
-            confirmButtonColor: '#4f46e5',
-            cancelButtonColor: '#6b7280',
-            confirmButtonText: 'Apply to All Staff',
-            cancelButtonText: 'Cancel',
-            focusConfirm: false,
-            width: '480px',
-            preConfirm: () => {
-                const val = parseInt(document.getElementById('pl_limit_value')?.value);
-                if (isNaN(val) || val < 0) {
-                    Swal.showValidationMessage('Please enter a valid number (0 or more)');
-                    return false;
-                }
-                return { permission_limit: val };
-            }
-        });
-
-        if (formValues) {
-            try {
-                const year = new Date(fromMonth).getFullYear();
-                Swal.fire({ title: 'Applying...', didOpen: () => Swal.showLoading() });
-                await Promise.all(
-                    staffData.map(emp =>
-                        api.put(`/leave-limits/${emp.emp_id}`, { year, ...formValues })
-                    )
-                );
-                Swal.fire({
-                    title: 'Done!',
-                    text: `Permission limit set to ${formValues.permission_limit}/month for all staff.`,
-                    icon: 'success',
-                    confirmButtonColor: '#4f46e5'
-                });
-                fetchLimits();
-            } catch {
-                Swal.fire({ title: 'Error', text: 'Some updates failed.', icon: 'error' });
-            }
-        }
-    };
 
     const filtered = staffData.filter(emp =>
         emp.name?.toLowerCase().includes(search.toLowerCase()) ||
@@ -486,13 +427,6 @@ const LeaveLimitation = () => {
                                 className="bg-sky-600 text-white px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-widest shadow-lg shadow-sky-100 hover:bg-sky-700 transition-all flex items-center gap-2 active:scale-95"
                             >
                                 <FaClipboardList size={14} /> Bulk Set
-                            </button>
-                            <button
-                                onClick={handleBulkSetPL}
-                                className="bg-indigo-600 text-white px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-widest shadow-lg shadow-indigo-100 hover:bg-indigo-700 transition-all flex items-center gap-2 active:scale-95"
-                                title="Bulk set Permission Letter monthly limit for all staff"
-                            >
-                                ✉️ Bulk Set PL
                             </button>
                         </div>
                     </div>
