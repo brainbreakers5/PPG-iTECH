@@ -28,15 +28,32 @@ const StaffDashboard = () => {
     const fetchData = useCallback(async () => {
         if (!user) return;
         try {
-            const month = new Date().toISOString().slice(0, 7); // "YYYY-MM"
-            const { data: records } = await api.get(`/attendance?month=${month}`);
+            const { data: profileData } = await api.get('/auth/profile');
+            setProfile(profileData);
 
+            // Fetch holiday/calendar data for month summary
+            const now = new Date();
+            const curMonth = now.getMonth() + 1;
+            const curYear = now.getFullYear();
+            const { data: holidayData } = await api.get(`holidays?month=${curMonth}&year=${curYear}`);
+            const daysInMonth = new Date(curYear, curMonth, 0).getDate();
+            
+            const holidayDateSet = new Set();
+            (holidayData || []).forEach(h => { holidayDateSet.add(h.h_date); });
+            
             const counts = { present: 0, absent: 0, od: 0, cl: 0, ml: 0, comp_leave: 0, lop: 0, late_entry: 0 };
             (records || []).forEach(r => {
                 const s = (r.status || '').toUpperCase();
                 const rem = (r.remarks || '').toUpperCase();
+                const recordDate = String(r.date).slice(0, 10);
+                const isHoliday = holidayDateSet.has(recordDate);
+                const dow = new Date(recordDate).getDay();
+                const isWeekend = dow === 0 || dow === 6;
+                const isNonWorking = isHoliday || isWeekend;
+
                 if (s.includes('PRESENT')) counts.present++;
-                if (s.includes('ABSENT')) counts.absent++;
+                // Skip absent on holidays/weekends
+                if (s.includes('ABSENT') && !isNonWorking) counts.absent++;
                 if (s.includes('OD') || rem.includes('OD')) counts.od++;
                 if ((s.includes('CL') || rem.includes('CL') || rem.includes('CASUAL')) && !s.includes('COMP') && !rem.includes('COMP')) counts.cl++;
                 if (s.includes('ML') || rem.includes('ML') || rem.includes('MEDICAL')) counts.ml++;
@@ -46,18 +63,8 @@ const StaffDashboard = () => {
             });
             setMyStats(counts);
 
-            const { data: profileData } = await api.get('/auth/profile');
-            setProfile(profileData);
-            // Fetch holiday/calendar data for month summary
-            const now = new Date();
-            const curMonth = now.getMonth() + 1;
-            const curYear = now.getFullYear();
-            const { data: holidayData } = await api.get(`holidays?month=${curMonth}&year=${curYear}`);
-            const daysInMonth = new Date(curYear, curMonth, 0).getDate();
             let hCount = 0, sCount = 0;
-            const holidayDateSet = new Set();
             (holidayData || []).forEach(h => {
-                holidayDateSet.add(h.h_date);
                 if (h.type === 'Holiday') hCount++;
                 else if (h.type === 'Special') sCount++;
             });
