@@ -26,21 +26,11 @@ const SalaryManagement = () => {
     }, [canInstitutionWide]);
 
     const getDefaultDates = () => {
-        const d = new Date();
-        const year = d.getFullYear();
-        const month = d.getMonth(); // 0-indexed
-
-        // FROM: 26th of past month
-        let pastMonth = month; // 0-indexed
-        let pastYear = year;
-        if (pastMonth === 0) {
-            pastMonth = 12; // 1-indexed Dec
-            pastYear--;
-        }
-        const fromDateStr = `${pastYear}-${String(pastMonth).padStart(2, '0')}-26`;
-
-        // TO: 25th of current month
-        const toDateStr = `${year}-${String(month + 1).padStart(2, '0')}-25`;
+        const nowDate = new Date();
+        const year = nowDate.getFullYear();
+        const month = nowDate.getMonth() + 1;
+        const fromDateStr = `${year}-${String(month).padStart(2, '0')}-01`;
+        const toDateStr = nowDate.toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
 
         return { from: fromDateStr, to: toDateStr };
     };
@@ -136,9 +126,11 @@ const SalaryManagement = () => {
         const handler = () => fetchSalaries();
         socket.on('salary_published', handler);
         socket.on('salary_calculated', handler); // Also refresh on background calc
+        socket.on('employee_updated', handler);
         return () => {
             socket.off('salary_published', handler);
             socket.off('salary_calculated', handler);
+            socket.off('employee_updated', handler);
         };
     }, [socket, fromDate, toDate]);
 
@@ -170,7 +162,15 @@ const SalaryManagement = () => {
             const d = new Date(toDate); // Target month is defined by the end date
             const m = d.getMonth() + 1;
             const y = d.getFullYear();
-            const { data } = await api.get(`/salary?month=${m}&year=${y}&fromDate=${fromDate}&toDate=${toDate}`);
+            const params = new URLSearchParams({
+                month: String(m),
+                year: String(y),
+                fromDate,
+                toDate,
+                paidStatuses: JSON.stringify(paidStatuses),
+                unpaidStatuses: JSON.stringify(unpaidStatuses)
+            });
+            const { data } = await api.get(`/salary?${params.toString()}`);
 
             if (!canInstitutionWide) {
                 setSalaries(data.filter(s => s.emp_id === user.emp_id));
@@ -185,6 +185,9 @@ const SalaryManagement = () => {
     };
 
     const getMergedSalaries = () => {
+        // Backend now returns a live merged salary set (saved + preview) for the selected period.
+        // Prefer it directly to avoid front-end fallback zeros.
+        if (salaries.length > 0) return salaries;
         if (!canInstitutionWide) return salaries;
 
         const dForContext = new Date(toDate); // Uses toDate to ensure arrays align
@@ -210,7 +213,7 @@ const SalaryManagement = () => {
                 calculated_salary: 0,
                 total_present: 0,
                 total_lop: 0,
-                status: 'Uncalculated',
+                status: 'Pending',
                 month: currentM,
                 year: currentY
             };
@@ -988,7 +991,7 @@ const SalaryManagement = () => {
                                                                     ✓ {Number(s.total_present || 0).toFixed(1)}
                                                                 </span>
                                                                 <span className="text-gray-400 bg-gray-50 px-2 py-1 rounded-md" title="Period Days">
-                                                                    DAYS: {(() => { const d1=new Date(fromDate); const d2=new Date(toDate); return Math.round((d2-d1)/(1000*60*60*24))+1; })()}
+                                                                    DAYS: {Number(s.total_days_in_period || 0) || (() => { const d1=new Date(fromDate); const d2=new Date(toDate); return Math.round((d2-d1)/(1000*60*60*24))+1; })()}
                                                                 </span>
                                                                 <span className="text-rose-500 bg-rose-50 px-2 py-1 rounded-md border border-rose-100" title="Without Pay Days">
                                                                     ✗ {Number(s.total_lop || 0).toFixed(1)}
@@ -1002,7 +1005,7 @@ const SalaryManagement = () => {
                                                             <div className="w-40 bg-gray-100 h-1.5 rounded-full overflow-hidden shadow-inner p-px">
                                                                 <motion.div
                                                                 initial={{ width: 0 }}
-                                                                animate={{ width: `${Math.min(100, (s.total_present / (Math.round((new Date(toDate)-new Date(fromDate))/(1000*60*60*24))+1)) * 100)}%` }}
+                                                                animate={{ width: `${Math.min(100, (Number(s.total_present || 0) / Math.max(1, Number(s.total_days_in_period || 0) || (Math.round((new Date(toDate)-new Date(fromDate))/(1000*60*60*24))+1))) * 100)}%` }}
                                                                 className="bg-gradient-to-r from-emerald-400 to-emerald-600 h-full rounded-full"
                                                             ></motion.div>
                                                             </div>
@@ -1052,7 +1055,7 @@ const SalaryManagement = () => {
                                                             </span>
                                                         ) : s.status === 'Uncalculated' ? (
                                                             <span className="inline-flex items-center gap-1.5 text-[9px] font-black uppercase px-4 py-2 rounded-2xl tracking-widest border bg-gray-50 text-gray-400 border-gray-100">
-                                                                <FaTimesCircle size={10} /> Unpaid
+                                                                <FaTimesCircle size={10} /> Pending
                                                             </span>
                                                         ) : (
                                                             <span className="inline-flex items-center gap-1.5 text-[9px] font-black uppercase px-4 py-2 rounded-2xl tracking-widest border bg-amber-50 text-amber-600 border-amber-100 animate-pulse">

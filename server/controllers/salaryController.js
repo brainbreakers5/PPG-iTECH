@@ -294,6 +294,12 @@ exports.getSalaryRecords = async (req, res) => {
     try {
         await ensureSalarySchema();
         const { month, year, fromDate, toDate } = req.query;
+        const paidStatuses = req.query.paidStatuses
+            ? JSON.parse(req.query.paidStatuses)
+            : ['Present', 'CL', 'ML', 'Comp Leave', 'OD', 'Leave', 'Holiday'];
+        const unpaidStatuses = req.query.unpaidStatuses
+            ? JSON.parse(req.query.unpaidStatuses)
+            : ['Absent', 'LOP'];
         const period = buildPeriod({ month, year, fromDate, toDate });
         const scopeWide = isInstitutionWideRole(req.user.role);
 
@@ -331,8 +337,8 @@ exports.getSalaryRecords = async (req, res) => {
         const attendanceMap = await getAttendanceAggregateMap({
             fromDate: period.fromDate,
             toDate: period.toDate,
-            paidStatuses: ['Present', 'CL', 'ML', 'Comp Leave', 'OD', 'Leave', 'Holiday'],
-            unpaidStatuses: ['Absent', 'LOP']
+            paidStatuses,
+            unpaidStatuses
         });
         const totalWorkingDays = getWorkingDays(period.fromDate, period.toDate);
 
@@ -340,6 +346,35 @@ exports.getSalaryRecords = async (req, res) => {
             const key = String(u.emp_id || '').trim();
             const existing = recMap[key];
             if (existing) {
+                if (existing.status !== 'Paid') {
+                    const metrics = computeSalaryMetrics({
+                        monthlySalary: parseFloat(u.monthly_salary) || parseFloat(u.base_salary) || 0,
+                        deductions: parseDeductions(u.deductions),
+                        workingDaysInPeriod: totalWorkingDays,
+                        payableDays: attendanceMap[key]?.payable_days || existing.total_present || 0
+                    });
+
+                    return {
+                        ...existing,
+                        name: u.name,
+                        role: u.role,
+                        profile_pic: u.profile_pic,
+                        monthly_salary: parseFloat(u.monthly_salary) || parseFloat(u.base_salary) || 0,
+                        department_name: u.department_name,
+                        deductions: u.deductions,
+                        total_present: metrics.payableDays,
+                        total_lop: metrics.lopDays,
+                        with_pay_count: metrics.payableDays,
+                        without_pay_count: metrics.lopDays,
+                        deductions_applied: metrics.deductionsApplied.toFixed(2),
+                        calculated_salary: metrics.netSalary.toFixed(2),
+                        gross_salary: metrics.grossSalary.toFixed(2),
+                        total_days_in_period: totalWorkingDays,
+                        from_date: toIsoDate(existing.from_date) || period.fromDate,
+                        to_date: toIsoDate(existing.to_date) || period.toDate
+                    };
+                }
+
                 return {
                     ...existing,
                     name: u.name,
