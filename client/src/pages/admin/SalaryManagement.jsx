@@ -193,10 +193,35 @@ const SalaryManagement = () => {
     };
 
     const getMergedSalaries = () => {
-        // Backend now returns a live merged salary set (saved + preview) for the selected period.
-        // Prefer it directly to avoid front-end fallback zeros.
-        if (salaries.length > 0) return salaries;
         if (!canInstitutionWide) return salaries;
+
+        const employeeByEmpId = new Map(
+            allEmployees.map(emp => [normalizeEmpId(emp.emp_id), emp])
+        );
+
+        const resolveGrossPay = (salaryRow, employeeRow) => {
+            return (
+                parseFloat(salaryRow?.gross_salary) ||
+                parseFloat(salaryRow?.monthly_salary) ||
+                parseFloat(employeeRow?.monthly_salary) ||
+                parseFloat(employeeRow?.base_salary) ||
+                0
+            );
+        };
+
+        // Always enrich salary rows with employee master salary fallback so Gross Pay
+        // defaults from Employee Management values whenever salary row values are empty.
+        if (salaries.length > 0) {
+            return salaries.map((salaryRow) => {
+                const employeeRow = employeeByEmpId.get(normalizeEmpId(salaryRow.emp_id));
+                const grossPay = resolveGrossPay(salaryRow, employeeRow);
+                return {
+                    ...salaryRow,
+                    monthly_salary: grossPay,
+                    gross_salary: grossPay
+                };
+            });
+        }
 
         const dForContext = new Date(toDate); // Uses toDate to ensure arrays align
         const currentM = dForContext.getMonth() + 1;
@@ -204,9 +229,7 @@ const SalaryManagement = () => {
 
         return allEmployees.map(emp => {
             const calc = salaries.find(s => normalizeEmpId(s.emp_id) === normalizeEmpId(emp.emp_id));
-            // Use the salary record's monthly_salary first (it's joined fresh from users table in /salary API)
-            // Then fallback to allEmployees monthly_salary (now also included after backend fix)
-            const grossPay = parseFloat(calc?.monthly_salary) || parseFloat(emp.monthly_salary) || parseFloat(emp.base_salary) || 0;
+            const grossPay = resolveGrossPay(calc, emp);
 
             if (calc) {
                 return {
