@@ -301,8 +301,8 @@ const LeaveLimitation = () => {
     };
 
     const handleBulkSet = async () => {
-        // Exclude no-limit types AND permission (it has its own dedicated button)
-        const editableTypes = leaveTypes.filter(t => !noLimitTypes.includes(t.key) && t.key !== 'permission');
+        // Exclude no-limit types (Permission is included now)
+        const editableTypes = leaveTypes.filter(t => !noLimitTypes.includes(t.key));
         const { value: formValues } = await Swal.fire({
             title: 'Set Default Limits for All Staff',
             html: `
@@ -352,14 +352,27 @@ const LeaveLimitation = () => {
         if (formValues) {
             try {
                 const year = new Date(formValues.fromMonth || fromMonth).getFullYear();
-                Swal.fire({ title: 'Applying...', didOpen: () => Swal.showLoading() });
-                await Promise.all(
+                Swal.fire({ title: 'Applying...', text: 'Updating registry limits for all personnel...', didOpen: () => Swal.showLoading() });
+                
+                const results = await Promise.allSettled(
                     staffData.map(emp => api.put(`/leave-limits/${emp.emp_id}`, { year, ...formValues }))
                 );
-                Swal.fire({ title: 'Done!', text: 'Limits updated for all staff.', icon: 'success', confirmButtonColor: '#2563eb' });
+                
+                const failed = results.filter(r => r.status === 'rejected');
+                if (failed.length === 0) {
+                    Swal.fire({ title: 'Bulk Set Complete!', text: `Synchronized limits for ${results.length} personnel.`, icon: 'success', confirmButtonColor: '#2563eb' });
+                } else {
+                    Swal.fire({ 
+                        title: 'Partial Update', 
+                        text: `${failed.length} updates encountered integrity constraints. ${results.length - failed.length} succeeded.`, 
+                        icon: 'warning',
+                        confirmButtonColor: '#f59e0b'
+                    });
+                }
                 fetchLimits();
-            } catch {
-                Swal.fire({ title: 'Error', text: 'Some updates failed.', icon: 'error' });
+            } catch (error) {
+                console.error('Bulk update fail:', error);
+                Swal.fire({ title: 'Critical Error', text: 'The bulk operation could not be completed.', icon: 'error' });
             }
         }
     };
