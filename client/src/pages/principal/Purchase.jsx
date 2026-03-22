@@ -11,7 +11,13 @@ const Purchase = () => {
     const { user } = useAuth();
     const [requests, setRequests] = useState([]);
     const [loading, setLoading] = useState(true);
-    const [filter, setFilter] = useState('All');
+    const getFilterOptions = () => {
+        if (user.role === 'principal') return ['Approved_HOD', 'Purchased', 'Rejected'];
+        return ['Pending', 'Purchased', 'Rejected'];
+    };
+
+    const filterOptions = getFilterOptions();
+    const [filter, setFilter] = useState(user.role === 'principal' ? 'Approved_HOD' : 'Pending');
     const [selectedIds, setSelectedIds] = useState([]);
     const navigate = useNavigate();
 
@@ -426,7 +432,6 @@ const Purchase = () => {
         return false;
     };
 
-    const filterOptions = ['All', 'Pending', 'Approved_HOD', 'Approved_Principal', 'Purchased', 'Rejected'];
     const filteredRequests = requests.filter(r => filter === 'All' || r.status === filter);
 
     return (
