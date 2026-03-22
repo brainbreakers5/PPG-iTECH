@@ -177,8 +177,8 @@ exports.getEmployees = async (req, res) => {
             if (req.query.all === 'true') {
                 query += ` WHERE u.role NOT IN ('admin')`;
             } else if (req.user.role === 'hod') {
-                // HOD can see their own department's staff AND HODs from all departments
-                query += ` WHERE (u.department_id = $1 OR u.role = 'hod') AND u.role NOT IN ('admin', 'principal')`;
+                // HOD can only see their own department's personnel
+                query += ` WHERE u.department_id = $1 AND u.role NOT IN ('admin', 'principal')`;
                 params.push(req.user.department_id);
             } else if (req.user.department_id) {
                 // Staff can only see their own department

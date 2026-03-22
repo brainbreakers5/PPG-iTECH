@@ -188,16 +188,6 @@ const Department = () => {
                                         <div className="flex items-center justify-center gap-3">
                                             <button
                                                 onClick={() => {
-                                                    navigate(`/hod/profile/${member.emp_id}`);
-                                                    window.dispatchEvent(new CustomEvent('closeSidebar'));
-                                                }}
-                                                className="h-12 w-12 bg-white text-sky-600 rounded-xl border border-gray-100 flex items-center justify-center hover:bg-sky-600 hover:text-white transition-all shadow-sm active:scale-90"
-                                                title="View Profile"
-                                            >
-                                                <FaEye size={16} />
-                                            </button>
-                                            <button
-                                                onClick={() => {
                                                     navigate(`/hod/timetable/${member.emp_id}`);
                                                     window.dispatchEvent(new CustomEvent('closeSidebar'));
                                                 }}

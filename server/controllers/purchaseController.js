@@ -5,7 +5,7 @@ const { createNotification } = require('./notificationController');
 // @route   POST /api/purchases
 // @access  Private (Staff, HOD, Principal)
 exports.createPurchaseRequest = async (req, res) => {
-    const { item_name, quantity, priority, specifications, estimated_cost } = req.body;
+    const { item_name, quantity, unit, specifications, estimated_cost } = req.body;
 
     try {
         let status = 'Pending';
@@ -24,12 +24,12 @@ exports.createPurchaseRequest = async (req, res) => {
 
         const query = `
             INSERT INTO purchases (
-                emp_id, item_name, quantity, priority, status
+                emp_id, item_name, quantity, unit, status
             ) VALUES ($1, $2, $3, $4, $5)
             RETURNING id
         `;
 
-        const { rows: purchaseRows } = await pool.query(query, [req.user.emp_id, item_name, quantity, priority || 'Medium', status]);
+        const { rows: purchaseRows } = await pool.query(query, [req.user.emp_id, item_name, quantity, unit || 'piece', status]);
         const purchaseId = purchaseRows[0].id;
 
         // Notify appropriate person

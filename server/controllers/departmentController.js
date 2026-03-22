@@ -5,7 +5,15 @@ const { pool } = require('../config/db');
 // @access  Private
 exports.getDepartments = async (req, res) => {
     try {
-        const { rows } = await pool.query('SELECT * FROM departments');
+        let query = 'SELECT * FROM departments';
+        const params = [];
+
+        if (req.user.role === 'hod' || req.user.role === 'staff') {
+            query += ' WHERE id = $1';
+            params.push(req.user.department_id);
+        }
+
+        const { rows } = await pool.query(query, params);
         res.json(rows);
     } catch (error) {
         console.error(error);

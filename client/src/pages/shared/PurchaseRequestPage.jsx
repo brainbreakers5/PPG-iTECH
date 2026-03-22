@@ -11,9 +11,9 @@ const labelClass = "block text-[10px] font-black text-gray-400 uppercase trackin
 
 const PurchaseRequestPage = () => {
     const navigate = useNavigate();
-    const [newItems, setNewItems] = useState([{ name: '', quantity: 1, priority: 'Medium' }]);
+    const [newItems, setNewItems] = useState([{ name: '', quantity: '', unit: 'piece' }]);
 
-    const addRow = () => setNewItems([...newItems, { name: '', quantity: 1, priority: 'Medium' }]);
+    const addRow = () => setNewItems([...newItems, { name: '', quantity: '', unit: 'piece' }]);
     const removeRow = (index) => {
         if (newItems.length > 1) {
             setNewItems(newItems.filter((_, i) => i !== index));
@@ -27,22 +27,35 @@ const PurchaseRequestPage = () => {
 
     const submitRequest = async () => {
         try {
-            const validItems = newItems.filter(item => item.name.trim() !== '');
+            const validItems = newItems.filter(item => item.name.trim() !== '' && item.quantity.trim() !== '' && item.unit);
             if (validItems.length === 0) {
-                return Swal.fire('Data Integrity Violation', 'Please add at least one item name to the procurement sequence.', 'warning');
+                return Swal.fire('Data Integrity Violation', 'Please add at least one complete item (name, quantity, and unit) to the procurement sequence.', 'warning');
             }
 
-            const promises = validItems.map(item => api.post('/purchases', {
+            // Confirm before submission
+            const { isConfirmed } = await Swal.fire({
+                title: 'Confirm Purchase Request',
+                text: `You are about to submit ${validItems.length} item(s) for procurement.`,
+                icon: 'question',
+                showCancelButton: true,
+                confirmButtonText: 'Submit Request',
+                confirmButtonColor: '#2563eb',
+                cancelButtonText: 'Review & Edit'
+            });
+
+            if (!isConfirmed) return;
+
+            const promises = validItems.map((item) => api.post('/purchases', {
                 item_name: item.name,
-                quantity: item.quantity,
-                priority: item.priority
+                quantity: parseInt(item.quantity),
+                unit: item.unit
             }));
 
             await Promise.all(promises);
 
             Swal.fire({
                 title: 'Request Submitted',
-                text: `Successfully initiated ${promises.length} purchase records.`,
+                text: `Successfully initiated ${promises.length} purchase record(s).`,
                 icon: 'success',
                 confirmButtonColor: '#2563eb',
             });
@@ -88,13 +101,13 @@ const PurchaseRequestPage = () => {
 
                     <div className="p-4 md:p-12">
                         <div className="overflow-x-auto mb-10 pb-4 scrollbar-thin scrollbar-thumb-sky-100 scrollbar-track-transparent">
-                            <table className="w-full text-left min-w-[650px]">
+                            <table className="w-full text-left min-w-[500px]">
                                 <thead className="border-b border-gray-100">
                                     <tr>
-                                        <th className="pb-6 text-[10px] font-black text-gray-400 uppercase tracking-widest">Item</th>
-                                        <th className="pb-6 text-[10px] font-black text-gray-400 uppercase tracking-widest w-24 px-4 text-center">Qty</th>
-                                        <th className="pb-6 text-[10px] font-black text-gray-400 uppercase tracking-widest w-40 px-4">Priority</th>
-                                        <th className="pb-6 text-[10px] font-black text-gray-400 uppercase tracking-widest w-16 text-center">Action</th>
+                                        <th className="pb-6 text-[10px] font-black text-gray-400 uppercase tracking-widest">Item Name</th>
+                                        <th className="pb-6 text-[10px] font-black text-gray-400 uppercase tracking-widest w-32 text-center px-4">Quantity</th>
+                                        <th className="pb-6 text-[10px] font-black text-gray-400 uppercase tracking-widest w-28 text-center px-4">Unit</th>
+                                        <th className="pb-6 text-[10px] font-black text-gray-400 uppercase tracking-widest w-24 text-center px-4">Action</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-gray-50/50">
@@ -119,30 +132,31 @@ const PurchaseRequestPage = () => {
                                                         />
                                                     </div>
                                                 </td>
-                                                <td className="py-6 px-4">
+                                                <td className="py-6 px-4 text-center">
                                                     <input
                                                         type="number"
                                                         min="1"
                                                         value={item.quantity}
                                                         onChange={(e) => updateItem(idx, 'quantity', e.target.value)}
-                                                        className={inputClass + " text-center font-black"}
+                                                        placeholder="Enter qty"
+                                                        className={inputClass + " text-center"}
                                                     />
                                                 </td>
-                                                <td className="py-6 px-4">
+                                                <td className="py-6 px-4 text-center">
                                                     <select
-                                                        value={item.priority}
-                                                        onChange={(e) => updateItem(idx, 'priority', e.target.value)}
-                                                        className={inputClass + " appearance-none text-center"}
+                                                        value={item.unit}
+                                                        onChange={(e) => updateItem(idx, 'unit', e.target.value)}
+                                                        className={inputClass + " text-center"}
                                                     >
-                                                        <option value="Low">Low</option>
-                                                        <option value="Medium">Medium</option>
-                                                        <option value="High">High</option>
+                                                        <option value="piece">Piece</option>
+                                                        <option value="kg">Kg</option>
+                                                        <option value="litre">Litre</option>
                                                     </select>
                                                 </td>
-                                                <td className="py-6 text-center">
+                                                <td className="py-6 text-center px-4">
                                                     <button
                                                         onClick={() => removeRow(idx)}
-                                                        className="h-12 w-12 flex items-center justify-center rounded-2xl text-rose-500 bg-rose-50/50 hover:bg-rose-500 hover:text-white transition-all active:scale-90"
+                                                        className="h-12 w-12 mx-auto flex items-center justify-center rounded-2xl text-rose-500 bg-rose-50/50 hover:bg-rose-500 hover:text-white transition-all active:scale-90"
                                                         title="Remove Row"
                                                     >
                                                         <FaTrash size={14} />
@@ -170,14 +184,14 @@ const PurchaseRequestPage = () => {
                                     onClick={() => navigate(-1)}
                                     className="w-full md:w-auto px-10 py-5 rounded-2xl text-[10px] font-black uppercase tracking-widest text-gray-400 hover:text-gray-600 hover:bg-gray-50 transition-all active:scale-95 bg-white border border-gray-50"
                                 >
-                                    Cancel Operations
+                                    Cancel
                                 </button>
                                 <button
                                     onClick={submitRequest}
                                     className="w-full md:w-auto bg-sky-600 text-white px-12 py-5 rounded-2xl shadow-2xl shadow-sky-200/50 hover:bg-sky-800 transition-all font-black uppercase tracking-widest text-[10px] flex items-center justify-center gap-4 active:scale-95 group"
                                 >
                                     <FaSave className="group-hover:scale-125 transition-transform" />
-                                    submit
+                                    Submit Request
                                 </button>
                             </div>
                         </div>

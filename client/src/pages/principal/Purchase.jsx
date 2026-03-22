@@ -12,7 +12,7 @@ const Purchase = () => {
     const [requests, setRequests] = useState([]);
     const [loading, setLoading] = useState(true);
     const getFilterOptions = () => {
-        if (user.role === 'principal') return ['Approved_HOD', 'Purchased', 'Rejected'];
+        if (user.role === 'principal') return ['Pending', 'Approved_HOD', 'Purchased', 'Rejected'];
         return ['Pending', 'Purchased', 'Rejected'];
     };
 
@@ -173,7 +173,7 @@ const Purchase = () => {
                 <td class="col-index">${idx + 1}</td>
                 <td class="col-item">${escapeHtml(req.item_name)}</td>
                 <td class="col-qty">${escapeHtml(req.quantity)}</td>
-                <td class="col-priority">${escapeHtml(req.priority)}</td>
+                <td class="col-unit">${escapeHtml(req.unit || 'piece')}</td>
                 <td class="col-applicant">${escapeHtml(req.applicant_name)}</td>
                 <td class="col-dept">${escapeHtml(req.department_name || '-')}</td>
                 <td class="col-status">${escapeHtml((req.status || '').replace('_', ' '))}</td>
@@ -269,12 +269,12 @@ const Purchase = () => {
                     
                     /* Dynamic column sizing based on content */
                     .col-index { width: 4%; text-align: center; }
-                    .col-item { width: ${Math.min(maxLengths.item / 2 + 15, 28)}%; }
-                    .col-qty { width: 6%; text-align: center; }
-                    .col-priority { width: 8%; }
-                    .col-applicant { width: ${Math.min(maxLengths.applicant / 2 + 10, 16)}%; }
-                    .col-dept { width: ${Math.min(maxLengths.department / 2 + 10, 14)}%; }
-                    .col-status { width: 10%; }
+                    .col-item { width: ${Math.min(maxLengths.item / 2 + 15, 30)}%; }
+                    .col-qty { width: 8%; text-align: center; }
+                    .col-unit { width: 8%; text-align: center; }
+                    .col-applicant { width: ${Math.min(maxLengths.applicant / 2 + 10, 18)}%; }
+                    .col-dept { width: ${Math.min(maxLengths.department / 2 + 10, 16)}%; }
+                    .col-status { width: 12%; }
                     .col-date { width: 14%; font-size: 8pt; }
                     
                     tr:nth-child(even) {
@@ -334,7 +334,7 @@ const Purchase = () => {
                             <th class="col-index">#</th>
                             <th class="col-item">Item</th>
                             <th class="col-qty">Qty</th>
-                            <th class="col-priority">Priority</th>
+                            <th class="col-unit">Unit</th>
                             <th class="col-applicant">Applicant</th>
                             <th class="col-dept">Department</th>
                             <th class="col-status">Status</th>
@@ -543,7 +543,7 @@ const Purchase = () => {
                                         </th>
                                         <th className="p-6 text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-sky-50">Item Name</th>
                                         <th className="p-6 text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-sky-50 text-center">Quantity</th>
-                                        <th className="p-6 text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-sky-50">Priority</th>
+                                        <th className="p-6 text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-sky-50 text-center">Unit</th>
                                         <th className="p-6 text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-sky-50 text-center">Status</th>
                                         <th className="p-6 text-[10px] font-black text-gray-500 uppercase tracking-widest border-b border-sky-50 text-center">Actions</th>
                                     </tr>
@@ -587,14 +587,11 @@ const Purchase = () => {
                                                 <td className="p-6 text-center">
                                                     <span className="text-sm font-black text-gray-700 bg-gray-50 px-3 py-1.5 rounded-lg border border-gray-100">{req.quantity}</span>
                                                 </td>
-                                                <td className="p-6">
-                                                    <div className={`inline-flex items-center gap-2 px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest border ${req.priority === 'High' ? 'bg-rose-50 text-rose-600 border-rose-100' :
-                                                        req.priority === 'Medium' ? 'bg-amber-50 text-amber-600 border-amber-100' : 'bg-sky-50 text-sky-600 border-sky-100'
-                                                        }`}>
-                                                        {req.priority === 'High' && <FaExclamationTriangle size={8} />}
-                                                        {req.priority}
-                                                    </div>
+
+                                                <td className="p-6 text-center">
+                                                    <span className="text-sm font-black text-sky-600 bg-sky-50 px-3 py-1.5 rounded-lg border border-sky-100 uppercase tracking-wider">{req.unit || 'piece'}</span>
                                                 </td>
+
                                                 <td className="p-6 text-center">
                                                     <span className={`inline-block text-[9px] font-black uppercase tracking-[0.1em] px-4 py-1.5 rounded-xl border-2 shadow-sm ${getStatusStyle(req.status)}`}>
                                                         {req.status.replace('_', ' ')}
