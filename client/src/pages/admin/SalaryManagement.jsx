@@ -4,6 +4,7 @@ import Layout from '../../components/Layout';
 import api from '../../utils/api';
 import Swal from 'sweetalert2';
 import { useAuth } from '../../context/AuthContext';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
     FaBuilding,
     FaCheckCircle,
@@ -56,6 +57,19 @@ const getCycleByMonthYear = (month, year) => {
 
 const toCurrency = (v) => Number(v || 0).toLocaleString('en-IN');
 const normalizeEmpId = (v) => String(v || '').trim();
+
+const fadeUp = {
+    hidden: { opacity: 0, y: 16 },
+    show: { opacity: 1, y: 0 }
+};
+
+const staggerWrap = {
+    hidden: { opacity: 0 },
+    show: {
+        opacity: 1,
+        transition: { staggerChildren: 0.06 }
+    }
+};
 
 const SalaryManagement = () => {
     const { user } = useAuth();
@@ -330,7 +344,11 @@ const SalaryManagement = () => {
     };
 
     const renderFilterControls = canInstitutionWide && (
-        <div className="bg-white p-6 rounded-[32px] shadow-xl shadow-sky-50/70 border border-sky-50 mb-6">
+        <motion.div
+            variants={fadeUp}
+            transition={{ duration: 0.35, ease: 'easeOut' }}
+            className="bg-white p-6 rounded-[32px] shadow-xl shadow-sky-50/70 border border-sky-50 mb-6"
+        >
             <div className="flex items-center gap-3 mb-4">
                 <div className="h-10 w-10 rounded-2xl bg-sky-100 text-sky-600 flex items-center justify-center">
                     <FaFilter size={14} />
@@ -370,13 +388,22 @@ const SalaryManagement = () => {
                 </div>
             </div>
             <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mt-4">Filtered records: {filteredRows.length}</p>
-        </div>
+        </motion.div>
     );
 
     return (
         <Layout>
-            <div className="max-w-7xl mx-auto pb-4">
-                <div className="mb-8 rounded-[36px] border border-sky-100 bg-gradient-to-r from-sky-50 via-white to-cyan-50 p-6 md:p-8 shadow-xl shadow-sky-50/80">
+            <motion.div
+                initial="hidden"
+                animate="show"
+                variants={staggerWrap}
+                className="max-w-7xl mx-auto pb-4"
+            >
+                <motion.div
+                    variants={fadeUp}
+                    transition={{ duration: 0.4, ease: 'easeOut' }}
+                    className="mb-8 rounded-[36px] border border-sky-100 bg-gradient-to-r from-sky-50 via-white to-cyan-50 p-6 md:p-8 shadow-xl shadow-sky-50/80"
+                >
                     <div className="flex flex-wrap items-center justify-between gap-4">
                         <div>
                             <h1 className="text-3xl md:text-4xl font-black text-gray-800 tracking-tight">
@@ -397,13 +424,13 @@ const SalaryManagement = () => {
                                     <>
                                         <button
                                             onClick={() => navigate(`/${user.role}/payroll/history`)}
-                                            className="px-4 py-2.5 rounded-2xl bg-amber-500 text-white text-[11px] font-black uppercase tracking-widest flex items-center gap-2 shadow-lg shadow-amber-100"
+                                            className="px-4 py-2.5 rounded-2xl bg-amber-500 text-white text-[11px] font-black uppercase tracking-widest flex items-center gap-2 shadow-lg shadow-amber-100 transition-all duration-300 hover:scale-[1.03] hover:shadow-xl hover:shadow-amber-200"
                                         >
                                             <FaHistory /> History Page
                                         </button>
                                         <button
                                             onClick={() => navigate(`/${user.role}/payroll/reports`)}
-                                            className="px-4 py-2.5 rounded-2xl bg-indigo-600 text-white text-[11px] font-black uppercase tracking-widest flex items-center gap-2 shadow-lg shadow-indigo-100"
+                                            className="px-4 py-2.5 rounded-2xl bg-indigo-600 text-white text-[11px] font-black uppercase tracking-widest flex items-center gap-2 shadow-lg shadow-indigo-100 transition-all duration-300 hover:scale-[1.03] hover:shadow-xl hover:shadow-indigo-200"
                                         >
                                             <FaEnvelope /> Reports Page
                                         </button>
@@ -412,7 +439,7 @@ const SalaryManagement = () => {
                                 {isHistoryPage && (
                                     <button
                                         onClick={() => navigate(`/${user.role}/payroll`)}
-                                        className="px-4 py-2.5 rounded-2xl bg-sky-600 text-white text-[11px] font-black uppercase tracking-widest flex items-center gap-2 shadow-lg shadow-sky-100"
+                                        className="px-4 py-2.5 rounded-2xl bg-sky-600 text-white text-[11px] font-black uppercase tracking-widest flex items-center gap-2 shadow-lg shadow-sky-100 transition-all duration-300 hover:scale-[1.03] hover:shadow-xl hover:shadow-sky-200"
                                     >
                                         <FaSearch /> Live Management
                                     </button>
@@ -420,10 +447,10 @@ const SalaryManagement = () => {
                             </div>
                         )}
                     </div>
-                </div>
+                </motion.div>
 
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-                    <div className="bg-white rounded-3xl border border-sky-50 shadow-lg shadow-sky-50/70 p-5">
+                <motion.div variants={staggerWrap} className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                    <motion.div variants={fadeUp} transition={{ duration: 0.35 }} className="bg-white rounded-3xl border border-sky-50 shadow-lg shadow-sky-50/70 p-5 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl">
                         <div className="flex items-center gap-3">
                             <div className="h-10 w-10 rounded-xl bg-sky-100 text-sky-600 flex items-center justify-center"><FaMoneyBillWave /></div>
                             <div>
@@ -431,8 +458,8 @@ const SalaryManagement = () => {
                                 <p className="text-lg font-black text-gray-800">Rs {toCurrency(summary.gross)}</p>
                             </div>
                         </div>
-                    </div>
-                    <div className="bg-white rounded-3xl border border-sky-50 shadow-lg shadow-sky-50/70 p-5">
+                    </motion.div>
+                    <motion.div variants={fadeUp} transition={{ duration: 0.35 }} className="bg-white rounded-3xl border border-sky-50 shadow-lg shadow-sky-50/70 p-5 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl">
                         <div className="flex items-center gap-3">
                             <div className="h-10 w-10 rounded-xl bg-emerald-100 text-emerald-600 flex items-center justify-center"><FaWallet /></div>
                             <div>
@@ -440,8 +467,8 @@ const SalaryManagement = () => {
                                 <p className="text-lg font-black text-emerald-700">Rs {toCurrency(summary.net)}</p>
                             </div>
                         </div>
-                    </div>
-                    <div className="bg-white rounded-3xl border border-sky-50 shadow-lg shadow-sky-50/70 p-5">
+                    </motion.div>
+                    <motion.div variants={fadeUp} transition={{ duration: 0.35 }} className="bg-white rounded-3xl border border-sky-50 shadow-lg shadow-sky-50/70 p-5 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl">
                         <div className="flex items-center gap-3">
                             <div className="h-10 w-10 rounded-xl bg-indigo-100 text-indigo-600 flex items-center justify-center"><FaUserTie /></div>
                             <div>
@@ -449,8 +476,8 @@ const SalaryManagement = () => {
                                 <p className="text-lg font-black text-gray-800">{summary.paidCount}</p>
                             </div>
                         </div>
-                    </div>
-                    <div className="bg-white rounded-3xl border border-sky-50 shadow-lg shadow-sky-50/70 p-5">
+                    </motion.div>
+                    <motion.div variants={fadeUp} transition={{ duration: 0.35 }} className="bg-white rounded-3xl border border-sky-50 shadow-lg shadow-sky-50/70 p-5 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl">
                         <div className="flex items-center gap-3">
                             <div className="h-10 w-10 rounded-xl bg-amber-100 text-amber-600 flex items-center justify-center"><FaBuilding /></div>
                             <div>
@@ -458,8 +485,8 @@ const SalaryManagement = () => {
                                 <p className="text-lg font-black text-gray-800">{summary.pendingCount}</p>
                             </div>
                         </div>
-                    </div>
-                </div>
+                    </motion.div>
+                </motion.div>
 
                 <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
                     <div>
@@ -468,7 +495,11 @@ const SalaryManagement = () => {
                 </div>
 
                 {!isPersonalView && (
-                    <div className="bg-white p-6 rounded-[32px] shadow-xl shadow-sky-50/70 border border-sky-50 mb-6 flex flex-wrap items-center gap-3">
+                    <motion.div
+                        variants={fadeUp}
+                        transition={{ duration: 0.35, ease: 'easeOut' }}
+                        className="bg-white p-6 rounded-[32px] shadow-xl shadow-sky-50/70 border border-sky-50 mb-6 flex flex-wrap items-center gap-3"
+                    >
                         {!isHistoryPage && (
                             <>
                                 <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">Fixed Period</span>
@@ -500,14 +531,18 @@ const SalaryManagement = () => {
                                 <span className="text-xs text-gray-500">Cycle: {selectedCycle.fromDate} to {selectedCycle.toDate}</span>
                             </>
                         )}
-                    </div>
+                    </motion.div>
                 )}
 
                 {!isPersonalView && !isHistoryPage && (
-                    <div className="bg-white p-6 rounded-[32px] shadow-xl shadow-sky-50/70 border border-sky-50 mb-6">
+                    <motion.div
+                        variants={fadeUp}
+                        transition={{ duration: 0.35, ease: 'easeOut' }}
+                        className="bg-white p-6 rounded-[32px] shadow-xl shadow-sky-50/70 border border-sky-50 mb-6"
+                    >
                         <div className="flex flex-wrap gap-2 items-center mb-3">
                             <h2 className="text-sm font-bold text-gray-700">Attendance Status Rules</h2>
-                            <button onClick={saveAttendanceConfig} className="px-3 py-2 rounded bg-sky-600 text-white text-xs font-bold">Save</button>
+                            <button onClick={saveAttendanceConfig} className="px-3 py-2 rounded-2xl bg-sky-600 text-white text-xs font-bold transition-all duration-300 hover:scale-[1.03] hover:bg-sky-700">Save</button>
                         </div>
                         <div className="flex flex-wrap gap-2 items-center mb-3">
                             <input
@@ -523,28 +558,40 @@ const SalaryManagement = () => {
                             <p><b>With Pay:</b> {paidStatuses.join(', ')}</p>
                             <p><b>Without Pay:</b> {unpaidStatuses.join(', ')}</p>
                         </div>
-                    </div>
+                    </motion.div>
                 )}
 
                 {isPersonalView && (
-                    <div className="bg-white p-5 rounded-[28px] shadow-xl shadow-sky-50/70 border border-sky-50 mb-6 text-xs text-gray-600">
+                    <motion.div
+                        variants={fadeUp}
+                        transition={{ duration: 0.35, ease: 'easeOut' }}
+                        className="bg-white p-5 rounded-[28px] shadow-xl shadow-sky-50/70 border border-sky-50 mb-6 text-xs text-gray-600"
+                    >
                         <p><b>Admin With Pay statuses:</b> {paidStatuses.join(', ')}</p>
                         <p><b>Admin Without Pay statuses:</b> {unpaidStatuses.join(', ')}</p>
-                    </div>
+                    </motion.div>
                 )}
 
                 {renderFilterControls}
 
                 {canInstitutionWide && isHistoryPage && (
-                    <div className="bg-white p-4 rounded-[28px] shadow-xl shadow-sky-50/70 border border-sky-50 mb-6 flex flex-wrap gap-2 items-center">
+                    <motion.div
+                        variants={fadeUp}
+                        transition={{ duration: 0.35, ease: 'easeOut' }}
+                        className="bg-white p-4 rounded-[28px] shadow-xl shadow-sky-50/70 border border-sky-50 mb-6 flex flex-wrap gap-2 items-center"
+                    >
                         <button onClick={toggleSelectAll} className="px-3 py-2 rounded-2xl bg-gray-100 text-xs font-bold">{selectedIds.length === filteredRows.length ? 'Clear Selection' : 'Select All'}</button>
                         <button onClick={() => handleBulkMark('Paid')} className="px-3 py-2 rounded-2xl bg-emerald-600 text-white text-xs font-bold flex items-center gap-1"><FaCheckCircle /> Mark All Paid</button>
                         <button onClick={() => handleBulkMark('Pending')} className="px-3 py-2 rounded-2xl bg-amber-500 text-white text-xs font-bold flex items-center gap-1"><FaClock /> Mark All Unpaid</button>
                         <span className="text-xs text-gray-500">Selected: {selectedIds.length}</span>
-                    </div>
+                    </motion.div>
                 )}
 
-                <div className="bg-white rounded-[36px] shadow-2xl shadow-sky-50/80 border border-sky-50 overflow-x-auto">
+                <motion.div
+                    variants={fadeUp}
+                    transition={{ duration: 0.4, ease: 'easeOut' }}
+                    className="bg-white rounded-[36px] shadow-2xl shadow-sky-50/80 border border-sky-50 overflow-x-auto"
+                >
                     <table className="w-full min-w-[1100px]">
                         <thead className="bg-gray-50/80 border-b border-gray-100">
                             <tr>
@@ -560,8 +607,16 @@ const SalaryManagement = () => {
                             </tr>
                         </thead>
                         <tbody>
-                            {!loading && filteredRows.map((r) => (
-                                <tr key={r.id} className="border-t border-gray-50 hover:bg-sky-50/40 transition-colors">
+                            <AnimatePresence mode="popLayout">
+                                {!loading && filteredRows.map((r, idx) => (
+                                <motion.tr
+                                    key={r.id}
+                                    initial={{ opacity: 0, y: 8 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    exit={{ opacity: 0, y: -6 }}
+                                    transition={{ duration: 0.22, delay: Math.min(idx * 0.015, 0.2) }}
+                                    className="border-t border-gray-50 hover:bg-sky-50/40 transition-colors"
+                                >
                                     {canInstitutionWide && isHistoryPage && (
                                         <td className="p-3">
                                             <input
@@ -654,12 +709,18 @@ const SalaryManagement = () => {
                                             )}
                                         </div>
                                     </td>
-                                </tr>
+                                </motion.tr>
                             ))}
+                            </AnimatePresence>
 
                             {loading && (
                                 <tr>
-                                    <td colSpan={canInstitutionWide && isHistoryPage ? 9 : 8} className="p-6 text-center text-gray-500">Loading...</td>
+                                    <td colSpan={canInstitutionWide && isHistoryPage ? 9 : 8} className="p-8 text-center text-gray-500">
+                                        <span className="inline-flex items-center gap-2 font-bold">
+                                            <span className="h-2.5 w-2.5 rounded-full bg-sky-400 animate-pulse" />
+                                            Loading payroll records...
+                                        </span>
+                                    </td>
                                 </tr>
                             )}
 
@@ -675,13 +736,13 @@ const SalaryManagement = () => {
                             )}
                         </tbody>
                     </table>
-                </div>
+                </motion.div>
 
                 <div className="mt-4 text-xs text-gray-500">
                     <FaMoneyBillWave className="inline mr-1" />
                     Period logic: fixed payroll cycle uses date range 26 to 25.
                 </div>
-            </div>
+            </motion.div>
         </Layout>
     );
 };
