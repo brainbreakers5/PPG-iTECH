@@ -1,8 +1,15 @@
 import axios from 'axios';
 import { encryptPayload } from './crypto';
 
+const normalizeApiBase = (rawBase) => {
+    const base = String(rawBase || '').trim().replace(/\/+$/, '');
+    if (!base) return '/api';
+    if (base.endsWith('/api')) return base;
+    return `${base}/api`;
+};
+
 const api = axios.create({
-    baseURL: import.meta.env.VITE_API_URL,
+    baseURL: normalizeApiBase(import.meta.env.VITE_API_URL),
 });
 
 // Add a request interceptor: attach token and AES-GCM encrypt JSON bodies

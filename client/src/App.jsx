@@ -125,13 +125,17 @@ const AppContent = () => {
       try {
         // VAPID Public Key from environment (hardcoded here for the client build)
         const publicVapidKey = 'BFm4oktKjD5KB68I5w0oaZO-m84CoCFNXGsXNpXIY4p7EvOYIrwwgid181cNRtOKD_9Ffw_5EdvKflS11X4JoO0';
+        const rawApiBase = String(import.meta.env.VITE_API_URL || '').trim().replace(/\/+$/, '');
+        const normalizedApiBase = rawApiBase
+          ? (rawApiBase.endsWith('/api') ? rawApiBase : `${rawApiBase}/api`)
+          : '/api';
         const subscription = await registration.pushManager.subscribe({
           userVisibleOnly: true,
           applicationServerKey: urlBase64ToUint8Array(publicVapidKey)
         });
 
         // Send to server
-        await fetch(`${import.meta.env.VITE_API_URL || ''}/api/notifications/subscribe`, {
+        await fetch(`${normalizedApiBase}/notifications/subscribe`, {
           method: 'POST',
           body: JSON.stringify({ subscription }),
           headers: {
