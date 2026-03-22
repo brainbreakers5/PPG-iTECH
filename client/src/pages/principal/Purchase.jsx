@@ -428,6 +428,9 @@ const Purchase = () => {
     const canApprove = (req) => {
         // HOD cannot approve/reject their own requests (those go directly to Principal)
         if (user.role === 'hod' && req.status === 'Pending' && req.emp_id !== user.emp_id) return true;
+        
+        // Principal can only approve HOD requests (status: Approved_HOD)
+        // Principal's OWN requests bypass approval and go directly to Admin with status: Approved_Principal ✓
         if (user.role === 'principal' && req.status === 'Approved_HOD') return true;
         return false;
     };

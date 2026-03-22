@@ -16,14 +16,14 @@ const SalaryManagement = () => {
     const [selectedIds, setSelectedIds] = useState([]); // for bulk mark paid
     const now = new Date();
     const socket = useSocket();
+    const canInstitutionWide = user.role === 'admin' || user.role === 'management';
 
     // Fetch all employees
     useEffect(() => {
-        const isAdmin = user.role === 'admin' || user.role === 'management';
-        if (isAdmin) {
+        if (canInstitutionWide) {
             api.get('/employees').then(res => setAllEmployees(res.data)).catch(e => console.error(e));
         }
-    }, [user.role]);
+    }, [canInstitutionWide]);
 
     const getDefaultDates = () => {
         const d = new Date();
@@ -84,7 +84,7 @@ const SalaryManagement = () => {
         
         // Auto-calculate on period change, config change, or attendance updates
         const silentCalculate = async () => {
-            if (user.role !== 'admin' && user.role !== 'management') return; 
+            if (!canInstitutionWide) return;
             try {
                 // Send explicit range to handle cases like single day or custom windows
                 await api.post('/salary/calculate', { 
@@ -118,7 +118,7 @@ const SalaryManagement = () => {
                 socket.off('punch_out', silentCalculate);
             }
         };
-    }, [fromDate, toDate, paidStatuses, unpaidStatuses, user.role, socket]);
+    }, [fromDate, toDate, paidStatuses, unpaidStatuses, canInstitutionWide, socket]);
 
     const handleAddStatus = (isPaid) => {
         if (!newStatus.trim()) return;
@@ -171,9 +171,8 @@ const SalaryManagement = () => {
             const m = d.getMonth() + 1;
             const y = d.getFullYear();
             const { data } = await api.get(`/salary?month=${m}&year=${y}&fromDate=${fromDate}&toDate=${toDate}`);
-            
-            const isAdmin = user.role === 'admin' || user.role === 'management';
-            if (!isAdmin) {
+
+            if (!canInstitutionWide) {
                 setSalaries(data.filter(s => s.emp_id === user.emp_id));
             } else {
                 setSalaries(data);
@@ -186,8 +185,7 @@ const SalaryManagement = () => {
     };
 
     const getMergedSalaries = () => {
-        const isAdmin = user.role === 'admin' || user.role === 'management';
-        if (!isAdmin) return salaries;
+        if (!canInstitutionWide) return salaries;
 
         const dForContext = new Date(toDate); // Uses toDate to ensure arrays align
         const currentM = dForContext.getMonth() + 1;
@@ -243,7 +241,7 @@ const SalaryManagement = () => {
                 
                 // Step 2: Publish
                 console.log("Starting publish for:", month, year);
-                const { data } = await api.post('/salary/publish', { month, year });
+                const { data } = await api.post('/salary/publish', { month, year, fromDate, toDate });
                 
                 Swal.fire({
                     title: 'Action Successful',
@@ -364,33 +362,6 @@ const SalaryManagement = () => {
         } catch (error) {
             console.error('Mark Paid Error:', error);
             Swal.fire('Error', error.response?.data?.message || 'Failed to mark as paid.', 'error');
-        }
-    };
-
-    const handleMarkUnpaid = async (s) => {
-        const result = await Swal.fire({
-            title: `Revert to Unpaid?`,
-            text: `This will revert ${s.name}'s salary for this period back to a pending state.`,
-            icon: 'warning',
-            showCancelButton: true,
-            confirmButtonColor: '#f59e0b',
-            confirmButtonText: 'Yes, Revert'
-        });
-        if (!result.isConfirmed) return;
-        try {
-            await api.put(`/salary/${s.id}/status`, { status: 'Pending' });
-            fetchSalaries();
-        } catch (error) {
-            Swal.fire('Error', 'Failed to revert status.', 'error');
-        }
-    };
-
-    const handleStatusUpdate = async (id, status) => {
-        try {
-            await api.put(`/salary/${id}/status`, { status });
-            fetchSalaries();
-        } catch (error) {
-            console.error(error);
         }
     };
 
@@ -710,7 +681,7 @@ const SalaryManagement = () => {
                             <FaClock className={`mr-3 ${isHistoryMode ? 'text-white' : 'text-amber-400'}`} /> 
                             {isHistoryMode ? 'Live Management' : 'Salary History'}
                         </button>
-                        {user.role === 'admin' && !isHistoryMode && (
+                        {canInstitutionWide && !isHistoryMode && (
                             <button
                                 onClick={handlePrint}
                                 className="flex-1 md:flex-none bg-white text-gray-500 px-8 py-5 rounded-2xl shadow-xl shadow-sky-50/50 hover:bg-gray-50 transition-all font-black uppercase tracking-[0.2em] text-[10px] flex items-center justify-center border border-sky-50 no-print"
@@ -725,7 +696,7 @@ const SalaryManagement = () => {
                 <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-6 mb-10 no-print">
                     {/* Role Selection (Cards Style) */}
                     <div className="flex flex-wrap gap-3">
-                        {user.role === 'admin' && [
+                        {canInstitutionWide && [
                             { id: 'all', label: 'All Personnel', icon: <FaChartLine /> },
                             { id: 'principal', label: 'Principal', icon: <FaShieldAlt /> },
                             { id: 'hod', label: 'HODs', icon: <FaShieldAlt /> },
@@ -851,7 +822,7 @@ const SalaryManagement = () => {
                                 <h2 className="text-xl font-black text-gray-800 tracking-tight">Attendance Configuration</h2>
                                 <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">Configure Payable vs Deduction statuses · Row-wise</p>
                             </div>
-                            {user.role === 'admin' && (
+                            {canInstitutionWide && (
                                 <button
                                     onClick={saveAttendanceConfig}
                                     className="bg-sky-600 text-white px-6 py-2.5 rounded-xl font-black text-[9px] uppercase tracking-widest hover:bg-sky-700 transition-all shadow-lg shadow-sky-100 flex items-center gap-2 no-print"
@@ -860,7 +831,7 @@ const SalaryManagement = () => {
                                 </button>
                             )}
                         </div>
-                        {user.role === 'admin' && (
+                        {canInstitutionWide && (
                             <div className="flex items-center gap-3 bg-gray-50 p-2 rounded-2xl border border-gray-100 shadow-inner">
                                 <input
                                     type="text"
@@ -902,7 +873,7 @@ const SalaryManagement = () => {
                                     <div key={status} className="bg-white px-4 py-2 rounded-xl border border-emerald-100 text-[10px] font-black uppercase text-emerald-700 flex items-center gap-2 group shadow-sm">
                                         <FaCheckCircle className="text-emerald-400" size={10} />
                                         {status}
-                                        {user.role === 'admin' && (
+                                        {canInstitutionWide && (
                                             <button onClick={() => setPaidStatuses(paidStatuses.filter(s => s !== status))} className="ml-1 text-emerald-300 hover:text-rose-500 transition-colors opacity-0 group-hover:opacity-100">×</button>
                                         )}
                                     </div>
@@ -921,7 +892,7 @@ const SalaryManagement = () => {
                                     <div key={status} className="bg-white px-4 py-2 rounded-xl border border-rose-100 text-[10px] font-black uppercase text-rose-700 flex items-center gap-2 group shadow-sm">
                                         <FaTimesCircle className="text-rose-400" size={10} />
                                         {status}
-                                        {user.role === 'admin' && (
+                                        {canInstitutionWide && (
                                             <button onClick={() => setUnpaidStatuses(unpaidStatuses.filter(s => s !== status))} className="ml-1 text-rose-300 hover:text-rose-500 transition-colors opacity-0 group-hover:opacity-100">×</button>
                                         )}
                                     </div>
@@ -934,7 +905,7 @@ const SalaryManagement = () => {
                 {/* Table Section */}
                 <div className="mb-12">
                     {/* Bulk Action Bar */}
-                    {user.role === 'admin' && !isHistoryMode && (
+                    {canInstitutionWide && !isHistoryMode && (
                         <div className="flex items-center justify-between mb-4 px-2">
                             <div className="flex items-center gap-3">
                                 <button onClick={toggleSelectAll} className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-gray-500 hover:text-sky-600 transition-colors">
@@ -960,7 +931,7 @@ const SalaryManagement = () => {
                             <table className="w-full">
                 <thead>
                     <tr className="bg-gray-50/50 border-b border-gray-100">
-                        {user.role === 'admin' && !isHistoryMode && <th className="p-4 pl-8 w-10"></th>}
+                        {canInstitutionWide && !isHistoryMode && <th className="p-4 pl-8 w-10"></th>}
                         <th className="p-8 text-[10px] font-black uppercase tracking-[0.2em] text-gray-400 text-left">Employee</th>
                         <th className="p-8 text-[10px] font-black uppercase tracking-[0.2em] text-gray-400 text-center">Attendance (With/Without Pay)</th>
                         <th className="p-8 text-[10px] font-black uppercase tracking-[0.2em] text-gray-400 text-right">Gross Pay</th>
@@ -988,7 +959,7 @@ const SalaryManagement = () => {
                                                     className={`hover:bg-sky-50/30 transition-all group ${selectedIds.includes(s.id) ? 'bg-emerald-50/30' : ''}`}
                                                 >
                                                     {/* Checkbox column – admin only */}
-                                                    {user.role === 'admin' && !isHistoryMode && (
+                                                    {canInstitutionWide && !isHistoryMode && (
                                                         <td className="p-4 pl-8">
                                                             {s.status !== 'Paid' && (
                                                                 <button onClick={() => toggleSelectId(s.id)} className="text-gray-300 hover:text-emerald-500 transition-colors">
@@ -1091,21 +1062,19 @@ const SalaryManagement = () => {
                                                     </td>
                                                     <td className="p-8 text-right flex justify-end gap-2">
                                                         <button
+                                                            onClick={() => fetchDailyBreakdown(s)}
+                                                            className="h-12 w-12 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center hover:bg-indigo-100 transition-all active:scale-90 shadow-sm border border-indigo-100"
+                                                            title="Day-Wise Breakdown"
+                                                        >
+                                                            <FaChartLine size={16} />
+                                                        </button>
+                                                        <button
                                                             onClick={() => handlePrintSlip(s)}
                                                             className="h-12 w-12 bg-sky-50 text-sky-600 rounded-2xl flex items-center justify-center hover:bg-sky-100 transition-all active:scale-90 shadow-sm border border-sky-100"
                                                             title="Print Salary Slip"
                                                         >
                                                             <FaFileAlt size={16} />
                                                         </button>
-                                                        {user.role === 'admin' && s.status === 'Paid' && (
-                                                            <button
-                                                                onClick={() => handleMarkUnpaid(s)}
-                                                                className="inline-flex items-center gap-2 text-[9px] font-black uppercase tracking-[0.1em] text-amber-600 bg-amber-50 border border-amber-200 px-4 py-2 rounded-xl hover:bg-amber-100 transition-all shadow-sm active:scale-95"
-                                                                title="Edit: Revert to Unpaid"
-                                                            >
-                                                                Edit
-                                                            </button>
-                                                        )}
                                                     </td>
                                                 </motion.tr>
                                             ))}

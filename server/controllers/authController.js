@@ -26,12 +26,17 @@ exports.loginUser = async (req, res) => {
 
     try {
         const { rows } = await pool.query(
-            'SELECT * FROM users WHERE LOWER(emp_id) = LOWER($1)',
+            "SELECT * FROM users WHERE LOWER(emp_id) = LOWER($1) AND role IN ('admin', 'principal', 'hod', 'staff')",
             [trimmedEmpId]
         );
         const user = rows[0];
 
         if (user) {
+            if (!user.password && !user.pin) {
+                await logActivity(user.id, 'FAILED_LOGIN', { emp_id: user.emp_id, reason: 'No valid login credentials on account' }, req.ip);
+                return res.status(401).json({ message: 'Invalid credentials' });
+            }
+
             // Check hashed password (priority) or hashed pin column if legacy
             // We use bcrypt.compare for both to ensure everything is hashed
             let isMatch = false;

@@ -1758,9 +1758,18 @@ const LeaveApply = () => {
                             {myLimits?.from_month && myLimits?.to_month && (
                                 <div className="mb-10 bg-white p-5 rounded-[32px] border border-sky-50/50 shadow-sm flex items-center gap-3">
                                     <FaCalendarAlt size={14} className="text-sky-500" />
-                                    <p className="text-[12px] font-black text-gray-700 tracking-wide">
-                                        {new Date(myLimits.from_month + '-01').toLocaleDateString('en-IN', { month: 'short', year: 'numeric' })} — {new Date(myLimits.to_month + '-01').toLocaleDateString('en-IN', { month: 'short', year: 'numeric' })}
-                                    </p>
+                                    <div>
+                                        <p className="text-[12px] font-black text-gray-700 tracking-wide">
+                                            {new Date(myLimits.from_month).toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+                                            {' '}—{' '}
+                                            {new Date(myLimits.to_month).toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+                                        </p>
+                                        {myLimits?.updated_at && (
+                                            <p className="text-[10px] font-black text-sky-500 uppercase tracking-widest mt-1">
+                                                Last Updated: {new Date(myLimits.updated_at).toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+                                            </p>
+                                        )}
+                                    </div>
                                 </div>
                             )}
 

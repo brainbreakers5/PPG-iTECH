@@ -19,6 +19,8 @@ const DepartmentStaffPage = () => {
     const [searchQuery, setSearchQuery] = useState('');
     const [filteredPersonnel, setFilteredPersonnel] = useState([]);
 
+    const canOpenSchedule = ['admin', 'principal', 'hod'].includes(effectiveRole);
+
     useEffect(() => {
         const fetchDepartmentData = async () => {
             try {
@@ -52,6 +54,12 @@ const DepartmentStaffPage = () => {
         );
         setFilteredPersonnel(result);
     }, [searchQuery, personnel]);
+
+    const handleOpenSchedule = (member) => {
+        if (!canOpenSchedule) return;
+        navigate(`/${effectiveRole}/timetable/${member.emp_id}`);
+        window.dispatchEvent(new CustomEvent('closeSidebar'));
+    };
 
     const handlePrint = () => {
         if (!filteredPersonnel || filteredPersonnel.length === 0) return;
@@ -174,8 +182,9 @@ const DepartmentStaffPage = () => {
                                 <tr className="border-b-2 border-sky-50">
                                     <th className="py-5 px-6 text-[10px] font-black text-sky-600 uppercase tracking-[0.2em] whitespace-nowrap">Personnel</th>
                                     <th className="py-5 px-6 text-[10px] font-black text-sky-600 uppercase tracking-[0.2em] whitespace-nowrap">Emp ID</th>
-                                    <th className="py-5 px-6 text-[10px] font-black text-sky-600 uppercase tracking-[0.2em] whitespace-nowrap">Role</th>
-                                    <th className="py-5 px-6 text-[10px] font-black text-sky-600 uppercase tracking-[0.2em] whitespace-nowrap">Email Identifier</th>
+                                    <th className="py-5 px-6 text-[10px] font-black text-sky-600 uppercase tracking-[0.2em] whitespace-nowrap">Department</th>
+                                    <th className="py-5 px-6 text-[10px] font-black text-sky-600 uppercase tracking-[0.2em] whitespace-nowrap">Contact Info</th>
+                                    <th className="py-5 px-6 text-[10px] font-black text-sky-600 uppercase tracking-[0.2em] whitespace-nowrap text-center">Action</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-50">
@@ -207,18 +216,40 @@ const DepartmentStaffPage = () => {
                                                 <span className="text-[11px] font-black text-gray-600 tracking-widest uppercase">{member.emp_id}</span>
                                             </td>
                                             <td className="py-4 px-6">
-                                                <span className={`px-3 py-1.5 rounded-[10px] border text-[9px] font-black uppercase tracking-widest inline-flex items-center gap-1.5 ${member.role === 'hod'
-                                                    ? 'bg-amber-50 text-amber-600 border-amber-100'
-                                                    : 'bg-sky-50 text-sky-600 border-sky-100'
-                                                }`}>
-                                                    <FaIdBadge /> {member.role}
-                                                </span>
+                                                <div className="flex flex-col gap-1">
+                                                    <span className="text-[10px] font-black text-gray-700 uppercase tracking-widest">{member.department_name || department?.name || '—'}</span>
+                                                    <span className={`px-3 py-1.5 rounded-[10px] border text-[9px] font-black uppercase tracking-widest inline-flex items-center gap-1.5 w-fit ${member.role === 'hod'
+                                                        ? 'bg-amber-50 text-amber-600 border-amber-100'
+                                                        : 'bg-sky-50 text-sky-600 border-sky-100'
+                                                    }`}>
+                                                        <FaIdBadge /> {member.role}
+                                                    </span>
+                                                </div>
                                             </td>
                                             <td className="py-4 px-6">
-                                                <div className="flex flex-col gap-0.5">
-                                                    <span className="text-[10px] font-black text-gray-700 tracking-tight lowercase">{member.email || '—'}</span>
-                                                    <span className="text-[8px] font-black text-gray-400 uppercase tracking-widest">Office Email</span>
+                                                <div className="flex flex-col gap-1.5">
+                                                    <div className="flex items-center gap-2">
+                                                        <FaEnvelope className="text-sky-500" size={10} />
+                                                        <span className="text-[10px] font-black text-gray-700 tracking-tight lowercase">{member.email || '—'}</span>
+                                                    </div>
+                                                    <div className="flex items-center gap-2">
+                                                        <FaPhone className="text-emerald-500" size={10} />
+                                                        <span className="text-[10px] font-black text-gray-700 tracking-tight">{member.mobile || '—'}</span>
+                                                    </div>
                                                 </div>
+                                            </td>
+                                            <td className="py-4 px-6 text-center">
+                                                {canOpenSchedule ? (
+                                                    <button
+                                                        onClick={() => handleOpenSchedule(member)}
+                                                        className="h-10 w-10 mx-auto rounded-xl bg-sky-50 text-sky-600 border border-sky-100 hover:bg-sky-600 hover:text-white transition-all flex items-center justify-center"
+                                                        title="View Timetable"
+                                                    >
+                                                        <FaCalendarAlt size={13} />
+                                                    </button>
+                                                ) : (
+                                                    <span className="text-[9px] font-black text-gray-300 uppercase tracking-widest">N/A</span>
+                                                )}
                                             </td>
                                         </motion.tr>
                                     ))}

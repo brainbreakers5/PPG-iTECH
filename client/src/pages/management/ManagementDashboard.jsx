@@ -7,6 +7,7 @@ import { useNavigate } from 'react-router-dom';
 import { FaBirthdayCake, FaUserCheck, FaUserTimes, FaCalendarDay, FaBus, FaFileAlt, FaTimes, FaCalendarAlt, FaStar, FaBriefcase, FaClock, FaHistory, FaEye } from 'react-icons/fa';
 import AttendanceHistory from '../../components/AttendanceHistory';
 import { formatTo12Hr } from '../../utils/timeFormatter';
+import { getCurrentDayStatus } from '../../utils/currentDayStatus';
 
 const ManagementDashboard = () => {
     const socket = useSocket();
@@ -21,6 +22,7 @@ const ManagementDashboard = () => {
     const [allEmployees, setAllEmployees] = useState([]);
     const [attendanceMap, setAttendanceMap] = useState({});
     const [monthStats, setMonthStats] = useState({ workingDays: 0, holidays: 0, specialEvents: 0 });
+    const [currentDayStatus, setCurrentDayStatus] = useState({ type: 'workingDays', detail: 'Regular working day' });
     const [employeeModal, setEmployeeModal] = useState(null);
     const [selectedEmployeeHistory, setSelectedEmployeeHistory] = useState(null); // { emp_id, name }
     const [isNonWorkingDay, setIsNonWorkingDay] = useState(false);
@@ -42,6 +44,7 @@ const ManagementDashboard = () => {
             const curMonth = now.getMonth() + 1;
             const curYear = now.getFullYear();
             const { data: holidayData } = await api.get(`holidays?month=${curMonth}&year=${curYear}`);
+            setCurrentDayStatus(getCurrentDayStatus({ today: date, holidayData }));
             const holidayDateSet = new Set();
             (holidayData || []).forEach(h => { holidayDateSet.add(h.h_date); });
             
@@ -199,7 +202,7 @@ const ManagementDashboard = () => {
                         whileHover={{ scale: 1.03, y: -3 }}
                         whileTap={{ scale: 0.97 }}
                         onClick={() => { navigate('/management/calendar'); window.dispatchEvent(new CustomEvent('closeSidebar')); }}
-                        className="bg-emerald-50 border border-emerald-100 rounded-2xl p-5 flex items-center gap-4 cursor-pointer hover:shadow-lg hover:shadow-emerald-100/60 transition-all group"
+                        className={`bg-emerald-50 border rounded-2xl p-5 flex items-center gap-4 cursor-pointer hover:shadow-lg hover:shadow-emerald-100/60 transition-all group ${currentDayStatus.type === 'workingDays' ? 'border-blue-500 ring-2 ring-blue-100' : 'border-emerald-100'}`}
                     >
                         <div className="h-11 w-11 rounded-xl bg-emerald-500 text-white flex items-center justify-center shadow-sm group-hover:bg-emerald-600 transition-colors">
                             <FaCalendarAlt />
@@ -207,13 +210,16 @@ const ManagementDashboard = () => {
                         <div>
                             <p className="text-[9px] font-black text-emerald-500 uppercase tracking-widest">Working Days</p>
                             <p className="text-2xl font-black text-emerald-700 tracking-tighter">{monthStats.workingDays}</p>
+                            {currentDayStatus.type === 'workingDays' && (
+                                <p className="text-[8px] font-black text-blue-600 uppercase tracking-widest mt-1">Today: {currentDayStatus.detail}</p>
+                            )}
                         </div>
                     </motion.div>
                     <motion.div
                         whileHover={{ scale: 1.03, y: -3 }}
                         whileTap={{ scale: 0.97 }}
                         onClick={() => { navigate('/management/calendar'); window.dispatchEvent(new CustomEvent('closeSidebar')); }}
-                        className="bg-rose-50 border border-rose-100 rounded-2xl p-5 flex items-center gap-4 cursor-pointer hover:shadow-lg hover:shadow-rose-100/60 transition-all group"
+                        className={`bg-rose-50 border rounded-2xl p-5 flex items-center gap-4 cursor-pointer hover:shadow-lg hover:shadow-rose-100/60 transition-all group ${currentDayStatus.type === 'holidays' ? 'border-blue-500 ring-2 ring-blue-100' : 'border-rose-100'}`}
                     >
                         <div className="h-11 w-11 rounded-xl bg-rose-500 text-white flex items-center justify-center shadow-sm group-hover:bg-rose-600 transition-colors">
                             <FaCalendarDay />
@@ -221,13 +227,16 @@ const ManagementDashboard = () => {
                         <div>
                             <p className="text-[9px] font-black text-rose-500 uppercase tracking-widest">Holidays</p>
                             <p className="text-2xl font-black text-rose-700 tracking-tighter">{monthStats.holidays}</p>
+                            {currentDayStatus.type === 'holidays' && (
+                                <p className="text-[8px] font-black text-blue-600 uppercase tracking-widest mt-1">Today: {currentDayStatus.detail}</p>
+                            )}
                         </div>
                     </motion.div>
                     <motion.div
                         whileHover={{ scale: 1.03, y: -3 }}
                         whileTap={{ scale: 0.97 }}
                         onClick={() => { navigate('/management/calendar'); window.dispatchEvent(new CustomEvent('closeSidebar')); }}
-                        className="bg-amber-50 border border-amber-100 rounded-2xl p-5 flex items-center gap-4 cursor-pointer hover:shadow-lg hover:shadow-amber-100/60 transition-all group"
+                        className={`bg-amber-50 border rounded-2xl p-5 flex items-center gap-4 cursor-pointer hover:shadow-lg hover:shadow-amber-100/60 transition-all group ${currentDayStatus.type === 'specialEvents' ? 'border-blue-500 ring-2 ring-blue-100' : 'border-amber-100'}`}
                     >
                         <div className="h-11 w-11 rounded-xl bg-amber-500 text-white flex items-center justify-center shadow-sm group-hover:bg-amber-600 transition-colors">
                             <FaStar />
@@ -235,6 +244,9 @@ const ManagementDashboard = () => {
                         <div>
                             <p className="text-[9px] font-black text-amber-500 uppercase tracking-widest">Special Events</p>
                             <p className="text-2xl font-black text-amber-700 tracking-tighter">{monthStats.specialEvents}</p>
+                            {currentDayStatus.type === 'specialEvents' && (
+                                <p className="text-[8px] font-black text-blue-600 uppercase tracking-widest mt-1">Today: {currentDayStatus.detail}</p>
+                            )}
                         </div>
                     </motion.div>
                 </div>

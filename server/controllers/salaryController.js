@@ -13,6 +13,123 @@ const getWorkingDays = (from, to) => {
     return count;
 };
 
+const toIsoDate = (v) => String(v || '').slice(0, 10);
+
+const isInstitutionWideRole = (role) => ['admin', 'management'].includes(String(role || '').toLowerCase());
+
+const buildPeriod = ({ month, year, fromDate, toDate }) => {
+    const y = parseInt(year, 10);
+    const m = parseInt(month, 10);
+    if (fromDate && toDate) {
+        return {
+            fromDate: toIsoDate(fromDate),
+            toDate: toIsoDate(toDate),
+            month: new Date(toDate).getMonth() + 1,
+            year: new Date(toDate).getFullYear()
+        };
+    }
+
+    const safeYear = Number.isFinite(y) ? y : new Date().getFullYear();
+    const safeMonth = Number.isFinite(m) ? m : (new Date().getMonth() + 1);
+    const from = `${safeYear}-${String(safeMonth).padStart(2, '0')}-01`;
+    const to = `${safeYear}-${String(safeMonth).padStart(2, '0')}-${new Date(safeYear, safeMonth, 0).getDate()}`;
+    return { fromDate: from, toDate: to, month: safeMonth, year: safeYear };
+};
+
+const parseDeductions = (raw) => {
+    try {
+        const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
+        if (!Array.isArray(parsed)) return 0;
+        return parsed.reduce((sum, d) => sum + (parseFloat(d.amount) || 0), 0);
+    } catch {
+        return 0;
+    }
+};
+
+const ensureSalarySchema = async () => {
+    await pool.query(`
+        ALTER TABLE salary_records
+        ADD COLUMN IF NOT EXISTS with_pay_count NUMERIC(10, 2) DEFAULT 0,
+        ADD COLUMN IF NOT EXISTS without_pay_count NUMERIC(10, 2) DEFAULT 0,
+        ADD COLUMN IF NOT EXISTS deductions_applied NUMERIC(12, 2) DEFAULT 0,
+        ADD COLUMN IF NOT EXISTS gross_salary NUMERIC(12, 2) DEFAULT 0,
+        ADD COLUMN IF NOT EXISTS total_days_in_period INTEGER DEFAULT 0,
+        ADD COLUMN IF NOT EXISTS from_date DATE,
+        ADD COLUMN IF NOT EXISTS to_date DATE,
+        ADD COLUMN IF NOT EXISTS paid_at TIMESTAMP
+    `);
+};
+
+const getAttendanceAggregateMap = async ({ fromDate, toDate, paidStatuses, unpaidStatuses }) => {
+    const { rows } = await pool.query(`
+        SELECT
+            TRIM(emp_id) AS emp_id,
+            SUM(
+                CASE
+                    WHEN status::text LIKE '%+%' THEN
+                        (CASE WHEN split_part(status::text, ' + ', 1) = ANY($3::text[]) THEN 0.5 ELSE 0 END +
+                         CASE WHEN split_part(status::text, ' + ', 2) = ANY($3::text[]) THEN 0.5 ELSE 0 END)
+                    WHEN status::text = ANY($3::text[]) THEN
+                        CASE
+                            WHEN remarks ILIKE '%Half Day%' OR remarks ILIKE '%half%' OR remarks ILIKE '%0.5%' OR remarks ILIKE '%1/2%'
+                            THEN 0.5
+                            ELSE 1.0
+                        END
+                    ELSE 0
+                END
+            ) AS payable_days,
+            SUM(
+                CASE
+                    WHEN status::text LIKE '%+%' THEN
+                        (CASE WHEN split_part(status::text, ' + ', 1) = ANY($4::text[]) THEN 0.5 ELSE 0 END +
+                         CASE WHEN split_part(status::text, ' + ', 2) = ANY($4::text[]) THEN 0.5 ELSE 0 END)
+                    WHEN status::text = ANY($4::text[]) THEN
+                        CASE
+                            WHEN remarks ILIKE '%Half Day%' OR remarks ILIKE '%half%' OR remarks ILIKE '%0.5%' OR remarks ILIKE '%1/2%'
+                            THEN 0.5
+                            ELSE 1.0
+                        END
+                    ELSE 0
+                END
+            ) AS unpaid_days,
+            COUNT(*) AS total_records
+        FROM attendance_records
+        WHERE date::date >= $1::date AND date::date <= $2::date
+        GROUP BY TRIM(emp_id)
+    `, [fromDate, toDate, paidStatuses, unpaidStatuses]);
+
+    const map = {};
+    rows.forEach((r) => {
+        map[r.emp_id] = {
+            payable_days: parseFloat(r.payable_days) || 0,
+            unpaid_days: parseFloat(r.unpaid_days) || 0,
+            total_records: parseInt(r.total_records, 10) || 0
+        };
+    });
+    return map;
+};
+
+const computeSalaryMetrics = ({ monthlySalary, deductions, workingDaysInPeriod, payableDays }) => {
+    const grossSalary = Number(monthlySalary || 0);
+    const fixedDeductions = Number(deductions || 0);
+    const divisor = workingDaysInPeriod > 0 ? workingDaysInPeriod : 1;
+    const dailySalary = grossSalary / divisor;
+    const normalizedPayable = Math.max(0, Math.min(workingDaysInPeriod, Number(payableDays || 0)));
+    const lopDays = Math.max(0, workingDaysInPeriod - normalizedPayable);
+    const lopAmount = lopDays * dailySalary;
+    const deductionsApplied = lopAmount + fixedDeductions;
+    const netSalary = Math.max(0, grossSalary - deductionsApplied);
+
+    return {
+        grossSalary,
+        dailySalary,
+        payableDays: normalizedPayable,
+        lopDays,
+        deductionsApplied,
+        netSalary
+    };
+};
+
 // @desc    Calculate Salary (supports exact date range)
 // @route   POST /api/salary/calculate
 // @access  Private (Admin)
@@ -28,29 +145,15 @@ exports.calculateSalary = async (req, res) => {
     } = req.body;
 
     try {
-        // Ensure table schema is up to date
-        await pool.query(`
-            ALTER TABLE salary_records 
-            ADD COLUMN IF NOT EXISTS with_pay_count NUMERIC(10, 2) DEFAULT 0,
-            ADD COLUMN IF NOT EXISTS without_pay_count NUMERIC(10, 2) DEFAULT 0,
-            ADD COLUMN IF NOT EXISTS deductions_applied NUMERIC(10, 2) DEFAULT 0,
-            ADD COLUMN IF NOT EXISTS gross_salary NUMERIC(12, 2) DEFAULT 0,
-            ADD COLUMN IF NOT EXISTS total_days_in_period INTEGER DEFAULT 0
-        `).catch(err => console.error('Silent migration failed (might be ok if already exists):', err.message));
-        // Determine date range for attendance lookup
-        // Use provided fromDate/toDate if available, else fallback to full month
-        const rangeFrom = fromDate || `${year}-${String(month).padStart(2, '0')}-01`;
-        const rangeTo   = toDate   || `${year}-${String(month).padStart(2, '0')}-${new Date(year, month, 0).getDate()}`;
-
-        // Total calendar days in range (for proration denominator)
-        const diffTime = new Date(rangeTo) - new Date(rangeFrom);
-        const totalDaysInRange = Math.round(diffTime / (1000 * 60 * 60 * 24)) + 1;
-
-        console.log(`Calculating salaries for range ${rangeFrom} → ${rangeTo} (${totalDaysInRange} days)`);
+        await ensureSalarySchema();
+        const period = buildPeriod({ month, year, fromDate, toDate });
+        const rangeFrom = period.fromDate;
+        const rangeTo = period.toDate;
+        const totalWorkingDays = getWorkingDays(rangeFrom, rangeTo);
 
         // 1. Fetch all eligible employees
         let usersQuery = `
-            SELECT id, emp_id, name, monthly_salary, role, deductions
+            SELECT id, emp_id, name, monthly_salary, base_salary, role, deductions
             FROM users
             WHERE LOWER(role) IN ('principal', 'hod', 'staff', 'management')
         `;
@@ -64,60 +167,15 @@ exports.calculateSalary = async (req, res) => {
             return res.json({ message: 'No eligible employees found', results: [] });
         }
 
-        // 2. Fetch attendance within the exact date range
-        const { rows: attendanceStats } = await pool.query(`
-            SELECT
-                TRIM(emp_id) as emp_id,
-                SUM(
-                    CASE
-                        WHEN status::text LIKE '%+%' THEN
-                            (CASE WHEN split_part(status::text, ' + ', 1) = ANY($3::text[]) THEN 0.5 ELSE 0 END +
-                             CASE WHEN split_part(status::text, ' + ', 2) = ANY($3::text[]) THEN 0.5 ELSE 0 END)
-                        WHEN status::text = ANY($3::text[]) THEN
-                            CASE
-                                WHEN remarks ILIKE '%Half Day%' OR
-                                     remarks ILIKE '%half%' OR
-                                     remarks ILIKE '%0.5%' OR
-                                     remarks ILIKE '%1/2%'
-                                THEN 0.5
-                                ELSE 1.0
-                            END
-                        ELSE 0
-                    END
-                ) as payable_days,
-                SUM(
-                    CASE
-                        WHEN status::text LIKE '%+%' THEN
-                            (CASE WHEN split_part(status::text, ' + ', 1) = ANY($4::text[]) THEN 0.5 ELSE 0 END +
-                             CASE WHEN split_part(status::text, ' + ', 2) = ANY($4::text[]) THEN 0.5 ELSE 0 END)
-                        WHEN status::text = ANY($4::text[]) THEN
-                            CASE
-                                WHEN remarks ILIKE '%Half Day%' OR
-                                     remarks ILIKE '%half%' OR
-                                     remarks ILIKE '%0.5%' OR
-                                     remarks ILIKE '%1/2%'
-                                THEN 0.5
-                                ELSE 1.0
-                            END
-                        ELSE 0
-                    END
-                ) as unpaid_days,
-                COUNT(*) as total_records
-            FROM attendance_records
-            WHERE date::date >= $1::date AND date::date <= $2::date
-            GROUP BY TRIM(emp_id)
-        `, [rangeFrom, rangeTo, paidStatuses, unpaidStatuses]);
-
-        const statsMap = {};
-        attendanceStats.forEach(row => {
-            statsMap[row.emp_id] = {
-                payable_days: parseFloat(row.payable_days) || 0,
-                unpaid_days: parseFloat(row.unpaid_days) || 0,
-                total_records: parseInt(row.total_records) || 0
-            };
+        // 2. Fetch attendance aggregate within exact date range
+        const statsMap = await getAttendanceAggregateMap({
+            fromDate: rangeFrom,
+            toDate: rangeTo,
+            paidStatuses,
+            unpaidStatuses
         });
 
-        // 3. Calculate and persist — SKIP records already marked as Paid
+        // 3. Calculate and persist — SKIP records already marked as Paid for same period
         const results = [];
         for (const user of users) {
             const userEmpId = (user.emp_id || '').trim();
@@ -125,8 +183,8 @@ exports.calculateSalary = async (req, res) => {
 
             // Check if already published (Paid) — do NOT overwrite paid records
             const { rows: existing } = await pool.query(
-                `SELECT status FROM salary_records WHERE TRIM(emp_id) = $1 AND month = $2 AND year = $3`,
-                [userEmpId, month, year]
+                `SELECT id, status FROM salary_records WHERE TRIM(emp_id) = $1 AND from_date = $2::date AND to_date = $3::date LIMIT 1`,
+                [userEmpId, rangeFrom, rangeTo]
             );
             if (existing.length > 0 && existing[0].status === 'Paid') {
                 // Skip: protect paid records from drift
@@ -134,86 +192,93 @@ exports.calculateSalary = async (req, res) => {
             }
 
             const stats = statsMap[userEmpId] || { payable_days: 0, unpaid_days: 0 };
-            // Ensure numbers, default to 0
-            const payableDays = isNaN(stats.payable_days) ? 0 : stats.payable_days;
-            const unpaidDays = isNaN(stats.unpaid_days) ? 0 : stats.unpaid_days;
-            const baseSalary = isNaN(parseFloat(user.monthly_salary)) ? 0 : parseFloat(user.monthly_salary);
+            const grossSource = parseFloat(user.monthly_salary) || parseFloat(user.base_salary) || 0;
+            const fixedDeductions = parseDeductions(user.deductions);
+            const metrics = computeSalaryMetrics({
+                monthlySalary: grossSource,
+                deductions: fixedDeductions,
+                workingDaysInPeriod: totalWorkingDays,
+                payableDays: stats.payable_days
+            });
 
-            // Compute total deductions
-            let totalDeductions = 0;
-            if (user.deductions) {
-                try {
-                    const parsedDeductions = typeof user.deductions === 'string' ? JSON.parse(user.deductions) : user.deductions;
-                    if (Array.isArray(parsedDeductions)) {
-                        totalDeductions = parsedDeductions.reduce((sum, d) => sum + (parseFloat(d.amount) || 0), 0);
-                    }
-                } catch (e) {
-                    console.error('Failed to parse deductions for', userEmpId);
-                }
+            if (existing.length > 0) {
+                await pool.query(`
+                    UPDATE salary_records
+                    SET month = $2,
+                        year = $3,
+                        total_present = $4,
+                        total_leave = $5,
+                        total_lop = $6,
+                        calculated_salary = $7,
+                        with_pay_count = $8,
+                        without_pay_count = $9,
+                        deductions_applied = $10,
+                        gross_salary = $11,
+                        total_days_in_period = $12,
+                        status = CASE WHEN status = 'Paid' THEN status ELSE 'Pending' END
+                    WHERE id = $1
+                `, [
+                    existing[0].id,
+                    period.month,
+                    period.year,
+                    metrics.payableDays,
+                    0,
+                    metrics.lopDays,
+                    metrics.netSalary.toFixed(2),
+                    metrics.payableDays,
+                    metrics.lopDays,
+                    metrics.deductionsApplied.toFixed(2),
+                    metrics.grossSalary.toFixed(2),
+                    totalWorkingDays
+                ]);
+            } else {
+                await pool.query(`
+                    INSERT INTO salary_records (
+                        emp_id, month, year, total_present, total_leave, total_lop,
+                        calculated_salary, status, with_pay_count, without_pay_count,
+                        deductions_applied, gross_salary, total_days_in_period, from_date, to_date
+                    ) VALUES (
+                        $1, $2, $3, $4, $5, $6,
+                        $7, 'Pending', $8, $9,
+                        $10, $11, $12, $13::date, $14::date
+                    )
+                `, [
+                    userEmpId,
+                    period.month,
+                    period.year,
+                    metrics.payableDays,
+                    0,
+                    metrics.lopDays,
+                    metrics.netSalary.toFixed(2),
+                    metrics.payableDays,
+                    metrics.lopDays,
+                    metrics.deductionsApplied.toFixed(2),
+                    metrics.grossSalary.toFixed(2),
+                    totalWorkingDays,
+                    rangeFrom,
+                    rangeTo
+                ]);
             }
-
-            // Real-time calculation logic:
-            // "based on attendance - with pay, without pay total counts"
-            // Use Earnings vs. Deductions approach:
-            // Gross = Base Monthly Salary
-            // Deductions = (Loss of Pay Amount) + (Fixed Profile Deductions)
-            const dailyRate = totalDaysInRange > 0 ? baseSalary / totalDaysInRange : 0;
-            const lopAmount = dailyRate * unpaidDays;
-            
-            // Total deductions = LOP based on attendance + Fixed deductions from profile
-            const totalDeductionsApplied = lopAmount + totalDeductions;
-            
-            // Result amounts
-            const grossAmount = baseSalary;
-            let calcAmountRaw = Math.max(0, grossAmount - totalDeductionsApplied);
-            if (isNaN(calcAmountRaw)) calcAmountRaw = 0;
-            let netSalary = calcAmountRaw.toFixed(2);
-            
-            const totalLop = unpaidDays;
-
-            await pool.query(`
-                INSERT INTO salary_records (
-                    emp_id, month, year, total_present, total_leave, total_lop, 
-                    calculated_salary, status, with_pay_count, without_pay_count, 
-                    deductions_applied, gross_salary, total_days_in_period
-                )
-                VALUES ($1, $2, $3, $4, $5, $6, $7, 'Pending', $8, $9, $10, $11, $12)
-                ON CONFLICT (emp_id, month, year) DO UPDATE SET
-                    total_present = EXCLUDED.total_present,
-                    total_leave = EXCLUDED.total_leave,
-                    total_lop = EXCLUDED.total_lop,
-                    calculated_salary = EXCLUDED.calculated_salary,
-                    with_pay_count = EXCLUDED.with_pay_count,
-                    without_pay_count = EXCLUDED.without_pay_count,
-                    deductions_applied = EXCLUDED.deductions_applied,
-                    gross_salary = EXCLUDED.gross_salary,
-                    total_days_in_period = EXCLUDED.total_days_in_period,
-                    status = CASE WHEN salary_records.status = 'Paid' THEN salary_records.status ELSE EXCLUDED.status END
-            `, [
-                userEmpId, month, year, 
-                payableDays, 0, totalLop, 
-                netSalary,
-                payableDays, totalLop,
-                totalDeductionsApplied.toFixed(2), grossAmount.toFixed(2), totalDaysInRange
-            ]);
 
             results.push({
                 emp_id: userEmpId,
                 name: user.name,
                 role: user.role,
-                monthly_salary: baseSalary,
-                calculated_salary: netSalary,
-                payable_days: payableDays,
-                total_lop: totalLop,
-                range_days: totalDaysInRange,
-                gross_salary: grossAmount.toFixed(2),
-                deductions_applied: totalDeductionsApplied.toFixed(2)
+                monthly_salary: metrics.grossSalary,
+                calculated_salary: metrics.netSalary.toFixed(2),
+                payable_days: metrics.payableDays,
+                total_lop: metrics.lopDays,
+                range_days: totalWorkingDays,
+                gross_salary: metrics.grossSalary.toFixed(2),
+                deductions_applied: metrics.deductionsApplied.toFixed(2),
+                from_date: rangeFrom,
+                to_date: rangeTo
             });
         }
 
         // Emit real-time update to all connected clients
         const io = req.app.get('io');
-        if (io) io.emit('salary_calculated', { month, year, count: results.length });
+        if (io) io.emit('salary_calculated', { month: period.month, year: period.year, fromDate: rangeFrom, toDate: rangeTo, count: results.length });
 
         res.json({ message: `Recalculated salaries for ${results.length} employees.`, results });
     } catch (error) {
@@ -227,48 +292,101 @@ exports.calculateSalary = async (req, res) => {
 // @access  Private
 exports.getSalaryRecords = async (req, res) => {
     try {
-        const { month, year } = req.query;
+        await ensureSalarySchema();
+        const { month, year, fromDate, toDate } = req.query;
+        const period = buildPeriod({ month, year, fromDate, toDate });
+        const scopeWide = isInstitutionWideRole(req.user.role);
 
-        let query = `
-            SELECT 
-                s.*,
-                u.name,
-                u.role,
-                u.profile_pic,
-                u.monthly_salary,
-                d.name as department_name
-            FROM salary_records s
-            JOIN users u ON TRIM(s.emp_id) = TRIM(u.emp_id)
+        let usersQuery = `
+            SELECT u.emp_id, u.name, u.role, u.profile_pic, u.monthly_salary, u.base_salary, u.deductions, d.name AS department_name
+            FROM users u
             LEFT JOIN departments d ON u.department_id = d.id
-            WHERE LOWER(u.role) != 'admin'
+            WHERE LOWER(u.role) IN ('principal', 'hod', 'staff', 'management')
         `;
-        const params = [];
+        const usersParams = [];
 
-        if (month) { query += ' AND s.month = $' + (params.push(month)); }
-        if (year)  { query += ' AND s.year = $'  + (params.push(year));  }
-
-        // Role-based filter: restrict non-admin users to their own records only
-        const role = req.user.role;
-        if (role === 'staff' || role === 'principal') {
-            query += ' AND TRIM(s.emp_id) = TRIM($' + (params.push(req.user.emp_id)) + ')';
-        } else if (role === 'hod') {
-            query += ' AND u.department_id = $' + (params.push(req.user.department_id));
+        if (!scopeWide) {
+            usersQuery += ` AND TRIM(u.emp_id) = TRIM($1)`;
+            usersParams.push(req.user.emp_id);
         }
-        // admin and management: no additional filter — see all
+        usersQuery += ` ORDER BY u.name ASC`;
 
-        query += `
-            ORDER BY
-                CASE LOWER(u.role)
-                    WHEN 'principal' THEN 1
-                    WHEN 'hod'       THEN 2
-                    WHEN 'staff'     THEN 3
-                    ELSE 4
-                END,
-                u.name ASC
-        `;
+        const { rows: users } = await pool.query(usersQuery, usersParams);
+        if (users.length === 0) return res.json([]);
 
-        const { rows } = await pool.query(query, params);
-        res.json(rows);
+        const empIds = users.map((u) => u.emp_id.trim());
+        const { rows: records } = await pool.query(`
+            SELECT s.*
+            FROM salary_records s
+            WHERE TRIM(s.emp_id) = ANY($1::text[])
+              AND s.from_date = $2::date
+              AND s.to_date = $3::date
+        `, [empIds, period.fromDate, period.toDate]);
+
+        const recMap = {};
+        records.forEach((r) => {
+            recMap[String(r.emp_id || '').trim()] = r;
+        });
+
+        const attendanceMap = await getAttendanceAggregateMap({
+            fromDate: period.fromDate,
+            toDate: period.toDate,
+            paidStatuses: ['Present', 'CL', 'ML', 'Comp Leave', 'OD', 'Leave', 'Holiday'],
+            unpaidStatuses: ['Absent', 'LOP']
+        });
+        const totalWorkingDays = getWorkingDays(period.fromDate, period.toDate);
+
+        const merged = users.map((u) => {
+            const key = String(u.emp_id || '').trim();
+            const existing = recMap[key];
+            if (existing) {
+                return {
+                    ...existing,
+                    name: u.name,
+                    role: u.role,
+                    profile_pic: u.profile_pic,
+                    monthly_salary: parseFloat(u.monthly_salary) || parseFloat(u.base_salary) || 0,
+                    department_name: u.department_name,
+                    deductions: u.deductions,
+                    from_date: toIsoDate(existing.from_date) || period.fromDate,
+                    to_date: toIsoDate(existing.to_date) || period.toDate
+                };
+            }
+
+            const gross = parseFloat(u.monthly_salary) || parseFloat(u.base_salary) || 0;
+            const metrics = computeSalaryMetrics({
+                monthlySalary: gross,
+                deductions: parseDeductions(u.deductions),
+                workingDaysInPeriod: totalWorkingDays,
+                payableDays: attendanceMap[key]?.payable_days || 0
+            });
+
+            return {
+                id: `preview_${key}_${period.fromDate}_${period.toDate}`,
+                emp_id: key,
+                name: u.name,
+                role: u.role,
+                profile_pic: u.profile_pic,
+                department_name: u.department_name,
+                monthly_salary: gross,
+                gross_salary: metrics.grossSalary.toFixed(2),
+                calculated_salary: metrics.netSalary.toFixed(2),
+                total_present: metrics.payableDays,
+                total_lop: metrics.lopDays,
+                with_pay_count: metrics.payableDays,
+                without_pay_count: metrics.lopDays,
+                deductions_applied: metrics.deductionsApplied.toFixed(2),
+                total_days_in_period: totalWorkingDays,
+                from_date: period.fromDate,
+                to_date: period.toDate,
+                status: 'Pending',
+                month: period.month,
+                year: period.year,
+                is_preview: true
+            };
+        });
+
+        res.json(merged);
     } catch (error) {
         console.error('GET SALARY ERROR:', error);
         res.status(500).json({ message: 'Server Error' });
@@ -289,18 +407,21 @@ exports.getDailyBreakdown = async (req, res) => {
             return res.status(400).json({ message: 'emp_id, fromDate, toDate are required' });
         }
 
+        if (!isInstitutionWideRole(req.user.role) && String(req.user.emp_id || '').trim() !== String(emp_id || '').trim()) {
+            return res.status(403).json({ message: 'Not authorized to view this salary breakdown' });
+        }
+
         // Fetch employee base salary
         const { rows: empRows } = await pool.query(
-            `SELECT monthly_salary FROM users WHERE TRIM(emp_id) = $1`,
+            `SELECT monthly_salary, base_salary FROM users WHERE TRIM(emp_id) = $1`,
             [emp_id.trim()]
         );
         if (!empRows.length) return res.status(404).json({ message: 'Employee not found' });
-        const baseSalary = parseFloat(empRows[0].monthly_salary) || 0;
+        const baseSalary = parseFloat(empRows[0].monthly_salary) || parseFloat(empRows[0].base_salary) || 0;
 
-        // Total days in range
-        const diffTime = new Date(toDate) - new Date(fromDate);
-        const totalDays = Math.round(diffTime / (1000 * 60 * 60 * 24)) + 1;
-        const dailyRate = totalDays > 0 ? baseSalary / totalDays : 0;
+        // Working days in range are the proration denominator
+        const totalDays = Math.max(1, getWorkingDays(fromDate, toDate));
+        const dailyRate = baseSalary / totalDays;
 
         // Fetch daily attendance
         const { rows: attendance } = await pool.query(`
@@ -310,31 +431,46 @@ exports.getDailyBreakdown = async (req, res) => {
             ORDER BY date ASC
         `, [emp_id.trim(), fromDate, toDate]);
 
-        // Build day-wise breakdown
-        const breakdown = attendance.map(a => {
+        const attMap = {};
+        attendance.forEach((a) => {
+            attMap[toIsoDate(a.date)] = a;
+        });
+
+        // Build day-wise breakdown including missing days for full transparency
+        const breakdown = [];
+        const cursor = new Date(fromDate);
+        const end = new Date(toDate);
+        while (cursor <= end) {
+            const iso = toIsoDate(cursor.toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' }));
+            const dayOfWeek = cursor.getDay();
+            const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+            const rec = attMap[iso];
+            const st = (rec?.status || (isWeekend ? 'Holiday' : 'Absent')).trim();
             let dayFactor = 0;
-            const st = (a.status || '').trim();
-            if (st.includes('+')) {
-                const parts = st.split('+').map(p => p.trim());
-                parts.forEach(p => { if (paidStatuses.includes(p)) dayFactor += 0.5; });
-            } else if (paidStatuses.includes(st)) {
-                const isHalf = (a.remarks || '').toLowerCase().includes('half') ||
-                               (a.remarks || '').includes('0.5') ||
-                               st.toLowerCase().includes('half');
-                dayFactor = isHalf ? 0.5 : 1.0;
+
+            if (!isWeekend) {
+                if (st.includes('+')) {
+                    const parts = st.split('+').map((p) => p.trim());
+                    parts.forEach((p) => { if (paidStatuses.includes(p)) dayFactor += 0.5; });
+                } else if (paidStatuses.includes(st)) {
+                    const remarks = (rec?.remarks || '').toLowerCase();
+                    const isHalf = remarks.includes('half') || remarks.includes('0.5') || st.toLowerCase().includes('half');
+                    dayFactor = isHalf ? 0.5 : 1.0;
+                }
             }
 
             const grossEarned = (dailyRate * dayFactor).toFixed(2);
-            return {
-                date: a.date,
+            breakdown.push({
+                date: iso,
                 status: st,
-                punch_in: a.punch_in,
-                punch_out: a.punch_out,
+                punch_in: rec?.punch_in || null,
+                punch_out: rec?.punch_out || null,
                 day_factor: dayFactor,
                 gross_earned: grossEarned,
-                net_earned: grossEarned // Currently no per-day deductions beyond LOP
-            };
-        });
+                net_earned: grossEarned
+            });
+            cursor.setDate(cursor.getDate() + 1);
+        }
 
         const totalGross = breakdown.reduce((acc, d) => acc + parseFloat(d.gross_earned), 0);
         res.json({
@@ -360,7 +496,17 @@ exports.getDailyBreakdown = async (req, res) => {
 exports.updateSalaryStatus = async (req, res) => {
     try {
         const { status } = req.body;
-        await pool.query('UPDATE salary_records SET status = $1 WHERE id = $2', [status, req.params.id]);
+        const { rows } = await pool.query('SELECT status FROM salary_records WHERE id = $1', [req.params.id]);
+        if (rows.length === 0) return res.status(404).json({ message: 'Salary record not found' });
+
+        if (rows[0].status === 'Paid' && status !== 'Paid') {
+            return res.status(400).json({ message: 'Paid salary records are immutable and cannot be reverted' });
+        }
+
+        await pool.query(
+            'UPDATE salary_records SET status = $1, paid_at = CASE WHEN $1 = \'Paid\' THEN COALESCE(paid_at, NOW()) ELSE paid_at END WHERE id = $2',
+            [status, req.params.id]
+        );
         res.json({ message: `Salary marked as ${status}` });
     } catch (error) {
         console.error(error);
@@ -372,17 +518,20 @@ exports.updateSalaryStatus = async (req, res) => {
 // @route   POST /api/salary/publish
 // @access  Private (Admin)
 exports.publishSalaries = async (req, res) => {
-    const { month, year } = req.body;
-    if (!month || !year) return res.status(400).json({ message: 'Month and year are required' });
+    const { month, year, fromDate, toDate } = req.body;
+    const period = buildPeriod({ month, year, fromDate, toDate });
 
     try {
+        await ensureSalarySchema();
         const { rowCount } = await pool.query(
-            `UPDATE salary_records SET status = 'Paid' WHERE month = $1 AND year = $2 AND status = 'Pending'`,
-            [month, year]
+            `UPDATE salary_records
+             SET status = 'Paid', paid_at = COALESCE(paid_at, NOW())
+             WHERE from_date = $1::date AND to_date = $2::date AND status = 'Pending'`,
+            [period.fromDate, period.toDate]
         );
 
         const io = req.app.get('io');
-        if (io) io.emit('salary_published', { month, year });
+        if (io) io.emit('salary_published', { month: period.month, year: period.year, fromDate: period.fromDate, toDate: period.toDate });
 
         res.json({ message: `${rowCount} salary records published`, count: rowCount });
     } catch (error) {

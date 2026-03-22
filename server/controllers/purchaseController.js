@@ -4,6 +4,10 @@ const { createNotification } = require('./notificationController');
 // @desc    Create purchase request
 // @route   POST /api/purchases
 // @access  Private (Staff, HOD, Principal)
+// WORKFLOW:
+// - Staff: Creates request with status "Pending" → Notifies HOD for approval
+// - HOD: Creates request with status "Approved_HOD" → Notifies Principal for approval
+// - Principal: Creates request with status "Approved_Principal" → DIRECTLY to Admin (NO approval needed) ✓
 exports.createPurchaseRequest = async (req, res) => {
     const { item_name, quantity, unit, specifications, estimated_cost } = req.body;
 
@@ -15,8 +19,9 @@ exports.createPurchaseRequest = async (req, res) => {
         if (req.user.role === 'hod') {
             status = 'Approved_HOD';
             notifyRole = 'principal';
-            notifyMsg = `New purchase request for ${item_name} from HOD ${req.user.name}. Needs your approval.`;
+            notifyMsg = `New purchase request for ${item_name} from HOD ${req.user.name}. Awaiting your approval.`;
         } else if (req.user.role === 'principal') {
+            // Principal requests BYPASS all approvals and go directly to Admin
             status = 'Approved_Principal';
             notifyRole = 'admin';
             notifyMsg = `New purchase request for ${item_name} from Principal. Ready for procurement.`;
@@ -32,7 +37,7 @@ exports.createPurchaseRequest = async (req, res) => {
         const { rows: purchaseRows } = await pool.query(query, [req.user.emp_id, item_name, quantity, unit || 'piece', status]);
         const purchaseId = purchaseRows[0].id;
 
-        // Notify appropriate person
+        // Notify appropriate person based on role
         let notifyId = null;
         if (notifyRole === 'hod') {
             const { rows } = await pool.query('SELECT emp_id FROM users WHERE department_id = $1 AND role = \'hod\'', [req.user.department_id]);

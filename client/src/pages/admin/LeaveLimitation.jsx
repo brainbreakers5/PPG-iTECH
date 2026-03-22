@@ -22,13 +22,16 @@ const colorMap = {
 };
 
 const LeaveLimitation = () => {
+    const today = new Date();
+    const firstDay = new Date(today.getFullYear(), today.getMonth(), 1).toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
+    const lastDay = new Date(today.getFullYear(), today.getMonth() + 1, 0).toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
     const [staffData, setStaffData] = useState([]);
     const [loading, setLoading] = useState(true);
     const [search, setSearch] = useState('');
     const [editingId, setEditingId] = useState(null);  // emp_id being edited
     const [editValues, setEditValues] = useState({});
-    const [fromMonth, setFromMonth] = useState(new Date().toISOString().slice(0, 7)); // YYYY-MM format
-    const [toMonth, setToMonth] = useState(new Date().toISOString().slice(0, 7));
+    const [fromDate, setFromDate] = useState(firstDay);
+    const [toDate, setToDate] = useState(lastDay);
     const [leaveTypes, setLeaveTypes] = useState([]);
     const [showAddLeaveType, setShowAddLeaveType] = useState(false);
     const socket = useSocket();
@@ -36,14 +39,14 @@ const LeaveLimitation = () => {
     useEffect(() => {
         fetchLimits();
         fetchLeaveTypes();
-    }, [fromMonth, toMonth]);
+    }, [fromDate, toDate]);
 
     useEffect(() => {
         if (!socket) return;
         const handler = () => fetchLimits();
         socket.on('leave_limits_updated', handler);
         return () => socket.off('leave_limits_updated', handler);
-    }, [socket, fromMonth]);
+    }, [socket, fromDate, toDate]);
 
     const fetchLeaveTypes = async () => {
         try {
@@ -78,7 +81,7 @@ const LeaveLimitation = () => {
     const fetchLimits = async () => {
         setLoading(true);
         try {
-            const year = new Date(fromMonth).getFullYear();
+            const year = new Date(fromDate).getFullYear();
             const { data } = await api.get(`/leave-limits?year=${year}`);
 
             // Filter data based on month range if additional date fields exist
@@ -117,8 +120,8 @@ const LeaveLimitation = () => {
 
     const saveEdit = async (emp_id) => {
         try {
-            const year = new Date(fromMonth).getFullYear();
-            await api.put(`/leave-limits/${emp_id}`, { year, fromMonth, toMonth, ...editValues });
+            const year = new Date(fromDate).getFullYear();
+            await api.put(`/leave-limits/${emp_id}`, { year, fromDate, toDate, ...editValues });
             Swal.fire({
                 title: 'Limits Updated!',
                 text: 'Leave limits have been saved successfully.',
@@ -309,13 +312,13 @@ const LeaveLimitation = () => {
                 <div style="display:grid; gap:16px; text-align:left; padding:10px 0;">
                     <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px; padding:12px; background:#f8fafc; border-radius:12px; margin-bottom:8px;">
                         <div>
-                            <label style="font-size:11px; font-weight:900; color:#64748b; text-transform:uppercase; letter-spacing:0.1em; display:block; margin-bottom:6px;">From Month</label>
-                            <input id="bulk_from_month" type="month" value="${fromMonth}" 
+                            <label style="font-size:11px; font-weight:900; color:#64748b; text-transform:uppercase; letter-spacing:0.1em; display:block; margin-bottom:6px;">From Date</label>
+                            <input id="bulk_from_date" type="date" value="${fromDate}" 
                                 style="width:100%; padding:8px 12px; border:2px solid #e5e7eb; border-radius:10px; font-weight:600; font-size:13px; outline:none;">
                         </div>
                         <div>
-                            <label style="font-size:11px; font-weight:900; color:#64748b; text-transform:uppercase; letter-spacing:0.1em; display:block; margin-bottom:6px;">To Month</label>
-                            <input id="bulk_to_month" type="month" value="${toMonth}" 
+                            <label style="font-size:11px; font-weight:900; color:#64748b; text-transform:uppercase; letter-spacing:0.1em; display:block; margin-bottom:6px;">To Date</label>
+                            <input id="bulk_to_date" type="date" value="${toDate}" 
                                 style="width:100%; padding:8px 12px; border:2px solid #e5e7eb; border-radius:10px; font-weight:600; font-size:13px; outline:none;">
                         </div>
                     </div>
@@ -346,32 +349,25 @@ const LeaveLimitation = () => {
                 editableTypes.forEach(t => {
                     values[`${t.key}_limit`] = parseInt(document.getElementById(`bulk_${t.key}`)?.value) || 12;
                 });
-                values.fromMonth = document.getElementById('bulk_from_month')?.value;
-                values.toMonth = document.getElementById('bulk_to_month')?.value;
+                values.fromDate = document.getElementById('bulk_from_date')?.value;
+                values.toDate = document.getElementById('bulk_to_date')?.value;
                 return values;
             }
         });
 
         if (formValues) {
             try {
-                const year = new Date(formValues.fromMonth || fromMonth).getFullYear();
+                const year = new Date(formValues.fromDate || fromDate).getFullYear();
                 Swal.fire({ title: 'Applying...', text: 'Updating registry limits for all personnel...', didOpen: () => Swal.showLoading() });
-                
-                const results = await Promise.allSettled(
-                    staffData.map(emp => api.put(`/leave-limits/${emp.emp_id}`, { year, ...formValues }))
-                );
-                
-                const failed = results.filter(r => r.status === 'rejected');
-                if (failed.length === 0) {
-                    Swal.fire({ title: 'Bulk Set Complete!', text: `Synchronized limits for ${results.length} personnel.`, icon: 'success', confirmButtonColor: '#2563eb' });
-                } else {
-                    Swal.fire({ 
-                        title: 'Partial Update', 
-                        text: `${failed.length} updates encountered integrity constraints. ${results.length - failed.length} succeeded.`, 
-                        icon: 'warning',
-                        confirmButtonColor: '#f59e0b'
-                    });
-                }
+
+                const { data } = await api.post('/leave-limits/bulk', { year, ...formValues });
+
+                Swal.fire({
+                    title: 'Bulk Set Complete!',
+                    text: `Synchronized limits for ${data?.updatedCount || staffData.length} personnel.`,
+                    icon: 'success',
+                    confirmButtonColor: '#2563eb'
+                });
                 fetchLimits();
             } catch (error) {
                 console.error('Bulk update fail:', error);
@@ -404,17 +400,17 @@ const LeaveLimitation = () => {
                             <div className="flex items-center gap-2 bg-white border border-sky-100 rounded-2xl px-4 py-2 shadow-lg shadow-sky-50/50">
                                 <span className="text-xs font-black text-gray-500 uppercase tracking-widest">From</span>
                                 <input
-                                    type="month"
-                                    value={fromMonth}
-                                    onChange={e => setFromMonth(e.target.value)}
+                                    type="date"
+                                    value={fromDate}
+                                    onChange={e => setFromDate(e.target.value)}
                                     className="bg-transparent font-black text-sm text-gray-700 outline-none"
                                 />
                                 <span className="text-gray-300">→</span>
                                 <span className="text-xs font-black text-gray-500 uppercase tracking-widest">To</span>
                                 <input
-                                    type="month"
-                                    value={toMonth}
-                                    onChange={e => setToMonth(e.target.value)}
+                                    type="date"
+                                    value={toDate}
+                                    onChange={e => setToDate(e.target.value)}
                                     className="bg-transparent font-black text-sm text-gray-700 outline-none"
                                 />
                             </div>
@@ -551,7 +547,16 @@ const LeaveLimitation = () => {
                                                             )}
                                                         </div>
                                                         {emp.from_month && emp.to_month && (
-                                                            <p className="text-[8px] font-bold text-emerald-500 mt-0.5">{emp.from_month} → {emp.to_month}</p>
+                                                            <p className="text-[8px] font-bold text-emerald-500 mt-0.5">
+                                                                {new Date(emp.from_month).toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+                                                                {' '}→{' '}
+                                                                {new Date(emp.to_month).toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+                                                            </p>
+                                                        )}
+                                                        {emp.updated_at && (
+                                                            <p className="text-[8px] font-bold text-sky-500 mt-0.5">
+                                                                Updated: {new Date(emp.updated_at).toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+                                                            </p>
                                                         )}
                                                     </div>
                                                 </div>
@@ -661,7 +666,10 @@ const LeaveLimitation = () => {
                 </div>
 
                 <p className="text-[10px] font-black text-gray-300 uppercase tracking-[0.3em] text-center mt-6">
-                    {fromMonth} to {toMonth} · Leave Management · {filtered.length} employee{filtered.length !== 1 ? 's' : ''}
+                    {new Date(fromDate).toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+                    {' '}to{' '}
+                    {new Date(toDate).toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+                    {' '}· Leave Management · {filtered.length} employee{filtered.length !== 1 ? 's' : ''}
                 </p>
             </motion.div>
         </Layout >

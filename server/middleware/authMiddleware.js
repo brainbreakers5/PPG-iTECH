@@ -29,9 +29,20 @@ exports.protect = async (req, res, next) => {
         const token = req.headers.authorization.split(' ')[1];
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
+        const ensureUserExists = async (id) => {
+            const { rows } = await pool.query('SELECT id FROM users WHERE id = $1', [id]);
+            return rows.length > 0;
+        };
+
         // Check cache first
         let user = getCachedUser(decoded.id);
-        if (!user) {
+        if (user) {
+            const stillExists = await ensureUserExists(decoded.id);
+            if (!stillExists) {
+                userCache.delete(decoded.id);
+                return res.status(401).json({ message: 'User not found' });
+            }
+        } else {
             const { rows } = await pool.query(`
                 SELECT u.id, u.emp_id, u.name, u.role, u.department_id, d.name as department_name
                 FROM users u 

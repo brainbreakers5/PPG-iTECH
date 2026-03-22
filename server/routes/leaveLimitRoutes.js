@@ -3,7 +3,8 @@ const router = express.Router();
 const {
     getAllLeaveLimits,
     getMyLeaveLimits,
-    updateLeaveLimit
+    updateLeaveLimit,
+    bulkUpdateLeaveLimits
 } = require('../controllers/leaveLimitController');
 const { protect, restrictTo } = require('../middleware/authMiddleware');
 
@@ -14,6 +15,7 @@ router.get('/my', getMyLeaveLimits);
 
 // Admin: get all staff limits & update
 router.get('/', restrictTo('admin'), getAllLeaveLimits);
+router.post('/bulk', restrictTo('admin'), bulkUpdateLeaveLimits);
 router.put('/:emp_id', restrictTo('admin'), updateLeaveLimit);
 
 module.exports = router;
