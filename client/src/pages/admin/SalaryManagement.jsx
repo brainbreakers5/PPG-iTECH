@@ -294,16 +294,25 @@ const SalaryManagement = () => {
         });
         if (!result.isConfirmed) return;
         try {
-            for (const s of unpaidSelected) {
-                await api.put(`/salary/${s.id}/status`, { status: 'Paid' });
-                await api.post('/salary/notify-paid', {
-                    emp_id: s.emp_id, name: s.name, email: s.email,
-                    fromDate, toDate, amount: s.calculated_salary
-                });
+            const results = await Promise.allSettled(
+                unpaidSelected.map(async (s) => {
+                    await api.put(`/salary/${s.id}/status`, { status: 'Paid' });
+                    await api.post('/salary/notify-paid', {
+                        emp_id: s.emp_id, name: s.name, email: s.email,
+                        fromDate, toDate, amount: s.calculated_salary
+                    });
+                })
+            );
+
+            const failedCount = results.filter(r => r.status === 'rejected').length;
+            if (failedCount > 0) {
+                console.error('Bulk mark paid failed for some employees:', results.filter(r => r.status === 'rejected'));
+                Swal.fire('Partial Success', `${unpaidSelected.length - failedCount} employees marked as Paid. ${failedCount} failed.`, 'warning');
+            } else {
+                Swal.fire({ title: 'All Paid!', text: `${unpaidSelected.length} employees marked as Paid.`, icon: 'success', timer: 2000, showConfirmButton: false, customClass: { popup: 'rounded-[32px]', container: 'z-[10000]' } });
             }
             setSelectedIds([]);
             fetchSalaries();
-            Swal.fire({ title: 'All Paid!', text: `${unpaidSelected.length} employees marked as Paid.`, icon: 'success', timer: 2000, showConfirmButton: false, customClass: { popup: 'rounded-[32px]', container: 'z-[10000]' } });
         } catch (err) {
             console.error(err);
             Swal.fire('Error', 'Some payments could not be processed.', 'error');
@@ -1037,7 +1046,26 @@ const SalaryManagement = () => {
                                                     <td className="p-8 text-right font-black text-rose-500">
                                                         <div className="flex flex-col items-end">
                                                             <span className="text-lg text-rose-600 tracking-tighter font-black">- ₹{Number(s.deductions_applied || 0).toLocaleString()}</span>
-                                                            <span className="text-[9px] text-gray-400 font-bold tracking-widest mt-1">Total Deductions</span>
+                                                            <div className="mt-1 flex flex-col items-end gap-1">
+                                                                <span className="text-[9px] text-gray-400 font-bold tracking-widest">Total Deductions</span>
+                                                                {(() => {
+                                                                    try {
+                                                                        const dArr = typeof s.deductions === 'string' ? JSON.parse(s.deductions) : (s.deductions || []);
+                                                                        if (dArr.length > 0) {
+                                                                            return (
+                                                                                <div className="flex flex-wrap gap-1 justify-end max-w-[150px]">
+                                                                                    {dArr.map((d, i) => (
+                                                                                        <span key={i} className="text-[7px] font-black bg-rose-50 text-rose-400 px-1.5 py-0.5 rounded border border-rose-100 uppercase truncate" title={`${d.type}: ₹${d.amount}`}>
+                                                                                            {d.type}: {Number(d.amount).toLocaleString()}
+                                                                                        </span>
+                                                                                    ))}
+                                                                                </div>
+                                                                            );
+                                                                        }
+                                                                    } catch (e) { return null; }
+                                                                    return null;
+                                                                })()}
+                                                            </div>
                                                         </div>
                                                     </td>
                                                     <td className="p-8 text-right font-black">
