@@ -149,7 +149,9 @@ const AdminDashboard = () => {
 
     // Get employees matching a role + status label for the modal
     const getFilteredEmployees = (roleKey, statusLabel) => {
-        const roleEmps = allEmployees.filter(e => (e.role || '').toLowerCase() === roleKey);
+        const roleEmps = allEmployees.filter(e => (e.role || '').toLowerCase() === roleKey.toLowerCase());
+        if (statusLabel === 'Total') return roleEmps;
+        
         return roleEmps.filter(emp => {
             const r = attendanceMap[emp.emp_id]; // Get the full attendance record
             const s = r?.status || '';
