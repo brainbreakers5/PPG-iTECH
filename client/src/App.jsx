@@ -55,7 +55,6 @@ import Notifications from './pages/shared/Notifications';
 // Management Pages
 import ManagementDashboard from './pages/management/ManagementDashboard';
 import ManagementDepartment from './pages/management/ManagementDepartment';
-import ManagementSalary from './pages/management/ManagementSalary';
 
 // Placeholder Dashboards
 // const AdminDashboard = () => <div className="p-10">Admin Dashboard (Coming Soon)</div>;
@@ -296,7 +295,7 @@ const AppContent = () => {
             <Route path="/" element={<ManagementDashboard />} />
             <Route path="departments" element={<ManagementDepartment />} />
             <Route path="departments/:id/staff" element={<DepartmentStaffPage rolePrefix="management" />} />
-            <Route path="payroll" element={<ManagementSalary />} />
+            <Route path="payroll" element={<SalaryManagement />} />
             <Route path="attendance" element={<PrincipalAttendance />} />
             <Route path="attendance/:empId/:month" element={<DetailedAttendancePage />} />
             <Route path="attendance/:empId/:startDate/:endDate" element={<DetailedAttendancePage />} />

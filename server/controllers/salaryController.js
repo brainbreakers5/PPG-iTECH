@@ -172,7 +172,7 @@ exports.calculateSalary = async (req, res) => {
 
         // 1. Fetch all eligible employees
         let usersQuery = `
-            SELECT id, emp_id, name, monthly_salary, base_salary, role, deductions
+            SELECT id, emp_id, name, monthly_salary, role, deductions
             FROM users
             WHERE LOWER(role::text) IN ('principal', 'hod', 'staff', 'management')
         `;
@@ -224,7 +224,7 @@ exports.calculateSalary = async (req, res) => {
             const resolvedPayableDays = (stats.payable_days > 0 || stats.total_records === 0)
                 ? stats.payable_days
                 : (stats.inferred_payable_days || 0);
-            const grossSource = parseFloat(user.monthly_salary) || parseFloat(user.base_salary) || 0;
+            const grossSource = parseFloat(user.monthly_salary) || 0;
             const fixedDeductions = parseDeductions(user.deductions);
             const metrics = computeSalaryMetrics({
                 monthlySalary: grossSource,
@@ -336,7 +336,7 @@ exports.getSalaryRecords = async (req, res) => {
         const scopeWide = isInstitutionWideRole(req.user.role);
 
         let usersQuery = `
-            SELECT u.emp_id, u.name, u.role, u.profile_pic, u.monthly_salary, u.base_salary, u.deductions, d.name AS department_name
+            SELECT u.emp_id, u.name, u.role, u.profile_pic, u.monthly_salary, u.deductions, d.name AS department_name
             FROM users u
             LEFT JOIN departments d ON u.department_id = d.id
             WHERE LOWER(u.role::text) IN ('principal', 'hod', 'staff', 'management')
@@ -383,7 +383,7 @@ exports.getSalaryRecords = async (req, res) => {
             if (existing) {
                 if (existing.status !== 'Paid') {
                     const metrics = computeSalaryMetrics({
-                        monthlySalary: parseFloat(u.monthly_salary) || parseFloat(u.base_salary) || 0,
+                        monthlySalary: parseFloat(u.monthly_salary) || 0,
                         deductions: parseDeductions(u.deductions),
                         workingDaysInPeriod: totalWorkingDays,
                         payableDays: (() => {
@@ -400,7 +400,7 @@ exports.getSalaryRecords = async (req, res) => {
                         name: u.name,
                         role: u.role,
                         profile_pic: u.profile_pic,
-                        monthly_salary: parseFloat(u.monthly_salary) || parseFloat(u.base_salary) || 0,
+                        monthly_salary: parseFloat(u.monthly_salary) || 0,
                         department_name: u.department_name,
                         deductions: u.deductions,
                         total_present: metrics.payableDays,
@@ -429,7 +429,7 @@ exports.getSalaryRecords = async (req, res) => {
                 };
             }
 
-            const gross = parseFloat(u.monthly_salary) || parseFloat(u.base_salary) || 0;
+            const gross = parseFloat(u.monthly_salary) || 0;
             const metrics = computeSalaryMetrics({
                 monthlySalary: gross,
                 deductions: parseDeductions(u.deductions),
@@ -495,11 +495,11 @@ exports.getDailyBreakdown = async (req, res) => {
 
         // Fetch employee base salary
         const { rows: empRows } = await pool.query(
-            `SELECT monthly_salary, base_salary FROM users WHERE TRIM(emp_id) = $1`,
+            `SELECT monthly_salary FROM users WHERE TRIM(emp_id) = $1`,
             [emp_id.trim()]
         );
         if (!empRows.length) return res.status(404).json({ message: 'Employee not found' });
-        const baseSalary = parseFloat(empRows[0].monthly_salary) || parseFloat(empRows[0].base_salary) || 0;
+        const baseSalary = parseFloat(empRows[0].monthly_salary) || 0;
 
         // Working days in range are the proration denominator
         const totalDays = Math.max(1, getWorkingDays(fromDate, toDate));
