@@ -5,16 +5,20 @@ import api from '../../utils/api';
 import Swal from 'sweetalert2';
 import { useAuth } from '../../context/AuthContext';
 import {
+    FaBuilding,
     FaCheckCircle,
     FaClock,
     FaEnvelope,
     FaExclamationCircle,
     FaFileAlt,
+    FaFilter,
     FaHistory,
     FaMoneyBillWave,
     FaPaperPlane,
     FaSearch,
-    FaTimesCircle
+    FaTimesCircle,
+    FaUserTie,
+    FaWallet
 } from 'react-icons/fa';
 
 const formatIso = (d) => d.toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
@@ -106,6 +110,14 @@ const SalaryManagement = () => {
             .filter(Boolean);
         return Array.from(new Set([...fromMaster, ...fromRows]));
     }, [rows, departments]);
+
+    const summary = useMemo(() => {
+        const gross = filteredRows.reduce((acc, row) => acc + Number(row.gross_salary || row.monthly_salary || 0), 0);
+        const net = filteredRows.reduce((acc, row) => acc + Number(row.calculated_salary || 0), 0);
+        const paidCount = filteredRows.filter((row) => String(row.status || '').toLowerCase() === 'paid').length;
+        const pendingCount = filteredRows.length - paidCount;
+        return { gross, net, paidCount, pendingCount };
+    }, [filteredRows]);
 
     const refreshRows = async () => {
         setLoading(true);
@@ -318,7 +330,16 @@ const SalaryManagement = () => {
     };
 
     const renderFilterControls = canInstitutionWide && (
-        <div className="bg-white p-4 rounded-[24px] shadow-lg shadow-sky-50/60 border border-sky-50 mb-5">
+        <div className="bg-white p-6 rounded-[32px] shadow-xl shadow-sky-50/70 border border-sky-50 mb-6">
+            <div className="flex items-center gap-3 mb-4">
+                <div className="h-10 w-10 rounded-2xl bg-sky-100 text-sky-600 flex items-center justify-center">
+                    <FaFilter size={14} />
+                </div>
+                <div>
+                    <p className="text-sm font-black text-gray-800 tracking-tight">Salary Filters</p>
+                    <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">Role and department based records</p>
+                </div>
+            </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                     <label className="block text-[10px] font-black uppercase tracking-[0.2em] text-gray-400 mb-2">Select Role</label>
@@ -348,65 +369,112 @@ const SalaryManagement = () => {
                     </select>
                 </div>
             </div>
-            <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mt-3">Filtered records: {filteredRows.length}</p>
+            <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mt-4">Filtered records: {filteredRows.length}</p>
         </div>
     );
 
     return (
         <Layout>
-            <div className="max-w-7xl mx-auto">
+            <div className="max-w-7xl mx-auto pb-4">
+                <div className="mb-8 rounded-[36px] border border-sky-100 bg-gradient-to-r from-sky-50 via-white to-cyan-50 p-6 md:p-8 shadow-xl shadow-sky-50/80">
+                    <div className="flex flex-wrap items-center justify-between gap-4">
+                        <div>
+                            <h1 className="text-3xl md:text-4xl font-black text-gray-800 tracking-tight">
+                                {isPersonalView ? 'My Salary Details' : isHistoryPage ? 'Salary History' : 'Salary Management'}
+                            </h1>
+                            <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 mt-2">
+                                {isPersonalView
+                                    ? 'All your past and current salary records are shown here.'
+                                    : isHistoryPage
+                                        ? 'Select period by month and year using fixed cycle 26 to 25.'
+                                        : 'Current live payroll period is fixed and not editable.'}
+                            </p>
+                        </div>
+
+                        {canInstitutionWide && (
+                            <div className="flex flex-wrap gap-2">
+                                {!isHistoryPage && (
+                                    <>
+                                        <button
+                                            onClick={() => navigate(`/${user.role}/payroll/history`)}
+                                            className="px-4 py-2.5 rounded-2xl bg-amber-500 text-white text-[11px] font-black uppercase tracking-widest flex items-center gap-2 shadow-lg shadow-amber-100"
+                                        >
+                                            <FaHistory /> History Page
+                                        </button>
+                                        <button
+                                            onClick={() => navigate(`/${user.role}/payroll/reports`)}
+                                            className="px-4 py-2.5 rounded-2xl bg-indigo-600 text-white text-[11px] font-black uppercase tracking-widest flex items-center gap-2 shadow-lg shadow-indigo-100"
+                                        >
+                                            <FaEnvelope /> Reports Page
+                                        </button>
+                                    </>
+                                )}
+                                {isHistoryPage && (
+                                    <button
+                                        onClick={() => navigate(`/${user.role}/payroll`)}
+                                        className="px-4 py-2.5 rounded-2xl bg-sky-600 text-white text-[11px] font-black uppercase tracking-widest flex items-center gap-2 shadow-lg shadow-sky-100"
+                                    >
+                                        <FaSearch /> Live Management
+                                    </button>
+                                )}
+                            </div>
+                        )}
+                    </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                    <div className="bg-white rounded-3xl border border-sky-50 shadow-lg shadow-sky-50/70 p-5">
+                        <div className="flex items-center gap-3">
+                            <div className="h-10 w-10 rounded-xl bg-sky-100 text-sky-600 flex items-center justify-center"><FaMoneyBillWave /></div>
+                            <div>
+                                <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">Gross Total</p>
+                                <p className="text-lg font-black text-gray-800">Rs {toCurrency(summary.gross)}</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div className="bg-white rounded-3xl border border-sky-50 shadow-lg shadow-sky-50/70 p-5">
+                        <div className="flex items-center gap-3">
+                            <div className="h-10 w-10 rounded-xl bg-emerald-100 text-emerald-600 flex items-center justify-center"><FaWallet /></div>
+                            <div>
+                                <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">Net Total</p>
+                                <p className="text-lg font-black text-emerald-700">Rs {toCurrency(summary.net)}</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div className="bg-white rounded-3xl border border-sky-50 shadow-lg shadow-sky-50/70 p-5">
+                        <div className="flex items-center gap-3">
+                            <div className="h-10 w-10 rounded-xl bg-indigo-100 text-indigo-600 flex items-center justify-center"><FaUserTie /></div>
+                            <div>
+                                <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">Paid Records</p>
+                                <p className="text-lg font-black text-gray-800">{summary.paidCount}</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div className="bg-white rounded-3xl border border-sky-50 shadow-lg shadow-sky-50/70 p-5">
+                        <div className="flex items-center gap-3">
+                            <div className="h-10 w-10 rounded-xl bg-amber-100 text-amber-600 flex items-center justify-center"><FaBuilding /></div>
+                            <div>
+                                <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">Pending Records</p>
+                                <p className="text-lg font-black text-gray-800">{summary.pendingCount}</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
                     <div>
-                        <h1 className="text-3xl font-black text-gray-800">
-                            {isPersonalView ? 'My Salary Details' : isHistoryPage ? 'Salary History' : 'Salary Management'}
-                        </h1>
-                        <p className="text-xs text-gray-500 mt-1">
-                            {isPersonalView
-                                ? 'All your past and current salary records are shown here.'
-                                : isHistoryPage
-                                    ? 'Select period by month/year (fixed date cycle 26 to 25).'
-                                    : 'Current live payroll period is fixed and not editable.'}
-                        </p>
+                        <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">Payroll Period</p>
                     </div>
-
-                    {canInstitutionWide && (
-                        <div className="flex flex-wrap gap-2">
-                            {!isHistoryPage && (
-                                <>
-                                    <button
-                                        onClick={() => navigate(`/${user.role}/payroll/history`)}
-                                        className="px-4 py-2 rounded-lg bg-amber-500 text-white text-sm font-bold flex items-center gap-2"
-                                    >
-                                        <FaHistory /> History Page
-                                    </button>
-                                    <button
-                                        onClick={() => navigate(`/${user.role}/payroll/reports`)}
-                                        className="px-4 py-2 rounded-lg bg-indigo-600 text-white text-sm font-bold flex items-center gap-2"
-                                    >
-                                        <FaEnvelope /> Reports Page
-                                    </button>
-                                </>
-                            )}
-                            {isHistoryPage && (
-                                <button
-                                    onClick={() => navigate(`/${user.role}/payroll`)}
-                                    className="px-4 py-2 rounded-lg bg-sky-600 text-white text-sm font-bold flex items-center gap-2"
-                                >
-                                    <FaSearch /> Live Management
-                                </button>
-                            )}
-                        </div>
-                    )}
                 </div>
 
                 {!isPersonalView && (
-                    <div className="bg-white p-5 rounded-[28px] shadow-lg shadow-sky-50/60 border border-sky-50 mb-5 flex flex-wrap items-center gap-3">
+                    <div className="bg-white p-6 rounded-[32px] shadow-xl shadow-sky-50/70 border border-sky-50 mb-6 flex flex-wrap items-center gap-3">
                         {!isHistoryPage && (
                             <>
-                                <span className="text-xs font-bold text-gray-500 uppercase">Fixed Period</span>
-                                <span className="px-3 py-2 rounded-lg bg-gray-100 text-sm font-semibold">{selectedCycle.fromDate}</span>
-                                <span className="text-gray-400">to</span>
-                                <span className="px-3 py-2 rounded-lg bg-gray-100 text-sm font-semibold">{selectedCycle.toDate}</span>
+                                <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">Fixed Period</span>
+                                <span className="px-4 py-2.5 rounded-2xl bg-sky-50 text-sm font-black text-sky-700 border border-sky-100">{selectedCycle.fromDate}</span>
+                                <span className="text-gray-300 font-black">to</span>
+                                <span className="px-4 py-2.5 rounded-2xl bg-sky-50 text-sm font-black text-sky-700 border border-sky-100">{selectedCycle.toDate}</span>
                             </>
                         )}
 
@@ -414,7 +482,7 @@ const SalaryManagement = () => {
                             <>
                                 <label className="text-xs font-bold text-gray-500 uppercase">Month</label>
                                 <select
-                                    className="px-3 py-2 rounded-lg border"
+                                    className="px-4 py-2.5 rounded-2xl border border-gray-100 bg-gray-50"
                                     value={selectedMonth}
                                     onChange={(e) => setSelectedMonth(Number(e.target.value))}
                                 >
@@ -425,7 +493,7 @@ const SalaryManagement = () => {
                                 <label className="text-xs font-bold text-gray-500 uppercase">Year</label>
                                 <input
                                     type="number"
-                                    className="px-3 py-2 rounded-lg border w-28"
+                                    className="px-4 py-2.5 rounded-2xl border border-gray-100 bg-gray-50 w-28"
                                     value={selectedYear}
                                     onChange={(e) => setSelectedYear(Number(e.target.value))}
                                 />
@@ -436,7 +504,7 @@ const SalaryManagement = () => {
                 )}
 
                 {!isPersonalView && !isHistoryPage && (
-                    <div className="bg-white p-6 rounded-[28px] shadow-lg shadow-sky-50/60 border border-sky-50 mb-5">
+                    <div className="bg-white p-6 rounded-[32px] shadow-xl shadow-sky-50/70 border border-sky-50 mb-6">
                         <div className="flex flex-wrap gap-2 items-center mb-3">
                             <h2 className="text-sm font-bold text-gray-700">Attendance Status Rules</h2>
                             <button onClick={saveAttendanceConfig} className="px-3 py-2 rounded bg-sky-600 text-white text-xs font-bold">Save</button>
@@ -446,10 +514,10 @@ const SalaryManagement = () => {
                                 value={newStatus}
                                 onChange={(e) => setNewStatus(e.target.value)}
                                 placeholder="Add status"
-                                className="px-3 py-2 rounded border text-sm"
+                                className="px-3 py-2 rounded-2xl border border-gray-100 bg-gray-50 text-sm"
                             />
-                            <button onClick={() => handleAddStatus(true)} className="px-3 py-2 rounded bg-emerald-600 text-white text-xs font-bold">Add With Pay</button>
-                            <button onClick={() => handleAddStatus(false)} className="px-3 py-2 rounded bg-rose-600 text-white text-xs font-bold">Add Without Pay</button>
+                            <button onClick={() => handleAddStatus(true)} className="px-3 py-2 rounded-2xl bg-emerald-600 text-white text-xs font-bold">Add With Pay</button>
+                            <button onClick={() => handleAddStatus(false)} className="px-3 py-2 rounded-2xl bg-rose-600 text-white text-xs font-bold">Add Without Pay</button>
                         </div>
                         <div className="text-xs text-gray-600">
                             <p><b>With Pay:</b> {paidStatuses.join(', ')}</p>
@@ -459,7 +527,7 @@ const SalaryManagement = () => {
                 )}
 
                 {isPersonalView && (
-                    <div className="bg-white p-5 rounded-[24px] shadow-lg shadow-sky-50/60 border border-sky-50 mb-5 text-xs text-gray-600">
+                    <div className="bg-white p-5 rounded-[28px] shadow-xl shadow-sky-50/70 border border-sky-50 mb-6 text-xs text-gray-600">
                         <p><b>Admin With Pay statuses:</b> {paidStatuses.join(', ')}</p>
                         <p><b>Admin Without Pay statuses:</b> {unpaidStatuses.join(', ')}</p>
                     </div>
@@ -468,17 +536,17 @@ const SalaryManagement = () => {
                 {renderFilterControls}
 
                 {canInstitutionWide && isHistoryPage && (
-                    <div className="bg-white p-4 rounded-[24px] shadow-lg shadow-sky-50/60 border border-sky-50 mb-5 flex flex-wrap gap-2 items-center">
-                        <button onClick={toggleSelectAll} className="px-3 py-2 rounded bg-gray-100 text-xs font-bold">{selectedIds.length === filteredRows.length ? 'Clear Selection' : 'Select All'}</button>
-                        <button onClick={() => handleBulkMark('Paid')} className="px-3 py-2 rounded bg-emerald-600 text-white text-xs font-bold flex items-center gap-1"><FaCheckCircle /> Mark All Paid</button>
-                        <button onClick={() => handleBulkMark('Pending')} className="px-3 py-2 rounded bg-amber-500 text-white text-xs font-bold flex items-center gap-1"><FaClock /> Mark All Unpaid</button>
+                    <div className="bg-white p-4 rounded-[28px] shadow-xl shadow-sky-50/70 border border-sky-50 mb-6 flex flex-wrap gap-2 items-center">
+                        <button onClick={toggleSelectAll} className="px-3 py-2 rounded-2xl bg-gray-100 text-xs font-bold">{selectedIds.length === filteredRows.length ? 'Clear Selection' : 'Select All'}</button>
+                        <button onClick={() => handleBulkMark('Paid')} className="px-3 py-2 rounded-2xl bg-emerald-600 text-white text-xs font-bold flex items-center gap-1"><FaCheckCircle /> Mark All Paid</button>
+                        <button onClick={() => handleBulkMark('Pending')} className="px-3 py-2 rounded-2xl bg-amber-500 text-white text-xs font-bold flex items-center gap-1"><FaClock /> Mark All Unpaid</button>
                         <span className="text-xs text-gray-500">Selected: {selectedIds.length}</span>
                     </div>
                 )}
 
-                <div className="bg-white rounded-[32px] shadow-xl shadow-sky-50/60 border border-sky-50 overflow-x-auto">
+                <div className="bg-white rounded-[36px] shadow-2xl shadow-sky-50/80 border border-sky-50 overflow-x-auto">
                     <table className="w-full min-w-[1100px]">
-                        <thead className="bg-gray-50">
+                        <thead className="bg-gray-50/80 border-b border-gray-100">
                             <tr>
                                 {canInstitutionWide && isHistoryPage && <th className="p-3 text-left text-xs">Select</th>}
                                 <th className="p-3 text-left text-xs uppercase tracking-widest text-gray-500">Employee</th>
@@ -493,7 +561,7 @@ const SalaryManagement = () => {
                         </thead>
                         <tbody>
                             {!loading && filteredRows.map((r) => (
-                                <tr key={r.id} className="border-t">
+                                <tr key={r.id} className="border-t border-gray-50 hover:bg-sky-50/40 transition-colors">
                                     {canInstitutionWide && isHistoryPage && (
                                         <td className="p-3">
                                             <input
@@ -504,7 +572,7 @@ const SalaryManagement = () => {
                                         </td>
                                     )}
                                     <td className="p-3">
-                                        <div className="font-semibold text-sm text-gray-800">{r.name}</div>
+                                        <div className="font-black text-sm text-gray-800">{r.name}</div>
                                         <div className="text-xs text-gray-500">{r.emp_id} {r.department_name ? `| ${r.department_name}` : ''}</div>
                                     </td>
                                     <td className="p-3 text-sm text-gray-700">{r.from_date || '-'} to {r.to_date || '-'}</td>
@@ -514,9 +582,9 @@ const SalaryManagement = () => {
                                     <td className="p-3 text-right text-emerald-700 font-bold">Rs {toCurrency(r.calculated_salary || 0)}</td>
                                     <td className="p-3 text-center">
                                         {String(r.status).toLowerCase() === 'paid' ? (
-                                            <span className="px-2 py-1 rounded bg-emerald-100 text-emerald-700 text-xs font-semibold">Paid</span>
+                                            <span className="px-3 py-1.5 rounded-2xl bg-emerald-100 text-emerald-700 text-xs font-black uppercase tracking-wider">Paid</span>
                                         ) : (
-                                            <span className="px-2 py-1 rounded bg-amber-100 text-amber-700 text-xs font-semibold">Pending</span>
+                                            <span className="px-3 py-1.5 rounded-2xl bg-amber-100 text-amber-700 text-xs font-black uppercase tracking-wider">Pending</span>
                                         )}
                                     </td>
                                     <td className="p-3 text-right">
@@ -524,7 +592,7 @@ const SalaryManagement = () => {
                                             {!isPersonalView && (
                                                 <button
                                                     onClick={() => window.print()}
-                                                    className="px-2 py-1 rounded bg-sky-50 text-sky-700 text-xs font-semibold"
+                                                    className="px-2.5 py-1.5 rounded-2xl bg-sky-50 text-sky-700 text-xs font-black"
                                                     title="Print"
                                                 >
                                                     <FaFileAlt />
@@ -533,7 +601,7 @@ const SalaryManagement = () => {
                                             {canInstitutionWide && (
                                                 <button
                                                     onClick={() => navigate(`/${user.role}/payroll/employee/${encodeURIComponent(normalizeEmpId(r.emp_id))}`)}
-                                                    className="px-2 py-1 rounded bg-indigo-50 text-indigo-700 text-xs font-semibold"
+                                                    className="px-2.5 py-1.5 rounded-2xl bg-indigo-50 text-indigo-700 text-xs font-black"
                                                     title="View employee salary page"
                                                 >
                                                     <FaSearch />
@@ -542,7 +610,7 @@ const SalaryManagement = () => {
                                             {isPersonalView && (
                                                 <button
                                                     onClick={handleSubmitReport}
-                                                    className="px-2 py-1 rounded bg-amber-50 text-amber-700 text-xs font-semibold flex items-center gap-1"
+                                                    className="px-2.5 py-1.5 rounded-2xl bg-amber-50 text-amber-700 text-xs font-black flex items-center gap-1"
                                                     title="Report issue"
                                                 >
                                                     <FaPaperPlane /> Report
@@ -561,7 +629,7 @@ const SalaryManagement = () => {
                                                                 Swal.fire('Error', error?.response?.data?.message || 'Failed to mark paid.', 'error');
                                                             }
                                                         }}
-                                                        className="px-2 py-1 rounded bg-emerald-50 text-emerald-700 text-xs font-semibold"
+                                                        className="px-2.5 py-1.5 rounded-2xl bg-emerald-50 text-emerald-700 text-xs font-black"
                                                         title="Mark paid"
                                                     >
                                                         <FaCheckCircle />
@@ -577,7 +645,7 @@ const SalaryManagement = () => {
                                                                 Swal.fire('Error', error?.response?.data?.message || 'Failed to mark unpaid.', 'error');
                                                             }
                                                         }}
-                                                        className="px-2 py-1 rounded bg-amber-50 text-amber-700 text-xs font-semibold"
+                                                        className="px-2.5 py-1.5 rounded-2xl bg-amber-50 text-amber-700 text-xs font-black"
                                                         title="Mark unpaid"
                                                     >
                                                         <FaTimesCircle />
