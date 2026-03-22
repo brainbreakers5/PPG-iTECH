@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import Layout from '../../components/Layout';
 import api from '../../utils/api';
 import Swal from 'sweetalert2';
-import { FaEdit, FaTrash, FaUserPlus, FaSearch, FaFilter, FaUsers, FaIdBadge, FaEnvelope, FaPhone, FaPrint } from 'react-icons/fa';
+import { FaEdit, FaTrash, FaUserPlus, FaSearch, FaFilter, FaUsers, FaIdBadge, FaEnvelope, FaPhone, FaPrint, FaEye } from 'react-icons/fa';
 import { motion, AnimatePresence } from 'framer-motion';
 
 
@@ -352,6 +352,13 @@ const EmployeeManagement = () => {
                                             </td>
                                             <td className="p-6">
                                                 <div className="flex justify-center gap-3">
+                                                    <button
+                                                        onClick={(e) => { e.stopPropagation(); handleRowClick(emp); }}
+                                                        className="h-10 w-10 bg-gray-50 text-gray-400 rounded-xl hover:bg-sky-600 hover:text-white transition-all shadow-sm flex items-center justify-center active:scale-90 group/btn"
+                                                        title="View Profile"
+                                                    >
+                                                        <FaEye className="group-hover/btn:scale-110 transition-transform" size={14} />
+                                                    </button>
                                                     <button
                                                         onClick={(e) => handleEdit(e, emp)}
                                                         className="h-10 w-10 bg-sky-50 text-sky-600 rounded-xl hover:bg-sky-600 hover:text-white transition-all shadow-sm flex items-center justify-center active:scale-90 group/btn"
