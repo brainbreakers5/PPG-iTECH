@@ -386,51 +386,53 @@ const ManagementDashboard = () => {
                                         <p className="text-gray-400 text-lg font-bold">No employees found</p>
                                     </div>
                                 ) : (
-                                    <table className="min-w-full text-left">
-                                        <thead className="sticky top-0 z-10">
-                                            <tr className="bg-gray-50">
-                                                <th className="px-5 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">#</th>
-                                                <th className="px-5 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Emp ID</th>
-                                                <th className="px-5 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Name</th>
-                                                <th className="px-5 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Department</th>
-                                                <th className="px-5 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-right">Status</th>
-                                             </tr>
-                                         </thead>
-                                        <tbody className="divide-y divide-gray-50">
-                                            {filtered.map((emp, idx) => (
-                                                <motion.tr
-                                                    key={emp.emp_id}
-                                                    initial={{ opacity: 0, y: 5 }}
-                                                    animate={{ opacity: 1, y: 0 }}
-                                                    transition={{ delay: idx * 0.02 }}
-                                                    className="hover:bg-purple-50/50 transition-colors"
-                                                >
-                                                    <td className="px-5 py-4 text-sm font-black text-gray-400">{idx + 1}</td>
-                                                    <td className="px-5 py-4 text-sm font-black text-purple-900">{emp.emp_id}</td>
-                                                    <td className="px-5 py-4">
-                                                        <div className="flex items-center gap-3">
-                                                            <img src={emp.profile_pic || `https://ui-avatars.com/api/?name=${encodeURIComponent(emp.name || '?')}&size=80&background=9333ea&color=fff&bold=true`} alt="" className="h-9 w-9 rounded-xl object-cover shrink-0" />
-                                                            <span className="text-sm font-bold text-gray-800">{emp.name}</span>
-                                                        </div>
-                                                    </td>
-                                                    <td className="px-5 py-4 text-sm font-medium text-gray-600">{emp.department_name || '—'}</td>
-                                                    <td className="px-5 py-4 text-right">
-                                                        <span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest border ${
-                                                            (attendanceMap[emp.emp_id]?.remarks || '').includes('Late Entry') ? 'bg-orange-50 text-orange-600 border-orange-100' :
-                                                            attendanceMap[emp.emp_id]?.status?.startsWith('Present') ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 
-                                                            'bg-purple-50 text-purple-600 border-purple-100'
-                                                        }`}>
-                                                            {(attendanceMap[emp.emp_id]?.remarks || '').includes('Late Entry') ? (
-                                                                <span>{attendanceMap[emp.emp_id]?.status === 'Present' ? 'LE' : `${attendanceMap[emp.emp_id]?.status} (LE)`}</span>
-                                                            ) : attendanceMap[emp.emp_id]?.status?.startsWith('Present +') 
-                                                                ? `P / ${attendanceMap[emp.emp_id].status.replace('Present +', '').trim()}` 
-                                                                : (attendanceMap[emp.emp_id]?.status || 'N/A')}
-                                                        </span>
-                                                    </td>
-                                                </motion.tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
+                                    <div className="overflow-x-auto">
+                                        <table className="min-w-[600px] w-full text-left">
+                                            <thead className="sticky top-0 z-10">
+                                                <tr className="bg-gray-50">
+                                                    <th className="px-5 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest whitespace-nowrap">#</th>
+                                                    <th className="px-5 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest whitespace-nowrap">Emp ID</th>
+                                                    <th className="px-5 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest whitespace-nowrap">Name</th>
+                                                    <th className="px-5 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest whitespace-nowrap">Department</th>
+                                                    <th className="px-5 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-right whitespace-nowrap">Status</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-gray-50">
+                                                {filtered.map((emp, idx) => (
+                                                    <motion.tr
+                                                        key={emp.id || emp.emp_id}
+                                                        initial={{ opacity: 0, y: 5 }}
+                                                        animate={{ opacity: 1, y: 0 }}
+                                                        transition={{ delay: idx * 0.02 }}
+                                                        className="hover:bg-purple-50/50 transition-colors"
+                                                    >
+                                                        <td className="px-5 py-4 text-sm font-black text-gray-400 whitespace-nowrap">{idx + 1}</td>
+                                                        <td className="px-5 py-4 text-sm font-black text-purple-900 whitespace-nowrap">{emp.emp_id}</td>
+                                                        <td className="px-5 py-4 whitespace-nowrap">
+                                                            <div className="flex items-center gap-3">
+                                                                <img src={emp.profile_pic || `https://ui-avatars.com/api/?name=${encodeURIComponent(emp.name || '?')}&size=80&background=9333ea&color=fff&bold=true`} alt="" className="h-9 w-9 rounded-xl object-cover shrink-0" />
+                                                                <span className="text-sm font-bold text-gray-800">{emp.name}</span>
+                                                            </div>
+                                                        </td>
+                                                        <td className="px-5 py-4 text-sm font-medium text-gray-600 whitespace-nowrap">{emp.department_name || '—'}</td>
+                                                        <td className="px-5 py-4 text-right whitespace-nowrap">
+                                                            <span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest border ${
+                                                                (attendanceMap[emp.emp_id]?.remarks || '').includes('Late Entry') ? 'bg-orange-50 text-orange-600 border-orange-100' :
+                                                                attendanceMap[emp.emp_id]?.status?.startsWith('Present') ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 
+                                                                'bg-purple-50 text-purple-600 border-purple-100'
+                                                            }`}>
+                                                                {(attendanceMap[emp.emp_id]?.remarks || '').includes('Late Entry') ? (
+                                                                    <span>{attendanceMap[emp.emp_id]?.status === 'Present' ? 'LE' : `${attendanceMap[emp.emp_id]?.status} (LE)`}</span>
+                                                                ) : attendanceMap[emp.emp_id]?.status?.startsWith('Present +') 
+                                                                    ? `P / ${attendanceMap[emp.emp_id].status.replace('Present +', '').trim()}` 
+                                                                    : (attendanceMap[emp.emp_id]?.status || 'N/A')}
+                                                            </span>
+                                                        </td>
+                                                    </motion.tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
                                 )}
                             </div>
                         </motion.div>
