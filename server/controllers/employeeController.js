@@ -176,11 +176,16 @@ exports.getEmployees = async (req, res) => {
             // If ?all=true is passed, HOD/Staff can see all staff/hod/principal profiles (e.g. for conversation participant selection)
             if (req.query.all === 'true') {
                 query += ` WHERE u.role NOT IN ('admin')`;
+            } else if (req.user.role === 'hod') {
+                // HOD can see their own department's staff AND HODs from all departments
+                query += ` WHERE (u.department_id = $1 OR u.role = 'hod') AND u.role NOT IN ('admin', 'principal')`;
+                params.push(req.user.department_id);
             } else if (req.user.department_id) {
+                // Staff can only see their own department
                 query += ` WHERE u.department_id = $1 AND u.role NOT IN ('admin', 'principal')`;
                 params.push(req.user.department_id);
             } else {
-                // Return an empty list if HOD/Staff is not assigned a department (for security)
+                // Return an empty list if not assigned a department (for security)
                 return res.status(200).json([]);
             }
         }
@@ -398,6 +403,10 @@ exports.deleteEmployee = async (req, res) => {
         await client.query('DELETE FROM users WHERE id = $1', [req.params.id]);
 
         await client.query('COMMIT');
+        
+        // Immediately clear auth cache for this deleted user
+        const { clearUserCache } = require('../middleware/authMiddleware');
+        clearUserCache(req.params.id);
 
         const io = req.app.get('io');
         if (io) io.emit('employee_updated', { action: 'deleted' });
