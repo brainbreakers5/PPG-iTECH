@@ -120,7 +120,9 @@ const HODDashboard = () => {
                 const role = (r.role || '').toLowerCase();
                 const isHod = role === 'hod';
                 const isInDept = String(r.department_id) === String(user.department_id);
-                if (!isInDept) return; 
+                // HOD core should show all HODs institution-wide like principal.
+                // Staff core remains scoped to current HOD's department.
+                if (!isHod && !isInDept) return;
 
                 const bucket = isHod ? agg.hod : agg.staff;
                 const p = Number(r.total_present) || 0;
@@ -150,7 +152,7 @@ const HODDashboard = () => {
                 const role = (emp.role || '').toLowerCase();
                 const isHod = role === 'hod';
                 const isInDept = String(emp.department_id) === String(user.department_id);
-                if (!isInDept) return;
+                if (!isHod && !isInDept) return;
 
                 const rec = map[emp.emp_id] || {};
                 const s = (rec.status || '').toUpperCase();

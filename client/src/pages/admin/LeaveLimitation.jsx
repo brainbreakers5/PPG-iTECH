@@ -351,6 +351,15 @@ const LeaveLimitation = () => {
                 });
                 values.fromDate = document.getElementById('bulk_from_date')?.value;
                 values.toDate = document.getElementById('bulk_to_date')?.value;
+
+                if (!values.fromDate || !values.toDate) {
+                    Swal.showValidationMessage('From Date and To Date are required.');
+                    return false;
+                }
+                if (new Date(values.fromDate) > new Date(values.toDate)) {
+                    Swal.showValidationMessage('From Date cannot be after To Date.');
+                    return false;
+                }
                 return values;
             }
         });
@@ -371,7 +380,11 @@ const LeaveLimitation = () => {
                 fetchLimits();
             } catch (error) {
                 console.error('Bulk update fail:', error);
-                Swal.fire({ title: 'Critical Error', text: 'The bulk operation could not be completed.', icon: 'error' });
+                Swal.fire({
+                    title: 'Critical Error',
+                    text: error.response?.data?.message || error.message || 'The bulk operation could not be completed.',
+                    icon: 'error'
+                });
             }
         }
     };

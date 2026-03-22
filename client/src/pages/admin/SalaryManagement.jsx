@@ -1029,8 +1029,8 @@ const SalaryManagement = () => {
                                                                             return (
                                                                                 <div className="flex flex-wrap gap-1 justify-end max-w-[150px]">
                                                                                     {dArr.map((d, i) => (
-                                                                                        <span key={i} className="text-[7px] font-black bg-rose-50 text-rose-400 px-1.5 py-0.5 rounded border border-rose-100 uppercase truncate" title={`${d.type}: ₹${d.amount}`}>
-                                                                                            {d.type}: {Number(d.amount).toLocaleString()}
+                                                                                        <span key={i} className="text-[7px] font-black bg-rose-50 text-rose-400 px-1.5 py-0.5 rounded border border-rose-100 uppercase truncate" title={`${d.type || d.name || d.label || 'Deduction'}: ₹${Number(d.amount ?? d.value ?? d.deductionAmount ?? d.deduction_amount ?? 0).toLocaleString()}`}>
+                                                                                            {d.type || d.name || d.label || 'Deduction'}: {Number(d.amount ?? d.value ?? d.deductionAmount ?? d.deduction_amount ?? 0).toLocaleString()}
                                                                                         </span>
                                                                                     ))}
                                                                                 </div>

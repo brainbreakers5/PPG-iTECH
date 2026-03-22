@@ -285,10 +285,17 @@ exports.bulkUpdateLeaveLimits = async (req, res) => {
         const resolvedFromDate = normalizePeriodDate(fromDate || fromMonth, false);
         const resolvedToDate = normalizePeriodDate(toDate || toMonth, true);
 
+        if (!resolvedFromDate || !resolvedToDate) {
+            return res.status(400).json({ message: 'Invalid period. From Date and To Date are required in YYYY-MM-DD format.' });
+        }
+        if (new Date(resolvedFromDate) > new Date(resolvedToDate)) {
+            return res.status(400).json({ message: 'Invalid period. From Date cannot be after To Date.' });
+        }
+
         await client.query('BEGIN');
 
         const { rows: employees } = await client.query(
-            `SELECT emp_id FROM users WHERE role IN ('principal', 'hod', 'staff')`
+            `SELECT emp_id FROM users WHERE role IN ('principal', 'hod', 'staff') AND emp_id IS NOT NULL`
         );
 
         for (const emp of employees) {

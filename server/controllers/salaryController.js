@@ -40,7 +40,11 @@ const parseDeductions = (raw) => {
     try {
         const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
         if (!Array.isArray(parsed)) return 0;
-        return parsed.reduce((sum, d) => sum + (parseFloat(d.amount) || 0), 0);
+        return parsed.reduce((sum, d) => {
+            const amount = d?.amount ?? d?.value ?? d?.deductionAmount ?? d?.deduction_amount ?? 0;
+            const numeric = parseFloat(String(amount).replace(/,/g, '')) || 0;
+            return sum + numeric;
+        }, 0);
     } catch {
         return 0;
     }
@@ -92,6 +96,20 @@ const getAttendanceAggregateMap = async ({ fromDate, toDate, paidStatuses, unpai
                     ELSE 0
                 END
             ) AS unpaid_days,
+            SUM(
+                CASE
+                    WHEN status::text LIKE '%+%' THEN
+                        (CASE WHEN split_part(status::text, ' + ', 1) = ANY($4::text[]) THEN 0 ELSE 0.5 END +
+                         CASE WHEN split_part(status::text, ' + ', 2) = ANY($4::text[]) THEN 0 ELSE 0.5 END)
+                    WHEN status::text = ANY($4::text[]) THEN 0
+                    ELSE
+                        CASE
+                            WHEN remarks ILIKE '%Half Day%' OR remarks ILIKE '%half%' OR remarks ILIKE '%0.5%' OR remarks ILIKE '%1/2%'
+                            THEN 0.5
+                            ELSE 1.0
+                        END
+                END
+            ) AS inferred_payable_days,
             COUNT(*) AS total_records
         FROM attendance_records
         WHERE date::date >= $1::date AND date::date <= $2::date
@@ -103,6 +121,7 @@ const getAttendanceAggregateMap = async ({ fromDate, toDate, paidStatuses, unpai
         map[r.emp_id] = {
             payable_days: parseFloat(r.payable_days) || 0,
             unpaid_days: parseFloat(r.unpaid_days) || 0,
+            inferred_payable_days: parseFloat(r.inferred_payable_days) || 0,
             total_records: parseInt(r.total_records, 10) || 0
         };
     });
@@ -110,7 +129,7 @@ const getAttendanceAggregateMap = async ({ fromDate, toDate, paidStatuses, unpai
 };
 
 const computeSalaryMetrics = ({ monthlySalary, deductions, workingDaysInPeriod, payableDays }) => {
-    const grossSalary = Number(monthlySalary || 0);
+    const grossSalary = parseFloat(String(monthlySalary || 0).replace(/,/g, '')) || 0;
     const fixedDeductions = Number(deductions || 0);
     const divisor = workingDaysInPeriod > 0 ? workingDaysInPeriod : 1;
     const dailySalary = grossSalary / divisor;
@@ -192,13 +211,16 @@ exports.calculateSalary = async (req, res) => {
             }
 
             const stats = statsMap[userEmpId] || { payable_days: 0, unpaid_days: 0 };
+            const resolvedPayableDays = (stats.payable_days > 0 || stats.total_records === 0)
+                ? stats.payable_days
+                : (stats.inferred_payable_days || 0);
             const grossSource = parseFloat(user.monthly_salary) || parseFloat(user.base_salary) || 0;
             const fixedDeductions = parseDeductions(user.deductions);
             const metrics = computeSalaryMetrics({
                 monthlySalary: grossSource,
                 deductions: fixedDeductions,
                 workingDaysInPeriod: totalWorkingDays,
-                payableDays: stats.payable_days
+                payableDays: resolvedPayableDays
             });
 
             if (existing.length > 0) {
@@ -351,7 +373,13 @@ exports.getSalaryRecords = async (req, res) => {
                         monthlySalary: parseFloat(u.monthly_salary) || parseFloat(u.base_salary) || 0,
                         deductions: parseDeductions(u.deductions),
                         workingDaysInPeriod: totalWorkingDays,
-                        payableDays: attendanceMap[key]?.payable_days || existing.total_present || 0
+                        payableDays: (() => {
+                            const attendanceStats = attendanceMap[key] || {};
+                            if ((attendanceStats.payable_days || 0) > 0 || (attendanceStats.total_records || 0) === 0) {
+                                return attendanceStats.payable_days || existing.total_present || 0;
+                            }
+                            return attendanceStats.inferred_payable_days || existing.total_present || 0;
+                        })()
                     });
 
                     return {
@@ -393,7 +421,13 @@ exports.getSalaryRecords = async (req, res) => {
                 monthlySalary: gross,
                 deductions: parseDeductions(u.deductions),
                 workingDaysInPeriod: totalWorkingDays,
-                payableDays: attendanceMap[key]?.payable_days || 0
+                payableDays: (() => {
+                    const attendanceStats = attendanceMap[key] || {};
+                    if ((attendanceStats.payable_days || 0) > 0 || (attendanceStats.total_records || 0) === 0) {
+                        return attendanceStats.payable_days || 0;
+                    }
+                    return attendanceStats.inferred_payable_days || 0;
+                })()
             });
 
             return {
