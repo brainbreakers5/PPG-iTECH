@@ -9,7 +9,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 const AdminPurchase = () => {
     const [requests, setRequests] = useState([]);
     const [loading, setLoading] = useState(true);
-    const [filter, setFilter] = useState('All');
+    const [filter, setFilter] = useState('Approved_Principal');
     const [selectedIds, setSelectedIds] = useState([]);
     const navigate = useNavigate();
 
@@ -327,7 +327,7 @@ const AdminPurchase = () => {
         }
     };
 
-    const filterOptions = ['All', 'Pending', 'Approved_HOD', 'Approved_Principal', 'Approved_Admin', 'Purchased', 'Rejected'];
+    const filterOptions = ['Approved_Principal', 'Purchased', 'Rejected'];
     const filteredRequests = requests.filter(r => filter === 'All' || r.status === filter);
 
     const toggleSelect = (id) => {
