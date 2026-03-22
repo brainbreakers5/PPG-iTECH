@@ -169,7 +169,7 @@ const DepartmentStaffPage = () => {
             ) : (
                 <div className="bg-white rounded-[40px] shadow-2xl shadow-sky-500/5 p-8 border border-white hover:border-sky-100 transition-colors group">
                     <div className="overflow-x-auto">
-                        <table className="w-full text-left border-collapse">
+                        <table className="min-w-[80vw] md:w-full text-left border-collapse">
                             <thead>
                                 <tr className="border-b-2 border-sky-50">
                                     <th className="py-5 px-6 text-[10px] font-black text-sky-600 uppercase tracking-[0.2em] whitespace-nowrap">Personnel</th>
