@@ -86,9 +86,9 @@ const PurchaseRequestPage = () => {
                         </div>
                     </div>
 
-                    <div className="p-12">
-                        <div className="overflow-x-auto overflow-visible mb-10">
-                            <table className="w-full text-left">
+                    <div className="p-4 md:p-12">
+                        <div className="overflow-x-auto mb-10 pb-4 scrollbar-thin scrollbar-thumb-sky-100 scrollbar-track-transparent">
+                            <table className="w-full text-left min-w-[650px]">
                                 <thead className="border-b border-gray-100">
                                     <tr>
                                         <th className="pb-6 text-[10px] font-black text-gray-400 uppercase tracking-widest">Item</th>
@@ -155,26 +155,26 @@ const PurchaseRequestPage = () => {
                             </table>
                         </div>
 
-                        <div className="flex justify-between items-center pt-8 border-t border-gray-100">
+                        <div className="flex flex-col md:flex-row justify-between items-stretch md:items-center pt-8 border-t border-gray-100 gap-6">
                             <button
                                 onClick={addRow}
-                                className="px-8 py-4 bg-gray-50 border border-gray-100 text-[10px] font-black uppercase tracking-widest text-sky-600 flex items-center gap-3 hover:bg-white hover:border-sky-100 hover:shadow-xl hover:shadow-sky-50 transition-all rounded-2xl active:scale-95 group"
+                                className="w-full md:w-auto px-8 py-5 bg-gray-50 border border-gray-100 text-[10px] font-black uppercase tracking-widest text-sky-600 flex items-center justify-center gap-3 hover:bg-white hover:border-sky-100 hover:shadow-xl hover:shadow-sky-50 transition-all rounded-2xl active:scale-95 group"
                             >
                                 <div className="h-8 w-8 rounded-xl bg-sky-600 text-white flex items-center justify-center group-hover:rotate-90 transition-transform">
                                     <FaPlus size={10} />
                                 </div>
                                 add item
                             </button>
-                            <div className="flex gap-4">
+                            <div className="flex flex-col md:flex-row gap-4">
                                 <button
                                     onClick={() => navigate(-1)}
-                                    className="px-10 py-5 rounded-2xl text-[10px] font-black uppercase tracking-widest text-gray-400 hover:text-gray-600 hover:bg-gray-50 transition-all active:scale-95"
+                                    className="w-full md:w-auto px-10 py-5 rounded-2xl text-[10px] font-black uppercase tracking-widest text-gray-400 hover:text-gray-600 hover:bg-gray-50 transition-all active:scale-95 bg-white border border-gray-50"
                                 >
                                     Cancel Operations
                                 </button>
                                 <button
                                     onClick={submitRequest}
-                                    className="bg-sky-600 text-white px-12 py-5 rounded-2xl shadow-2xl shadow-sky-100 hover:bg-sky-800 transition-all font-black uppercase tracking-widest text-[10px] flex items-center gap-4 active:scale-95 group"
+                                    className="w-full md:w-auto bg-sky-600 text-white px-12 py-5 rounded-2xl shadow-2xl shadow-sky-200/50 hover:bg-sky-800 transition-all font-black uppercase tracking-widest text-[10px] flex items-center justify-center gap-4 active:scale-95 group"
                                 >
                                     <FaSave className="group-hover:scale-125 transition-transform" />
                                     submit
