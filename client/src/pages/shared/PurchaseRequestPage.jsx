@@ -6,8 +6,8 @@ import api from '../../utils/api';
 import Swal from 'sweetalert2';
 import { motion, AnimatePresence } from 'framer-motion';
 
-const inputClass = "w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl outline-none focus:ring-4 focus:ring-sky-100 focus:border-sky-500 transition-all font-bold text-gray-700 text-sm";
-const labelClass = "block text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-3 ml-1";
+const inputClass = "w-full p-5 md:p-4 bg-gray-50 border border-gray-100 rounded-2xl outline-none focus:ring-4 focus:ring-sky-100 focus:border-sky-500 transition-all font-bold text-gray-700 text-sm";
+const labelClass = "block text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-4 ml-1";
 
 const PurchaseRequestPage = () => {
     const navigate = useNavigate();
@@ -41,8 +41,8 @@ const PurchaseRequestPage = () => {
             await Promise.all(promises);
 
             Swal.fire({
-                title: 'Requests Synchronized',
-                text: `Successfully initiated ${promises.length} procurement records.`,
+                title: 'Request Submitted',
+                text: `Successfully initiated ${promises.length} purchase records.`,
                 icon: 'success',
                 confirmButtonColor: '#2563eb',
             });
@@ -56,7 +56,7 @@ const PurchaseRequestPage = () => {
 
     return (
         <Layout>
-            <div className="max-w-5xl mx-auto py-10">
+            <div className="max-w-5xl mx-auto py-6 md:py-10 px-4 md:px-0">
                 <div className="mb-10 flex items-center gap-6">
                     <button
                         onClick={() => navigate(-1)}
@@ -65,7 +65,7 @@ const PurchaseRequestPage = () => {
                         <FaArrowLeft size={20} />
                     </button>
                     <div>
-                        <h1 className="text-4xl font-black text-gray-800 tracking-tight">Procurement Initiation</h1>
+                        <h1 className="text-3xl md:text-4xl font-black text-gray-800 tracking-tight text-nowrap">New Purchase</h1>
                         <p className="text-[10px] font-black text-sky-500 uppercase tracking-[0.2em] mt-1">Resource Allocation Matrix</p>
                     </div>
                 </div>
@@ -91,7 +91,7 @@ const PurchaseRequestPage = () => {
                             <table className="w-full text-left">
                                 <thead className="border-b border-gray-100">
                                     <tr>
-                                        <th className="pb-6 text-[10px] font-black text-gray-400 uppercase tracking-widest">Resource Descriptor</th>
+                                        <th className="pb-6 text-[10px] font-black text-gray-400 uppercase tracking-widest">Item</th>
                                         <th className="pb-6 text-[10px] font-black text-gray-400 uppercase tracking-widest w-24 px-4 text-center">Qty</th>
                                         <th className="pb-6 text-[10px] font-black text-gray-400 uppercase tracking-widest w-40 px-4">Priority</th>
                                         <th className="pb-6 text-[10px] font-black text-gray-400 uppercase tracking-widest w-16 text-center">Action</th>
@@ -163,7 +163,7 @@ const PurchaseRequestPage = () => {
                                 <div className="h-8 w-8 rounded-xl bg-sky-600 text-white flex items-center justify-center group-hover:rotate-90 transition-transform">
                                     <FaPlus size={10} />
                                 </div>
-                                Append Identifier
+                                add item
                             </button>
                             <div className="flex gap-4">
                                 <button
@@ -177,7 +177,7 @@ const PurchaseRequestPage = () => {
                                     className="bg-sky-600 text-white px-12 py-5 rounded-2xl shadow-2xl shadow-sky-100 hover:bg-sky-800 transition-all font-black uppercase tracking-widest text-[10px] flex items-center gap-4 active:scale-95 group"
                                 >
                                     <FaSave className="group-hover:scale-125 transition-transform" />
-                                    Synchronize Procurement
+                                    submit
                                 </button>
                             </div>
                         </div>
