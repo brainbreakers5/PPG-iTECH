@@ -132,24 +132,39 @@ const PersonnelListPage = () => {
                                 </div>
                                 
                                 <div className="hidden lg:block w-px h-10 bg-gray-100"></div>
+
+                                {/* Email (New) */}
+                                <div className="text-center md:text-left shrink-0 min-w-[200px]">
+                                    <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1 text-center md:text-left">Email Identifier</p>
+                                    <div className="flex items-center justify-center md:justify-start gap-1">
+                                        <FaEnvelope className="text-sky-300" size={10} />
+                                        <p className="text-xs font-black text-gray-700 tracking-tight px-3 py-1 truncate max-w-[180px]">
+                                            {member.email}
+                                        </p>
+                                    </div>
+                                </div>
+                                
+                                <div className="hidden lg:block w-px h-10 bg-gray-100"></div>
                                 
                                 {/* Actions */}
                                 <div className="flex items-center justify-center gap-3 shrink-0 mt-4 md:mt-0 w-full md:w-auto">
-                                    <button
-                                        onClick={() => {
-                                            const rolePrefix = user?.role === 'admin' ? 'admin' :
-                                                user?.role === 'principal' ? 'principal' :
-                                                    user?.role === 'hod' ? 'hod' : 
-                                                        user?.role === 'management' ? 'management' : 'staff';
-                                            navigate(`/${rolePrefix}/profile/${member.emp_id}`);
-                                            window.dispatchEvent(new CustomEvent('closeSidebar'));
-                                        }}
-                                        className="flex-1 md:flex-none h-10 px-4 md:px-0 md:w-10 rounded-xl bg-sky-50 text-sky-600 flex items-center justify-center hover:bg-sky-600 hover:text-white transition-all shadow-sm border border-sky-100 group/btn tooltip-trigger"
-                                        title="View Profile"
-                                    >
-                                        <FaEye size={14} className="group-hover/btn:scale-110 transition-transform" />
-                                        <span className="md:hidden ml-2 text-[10px] font-black uppercase tracking-widest">Profile</span>
-                                    </button>
+                                    {!( (user?.role === 'principal' || user?.role === 'hod') && member.emp_id !== user?.emp_id ) && (
+                                        <button
+                                            onClick={() => {
+                                                const rolePrefix = user?.role === 'admin' ? 'admin' :
+                                                    user?.role === 'principal' ? 'principal' :
+                                                        user?.role === 'hod' ? 'hod' : 
+                                                            user?.role === 'management' ? 'management' : 'staff';
+                                                navigate(`/${rolePrefix}/profile/${member.emp_id}`);
+                                                window.dispatchEvent(new CustomEvent('closeSidebar'));
+                                            }}
+                                            className="flex-1 md:flex-none h-10 px-4 md:px-0 md:w-10 rounded-xl bg-sky-50 text-sky-600 flex items-center justify-center hover:bg-sky-600 hover:text-white transition-all shadow-sm border border-sky-100 group/btn tooltip-trigger"
+                                            title="View Profile"
+                                        >
+                                            <FaEye size={14} className="group-hover/btn:scale-110 transition-transform" />
+                                            <span className="md:hidden ml-2 text-[10px] font-black uppercase tracking-widest">Profile</span>
+                                        </button>
+                                    )}
                                     {(user?.role !== 'staff' && user?.role !== 'management' || member.emp_id === user?.emp_id) && (
                                         <button
                                             onClick={() => {
