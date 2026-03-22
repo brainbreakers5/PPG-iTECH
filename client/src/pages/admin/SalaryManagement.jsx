@@ -75,6 +75,8 @@ const SalaryManagement = () => {
     const [loading, setLoading] = useState(true);
     const [selectedIds, setSelectedIds] = useState([]);
     const [activeRole, setActiveRole] = useState('all');
+    const [activeDepartment, setActiveDepartment] = useState('all');
+    const [departments, setDepartments] = useState([]);
 
     const [paidStatuses, setPaidStatuses] = useState(() => {
         const saved = localStorage.getItem('salary_paid_statuses');
@@ -88,8 +90,22 @@ const SalaryManagement = () => {
     const [newStatus, setNewStatus] = useState('');
 
     const filteredRows = useMemo(() => {
-        return rows.filter((r) => activeRole === 'all' || String(r.role || '').toLowerCase() === activeRole);
-    }, [rows, activeRole]);
+        return rows.filter((r) => {
+            const roleMatch = activeRole === 'all' || String(r.role || '').toLowerCase() === activeRole;
+            const deptMatch = activeDepartment === 'all' || String(r.department_name || '').toLowerCase() === activeDepartment;
+            return roleMatch && deptMatch;
+        });
+    }, [rows, activeRole, activeDepartment]);
+
+    const departmentOptions = useMemo(() => {
+        const fromRows = rows
+            .map((r) => String(r.department_name || '').trim())
+            .filter(Boolean);
+        const fromMaster = departments
+            .map((d) => String(d.name || '').trim())
+            .filter(Boolean);
+        return Array.from(new Set([...fromMaster, ...fromRows]));
+    }, [rows, departments]);
 
     const refreshRows = async () => {
         setLoading(true);
@@ -144,6 +160,20 @@ const SalaryManagement = () => {
         refreshRows();
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [selectedMonth, selectedYear, isHistoryPage, isPersonalView]);
+
+    useEffect(() => {
+        const fetchDepartments = async () => {
+            if (!canInstitutionWide) return;
+            try {
+                const { data } = await api.get('/departments');
+                setDepartments(Array.isArray(data) ? data : []);
+            } catch (error) {
+                console.error('Failed to fetch departments:', error);
+                setDepartments([]);
+            }
+        };
+        fetchDepartments();
+    }, [canInstitutionWide]);
 
     const saveAttendanceConfig = async () => {
         localStorage.setItem('salary_paid_statuses', JSON.stringify(paidStatuses));
@@ -287,17 +317,38 @@ const SalaryManagement = () => {
         setSelectedIds(filteredRows.map((r) => r.id));
     };
 
-    const renderRoleTabs = canInstitutionWide && (
-        <div className="flex flex-wrap gap-2 mb-4">
-            {['all', 'principal', 'hod', 'staff', 'management'].map((r) => (
-                <button
-                    key={r}
-                    onClick={() => setActiveRole(r)}
-                    className={`px-3 py-2 rounded-lg text-xs font-bold uppercase ${activeRole === r ? 'bg-sky-600 text-white' : 'bg-white text-gray-500 border'}`}
-                >
-                    {r}
-                </button>
-            ))}
+    const renderFilterControls = canInstitutionWide && (
+        <div className="bg-white p-4 rounded-[24px] shadow-lg shadow-sky-50/60 border border-sky-50 mb-5">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label className="block text-[10px] font-black uppercase tracking-[0.2em] text-gray-400 mb-2">Select Role</label>
+                    <select
+                        value={activeRole}
+                        onChange={(e) => setActiveRole(e.target.value)}
+                        className="w-full px-4 py-3 rounded-2xl bg-gray-50 border border-gray-100 text-sm font-bold text-gray-700 outline-none focus:ring-4 focus:ring-sky-100"
+                    >
+                        <option value="all">All Roles</option>
+                        <option value="principal">Principal</option>
+                        <option value="hod">HOD</option>
+                        <option value="staff">Staff</option>
+                        <option value="management">Management</option>
+                    </select>
+                </div>
+                <div>
+                    <label className="block text-[10px] font-black uppercase tracking-[0.2em] text-gray-400 mb-2">Select Department</label>
+                    <select
+                        value={activeDepartment}
+                        onChange={(e) => setActiveDepartment(e.target.value)}
+                        className="w-full px-4 py-3 rounded-2xl bg-gray-50 border border-gray-100 text-sm font-bold text-gray-700 outline-none focus:ring-4 focus:ring-sky-100"
+                    >
+                        <option value="all">All Departments</option>
+                        {departmentOptions.map((name) => (
+                            <option key={name} value={name.toLowerCase()}>{name}</option>
+                        ))}
+                    </select>
+                </div>
+            </div>
+            <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mt-3">Filtered records: {filteredRows.length}</p>
         </div>
     );
 
@@ -349,7 +400,7 @@ const SalaryManagement = () => {
                 </div>
 
                 {!isPersonalView && (
-                    <div className="bg-white rounded-xl border p-4 mb-4 flex flex-wrap items-center gap-3">
+                    <div className="bg-white p-5 rounded-[28px] shadow-lg shadow-sky-50/60 border border-sky-50 mb-5 flex flex-wrap items-center gap-3">
                         {!isHistoryPage && (
                             <>
                                 <span className="text-xs font-bold text-gray-500 uppercase">Fixed Period</span>
@@ -385,7 +436,7 @@ const SalaryManagement = () => {
                 )}
 
                 {!isPersonalView && !isHistoryPage && (
-                    <div className="bg-white rounded-xl border p-4 mb-4">
+                    <div className="bg-white p-6 rounded-[28px] shadow-lg shadow-sky-50/60 border border-sky-50 mb-5">
                         <div className="flex flex-wrap gap-2 items-center mb-3">
                             <h2 className="text-sm font-bold text-gray-700">Attendance Status Rules</h2>
                             <button onClick={saveAttendanceConfig} className="px-3 py-2 rounded bg-sky-600 text-white text-xs font-bold">Save</button>
@@ -408,16 +459,16 @@ const SalaryManagement = () => {
                 )}
 
                 {isPersonalView && (
-                    <div className="bg-white rounded-xl border p-4 mb-4 text-xs text-gray-600">
+                    <div className="bg-white p-5 rounded-[24px] shadow-lg shadow-sky-50/60 border border-sky-50 mb-5 text-xs text-gray-600">
                         <p><b>Admin With Pay statuses:</b> {paidStatuses.join(', ')}</p>
                         <p><b>Admin Without Pay statuses:</b> {unpaidStatuses.join(', ')}</p>
                     </div>
                 )}
 
-                {renderRoleTabs}
+                {renderFilterControls}
 
                 {canInstitutionWide && isHistoryPage && (
-                    <div className="bg-white rounded-xl border p-3 mb-4 flex flex-wrap gap-2 items-center">
+                    <div className="bg-white p-4 rounded-[24px] shadow-lg shadow-sky-50/60 border border-sky-50 mb-5 flex flex-wrap gap-2 items-center">
                         <button onClick={toggleSelectAll} className="px-3 py-2 rounded bg-gray-100 text-xs font-bold">{selectedIds.length === filteredRows.length ? 'Clear Selection' : 'Select All'}</button>
                         <button onClick={() => handleBulkMark('Paid')} className="px-3 py-2 rounded bg-emerald-600 text-white text-xs font-bold flex items-center gap-1"><FaCheckCircle /> Mark All Paid</button>
                         <button onClick={() => handleBulkMark('Pending')} className="px-3 py-2 rounded bg-amber-500 text-white text-xs font-bold flex items-center gap-1"><FaClock /> Mark All Unpaid</button>
@@ -425,12 +476,12 @@ const SalaryManagement = () => {
                     </div>
                 )}
 
-                <div className="bg-white rounded-xl border overflow-x-auto">
+                <div className="bg-white rounded-[32px] shadow-xl shadow-sky-50/60 border border-sky-50 overflow-x-auto">
                     <table className="w-full min-w-[1100px]">
                         <thead className="bg-gray-50">
                             <tr>
                                 {canInstitutionWide && isHistoryPage && <th className="p-3 text-left text-xs">Select</th>}
-                                <th className="p-3 text-left text-xs uppercase text-gray-500">Employee</th>
+                                <th className="p-3 text-left text-xs uppercase tracking-widest text-gray-500">Employee</th>
                                 <th className="p-3 text-left text-xs uppercase text-gray-500">Period</th>
                                 <th className="p-3 text-right text-xs uppercase text-gray-500">With/Without Pay</th>
                                 <th className="p-3 text-right text-xs uppercase text-gray-500">Gross</th>
