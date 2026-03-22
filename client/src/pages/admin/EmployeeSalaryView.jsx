@@ -36,7 +36,7 @@ const EmployeeSalaryView = () => {
             <div className="max-w-6xl mx-auto">
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-10 gap-6">
                     <div>
-                        <h1 className="text-3xl font-black text-gray-800 tracking-tight">Employee Salary Page</h1>
+                        <h1 className="text-3xl md:text-4xl font-black text-gray-800 tracking-tighter">Employee <span className="text-sky-600">Salary</span></h1>
                         <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 mt-2">Employee ID: {empId}</p>
                     </div>
                     <button
@@ -111,9 +111,10 @@ const EmployeeSalaryView = () => {
                                 <tr>
                                     <td colSpan={6} className="p-32 text-center text-gray-400">
                                         <div className="flex flex-col items-center gap-6 opacity-20 grayscale">
+                                            <FaArrowLeft size={64} className="text-gray-400" />
                                             <div>
                                                 <p className="text-xl font-black text-gray-800 tracking-tight">No Records</p>
-                                                <p className="text-sm font-bold uppercase tracking-widest text-gray-400 mt-1">No salary records found for this view.</p>
+                                                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400 mt-1">No salary records found for this view.</p>
                                             </div>
                                         </div>
                                     </td>

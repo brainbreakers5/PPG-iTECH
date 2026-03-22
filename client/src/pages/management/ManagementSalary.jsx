@@ -234,8 +234,8 @@ const ManagementSalary = () => {
                 {/* Header Section */}
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-10 gap-6">
                     <div>
-                        <h1 className="text-3xl font-black text-gray-800 tracking-tight">Management <span className="text-[#7C3AED]">Salary</span></h1>
-                        <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 mt-2">Overview of salaries and reports.</p>
+                        <h1 className="text-3xl md:text-4xl font-black text-gray-800 tracking-tighter">Management <span className="text-[#7C3AED]">Salary</span></h1>
+                        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400 mt-2">Overview of salaries and reports.</p>
                     </div>
                 </div>
 

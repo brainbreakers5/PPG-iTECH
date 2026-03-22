@@ -347,7 +347,7 @@ const SalaryManagement = () => {
         <motion.div
             variants={fadeUp}
             transition={{ duration: 0.35, ease: 'easeOut' }}
-            className="bg-white p-6 rounded-[32px] shadow-xl shadow-sky-50/70 border border-sky-50 mb-6"
+            className="modern-card p-6 border-sky-100 mb-6"
         >
             <div className="flex items-center gap-3 mb-4">
                 <div className="h-10 w-10 rounded-2xl bg-sky-100 text-sky-600 flex items-center justify-center">
@@ -401,8 +401,14 @@ const SalaryManagement = () => {
             >
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-10 gap-6">
                     <div>
-                        <h1 className="text-3xl font-black text-gray-800 tracking-tight">
-                            {isPersonalView ? 'My Salary Details' : isHistoryPage ? 'Salary History' : 'Salary Management'}
+                        <h1 className="text-3xl md:text-4xl font-black text-gray-800 tracking-tighter">
+                            {isPersonalView ? (
+                                <>My Salary <span className="text-sky-600">Details</span></>
+                            ) : isHistoryPage ? (
+                                <>Salary <span className="text-sky-600">History</span></>
+                            ) : (
+                                <>Salary <span className="text-sky-600">Management</span></>
+                            )}
                         </h1>
                         <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 mt-2">
                             {isPersonalView
@@ -444,40 +450,32 @@ const SalaryManagement = () => {
                 </div>
 
                 <motion.div variants={staggerWrap} className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-                    <motion.div variants={fadeUp} transition={{ duration: 0.35 }} className="bg-white rounded-3xl border border-sky-50 shadow-lg shadow-sky-50/70 p-5 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl">
-                        <div className="flex items-center gap-3">
-                            <div className="h-10 w-10 rounded-xl bg-sky-100 text-sky-600 flex items-center justify-center"><FaMoneyBillWave /></div>
-                            <div>
-                                <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">Gross Total</p>
-                                <p className="text-lg font-black text-gray-800">Rs {toCurrency(summary.gross)}</p>
-                            </div>
+                    <motion.div variants={fadeUp} transition={{ duration: 0.35 }} className="modern-card p-6 border-sky-100 flex items-center gap-4 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl group">
+                        <div className="h-12 w-12 rounded-2xl bg-sky-50 text-sky-600 flex items-center justify-center shadow-lg shadow-sky-100 group-hover:scale-110 group-hover:-translate-y-1 transition-transform"><FaMoneyBillWave size={20} /></div>
+                        <div>
+                            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">Gross Total</p>
+                            <p className="text-xl font-black text-gray-800 tracking-tighter">Rs {toCurrency(summary.gross)}</p>
                         </div>
                     </motion.div>
-                    <motion.div variants={fadeUp} transition={{ duration: 0.35 }} className="bg-white rounded-3xl border border-sky-50 shadow-lg shadow-sky-50/70 p-5 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl">
-                        <div className="flex items-center gap-3">
-                            <div className="h-10 w-10 rounded-xl bg-emerald-100 text-emerald-600 flex items-center justify-center"><FaWallet /></div>
-                            <div>
-                                <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">Net Total</p>
-                                <p className="text-lg font-black text-emerald-700">Rs {toCurrency(summary.net)}</p>
-                            </div>
+                    <motion.div variants={fadeUp} transition={{ duration: 0.35 }} className="modern-card p-6 border-emerald-100 flex items-center gap-4 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl group">
+                        <div className="h-12 w-12 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center shadow-lg shadow-emerald-100 group-hover:scale-110 group-hover:-translate-y-1 transition-transform"><FaWallet size={20} /></div>
+                        <div>
+                            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">Net Total</p>
+                            <p className="text-xl font-black text-emerald-700 tracking-tighter">Rs {toCurrency(summary.net)}</p>
                         </div>
                     </motion.div>
-                    <motion.div variants={fadeUp} transition={{ duration: 0.35 }} className="bg-white rounded-3xl border border-sky-50 shadow-lg shadow-sky-50/70 p-5 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl">
-                        <div className="flex items-center gap-3">
-                            <div className="h-10 w-10 rounded-xl bg-indigo-100 text-indigo-600 flex items-center justify-center"><FaUserTie /></div>
-                            <div>
-                                <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">Paid Records</p>
-                                <p className="text-lg font-black text-gray-800">{summary.paidCount}</p>
-                            </div>
+                    <motion.div variants={fadeUp} transition={{ duration: 0.35 }} className="modern-card p-6 border-indigo-100 flex items-center gap-4 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl group">
+                        <div className="h-12 w-12 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center shadow-lg shadow-indigo-100 group-hover:scale-110 group-hover:-translate-y-1 transition-transform"><FaUserTie size={20} /></div>
+                        <div>
+                            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">Paid Records</p>
+                            <p className="text-xl font-black text-gray-800 tracking-tighter">{summary.paidCount}</p>
                         </div>
                     </motion.div>
-                    <motion.div variants={fadeUp} transition={{ duration: 0.35 }} className="bg-white rounded-3xl border border-sky-50 shadow-lg shadow-sky-50/70 p-5 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl">
-                        <div className="flex items-center gap-3">
-                            <div className="h-10 w-10 rounded-xl bg-amber-100 text-amber-600 flex items-center justify-center"><FaBuilding /></div>
-                            <div>
-                                <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">Pending Records</p>
-                                <p className="text-lg font-black text-gray-800">{summary.pendingCount}</p>
-                            </div>
+                    <motion.div variants={fadeUp} transition={{ duration: 0.35 }} className="modern-card p-6 border-amber-100 flex items-center gap-4 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl group">
+                        <div className="h-12 w-12 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center shadow-lg shadow-amber-100 group-hover:scale-110 group-hover:-translate-y-1 transition-transform"><FaBuilding size={20} /></div>
+                        <div>
+                            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">Pending</p>
+                            <p className="text-xl font-black text-gray-800 tracking-tighter">{summary.pendingCount}</p>
                         </div>
                     </motion.div>
                 </motion.div>
@@ -492,7 +490,7 @@ const SalaryManagement = () => {
                     <motion.div
                         variants={fadeUp}
                         transition={{ duration: 0.35, ease: 'easeOut' }}
-                        className="bg-white p-6 rounded-[32px] shadow-xl shadow-sky-50/70 border border-sky-50 mb-6 flex flex-wrap items-center gap-3"
+                        className="modern-card p-6 border-sky-100 mb-6 flex flex-wrap items-center gap-4"
                     >
                         {!isHistoryPage && (
                             <>
@@ -532,11 +530,11 @@ const SalaryManagement = () => {
                     <motion.div
                         variants={fadeUp}
                         transition={{ duration: 0.35, ease: 'easeOut' }}
-                        className="bg-white p-6 rounded-[32px] shadow-xl shadow-sky-50/70 border border-sky-50 mb-6"
+                        className="modern-card p-6 border-sky-100 mb-6"
                     >
-                        <div className="flex flex-wrap gap-2 items-center mb-3">
-                            <h2 className="text-sm font-bold text-gray-700">Attendance Status Rules</h2>
-                            <button onClick={saveAttendanceConfig} className="px-3 py-2 rounded-2xl bg-sky-600 text-white text-xs font-bold transition-all duration-300 hover:scale-[1.03] hover:bg-sky-700">Save</button>
+                        <div className="flex flex-wrap gap-4 items-center mb-6">
+                            <h2 className="text-sm font-black text-gray-800 tracking-tight">Attendance Status Rules</h2>
+                            <button onClick={saveAttendanceConfig} className="bg-sky-600 text-white px-6 py-3 rounded-2xl shadow-lg shadow-sky-100 hover:bg-sky-700 transition-all active:scale-95 font-black uppercase tracking-widest text-[10px]">Save Config</button>
                         </div>
                         <div className="flex flex-wrap gap-2 items-center mb-3">
                             <input
@@ -572,12 +570,12 @@ const SalaryManagement = () => {
                     <motion.div
                         variants={fadeUp}
                         transition={{ duration: 0.35, ease: 'easeOut' }}
-                        className="bg-white p-4 rounded-[28px] shadow-xl shadow-sky-50/70 border border-sky-50 mb-6 flex flex-wrap gap-2 items-center"
+                        className="modern-card p-6 border-sky-100 mb-6 flex flex-wrap gap-3 items-center"
                     >
-                        <button onClick={toggleSelectAll} className="px-3 py-2 rounded-2xl bg-gray-100 text-xs font-bold">{selectedIds.length === filteredRows.length ? 'Clear Selection' : 'Select All'}</button>
-                        <button onClick={() => handleBulkMark('Paid')} className="px-3 py-2 rounded-2xl bg-emerald-600 text-white text-xs font-bold flex items-center gap-1"><FaCheckCircle /> Mark All Paid</button>
-                        <button onClick={() => handleBulkMark('Pending')} className="px-3 py-2 rounded-2xl bg-amber-500 text-white text-xs font-bold flex items-center gap-1"><FaClock /> Mark All Unpaid</button>
-                        <span className="text-xs text-gray-500">Selected: {selectedIds.length}</span>
+                        <button onClick={toggleSelectAll} className="bg-gray-100 text-gray-600 px-6 py-3 rounded-2xl hover:bg-gray-200 transition-all font-black uppercase tracking-widest text-[10px] active:scale-95">{selectedIds.length === filteredRows.length ? 'Clear Selection' : 'Select All'}</button>
+                        <button onClick={() => handleBulkMark('Paid')} className="bg-emerald-600 text-white px-6 py-3 rounded-2xl shadow-lg shadow-emerald-100 hover:bg-emerald-700 transition-all font-black uppercase tracking-widest text-[10px] active:scale-95 flex items-center gap-2"><FaCheckCircle /> Mark All Paid</button>
+                        <button onClick={() => handleBulkMark('Pending')} className="bg-amber-500 text-white px-6 py-3 rounded-2xl shadow-lg shadow-amber-100 hover:bg-amber-600 transition-all font-black uppercase tracking-widest text-[10px] active:scale-95 flex items-center gap-2"><FaClock /> Mark All Unpaid</button>
+                        <span className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400 ml-auto bg-gray-50 px-4 py-2 rounded-xl">Selected: {selectedIds.length}</span>
                     </motion.div>
                 )}
 

@@ -64,8 +64,8 @@ const SalaryReports = () => {
             <div className="max-w-7xl mx-auto">
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-10 gap-6">
                     <div>
-                        <h1 className="text-3xl font-black text-gray-800 tracking-tight">Salary Reports</h1>
-                        <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 mt-2">Employees can submit salary issues here. Admin can reply directly.</p>
+                        <h1 className="text-3xl md:text-4xl font-black text-gray-800 tracking-tighter">Salary <span className="text-sky-600">Reports</span></h1>
+                        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400 mt-2">Employees can submit salary issues here. Admin can reply directly.</p>
                     </div>
                     <button
                         onClick={() => navigate(`/${user.role}/payroll`)}
@@ -150,7 +150,7 @@ const SalaryReports = () => {
                                             <FaEnvelopeOpenText size={64} className="text-gray-400" />
                                             <div>
                                                 <p className="text-xl font-black text-gray-800 tracking-tight">No Reports</p>
-                                                <p className="text-sm font-bold uppercase tracking-widest text-gray-400 mt-1">No salary reports found.</p>
+                                                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400 mt-1">No salary reports found.</p>
                                             </div>
                                         </div>
                                     </td>
