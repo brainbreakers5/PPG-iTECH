@@ -56,7 +56,7 @@ const PurchaseRequestPage = () => {
 
     return (
         <Layout>
-            <div className="max-w-5xl mx-auto py-6 md:py-10 px-4 md:px-0">
+            <div className="max-w-7xl mx-auto py-6 md:py-10 px-4 md:px-0 overflow-y-auto min-h-screen">
                 <div className="mb-10 flex items-center gap-6">
                     <button
                         onClick={() => navigate(-1)}
