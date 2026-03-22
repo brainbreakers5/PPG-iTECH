@@ -5,6 +5,7 @@ import { FaFileDownload, FaSearch, FaFingerprint, FaClock, FaIdBadge, FaCalendar
 import { motion, AnimatePresence } from 'framer-motion';
 import Swal from 'sweetalert2';
 import { formatTo12Hr } from '../../utils/timeFormatter';
+import { finalizePrintWindow } from '../../utils/printUtils';
 
 const BiometricHistory = () => {
     const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
@@ -62,7 +63,7 @@ const BiometricHistory = () => {
         return `${h}h ${String(m).padStart(2, '0')}m`;
     };
 
-    const handlePrint = () => {
+    const handlePrint = async () => {
         if (filteredLogs.length === 0) {
             Swal.fire({ icon: 'warning', title: 'No Data', text: 'No records to print.' });
             return;
@@ -132,11 +133,13 @@ const BiometricHistory = () => {
             </html>
         `);
         printWindow.document.close();
-        printWindow.focus();
-        setTimeout(() => {
-            printWindow.print();
-            printWindow.close();
-        }, 500);
+        await finalizePrintWindow({
+            printWindow,
+            title: titleText,
+            delay: 500,
+            modeLabel: 'the biometric sync report',
+            closeAfterPrint: true
+        });
     };
 
     return (

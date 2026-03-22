@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import Layout from '../../components/Layout';
 import api from '../../utils/api';
 import Swal from 'sweetalert2';
+import { finalizePrintWindow } from '../../utils/printUtils';
 import { FaShoppingCart, FaBoxOpen, FaLayerGroup, FaExclamationTriangle, FaPrint, FaPlus, FaTimes, FaCheck } from 'react-icons/fa';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -41,7 +42,7 @@ const AdminPurchase = () => {
         .replace(/"/g, '&quot;')
         .replace(/'/g, '&#39;');
 
-    const handlePrintRequests = (items, title) => {
+    const handlePrintRequests = async (items, title) => {
         if (!items || items.length === 0) {
             Swal.fire({
                 title: 'Nothing to print',
@@ -246,8 +247,12 @@ const AdminPurchase = () => {
             </html>
         `);
         printWindow.document.close();
-        printWindow.focus();
-        setTimeout(() => printWindow.print(), 250);
+        await finalizePrintWindow({
+            printWindow,
+            title,
+            delay: 250,
+            modeLabel: 'the purchase report'
+        });
     };
 
     const handleAction = async (id, status) => {

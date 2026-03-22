@@ -36,6 +36,34 @@ const LeaveLimitation = () => {
     const [showAddLeaveType, setShowAddLeaveType] = useState(false);
     const socket = useSocket();
 
+    const mapEmployeesToDefaultLimits = (employees, year) => {
+        return (employees || []).filter((e) => e?.emp_id).map((emp) => ({
+            emp_id: emp.emp_id,
+            name: emp.name,
+            designation: emp.designation,
+            role: emp.role,
+            profile_pic: emp.profile_pic,
+            department_name: emp.department_name,
+            year,
+            from_month: fromDate,
+            to_month: toDate,
+            updated_at: null,
+            cl_limit: 12,
+            ml_limit: 12,
+            od_limit: 10,
+            comp_limit: 6,
+            lop_limit: 30,
+            permission_limit: 2,
+            cl_taken: 0,
+            ml_taken: 0,
+            od_taken: 0,
+            comp_taken: 0,
+            lop_taken: 0,
+            permission_taken: 0,
+            comp_earned: 0,
+        }));
+    };
+
     useEffect(() => {
         fetchLimits();
         fetchLeaveTypes();
@@ -87,9 +115,22 @@ const LeaveLimitation = () => {
             // Filter data based on month range if additional date fields exist
             // For now, we show all data for the selected year
             // This can be enhanced when month-specific leave records are available
-            setStaffData(data);
+            if (Array.isArray(data) && data.length > 0) {
+                setStaffData(data);
+            } else {
+                const { data: employees } = await api.get('/employees?all=true');
+                setStaffData(mapEmployeesToDefaultLimits(employees, year));
+            }
         } catch (error) {
             console.error('Failed to fetch limits', error);
+            try {
+                const year = new Date(fromDate).getFullYear();
+                const { data: employees } = await api.get('/employees?all=true');
+                setStaffData(mapEmployeesToDefaultLimits(employees, year));
+            } catch (fallbackError) {
+                console.error('Fallback employee fetch failed', fallbackError);
+                setStaffData([]);
+            }
         } finally {
             setLoading(false);
         }
@@ -384,11 +425,34 @@ const LeaveLimitation = () => {
                 fetchLimits();
             } catch (error) {
                 console.error('Bulk update fail:', error);
-                Swal.fire({
-                    title: 'Critical Error',
-                    text: error.response?.data?.message || error.message || 'The bulk operation could not be completed.',
-                    icon: 'error'
-                });
+                try {
+                    const year = new Date(formValues.fromDate || fromDate).getFullYear();
+                    const { data: employees } = await api.get('/employees?all=true');
+                    const targets = (employees || []).filter((e) => e?.emp_id);
+                    const settled = await Promise.allSettled(
+                        targets.map((emp) => api.put(`/leave-limits/${emp.emp_id}`, { year, ...formValues }))
+                    );
+                    const successCount = settled.filter((s) => s.status === 'fulfilled').length;
+                    const failCount = settled.length - successCount;
+
+                    if (successCount > 0) {
+                        Swal.fire({
+                            title: failCount > 0 ? 'Bulk Set Partial' : 'Bulk Set Complete!',
+                            text: `${successCount} updated${failCount > 0 ? `, ${failCount} failed` : ''}.`,
+                            icon: failCount > 0 ? 'warning' : 'success',
+                            confirmButtonColor: '#2563eb'
+                        });
+                        fetchLimits();
+                    } else {
+                        throw new Error('Fallback per-employee update failed for all users.');
+                    }
+                } catch (fallbackError) {
+                    Swal.fire({
+                        title: 'Critical Error',
+                        text: fallbackError?.response?.data?.message || fallbackError.message || error.response?.data?.message || error.message || 'The bulk operation could not be completed.',
+                        icon: 'error'
+                    });
+                }
             }
         }
     };

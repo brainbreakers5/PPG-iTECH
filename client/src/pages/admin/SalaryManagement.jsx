@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import Layout from '../../components/Layout';
 import api from '../../utils/api';
 import Swal from 'sweetalert2';
+import { finalizePrintWindow } from '../../utils/printUtils';
 import { useAuth } from '../../context/AuthContext';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -55,6 +56,10 @@ const getCycleByMonthYear = (month, year) => {
 
 const toCurrency = (v) => Number(v || 0).toLocaleString('en-IN');
 const normalizeEmpId = (v) => String(v || '').trim();
+const formatGeneratedAt = () => {
+    const now = new Date();
+    return `${now.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })} ${now.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}`;
+};
 const escapeHtml = (value) => String(value ?? '')
     .replaceAll('&', '&amp;')
     .replaceAll('<', '&lt;')
@@ -113,9 +118,12 @@ const SalaryManagement = () => {
 
     const filteredRows = useMemo(() => {
         return rows.filter((r) => {
-            const roleMatch = activeRole === 'all' || String(r.role || '').toLowerCase() === activeRole;
+            const roleValue = String(r.role || '').toLowerCase();
+            const nameValue = String(r.name || '').toLowerCase();
+            const roleMatch = activeRole === 'all' || roleValue === activeRole;
             const deptMatch = activeDepartment === 'all' || String(r.department_name || '').toLowerCase() === activeDepartment;
-            return roleMatch && deptMatch;
+            const hideManagementDetails = roleValue === 'management' || nameValue.includes('institutional management');
+            return roleMatch && deptMatch && !hideManagementDetails;
         });
     }, [rows, activeRole, activeDepartment]);
 
@@ -147,7 +155,12 @@ const SalaryManagement = () => {
         try {
             if (isPersonalView) {
                 const { data } = await api.get('/salary/timeline');
-                setRows(Array.isArray(data) ? data : []);
+                const normalized = (Array.isArray(data) ? data : []).slice().sort((a, b) => {
+                    const aDate = new Date(a?.to_date || a?.from_date || a?.created_at || 0).getTime();
+                    const bDate = new Date(b?.to_date || b?.from_date || b?.created_at || 0).getTime();
+                    return bDate - aDate;
+                });
+                setRows(normalized);
                 setLoading(false);
                 return;
             }
@@ -299,7 +312,7 @@ const SalaryManagement = () => {
         }
     };
 
-    const printPaymentSlip = (row) => {
+    const printPaymentSlip = async (row) => {
         const printWindow = window.open('', '_blank', 'width=900,height=900');
         if (!printWindow) return;
 
@@ -308,6 +321,7 @@ const SalaryManagement = () => {
         const net = Number(row.calculated_salary || 0);
         const withPay = Number(row.total_present || row.with_pay_count || 0).toFixed(1);
         const withoutPay = Number(row.total_lop || row.without_pay_count || 0).toFixed(1);
+        const generatedAt = formatGeneratedAt();
 
         const html = `
             <html>
@@ -322,6 +336,28 @@ const SalaryManagement = () => {
                             border-radius: 16px;
                             padding: 18px;
                             background: linear-gradient(180deg, #f8fbff 0%, #ffffff 100%);
+                        }
+                        .page-head {
+                            display: flex;
+                            justify-content: space-between;
+                            align-items: flex-start;
+                            margin-bottom: 12px;
+                        }
+                        .head-center {
+                            text-align: center;
+                            font-size: 18px;
+                            font-weight: 900;
+                            letter-spacing: 0.05em;
+                            color: #0f172a;
+                            flex: 1;
+                        }
+                        .brand-right {
+                            text-align: right;
+                            font-size: 10px;
+                            font-weight: 700;
+                            color: #334155;
+                            line-height: 1.4;
+                            min-width: 190px;
                         }
                         .head {
                             display: flex;
@@ -348,6 +384,15 @@ const SalaryManagement = () => {
                 </head>
                 <body>
                     <div class="slip">
+                        <div class="page-head">
+                            <div></div>
+                            <div class="head-center">PPG MANAGEMENT SALARY</div>
+                            <div class="brand-right">
+                                <div>PPG EMP HUB</div>
+                                <div>Generated: ${escapeHtml(generatedAt)}</div>
+                                <div>Payroll Payment Slip</div>
+                            </div>
+                        </div>
                         <div class="head">
                             <div>
                                 <p class="title">Payment Slip</p>
@@ -380,9 +425,6 @@ const SalaryManagement = () => {
 
                         <p class="footer">Generated from Salary Records.</p>
                     </div>
-                    <script>
-                        window.onload = function() { window.print(); };
-                    </script>
                 </body>
             </html>
         `;
@@ -390,11 +432,19 @@ const SalaryManagement = () => {
         printWindow.document.open();
         printWindow.document.write(html);
         printWindow.document.close();
+
+        await finalizePrintWindow({
+            printWindow,
+            title: `Payment Slip - ${row.name}`,
+            delay: 250,
+            modeLabel: 'the payment slip'
+        });
     };
 
-    const printAllHistoryRows = () => {
+    const printAllHistoryRows = async () => {
         const printWindow = window.open('', '_blank', 'width=1100,height=900');
         if (!printWindow) return;
+        const generatedAt = formatGeneratedAt();
 
         const bodyRows = filteredRows.map((r, index) => `
             <tr>
@@ -402,7 +452,6 @@ const SalaryManagement = () => {
                 <td>${escapeHtml(r.name)}</td>
                 <td>${escapeHtml(r.emp_id)}</td>
                 <td>${escapeHtml(r.department_name || '-')}</td>
-                <td>${escapeHtml(r.from_date || selectedCycle.fromDate)} to ${escapeHtml(r.to_date || selectedCycle.toDate)}</td>
                 <td class="right">${toCurrency(r.gross_salary || r.monthly_salary || 0)}</td>
                 <td class="right">${toCurrency(r.deductions_applied || 0)}</td>
                 <td class="right">${toCurrency(r.calculated_salary || 0)}</td>
@@ -422,6 +471,7 @@ const SalaryManagement = () => {
                         .head { margin-bottom: 10px; }
                         .title { margin: 0; font-size: 20px; font-weight: 900; letter-spacing: 0.03em; }
                         .sub { margin-top: 4px; font-size: 11px; color: #4b5563; }
+                        .brand-right { text-align: right; font-size: 10px; font-weight: 700; color: #334155; line-height: 1.4; margin-bottom: 8px; }
                         table { width: 100%; border-collapse: collapse; }
                         thead { display: table-header-group; }
                         tr { page-break-inside: avoid; }
@@ -432,6 +482,11 @@ const SalaryManagement = () => {
                 </head>
                 <body>
                     <div class="wrap">
+                        <div class="brand-right">
+                            <div>PPG EMP HUB</div>
+                            <div>Generated: ${escapeHtml(generatedAt)}</div>
+                            <div>Salary History Records</div>
+                        </div>
                         <div class="head">
                             <p class="title">Salary History Records</p>
                             <p class="sub">Cycle: ${escapeHtml(selectedCycle.fromDate)} to ${escapeHtml(selectedCycle.toDate)} | Total Employees: ${filteredRows.length}</p>
@@ -443,7 +498,6 @@ const SalaryManagement = () => {
                                     <th>Employee</th>
                                     <th>Emp ID</th>
                                     <th>Department</th>
-                                    <th>Period</th>
                                     <th class="right">Gross</th>
                                     <th class="right">Deduction</th>
                                     <th class="right">Net</th>
@@ -453,9 +507,6 @@ const SalaryManagement = () => {
                             <tbody>${bodyRows}</tbody>
                         </table>
                     </div>
-                    <script>
-                        window.onload = function() { window.print(); };
-                    </script>
                 </body>
             </html>
         `;
@@ -463,6 +514,13 @@ const SalaryManagement = () => {
         printWindow.document.open();
         printWindow.document.write(html);
         printWindow.document.close();
+
+        await finalizePrintWindow({
+            printWindow,
+            title: 'Salary History - All Employees',
+            delay: 250,
+            modeLabel: 'the salary history report'
+        });
     };
 
     const handleBulkMark = async (status) => {
@@ -793,7 +851,13 @@ const SalaryManagement = () => {
                                     )}
                                     {!isPersonalView && (
                                         <td className="p-6">
-                                            <div>
+                                            <div className="flex items-center gap-3">
+                                                <img
+                                                    src={r.profile_pic || r.profile_picture_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(r.name || '?')}&background=0ea5e9&color=fff&bold=true`}
+                                                    alt={r.name}
+                                                    className="h-10 w-10 rounded-xl object-cover border border-sky-100 shadow-sm"
+                                                />
+                                                <div>
                                                 <p className="text-sm font-black text-gray-800 tracking-tight">{r.name}</p>
                                                 <div className="flex flex-wrap gap-2 items-center mt-1">
                                                     <p className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.2em]"><span className="text-sky-500 font-black">{r.emp_id}</span></p>
@@ -803,6 +867,7 @@ const SalaryManagement = () => {
                                                             <p className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.2em]"><span className="text-gray-600 font-black">{r.department_name}</span></p>
                                                         </>
                                                     )}
+                                                </div>
                                                 </div>
                                             </div>
                                         </td>

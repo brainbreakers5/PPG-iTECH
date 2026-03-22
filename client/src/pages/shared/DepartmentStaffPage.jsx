@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import Layout from '../../components/Layout';
 import api from '../../utils/api';
+import { finalizePrintWindow } from '../../utils/printUtils';
 import { useAuth } from '../../context/AuthContext';
 import { FaUserTie, FaEye, FaCalendarAlt, FaIdBadge, FaEnvelope, FaPhone, FaBuilding, FaSuitcase, FaArrowLeft, FaUsers, FaSearch, FaFilter, FaPrint } from 'react-icons/fa';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -61,7 +62,7 @@ const DepartmentStaffPage = () => {
         window.dispatchEvent(new CustomEvent('closeSidebar'));
     };
 
-    const handlePrint = () => {
+    const handlePrint = async () => {
         if (!filteredPersonnel || filteredPersonnel.length === 0) return;
 
         const printWindow = window.open('', '_blank', 'width=1200,height=800');
@@ -123,8 +124,12 @@ const DepartmentStaffPage = () => {
             </body></html>
         `);
         printWindow.document.close();
-        printWindow.focus();
-        setTimeout(() => printWindow.print(), 250);
+        await finalizePrintWindow({
+            printWindow,
+            title: `${department?.name || 'Department'} Staff and HOD Report`,
+            delay: 250,
+            modeLabel: 'the department staff report'
+        });
     };
 
     return (

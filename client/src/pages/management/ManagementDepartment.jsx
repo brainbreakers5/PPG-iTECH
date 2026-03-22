@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import Layout from '../../components/Layout';
 import { useNavigate } from 'react-router-dom';
 import api from '../../utils/api';
+import { finalizePrintWindow } from '../../utils/printUtils';
 import { FaBuilding, FaArrowRight, FaPrint } from 'react-icons/fa';
 import { motion } from 'framer-motion';
 
@@ -31,7 +32,7 @@ const ManagementDepartment = () => {
         window.dispatchEvent(new CustomEvent('closeSidebar'));
     };
 
-    const handlePrint = () => {
+    const handlePrint = async () => {
         if (!departments || departments.length === 0) return;
         const printWindow = window.open('', '_blank', 'width=1200,height=800');
         if (!printWindow) return;
@@ -121,8 +122,12 @@ const ManagementDepartment = () => {
             </body></html>
         `);
         printWindow.document.close();
-        printWindow.focus();
-        setTimeout(() => printWindow.print(), 500);
+        await finalizePrintWindow({
+            printWindow,
+            title: 'Department Personnel Registry',
+            delay: 500,
+            modeLabel: 'the department personnel registry'
+        });
     };
 
     return (

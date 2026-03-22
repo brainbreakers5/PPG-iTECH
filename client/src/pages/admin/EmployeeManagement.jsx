@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import Layout from '../../components/Layout';
 import api from '../../utils/api';
 import Swal from 'sweetalert2';
+import { finalizePrintWindow } from '../../utils/printUtils';
 import { FaEdit, FaTrash, FaUserPlus, FaSearch, FaFilter, FaUsers, FaIdBadge, FaEnvelope, FaPhone, FaPrint, FaEye } from 'react-icons/fa';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -124,7 +125,7 @@ const EmployeeManagement = () => {
         window.dispatchEvent(new CustomEvent('closeSidebar'));
     };
 
-    const handlePrint = () => {
+    const handlePrint = async () => {
         if (!filteredEmployees || filteredEmployees.length === 0) {
             Swal.fire({ icon: 'warning', title: 'No Data', text: 'No employees to print.' });
             return;
@@ -193,8 +194,12 @@ const EmployeeManagement = () => {
             </body></html>
         `);
         printWindow.document.close();
-        printWindow.focus();
-        setTimeout(() => printWindow.print(), 250);
+        await finalizePrintWindow({
+            printWindow,
+            title: 'Employee Management Report',
+            delay: 250,
+            modeLabel: 'the employee management report'
+        });
     };
 
     return (

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import Layout from '../../components/Layout';
 import api from '../../utils/api';
+import { finalizePrintWindow } from '../../utils/printUtils';
 import { FaFilter, FaFileAlt, FaClock, FaMoneyBillWave, FaShieldAlt, FaChartLine, FaWallet, FaCheckCircle } from 'react-icons/fa';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -40,7 +41,7 @@ const ManagementSalary = () => {
         .replace(/"/g, '&quot;')
         .replace(/'/g, '&#39;');
 
-    const handlePrint = () => {
+    const handlePrint = async () => {
         const items = salaries.filter(s => activeRole === 'all' || s.role === activeRole);
         if (!items || items.length === 0) return;
 
@@ -122,11 +123,15 @@ const ManagementSalary = () => {
             </html>
         `);
         printWindow.document.close();
-        printWindow.focus();
-        setTimeout(() => printWindow.print(), 250);
+        await finalizePrintWindow({
+            printWindow,
+            title,
+            delay: 250,
+            modeLabel: 'the salary report'
+        });
     };
 
-    const handlePrintSlip = (s) => {
+    const handlePrintSlip = async (s) => {
         const printWindow = window.open('', '_blank', 'width=800,height=600');
         if (!printWindow) return;
 
@@ -220,8 +225,12 @@ const ManagementSalary = () => {
             </html>
         `);
         printWindow.document.close();
-        printWindow.focus();
-        setTimeout(() => printWindow.print(), 500);
+        await finalizePrintWindow({
+            printWindow,
+            title: `Salary Slip - ${s.name}`,
+            delay: 500,
+            modeLabel: 'the salary slip'
+        });
     };
 
     return (

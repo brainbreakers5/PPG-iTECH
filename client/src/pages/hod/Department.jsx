@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Layout from '../../components/Layout';
 import api from '../../utils/api';
+import { finalizePrintWindow } from '../../utils/printUtils';
 import { FaUserTie, FaEye, FaCalendarAlt, FaIdBadge, FaEnvelope, FaPhone, FaBuilding, FaSuitcase, FaPrint } from 'react-icons/fa';
 import { motion } from 'framer-motion';
 
@@ -34,7 +35,7 @@ const Department = () => {
         fetchDept();
     }, []);
 
-    const handlePrint = () => {
+    const handlePrint = async () => {
         if (!staff || staff.length === 0) return;
 
         const printWindow = window.open('', '_blank', 'width=1200,height=800');
@@ -96,8 +97,12 @@ const Department = () => {
             </body></html>
         `);
         printWindow.document.close();
-        printWindow.focus();
-        setTimeout(() => printWindow.print(), 250);
+        await finalizePrintWindow({
+            printWindow,
+            title: 'Departmental Matrix Report',
+            delay: 250,
+            modeLabel: 'the departmental matrix report'
+        });
     };
 
     return (

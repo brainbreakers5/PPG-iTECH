@@ -4,6 +4,7 @@ import Layout from '../../components/Layout';
 import api from '../../utils/api';
 import Swal from 'sweetalert2';
 import { useAuth } from '../../context/AuthContext';
+import { finalizePrintWindow } from '../../utils/printUtils';
 import { FaShoppingCart, FaCheck, FaTimes, FaPlus, FaFilter, FaInfoCircle, FaHourglassHalf, FaBoxOpen, FaLayerGroup, FaExclamationTriangle, FaPrint } from 'react-icons/fa';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -128,7 +129,7 @@ const Purchase = () => {
         .replace(/"/g, '&quot;')
         .replace(/'/g, '&#39;');
 
-    const handlePrintRequests = (items, title) => {
+    const handlePrintRequests = async (items, title) => {
         if (!items || items.length === 0) {
             Swal.fire({
                 title: 'Nothing to print',
@@ -347,8 +348,12 @@ const Purchase = () => {
             </html>
         `);
         printWindow.document.close();
-        printWindow.focus();
-        setTimeout(() => printWindow.print(), 250);
+        await finalizePrintWindow({
+            printWindow,
+            title,
+            delay: 250,
+            modeLabel: 'the purchase report'
+        });
     };
 
     const toggleSelect = (id) => {
@@ -367,18 +372,18 @@ const Purchase = () => {
         }
     };
 
-    const handlePrintSelectedPurchased = () => {
+    const handlePrintSelectedPurchased = async () => {
         const selectedPurchased = requests.filter(r => selectedIds.includes(r.id) && r.status === 'Purchased');
-        handlePrintRequests(selectedPurchased, 'Selected Purchased Requests');
+        await handlePrintRequests(selectedPurchased, 'Selected Purchased Requests');
     };
 
-    const handlePrintAllPurchased = () => {
+    const handlePrintAllPurchased = async () => {
         const allPurchased = filteredRequests.filter(r => r.status === 'Purchased');
-        handlePrintRequests(allPurchased, 'All Purchased Requests');
+        await handlePrintRequests(allPurchased, 'All Purchased Requests');
     };
 
-    const handlePrintSingle = (req) => {
-        handlePrintRequests([req], `Purchased Request - ${req.item_name}`);
+    const handlePrintSingle = async (req) => {
+        await handlePrintRequests([req], `Purchased Request - ${req.item_name}`);
     };
 
     const handleDelete = async (id) => {

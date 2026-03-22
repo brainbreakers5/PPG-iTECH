@@ -8,6 +8,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useTimetableConfig } from '@/hooks/useTimetableConfig';
 import Swal from 'sweetalert2';
 import { formatTo12Hr } from '@/utils/timeFormatter';
+import { finalizePrintWindow } from '@/utils/printUtils';
 
 const to12h = (timeStr) => {
     if (!timeStr) return '';
@@ -216,7 +217,7 @@ const StaffTimetable = () => {
         return timetable.filter(t => t.day_of_week === day && t.period_number === period);
     };
 
-    const handlePrint = () => {
+    const handlePrint = async () => {
         const printWindow = window.open('', '_blank', 'width=1200,height=800');
         if (!printWindow) return;
 
@@ -281,8 +282,12 @@ const StaffTimetable = () => {
         <table><thead><tr><th class="day-col">Day</th>${slotsHtml}</tr></thead><tbody>${rowsHtml}</tbody></table>
         </body></html>`);
         printWindow.document.close();
-        printWindow.focus();
-        setTimeout(() => printWindow.print(), 250);
+        await finalizePrintWindow({
+            printWindow,
+            title: `Timetable - ${staffName}`,
+            delay: 250,
+            modeLabel: 'the timetable report'
+        });
     };
 
     return (

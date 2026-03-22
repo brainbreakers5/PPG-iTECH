@@ -2,6 +2,7 @@ import React, { useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import Layout from '../../components/Layout';
 import AttendanceHistory from '../../components/AttendanceHistory';
+import { finalizePrintWindow } from '../../utils/printUtils';
 import { FaArrowLeft, FaIdBadge, FaCalendarAlt, FaPrint } from 'react-icons/fa';
 import { motion } from 'framer-motion';
 
@@ -15,7 +16,7 @@ const DetailedAttendancePage = () => {
     const start = paramStart || (month ? `${month}-01` : null);
     const end = paramEnd || (month ? new Date(new Date(month).getFullYear(), new Date(month).getMonth() + 1, 0).toISOString().split('T')[0] : null);
 
-    const handlePrint = () => {
+    const handlePrint = async () => {
         const container = printRef.current;
         if (!container) return;
 
@@ -83,8 +84,12 @@ const DetailedAttendancePage = () => {
             </table>
         </body></html>`);
         printWindow.document.close();
-        printWindow.focus();
-        setTimeout(() => printWindow.print(), 250);
+        await finalizePrintWindow({
+            printWindow,
+            title: `Attendance - ${empId}`,
+            delay: 250,
+            modeLabel: 'the detailed attendance report'
+        });
     };
 
     return (

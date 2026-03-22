@@ -3,6 +3,7 @@ import Layout from '../../components/Layout';
 import api from '../../utils/api';
 import { FaFileDownload, FaFilter, FaSearch, FaEye, FaTimes, FaCalendarAlt, FaSync } from 'react-icons/fa';
 import { motion, AnimatePresence } from 'framer-motion';
+import { finalizePrintWindow } from '../../utils/printUtils';
 import { useSocket } from '../../context/SocketContext';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
@@ -274,7 +275,7 @@ const AttendanceRecord = () => {
 
 
 
-    const handlePrint = () => {
+    const handlePrint = async () => {
         if (!detailedRecords || detailedRecords.length === 0) {
             Swal.fire({ icon: 'warning', title: 'No Data', text: 'No matching records available to print.' });
             return;
@@ -426,8 +427,12 @@ const AttendanceRecord = () => {
             </html>
         `);
         printWindow.document.close();
-        printWindow.focus();
-        setTimeout(() => printWindow.print(), 250);
+        await finalizePrintWindow({
+            printWindow,
+            title,
+            delay: 250,
+            modeLabel: 'the attendance report'
+        });
     };
 
     const StatusBadge = ({ status, inTime, outTime }) => {

@@ -4,6 +4,7 @@ import Layout from '../../components/Layout';
 import api from '../../utils/api';
 import Swal from 'sweetalert2';
 import { useAuth } from '../../context/AuthContext';
+import { finalizePrintWindow } from '../../utils/printUtils';
 import { FaPlus, FaTrash, FaEdit, FaSearch, FaCalendarAlt, FaUserTie, FaClock, FaDoorOpen, FaBookOpen, FaArrowLeft, FaPrint, FaFileAlt } from 'react-icons/fa';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTimetableConfig } from '../../hooks/useTimetableConfig';
@@ -238,7 +239,7 @@ const Timetable = ({ showToggle = true }) => {
         </Layout>
     );
 
-    const handlePrint = () => {
+    const handlePrint = async () => {
         const printWindow = window.open('', '_blank', 'width=1200,height=800');
         if (!printWindow) return;
 
@@ -303,8 +304,12 @@ const Timetable = ({ showToggle = true }) => {
         <table><thead><tr><th class="day-col">Day</th>${slotsHtml}</tr></thead><tbody>${rowsHtml}</tbody></table>
         </body></html>`);
         printWindow.document.close();
-        printWindow.focus();
-        setTimeout(() => printWindow.print(), 250);
+        await finalizePrintWindow({
+            printWindow,
+            title: `Timetable - ${staffName}`,
+            delay: 250,
+            modeLabel: 'the timetable report'
+        });
     };
 
     return (
