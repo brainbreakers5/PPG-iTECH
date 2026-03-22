@@ -453,12 +453,6 @@ const TimetableGrid = ({ days, displaySlots, timetable, loading, showStaffName, 
                                                                 )}
                                                             </div>
                                                             <p className="text-sm font-black text-gray-800 tracking-tight line-clamp-2 leading-snug">{entry.subject}</p>
-                                                            {showStaffName && (
-                                                                <div className="flex items-center gap-1.5">
-                                                                    <FaUserTie size={9} className="text-sky-400 shrink-0" />
-                                                                    <span className="text-[9px] font-bold text-sky-500 uppercase tracking-widest truncate">{entry.staff_name}</span>
-                                                                </div>
-                                                            )}
                                                         </div>
                                                         <div className="mt-3 pt-2 border-t border-gray-50 flex items-center justify-between">
                                                             <div className="flex items-center gap-1.5 text-[9px] font-black text-gray-400 uppercase tracking-widest">
