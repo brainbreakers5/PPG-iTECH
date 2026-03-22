@@ -393,10 +393,9 @@ const ManagementDashboard = () => {
                                                 <th className="px-5 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Emp ID</th>
                                                 <th className="px-5 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Name</th>
                                                 <th className="px-5 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Department</th>
-                                                <th className="px-5 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Status</th>
-                                                <th className="px-5 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-center no-print">Action</th>
-                                            </tr>
-                                        </thead>
+                                                <th className="px-5 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-right">Status</th>
+                                             </tr>
+                                         </thead>
                                         <tbody className="divide-y divide-gray-50">
                                             {filtered.map((emp, idx) => (
                                                 <motion.tr
@@ -415,7 +414,7 @@ const ManagementDashboard = () => {
                                                         </div>
                                                     </td>
                                                     <td className="px-5 py-4 text-sm font-medium text-gray-600">{emp.department_name || '—'}</td>
-                                                    <td className="px-5 py-4">
+                                                    <td className="px-5 py-4 text-right">
                                                         <span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest border ${
                                                             (attendanceMap[emp.emp_id]?.remarks || '').includes('Late Entry') ? 'bg-orange-50 text-orange-600 border-orange-100' :
                                                             attendanceMap[emp.emp_id]?.status?.startsWith('Present') ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 
@@ -426,30 +425,7 @@ const ManagementDashboard = () => {
                                                             ) : attendanceMap[emp.emp_id]?.status?.startsWith('Present +') 
                                                                 ? `P / ${attendanceMap[emp.emp_id].status.replace('Present +', '').trim()}` 
                                                                 : (attendanceMap[emp.emp_id]?.status || 'N/A')}
-                                                            {attendanceMap[emp.emp_id]?.status?.startsWith('Present') === false && attendanceMap[emp.emp_id]?.status !== 'Absent' && attendanceMap[emp.emp_id]?.in_time && attendanceMap[emp.emp_id]?.out_time && (
-                                                                <> ({formatTo12Hr(attendanceMap[emp.emp_id].in_time)} - {formatTo12Hr(attendanceMap[emp.emp_id].out_time)})</>
-                                                            )}
                                                         </span>
-                                                    </td>
-                                                    <td className="px-5 py-4 text-center no-print">
-                                                        <div className="flex items-center justify-center gap-2">
-                                                            <button 
-                                                                onClick={(e) => {
-                                                                    e.stopPropagation();
-                                                                    setSelectedEmployeeHistory({ emp_id: emp.emp_id, name: emp.name });
-                                                                }}
-                                                                className="p-2 hover:bg-purple-50 text-purple-600 rounded-lg transition-colors"
-                                                                title="View Attendance History"
-                                                            >
-                                                                <FaHistory size={14} />
-                                                            </button>
-                                                            <button 
-                                                                onClick={() => { navigate(`/management/profile/${emp.emp_id}`); setEmployeeModal(null); window.dispatchEvent(new CustomEvent('closeSidebar')); }}
-                                                                className="p-2 hover:bg-purple-50 text-gray-300 hover:text-purple-500 rounded-lg transition-colors"
-                                                            >
-                                                                <FaEye size={14} />
-                                                            </button>
-                                                        </div>
                                                     </td>
                                                 </motion.tr>
                                             ))}
