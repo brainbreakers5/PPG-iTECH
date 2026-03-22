@@ -60,6 +60,7 @@ const ProfileViewer = ({ user, onClose }) => {
     // HOD & Principal are restricted when viewing OTHERS' profiles
     // Principal & HOD can view sensitive info for others they are authorized to view
     const canViewSensitiveInfo = isOwnProfile || ['admin', 'management', 'principal', 'hod'].includes(authUser.role);
+    const canViewDeductions = isOwnProfile || ['admin', 'management'].includes(authUser.role);
 
     const parsedDeductions = (() => {
         try {
@@ -532,7 +533,7 @@ const ProfileViewer = ({ user, onClose }) => {
                                     <FaPrint size={12} className="group-hover:scale-110 transition-transform" /> Print
                                 </button>
                             )}
-                            {(authUser.role === 'admin' || authUser.role === 'management') && !isEditingProfile && (
+                            {isOwnProfile && !isEditingProfile && (
                                 <button
                                     onClick={() => setIsEditingProfile(true)}
                                     className="flex items-center gap-2 px-5 py-2.5 bg-sky-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-sky-700 transition-all shadow-lg shadow-sky-200"
@@ -668,7 +669,7 @@ const ProfileViewer = ({ user, onClose }) => {
                                                 <InfoRow icon={<FaUserCircle />} label="PF / UAN" value={`${user.pf_number || ''} ${user.uan_number ? `/ ${user.uan_number}` : ''}`} />
                                             )}
 
-                                            {parsedDeductions.length > 0 && (
+                                            {canViewDeductions && parsedDeductions.length > 0 && (
                                                 <div className="col-span-full mt-4">
                                                     <div className="p-5 rounded-3xl bg-rose-50/50 border border-transparent">
                                                         <p className="text-[9px] font-black text-rose-500 uppercase tracking-widest leading-none mb-3 flex items-center gap-2">
