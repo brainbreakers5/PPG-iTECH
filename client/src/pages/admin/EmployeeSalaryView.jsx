@@ -34,60 +34,94 @@ const EmployeeSalaryView = () => {
     return (
         <Layout>
             <div className="max-w-6xl mx-auto">
-                <div className="flex items-center justify-between mb-6">
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-10 gap-6">
                     <div>
-                        <h1 className="text-3xl font-black text-gray-800">Employee Salary Page</h1>
-                        <p className="text-sm text-gray-500">Employee ID: {empId}</p>
+                        <h1 className="text-3xl font-black text-gray-800 tracking-tight">Employee Salary Page</h1>
+                        <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 mt-2">Employee ID: {empId}</p>
                     </div>
                     <button
                         onClick={() => navigate(`/${user.role}/payroll/history`)}
-                        className="px-4 py-2 rounded-lg bg-sky-600 text-white text-sm font-bold flex items-center gap-2"
+                        className="bg-sky-600 text-white px-8 py-4 rounded-2xl shadow-xl shadow-sky-100 hover:bg-sky-700 transition-all flex items-center font-black uppercase tracking-widest text-xs active:scale-95 group"
                     >
-                        <FaArrowLeft /> Back
+                        <FaArrowLeft className="mr-3 group-hover:-translate-x-1 transition-transform" /> Back
                     </button>
                 </div>
 
-                <div className="bg-white border rounded-xl overflow-x-auto">
-                    <table className="w-full min-w-[900px]">
-                        <thead className="bg-gray-50">
+                <div className="modern-card !p-0 overflow-hidden border-sky-100">
+                    <div className="bg-sky-50/30 p-6 border-b border-sky-50 flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                            <h2 className="text-lg font-black text-gray-800 uppercase tracking-widest">Salary Ledger</h2>
+                        </div>
+                    </div>
+                    <div className="overflow-x-auto">
+                    <table className="w-full text-left border-collapse">
+                        <thead className="bg-gray-50/50">
                             <tr>
-                                <th className="p-3 text-left text-xs uppercase text-gray-500">Period</th>
-                                <th className="p-3 text-right text-xs uppercase text-gray-500">With/Without</th>
-                                <th className="p-3 text-right text-xs uppercase text-gray-500">Gross</th>
-                                <th className="p-3 text-right text-xs uppercase text-gray-500">Deductions</th>
-                                <th className="p-3 text-right text-xs uppercase text-gray-500">Net</th>
-                                <th className="p-3 text-center text-xs uppercase text-gray-500">Status</th>
+                                <th className="p-6 text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-sky-50">Period</th>
+                                <th className="p-6 text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-sky-50 text-right">With/Without Pay</th>
+                                <th className="p-6 text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-sky-50 text-right">Gross</th>
+                                <th className="p-6 text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-sky-50 text-right">Deductions</th>
+                                <th className="p-6 text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-sky-50 text-right">Net</th>
+                                <th className="p-6 text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-sky-50 text-center">Status</th>
                             </tr>
                         </thead>
                         <tbody>
                             {!loading && rows.map((r) => (
-                                <tr key={r.id} className="border-t">
-                                    <td className="p-3 text-sm">{r.from_date || '-'} to {r.to_date || '-'}</td>
-                                    <td className="p-3 text-right text-sm">{Number(r.total_present || r.with_pay_count || 0).toFixed(1)} / {Number(r.total_lop || r.without_pay_count || 0).toFixed(1)}</td>
-                                    <td className="p-3 text-right text-sm font-semibold">Rs {toCurrency(r.gross_salary || r.monthly_salary || 0)}</td>
-                                    <td className="p-3 text-right text-sm text-rose-600">Rs {toCurrency(r.deductions_applied || 0)}</td>
-                                    <td className="p-3 text-right text-sm text-emerald-700 font-bold">Rs {toCurrency(r.calculated_salary || 0)}</td>
-                                    <td className="p-3 text-center">
-                                        <span className={`px-2 py-1 rounded text-xs font-semibold ${String(r.status).toLowerCase() === 'paid' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
-                                            {r.status}
-                                        </span>
+                                <tr key={r.id} className="hover:bg-sky-50/20 transition-all group border-b border-sky-50/10">
+                                    <td className="p-6">
+                                        <span className="text-xs font-black text-gray-600 bg-gray-50 px-3 py-1.5 rounded-xl border border-gray-100 whitespace-nowrap">{r.from_date || '-'} to {r.to_date || '-'}</span>
+                                    </td>
+                                    <td className="p-6 text-right">
+                                        <div className="flex flex-col items-end gap-1">
+                                            <span className="text-sm font-black text-emerald-600">{Number(r.total_present || r.with_pay_count || 0).toFixed(1)} <span className="text-[9px] text-gray-400 uppercase">Paid</span></span>
+                                            <span className="text-sm font-black text-rose-600">{Number(r.total_lop || r.without_pay_count || 0).toFixed(1)} <span className="text-[9px] text-gray-400 uppercase">Unpaid</span></span>
+                                        </div>
+                                    </td>
+                                    <td className="p-6 text-right">
+                                        <span className="text-sm font-black text-gray-700 bg-gray-50 px-3 py-1.5 rounded-lg border border-gray-100 whitespace-nowrap">Rs {toCurrency(r.gross_salary || r.monthly_salary || 0)}</span>
+                                    </td>
+                                    <td className="p-6 text-right">
+                                        <span className="text-sm font-black text-rose-600 bg-rose-50 px-3 py-1.5 rounded-lg border border-rose-100 whitespace-nowrap">Rs {toCurrency(r.deductions_applied || 0)}</span>
+                                    </td>
+                                    <td className="p-6 text-right">
+                                        <span className="text-sm font-black text-emerald-700 bg-emerald-50 px-3 py-1.5 rounded-lg border border-emerald-100 whitespace-nowrap">Rs {toCurrency(r.calculated_salary || 0)}</span>
+                                    </td>
+                                    <td className="p-6 text-center">
+                                        {String(r.status).toLowerCase() === 'paid' ? (
+                                            <span className="inline-block text-[9px] font-black uppercase tracking-[0.1em] px-4 py-1.5 rounded-xl border-2 shadow-sm bg-emerald-600 text-white border-emerald-600">Paid</span>
+                                        ) : (
+                                            <span className="inline-block text-[9px] font-black uppercase tracking-[0.1em] px-4 py-1.5 rounded-xl border-2 shadow-sm bg-amber-50 text-amber-600 border-amber-100">Pending</span>
+                                        )}
                                     </td>
                                 </tr>
                             ))}
 
                             {loading && (
                                 <tr>
-                                    <td colSpan={6} className="p-6 text-center text-gray-500">Loading...</td>
+                                    <td colSpan={6} className="p-32 text-center text-gray-500">
+                                        <div className="flex flex-col items-center gap-4">
+                                            <div className="h-14 w-14 border-4 border-sky-100 border-t-sky-600 rounded-full animate-spin"></div>
+                                            <p className="text-[10px] font-black text-sky-500 uppercase tracking-[0.2em] mt-2">Loading records...</p>
+                                        </div>
+                                    </td>
                                 </tr>
                             )}
 
                             {!loading && rows.length === 0 && (
                                 <tr>
-                                    <td colSpan={6} className="p-8 text-center text-gray-400">No salary records found for this employee.</td>
+                                    <td colSpan={6} className="p-32 text-center text-gray-400">
+                                        <div className="flex flex-col items-center gap-6 opacity-20 grayscale">
+                                            <div>
+                                                <p className="text-xl font-black text-gray-800 tracking-tight">No Records</p>
+                                                <p className="text-sm font-bold uppercase tracking-widest text-gray-400 mt-1">No salary records found for this view.</p>
+                                            </div>
+                                        </div>
+                                    </td>
                                 </tr>
                             )}
                         </tbody>
                     </table>
+                    </div>
                 </div>
             </div>
         </Layout>

@@ -399,55 +399,49 @@ const SalaryManagement = () => {
                 variants={staggerWrap}
                 className="max-w-7xl mx-auto pb-4"
             >
-                <motion.div
-                    variants={fadeUp}
-                    transition={{ duration: 0.4, ease: 'easeOut' }}
-                    className="mb-8 rounded-[36px] border border-sky-100 bg-gradient-to-r from-sky-50 via-white to-cyan-50 p-6 md:p-8 shadow-xl shadow-sky-50/80"
-                >
-                    <div className="flex flex-wrap items-center justify-between gap-4">
-                        <div>
-                            <h1 className="text-3xl md:text-4xl font-black text-gray-800 tracking-tight">
-                                {isPersonalView ? 'My Salary Details' : isHistoryPage ? 'Salary History' : 'Salary Management'}
-                            </h1>
-                            <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 mt-2">
-                                {isPersonalView
-                                    ? 'All your past and current salary records are shown here.'
-                                    : isHistoryPage
-                                        ? 'Select period by month and year using fixed cycle 26 to 25.'
-                                        : 'Current live payroll period is fixed and not editable.'}
-                            </p>
-                        </div>
-
-                        {canInstitutionWide && (
-                            <div className="flex flex-wrap gap-2">
-                                {!isHistoryPage && (
-                                    <>
-                                        <button
-                                            onClick={() => navigate(`/${user.role}/payroll/history`)}
-                                            className="px-4 py-2.5 rounded-2xl bg-amber-500 text-white text-[11px] font-black uppercase tracking-widest flex items-center gap-2 shadow-lg shadow-amber-100 transition-all duration-300 hover:scale-[1.03] hover:shadow-xl hover:shadow-amber-200"
-                                        >
-                                            <FaHistory /> History Page
-                                        </button>
-                                        <button
-                                            onClick={() => navigate(`/${user.role}/payroll/reports`)}
-                                            className="px-4 py-2.5 rounded-2xl bg-indigo-600 text-white text-[11px] font-black uppercase tracking-widest flex items-center gap-2 shadow-lg shadow-indigo-100 transition-all duration-300 hover:scale-[1.03] hover:shadow-xl hover:shadow-indigo-200"
-                                        >
-                                            <FaEnvelope /> Reports Page
-                                        </button>
-                                    </>
-                                )}
-                                {isHistoryPage && (
-                                    <button
-                                        onClick={() => navigate(`/${user.role}/payroll`)}
-                                        className="px-4 py-2.5 rounded-2xl bg-sky-600 text-white text-[11px] font-black uppercase tracking-widest flex items-center gap-2 shadow-lg shadow-sky-100 transition-all duration-300 hover:scale-[1.03] hover:shadow-xl hover:shadow-sky-200"
-                                    >
-                                        <FaSearch /> Live Management
-                                    </button>
-                                )}
-                            </div>
-                        )}
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-10 gap-6">
+                    <div>
+                        <h1 className="text-3xl font-black text-gray-800 tracking-tight">
+                            {isPersonalView ? 'My Salary Details' : isHistoryPage ? 'Salary History' : 'Salary Management'}
+                        </h1>
+                        <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 mt-2">
+                            {isPersonalView
+                                ? 'All your past and current salary records are shown here.'
+                                : isHistoryPage
+                                    ? 'Select period by month and year using fixed cycle 26 to 25.'
+                                    : 'Current live payroll period is fixed and not editable.'}
+                        </p>
                     </div>
-                </motion.div>
+
+                    {canInstitutionWide && (
+                        <div className="flex flex-wrap gap-4">
+                            {!isHistoryPage && (
+                                <>
+                                    <button
+                                        onClick={() => navigate(`/${user.role}/payroll/history`)}
+                                        className="bg-amber-500 text-white px-8 py-4 rounded-2xl shadow-xl shadow-amber-100 hover:bg-amber-600 transition-all flex items-center font-black uppercase tracking-widest text-xs active:scale-95 group"
+                                    >
+                                        <FaHistory className="mr-3 group-hover:-rotate-12 transition-transform" /> History Page
+                                    </button>
+                                    <button
+                                        onClick={() => navigate(`/${user.role}/payroll/reports`)}
+                                        className="bg-indigo-600 text-white px-8 py-4 rounded-2xl shadow-xl shadow-indigo-100 hover:bg-indigo-700 transition-all flex items-center font-black uppercase tracking-widest text-xs active:scale-95 group"
+                                    >
+                                        <FaEnvelope className="mr-3 group-hover:scale-110 transition-transform" /> Reports Page
+                                    </button>
+                                </>
+                            )}
+                            {isHistoryPage && (
+                                <button
+                                    onClick={() => navigate(`/${user.role}/payroll`)}
+                                    className="bg-sky-600 text-white px-8 py-4 rounded-2xl shadow-xl shadow-sky-100 hover:bg-sky-700 transition-all flex items-center font-black uppercase tracking-widest text-xs active:scale-95 group"
+                                >
+                                    <FaSearch className="mr-3 group-hover:scale-110 transition-transform" /> Live Management
+                                </button>
+                            )}
+                        </div>
+                    )}
+                </div>
 
                 <motion.div variants={staggerWrap} className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
                     <motion.div variants={fadeUp} transition={{ duration: 0.35 }} className="bg-white rounded-3xl border border-sky-50 shadow-lg shadow-sky-50/70 p-5 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl">
@@ -590,82 +584,122 @@ const SalaryManagement = () => {
                 <motion.div
                     variants={fadeUp}
                     transition={{ duration: 0.4, ease: 'easeOut' }}
-                    className="bg-white rounded-[36px] shadow-2xl shadow-sky-50/80 border border-sky-50 overflow-x-auto"
+                    className="modern-card !p-0 overflow-hidden border-sky-100"
                 >
-                    <table className="w-full min-w-[1100px]">
-                        <thead className="bg-gray-50/80 border-b border-gray-100">
-                            <tr>
-                                {canInstitutionWide && isHistoryPage && <th className="p-3 text-left text-xs">Select</th>}
-                                <th className="p-3 text-left text-xs uppercase tracking-widest text-gray-500">Employee</th>
-                                <th className="p-3 text-left text-xs uppercase text-gray-500">Period</th>
-                                <th className="p-3 text-right text-xs uppercase text-gray-500">With/Without Pay</th>
-                                <th className="p-3 text-right text-xs uppercase text-gray-500">Gross</th>
-                                <th className="p-3 text-right text-xs uppercase text-gray-500">Deductions</th>
-                                <th className="p-3 text-right text-xs uppercase text-gray-500">Net</th>
-                                <th className="p-3 text-center text-xs uppercase text-gray-500">Status</th>
-                                <th className="p-3 text-right text-xs uppercase text-gray-500">Actions</th>
-                            </tr>
-                        </thead>
+                    <div className="bg-sky-50/30 p-6 border-b border-sky-50 flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                            <div className="h-10 w-10 rounded-xl bg-sky-100 flex items-center justify-center text-sky-600 shadow-sm">
+                                <FaFileAlt size={18} />
+                            </div>
+                            <h2 className="text-lg font-black text-gray-800 uppercase tracking-widest">Salary Ledger</h2>
+                        </div>
+                    </div>
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-left border-collapse">
+                            <thead>
+                                <tr className="bg-gray-50/50">
+                                    {canInstitutionWide && isHistoryPage && <th className="p-6 w-12 border-b border-sky-50"><div className="flex justify-center">Select</div></th>}
+                                    <th className="p-6 text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-sky-50">Employee</th>
+                                    <th className="p-6 text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-sky-50">Period</th>
+                                    <th className="p-6 text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-sky-50 text-right">With/Without Pay</th>
+                                    <th className="p-6 text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-sky-50 text-right">Gross</th>
+                                    <th className="p-6 text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-sky-50 text-right">Deductions</th>
+                                    <th className="p-6 text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-sky-50 text-right">Net</th>
+                                    <th className="p-6 text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-sky-50 text-center">Status</th>
+                                    <th className="p-6 text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-sky-50 text-center">Actions</th>
+                                </tr>
+                            </thead>
                         <tbody>
                             <AnimatePresence mode="popLayout">
                                 {!loading && filteredRows.map((r, idx) => (
                                 <motion.tr
                                     key={r.id}
-                                    initial={{ opacity: 0, y: 8 }}
-                                    animate={{ opacity: 1, y: 0 }}
-                                    exit={{ opacity: 0, y: -6 }}
-                                    transition={{ duration: 0.22, delay: Math.min(idx * 0.015, 0.2) }}
-                                    className="border-t border-gray-50 hover:bg-sky-50/40 transition-colors"
+                                    initial={{ opacity: 0 }}
+                                    animate={{ opacity: 1 }}
+                                    exit={{ opacity: 0, scale: 0.98 }}
+                                    transition={{ delay: idx * 0.03 }}
+                                    className="hover:bg-sky-50/20 transition-all group border-b border-sky-50/10"
                                 >
                                     {canInstitutionWide && isHistoryPage && (
-                                        <td className="p-3">
-                                            <input
-                                                type="checkbox"
-                                                checked={selectedIds.includes(r.id)}
-                                                onChange={() => setSelectedIds((prev) => prev.includes(r.id) ? prev.filter((x) => x !== r.id) : [...prev, r.id])}
-                                            />
+                                        <td className="p-6">
+                                            <div className="flex justify-center">
+                                                <input
+                                                    type="checkbox"
+                                                    className="w-4 h-4 rounded border-sky-200 text-sky-600 focus:ring-sky-500 cursor-pointer"
+                                                    checked={selectedIds.includes(r.id)}
+                                                    onChange={() => setSelectedIds((prev) => prev.includes(r.id) ? prev.filter((x) => x !== r.id) : [...prev, r.id])}
+                                                />
+                                            </div>
                                         </td>
                                     )}
-                                    <td className="p-3">
-                                        <div className="font-black text-sm text-gray-800">{r.name}</div>
-                                        <div className="text-xs text-gray-500">{r.emp_id} {r.department_name ? `| ${r.department_name}` : ''}</div>
+                                    <td className="p-6">
+                                        <div className="flex items-center gap-4">
+                                            <div className="h-12 w-12 rounded-2xl bg-white border border-sky-100 flex items-center justify-center text-sky-600 shadow-sm group-hover:scale-110 transition-transform hide-on-mobile">
+                                                <FaUserTie size={20} />
+                                            </div>
+                                            <div>
+                                                <p className="text-sm font-black text-gray-800 tracking-tight">{r.name}</p>
+                                                <div className="flex flex-wrap gap-2 items-center mt-1">
+                                                     <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest"><span className="text-sky-500 font-black">{r.emp_id}</span></p>
+                                                     {r.department_name && (
+                                                         <>
+                                                             <span className="h-1 w-1 bg-gray-300 rounded-full"></span>
+                                                             <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest"><span className="text-gray-600 font-black">{r.department_name}</span></p>
+                                                         </>
+                                                     )}
+                                                </div>
+                                            </div>
+                                        </div>
                                     </td>
-                                    <td className="p-3 text-sm text-gray-700">{r.from_date || '-'} to {r.to_date || '-'}</td>
-                                    <td className="p-3 text-right text-sm text-gray-700">{Number(r.total_present || r.with_pay_count || 0).toFixed(1)} / {Number(r.total_lop || r.without_pay_count || 0).toFixed(1)}</td>
-                                    <td className="p-3 text-right font-semibold">Rs {toCurrency(r.gross_salary || r.monthly_salary || 0)}</td>
-                                    <td className="p-3 text-right text-rose-600">Rs {toCurrency(r.deductions_applied || 0)}</td>
-                                    <td className="p-3 text-right text-emerald-700 font-bold">Rs {toCurrency(r.calculated_salary || 0)}</td>
-                                    <td className="p-3 text-center">
+                                    <td className="p-6">
+                                        <span className="text-xs font-black text-gray-600 bg-gray-50 px-3 py-1.5 rounded-xl border border-gray-100 whitespace-nowrap">{r.from_date || '-'} to {r.to_date || '-'}</span>
+                                    </td>
+                                    <td className="p-6 text-right">
+                                        <div className="flex flex-col items-end gap-1">
+                                            <span className="text-sm font-black text-emerald-600">{Number(r.total_present || r.with_pay_count || 0).toFixed(1)} <span className="text-[9px] text-gray-400 uppercase">Paid</span></span>
+                                            <span className="text-sm font-black text-rose-600">{Number(r.total_lop || r.without_pay_count || 0).toFixed(1)} <span className="text-[9px] text-gray-400 uppercase">Unpaid</span></span>
+                                        </div>
+                                    </td>
+                                    <td className="p-6 text-right">
+                                        <span className="text-sm font-black text-gray-700 bg-gray-50 px-3 py-1.5 rounded-lg border border-gray-100 whitespace-nowrap">Rs {toCurrency(r.gross_salary || r.monthly_salary || 0)}</span>
+                                    </td>
+                                    <td className="p-6 text-right">
+                                        <span className="text-sm font-black text-rose-600 bg-rose-50 px-3 py-1.5 rounded-lg border border-rose-100 whitespace-nowrap">Rs {toCurrency(r.deductions_applied || 0)}</span>
+                                    </td>
+                                    <td className="p-6 text-right">
+                                        <span className="text-sm font-black text-emerald-700 bg-emerald-50 px-3 py-1.5 rounded-lg border border-emerald-100 whitespace-nowrap">Rs {toCurrency(r.calculated_salary || 0)}</span>
+                                    </td>
+                                    <td className="p-6 text-center">
                                         {String(r.status).toLowerCase() === 'paid' ? (
-                                            <span className="px-3 py-1.5 rounded-2xl bg-emerald-100 text-emerald-700 text-xs font-black uppercase tracking-wider">Paid</span>
+                                            <span className="inline-block text-[9px] font-black uppercase tracking-[0.1em] px-4 py-1.5 rounded-xl border-2 shadow-sm bg-emerald-600 text-white border-emerald-600">Paid</span>
                                         ) : (
-                                            <span className="px-3 py-1.5 rounded-2xl bg-amber-100 text-amber-700 text-xs font-black uppercase tracking-wider">Pending</span>
+                                            <span className="inline-block text-[9px] font-black uppercase tracking-[0.1em] px-4 py-1.5 rounded-xl border-2 shadow-sm bg-amber-50 text-amber-600 border-amber-100">Pending</span>
                                         )}
                                     </td>
-                                    <td className="p-3 text-right">
-                                        <div className="flex justify-end gap-2">
+                                    <td className="p-6">
+                                        <div className="flex justify-center gap-2">
                                             {!isPersonalView && (
                                                 <button
                                                     onClick={() => window.print()}
-                                                    className="px-2.5 py-1.5 rounded-2xl bg-sky-50 text-sky-700 text-xs font-black"
+                                                    className="h-10 w-10 bg-sky-50 text-sky-600 rounded-xl hover:bg-sky-600 hover:text-white transition-all shadow-sm flex items-center justify-center active:scale-90 group/btn"
                                                     title="Print"
                                                 >
-                                                    <FaFileAlt />
+                                                    <FaFileAlt className="group-hover/btn:scale-125 transition-transform" />
                                                 </button>
                                             )}
                                             {canInstitutionWide && (
                                                 <button
                                                     onClick={() => navigate(`/${user.role}/payroll/employee/${encodeURIComponent(normalizeEmpId(r.emp_id))}`)}
-                                                    className="px-2.5 py-1.5 rounded-2xl bg-indigo-50 text-indigo-700 text-xs font-black"
+                                                    className="h-10 w-10 bg-indigo-50 text-indigo-600 rounded-xl hover:bg-indigo-600 hover:text-white transition-all shadow-sm flex items-center justify-center active:scale-90 group/btn"
                                                     title="View employee salary page"
                                                 >
-                                                    <FaSearch />
+                                                    <FaSearch className="group-hover/btn:scale-125 transition-transform" />
                                                 </button>
                                             )}
                                             {isPersonalView && (
                                                 <button
                                                     onClick={handleSubmitReport}
-                                                    className="px-2.5 py-1.5 rounded-2xl bg-amber-50 text-amber-700 text-xs font-black flex items-center gap-1"
+                                                    className="h-10 flex items-center gap-2 px-4 bg-amber-50 text-amber-600 rounded-xl hover:bg-amber-500 hover:text-white transition-all shadow-sm active:scale-90 font-black text-[10px] uppercase tracking-widest"
                                                     title="Report issue"
                                                 >
                                                     <FaPaperPlane /> Report
@@ -684,10 +718,10 @@ const SalaryManagement = () => {
                                                                 Swal.fire('Error', error?.response?.data?.message || 'Failed to mark paid.', 'error');
                                                             }
                                                         }}
-                                                        className="px-2.5 py-1.5 rounded-2xl bg-emerald-50 text-emerald-700 text-xs font-black"
+                                                        className="h-10 w-10 bg-emerald-50 text-emerald-600 rounded-xl hover:bg-emerald-600 hover:text-white transition-all shadow-sm flex items-center justify-center active:scale-90 group/btn"
                                                         title="Mark paid"
                                                     >
-                                                        <FaCheckCircle />
+                                                        <FaCheckCircle className="group-hover/btn:scale-125 transition-transform" />
                                                     </button>
                                                     <button
                                                         onClick={async () => {
@@ -700,10 +734,10 @@ const SalaryManagement = () => {
                                                                 Swal.fire('Error', error?.response?.data?.message || 'Failed to mark unpaid.', 'error');
                                                             }
                                                         }}
-                                                        className="px-2.5 py-1.5 rounded-2xl bg-amber-50 text-amber-700 text-xs font-black"
+                                                        className="h-10 w-10 bg-rose-50 text-rose-600 rounded-xl hover:bg-rose-600 hover:text-white transition-all shadow-sm flex items-center justify-center active:scale-90 group/btn"
                                                         title="Mark unpaid"
                                                     >
-                                                        <FaTimesCircle />
+                                                        <FaTimesCircle className="group-hover/btn:scale-125 transition-transform" />
                                                     </button>
                                                 </>
                                             )}
@@ -714,29 +748,33 @@ const SalaryManagement = () => {
                             </AnimatePresence>
 
                             {loading && (
-                                <tr>
-                                    <td colSpan={canInstitutionWide && isHistoryPage ? 9 : 8} className="p-8 text-center text-gray-500">
-                                        <span className="inline-flex items-center gap-2 font-bold">
-                                            <span className="h-2.5 w-2.5 rounded-full bg-sky-400 animate-pulse" />
-                                            Loading payroll records...
-                                        </span>
-                                    </td>
-                                </tr>
-                            )}
+                                        <tr>
+                                            <td colSpan={canInstitutionWide && isHistoryPage ? 9 : 8} className="p-32 text-center text-gray-500">
+                                                <div className="flex flex-col items-center gap-4">
+                                                    <div className="h-14 w-14 border-4 border-sky-100 border-t-sky-600 rounded-full animate-spin"></div>
+                                                    <p className="text-[10px] font-black text-sky-500 uppercase tracking-[0.2em] mt-2">Loading payroll records...</p>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    )}
 
-                            {!loading && filteredRows.length === 0 && (
-                                <tr>
-                                    <td colSpan={canInstitutionWide && isHistoryPage ? 9 : 8} className="p-8 text-center text-gray-400">
-                                        <div className="flex flex-col items-center gap-2">
-                                            <FaExclamationCircle className="text-xl" />
-                                            <span>No salary records found for this view.</span>
-                                        </div>
-                                    </td>
-                                </tr>
-                            )}
-                        </tbody>
-                    </table>
-                </motion.div>
+                                    {!loading && filteredRows.length === 0 && (
+                                        <tr>
+                                            <td colSpan={canInstitutionWide && isHistoryPage ? 9 : 8} className="p-32 text-center">
+                                                <div className="flex flex-col items-center gap-6 opacity-20 grayscale">
+                                                    <FaMoneyBillWave size={64} className="text-gray-400" />
+                                                    <div>
+                                                        <p className="text-xl font-black text-gray-800 tracking-tight">No Records</p>
+                                                        <p className="text-sm font-bold uppercase tracking-widest text-gray-400 mt-1">No salary records found for this view.</p>
+                                                    </div>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+                    </motion.div>
 
                 <div className="mt-4 text-xs text-gray-500">
                     <FaMoneyBillWave className="inline mr-1" />
