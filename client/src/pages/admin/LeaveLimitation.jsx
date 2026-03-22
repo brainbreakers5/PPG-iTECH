@@ -347,7 +347,11 @@ const LeaveLimitation = () => {
             preConfirm: () => {
                 const values = {};
                 editableTypes.forEach(t => {
-                    values[`${t.key}_limit`] = parseInt(document.getElementById(`bulk_${t.key}`)?.value) || 12;
+                    const mappedKey = `${colPrefix(t.key)}_limit`;
+                    const raw = document.getElementById(`bulk_${t.key}`)?.value;
+                    const parsed = Number.parseInt(raw, 10);
+                    const fallback = t.key === 'permission' ? 2 : (t.defaultDays || 12);
+                    values[mappedKey] = Number.isFinite(parsed) ? Math.max(0, Math.min(365, parsed)) : fallback;
                 });
                 values.fromDate = document.getElementById('bulk_from_date')?.value;
                 values.toDate = document.getElementById('bulk_to_date')?.value;
@@ -515,7 +519,7 @@ const LeaveLimitation = () => {
                             <tbody className="divide-y divide-sky-50/80">
                                 {loading ? (
                                     <tr>
-                                        <td colSpan="7" className="p-16 text-center">
+                                        <td colSpan={leaveTypes.length + 2} className="p-16 text-center">
                                             <div className="flex items-center justify-center gap-3">
                                                 <div className="h-2 w-2 bg-sky-600 rounded-full animate-bounce" />
                                                 <div className="h-2 w-2 bg-sky-600 rounded-full animate-bounce delay-100" />
@@ -525,9 +529,9 @@ const LeaveLimitation = () => {
                                     </tr>
                                 ) : filtered.length === 0 ? (
                                     <tr>
-                                        <td colSpan="7" className="p-16 text-center opacity-30">
+                                        <td colSpan={leaveTypes.length + 2} className="p-16 text-center opacity-30">
                                             <FaUserTie size={40} className="mx-auto mb-3" />
-                                            <p className="font-black text-sm">No staff found</p>
+                                            <p className="font-black text-sm">No employee found</p>
                                         </td>
                                     </tr>
                                 ) : filtered.map((emp, idx) => {

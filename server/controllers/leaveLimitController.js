@@ -26,6 +26,13 @@ const toMonthKey = (dateValue) => {
     return String(dateValue).slice(0, 7);
 };
 
+const sanitizeLimit = (value, fallback = null) => {
+    if (value === undefined || value === null || value === '') return fallback;
+    const parsed = Number.parseInt(value, 10);
+    if (!Number.isFinite(parsed)) return fallback;
+    return Math.max(0, Math.min(365, parsed));
+};
+
 // Ensure a leave_limits row exists for an employee for the given year, also fix NULLs
 const ensureLimitRow = async (client, emp_id, year) => {
     await client.query(`
@@ -64,11 +71,11 @@ exports.getAllLeaveLimits = async (req, res) => {
         const year = parseInt(req.query.year) || currentYear();
         const monthKey = currentMonthKey();
 
-        // Get all staff/hod employees
+        // Get all employees with an employee id
         const { rows: employees } = await pool.query(`
             SELECT emp_id, name, designation, role, department_id
             FROM users
-            WHERE role IN ('principal', 'hod', 'staff')
+            WHERE emp_id IS NOT NULL
             ORDER BY name ASC
         `);
 
@@ -113,7 +120,7 @@ exports.getAllLeaveLimits = async (req, res) => {
                   AND lr.status = 'Approved'
                   AND EXTRACT(YEAR FROM lr.from_date) = $1
             ) comp_earned ON true
-            WHERE u.role IN ('principal', 'hod', 'staff')
+            WHERE u.emp_id IS NOT NULL
             ORDER BY u.name ASC
         `, [year]);
 
@@ -204,6 +211,7 @@ exports.updateLeaveLimit = async (req, res) => {
             ml_limit,
             od_limit,
             comp_limit,
+            comp_leave_limit,
             lop_limit,
             permission_limit,
             fromMonth,
@@ -211,6 +219,13 @@ exports.updateLeaveLimit = async (req, res) => {
             fromDate,
             toDate
         } = req.body;
+
+        const normalizedCompLimit = sanitizeLimit(comp_limit ?? comp_leave_limit, null);
+        const normalizedClLimit = sanitizeLimit(cl_limit, null);
+        const normalizedMlLimit = sanitizeLimit(ml_limit, null);
+        const normalizedOdLimit = sanitizeLimit(od_limit, null);
+        const normalizedLopLimit = sanitizeLimit(lop_limit, null);
+        const normalizedPermissionLimit = sanitizeLimit(permission_limit, null);
 
         const resolvedFromDate = normalizePeriodDate(fromDate || fromMonth, false);
         const resolvedToDate = normalizePeriodDate(toDate || toMonth, true);
@@ -232,12 +247,12 @@ exports.updateLeaveLimit = async (req, res) => {
         `, [
             emp_id,
             year,
-            cl_limit !== undefined ? cl_limit : null,
-            ml_limit !== undefined ? ml_limit : null,
-            od_limit !== undefined ? od_limit : null,
-            comp_limit !== undefined ? comp_limit : null,
-            lop_limit !== undefined ? lop_limit : null,
-            permission_limit !== undefined ? permission_limit : null,
+            normalizedClLimit,
+            normalizedMlLimit,
+            normalizedOdLimit,
+            normalizedCompLimit,
+            normalizedLopLimit,
+            normalizedPermissionLimit,
             resolvedFromDate !== undefined ? resolvedFromDate : null,
             resolvedToDate !== undefined ? resolvedToDate : null
         ]);
@@ -274,6 +289,7 @@ exports.bulkUpdateLeaveLimits = async (req, res) => {
             ml_limit,
             od_limit,
             comp_limit,
+            comp_leave_limit,
             lop_limit,
             permission_limit,
             fromMonth,
@@ -281,6 +297,13 @@ exports.bulkUpdateLeaveLimits = async (req, res) => {
             fromDate,
             toDate
         } = req.body;
+
+        const normalizedCompLimit = sanitizeLimit(comp_limit ?? comp_leave_limit, null);
+        const normalizedClLimit = sanitizeLimit(cl_limit, null);
+        const normalizedMlLimit = sanitizeLimit(ml_limit, null);
+        const normalizedOdLimit = sanitizeLimit(od_limit, null);
+        const normalizedLopLimit = sanitizeLimit(lop_limit, null);
+        const normalizedPermissionLimit = sanitizeLimit(permission_limit, null);
 
         const resolvedFromDate = normalizePeriodDate(fromDate || fromMonth, false);
         const resolvedToDate = normalizePeriodDate(toDate || toMonth, true);
@@ -295,7 +318,7 @@ exports.bulkUpdateLeaveLimits = async (req, res) => {
         await client.query('BEGIN');
 
         const { rows: employees } = await client.query(
-            `SELECT emp_id FROM users WHERE role IN ('principal', 'hod', 'staff') AND emp_id IS NOT NULL`
+            `SELECT emp_id FROM users WHERE emp_id IS NOT NULL`
         );
 
         for (const emp of employees) {
@@ -318,12 +341,12 @@ exports.bulkUpdateLeaveLimits = async (req, res) => {
                 [
                     emp.emp_id,
                     year,
-                    cl_limit !== undefined ? cl_limit : null,
-                    ml_limit !== undefined ? ml_limit : null,
-                    od_limit !== undefined ? od_limit : null,
-                    comp_limit !== undefined ? comp_limit : null,
-                    lop_limit !== undefined ? lop_limit : null,
-                    permission_limit !== undefined ? permission_limit : null,
+                    normalizedClLimit,
+                    normalizedMlLimit,
+                    normalizedOdLimit,
+                    normalizedCompLimit,
+                    normalizedLopLimit,
+                    normalizedPermissionLimit,
                     resolvedFromDate,
                     resolvedToDate
                 ]

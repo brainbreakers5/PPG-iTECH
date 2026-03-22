@@ -71,7 +71,7 @@ const HODDashboard = () => {
             const { data: summary } = await api.get(`/attendance/summary?date=${date}`);
             const { data: bdays } = await api.get('/employees/birthdays/today');
             setBirthdays(bdays);
-            const { data: emps } = await api.get('/employees');
+            const { data: emps } = await api.get('/employees?all=true');
             setAllEmployees(emps);
             const month = date.slice(0, 7);
             const { data: records } = await api.get(`/attendance?month=${month}&emp_id=${user.emp_id}`);

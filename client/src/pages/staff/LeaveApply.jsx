@@ -148,8 +148,22 @@ const LeaveApply = () => {
             // Fallback defaults so the balance tab still renders
             setMyLimits({
                 year: limitYear,
-                cl_limit: 12, ml_limit: 12, od_limit: 10, comp_limit: 6,
-                cl_taken: 0, ml_taken: 0, od_taken: 0, comp_taken: 0
+                updated_at: null,
+                from_month: null,
+                to_month: null,
+                cl_limit: 12,
+                ml_limit: 12,
+                od_limit: 10,
+                comp_limit: 6,
+                lop_limit: 30,
+                permission_limit: 2,
+                cl_taken: 0,
+                ml_taken: 0,
+                od_taken: 0,
+                comp_taken: 0,
+                lop_taken: 0,
+                permission_taken: 0,
+                comp_earned: 0
             });
         } finally { setBalanceLoading(false); }
     };
