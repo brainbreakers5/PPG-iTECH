@@ -355,7 +355,7 @@ const SalaryManagement = () => {
                 </div>
                 <div>
                     <p className="text-sm font-black text-gray-800 tracking-tight">Salary Filters</p>
-                    <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">Role and department based records</p>
+                    <p className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">Role and department based records</p>
                 </div>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -387,7 +387,7 @@ const SalaryManagement = () => {
                     </select>
                 </div>
             </div>
-            <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mt-4">Filtered records: {filteredRows.length}</p>
+            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-gray-400 mt-4">Filtered records: {filteredRows.length}</p>
         </motion.div>
     );
 
@@ -410,7 +410,7 @@ const SalaryManagement = () => {
                                 <>Salary <span className="text-sky-600">Management</span></>
                             )}
                         </h1>
-                        <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 mt-2">
+                        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400 mt-2">
                             {isPersonalView
                                 ? 'All your past and current salary records are shown here.'
                                 : isHistoryPage
@@ -425,13 +425,13 @@ const SalaryManagement = () => {
                                 <>
                                     <button
                                         onClick={() => navigate(`/${user.role}/payroll/history`)}
-                                        className="bg-amber-500 text-white px-8 py-4 rounded-2xl shadow-xl shadow-amber-100 hover:bg-amber-600 transition-all flex items-center font-black uppercase tracking-widest text-xs active:scale-95 group"
+                                        className="bg-sky-600 text-white px-8 py-4 rounded-2xl shadow-xl shadow-sky-100 hover:bg-sky-700 transition-all active:scale-95 flex items-center font-black uppercase tracking-[0.2em] text-[10px]"
                                     >
                                         <FaHistory className="mr-3 group-hover:-rotate-12 transition-transform" /> History Page
                                     </button>
                                     <button
                                         onClick={() => navigate(`/${user.role}/payroll/reports`)}
-                                        className="bg-indigo-600 text-white px-8 py-4 rounded-2xl shadow-xl shadow-indigo-100 hover:bg-indigo-700 transition-all flex items-center font-black uppercase tracking-widest text-xs active:scale-95 group"
+                                        className="bg-sky-600 text-white px-8 py-4 rounded-2xl shadow-xl shadow-sky-100 hover:bg-sky-700 transition-all active:scale-95 flex items-center font-black uppercase tracking-[0.2em] text-[10px]"
                                     >
                                         <FaEnvelope className="mr-3 group-hover:scale-110 transition-transform" /> Reports Page
                                     </button>
@@ -440,7 +440,7 @@ const SalaryManagement = () => {
                             {isHistoryPage && (
                                 <button
                                     onClick={() => navigate(`/${user.role}/payroll`)}
-                                    className="bg-sky-600 text-white px-8 py-4 rounded-2xl shadow-xl shadow-sky-100 hover:bg-sky-700 transition-all flex items-center font-black uppercase tracking-widest text-xs active:scale-95 group"
+                                    className="bg-sky-600 text-white px-8 py-4 rounded-2xl shadow-xl shadow-sky-100 hover:bg-sky-700 transition-all active:scale-95 flex items-center font-black uppercase tracking-[0.2em] text-[10px]"
                                 >
                                     <FaSearch className="mr-3 group-hover:scale-110 transition-transform" /> Live Management
                                 </button>
@@ -482,7 +482,7 @@ const SalaryManagement = () => {
 
                 <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
                     <div>
-                        <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">Payroll Period</p>
+                        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">Payroll Period</p>
                     </div>
                 </div>
 
@@ -494,7 +494,7 @@ const SalaryManagement = () => {
                     >
                         {!isHistoryPage && (
                             <>
-                                <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">Fixed Period</span>
+                                <span className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">Fixed Period</span>
                                 <span className="px-4 py-2.5 rounded-2xl bg-sky-50 text-sm font-black text-sky-700 border border-sky-100">{selectedCycle.fromDate}</span>
                                 <span className="text-gray-300 font-black">to</span>
                                 <span className="px-4 py-2.5 rounded-2xl bg-sky-50 text-sm font-black text-sky-700 border border-sky-100">{selectedCycle.toDate}</span>
@@ -534,7 +534,7 @@ const SalaryManagement = () => {
                     >
                         <div className="flex flex-wrap gap-4 items-center mb-6">
                             <h2 className="text-sm font-black text-gray-800 tracking-tight">Attendance Status Rules</h2>
-                            <button onClick={saveAttendanceConfig} className="bg-sky-600 text-white px-6 py-3 rounded-2xl shadow-lg shadow-sky-100 hover:bg-sky-700 transition-all active:scale-95 font-black uppercase tracking-widest text-[10px]">Save Config</button>
+                            <button onClick={saveAttendanceConfig} className="bg-sky-600 text-white px-6 py-3 rounded-2xl shadow-lg shadow-sky-100 hover:bg-sky-700 transition-all active:scale-95 font-black uppercase tracking-[0.2em] text-[10px]">Save Config</button>
                         </div>
                         <div className="flex flex-wrap gap-2 items-center mb-3">
                             <input
@@ -572,9 +572,9 @@ const SalaryManagement = () => {
                         transition={{ duration: 0.35, ease: 'easeOut' }}
                         className="modern-card p-6 border-sky-100 mb-6 flex flex-wrap gap-3 items-center"
                     >
-                        <button onClick={toggleSelectAll} className="bg-gray-100 text-gray-600 px-6 py-3 rounded-2xl hover:bg-gray-200 transition-all font-black uppercase tracking-widest text-[10px] active:scale-95">{selectedIds.length === filteredRows.length ? 'Clear Selection' : 'Select All'}</button>
-                        <button onClick={() => handleBulkMark('Paid')} className="bg-emerald-600 text-white px-6 py-3 rounded-2xl shadow-lg shadow-emerald-100 hover:bg-emerald-700 transition-all font-black uppercase tracking-widest text-[10px] active:scale-95 flex items-center gap-2"><FaCheckCircle /> Mark All Paid</button>
-                        <button onClick={() => handleBulkMark('Pending')} className="bg-amber-500 text-white px-6 py-3 rounded-2xl shadow-lg shadow-amber-100 hover:bg-amber-600 transition-all font-black uppercase tracking-widest text-[10px] active:scale-95 flex items-center gap-2"><FaClock /> Mark All Unpaid</button>
+                        <button onClick={toggleSelectAll} className="bg-gray-100 text-gray-600 px-6 py-3 rounded-2xl hover:bg-gray-200 transition-all font-black uppercase tracking-[0.2em] text-[10px] active:scale-95">{selectedIds.length === filteredRows.length ? 'Clear Selection' : 'Select All'}</button>
+                        <button onClick={() => handleBulkMark('Paid')} className="bg-sky-600 text-white px-6 py-3 rounded-2xl shadow-lg shadow-sky-100 hover:bg-sky-700 transition-all font-black uppercase tracking-[0.2em] text-[10px] active:scale-95 flex items-center gap-2"><FaCheckCircle /> Mark All Paid</button>
+                        <button onClick={() => handleBulkMark('Pending')} className="bg-sky-600 text-white px-6 py-3 rounded-2xl shadow-lg shadow-sky-100 hover:bg-sky-700 transition-all font-black uppercase tracking-[0.2em] text-[10px] active:scale-95 flex items-center gap-2"><FaClock /> Mark All Unpaid</button>
                         <span className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400 ml-auto bg-gray-50 px-4 py-2 rounded-xl">Selected: {selectedIds.length}</span>
                     </motion.div>
                 )}
@@ -632,17 +632,17 @@ const SalaryManagement = () => {
                                     )}
                                     <td className="p-6">
                                         <div className="flex items-center gap-4">
-                                            <div className="h-12 w-12 rounded-2xl bg-white border border-sky-100 flex items-center justify-center text-sky-600 shadow-sm group-hover:scale-110 transition-transform hide-on-mobile">
+                                            <div className="h-12 w-12 rounded-2xl bg-white border border-sky-100 flex items-center justify-center text-sky-600 shadow-sm group-hover:scale-110 group-hover:rotate-3 transition-all duration-500 hide-on-mobile">
                                                 <FaUserTie size={20} />
                                             </div>
                                             <div>
                                                 <p className="text-sm font-black text-gray-800 tracking-tight">{r.name}</p>
                                                 <div className="flex flex-wrap gap-2 items-center mt-1">
-                                                     <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest"><span className="text-sky-500 font-black">{r.emp_id}</span></p>
+                                                     <p className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.2em]"><span className="text-sky-500 font-black">{r.emp_id}</span></p>
                                                      {r.department_name && (
                                                          <>
                                                              <span className="h-1 w-1 bg-gray-300 rounded-full"></span>
-                                                             <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest"><span className="text-gray-600 font-black">{r.department_name}</span></p>
+                                                             <p className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.2em]"><span className="text-gray-600 font-black">{r.department_name}</span></p>
                                                          </>
                                                      )}
                                                 </div>
@@ -671,7 +671,7 @@ const SalaryManagement = () => {
                                         {String(r.status).toLowerCase() === 'paid' ? (
                                             <span className="inline-block text-[9px] font-black uppercase tracking-[0.1em] px-4 py-1.5 rounded-xl border-2 shadow-sm bg-emerald-600 text-white border-emerald-600">Paid</span>
                                         ) : (
-                                            <span className="inline-block text-[9px] font-black uppercase tracking-[0.1em] px-4 py-1.5 rounded-xl border-2 shadow-sm bg-amber-50 text-amber-600 border-amber-100">Pending</span>
+                                            <span className="inline-block text-[9px] font-black uppercase tracking-[0.1em] px-4 py-1.5 rounded-xl bg-amber-50 text-amber-600 border border-amber-100 animate-pulse">Pending</span>
                                         )}
                                     </td>
                                     <td className="p-6">
@@ -688,7 +688,7 @@ const SalaryManagement = () => {
                                             {canInstitutionWide && (
                                                 <button
                                                     onClick={() => navigate(`/${user.role}/payroll/employee/${encodeURIComponent(normalizeEmpId(r.emp_id))}`)}
-                                                    className="h-10 w-10 bg-indigo-50 text-indigo-600 rounded-xl hover:bg-indigo-600 hover:text-white transition-all shadow-sm flex items-center justify-center active:scale-90 group/btn"
+                                                    className="h-10 w-10 bg-sky-50 text-sky-600 rounded-xl hover:bg-sky-600 hover:text-white transition-all active:scale-95 group/btn"
                                                     title="View employee salary page"
                                                 >
                                                     <FaSearch className="group-hover/btn:scale-125 transition-transform" />
@@ -697,7 +697,7 @@ const SalaryManagement = () => {
                                             {isPersonalView && (
                                                 <button
                                                     onClick={handleSubmitReport}
-                                                    className="h-10 flex items-center gap-2 px-4 bg-amber-50 text-amber-600 rounded-xl hover:bg-amber-500 hover:text-white transition-all shadow-sm active:scale-90 font-black text-[10px] uppercase tracking-widest"
+                                                    className="bg-sky-600 text-white px-8 py-4 rounded-2xl shadow-xl shadow-sky-100 hover:bg-sky-700 transition-all active:scale-95 text-[10px] font-black uppercase tracking-[0.2em] flex items-center gap-2"
                                                     title="Report issue"
                                                 >
                                                     <FaPaperPlane /> Report
@@ -716,7 +716,7 @@ const SalaryManagement = () => {
                                                                 Swal.fire('Error', error?.response?.data?.message || 'Failed to mark paid.', 'error');
                                                             }
                                                         }}
-                                                        className="h-10 w-10 bg-emerald-50 text-emerald-600 rounded-xl hover:bg-emerald-600 hover:text-white transition-all shadow-sm flex items-center justify-center active:scale-90 group/btn"
+                                                        className="h-10 w-10 bg-sky-50 text-sky-600 rounded-xl hover:bg-sky-600 hover:text-white transition-all active:scale-95 group/btn"
                                                         title="Mark paid"
                                                     >
                                                         <FaCheckCircle className="group-hover/btn:scale-125 transition-transform" />
@@ -732,7 +732,7 @@ const SalaryManagement = () => {
                                                                 Swal.fire('Error', error?.response?.data?.message || 'Failed to mark unpaid.', 'error');
                                                             }
                                                         }}
-                                                        className="h-10 w-10 bg-rose-50 text-rose-600 rounded-xl hover:bg-rose-600 hover:text-white transition-all shadow-sm flex items-center justify-center active:scale-90 group/btn"
+                                                        className="h-10 w-10 bg-sky-50 text-sky-600 rounded-xl hover:bg-sky-600 hover:text-white transition-all active:scale-95 group/btn"
                                                         title="Mark unpaid"
                                                     >
                                                         <FaTimesCircle className="group-hover/btn:scale-125 transition-transform" />
@@ -763,7 +763,7 @@ const SalaryManagement = () => {
                                                     <FaMoneyBillWave size={64} className="text-gray-400" />
                                                     <div>
                                                         <p className="text-xl font-black text-gray-800 tracking-tight">No Records</p>
-                                                        <p className="text-sm font-bold uppercase tracking-widest text-gray-400 mt-1">No salary records found for this view.</p>
+                                                        <p className="text-sm font-bold uppercase tracking-[0.2em] text-gray-400 mt-1">No salary records found for this view.</p>
                                                     </div>
                                                 </div>
                                             </td>
