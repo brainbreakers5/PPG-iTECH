@@ -202,8 +202,18 @@ exports.calculateSalary = async (req, res) => {
 
             // Check if already published (Paid) — do NOT overwrite paid records
             const { rows: existing } = await pool.query(
-                `SELECT id, status FROM salary_records WHERE TRIM(emp_id) = $1 AND from_date::date = $2::date AND to_date::date = $3::date LIMIT 1`,
-                [userEmpId, rangeFrom, rangeTo]
+                                `SELECT id, status
+                                 FROM salary_records
+                                 WHERE TRIM(emp_id) = $1
+                                     AND (
+                                                (from_date IS NOT NULL AND to_date IS NOT NULL AND from_date::date = $2::date AND to_date::date = $3::date)
+                                                OR (month = $4 AND year = $5)
+                                     )
+                                 ORDER BY
+                                     CASE WHEN (from_date IS NOT NULL AND to_date IS NOT NULL AND from_date::date = $2::date AND to_date::date = $3::date) THEN 0 ELSE 1 END,
+                                     id DESC
+                                 LIMIT 1`,
+                                [userEmpId, rangeFrom, rangeTo, period.month, period.year]
             );
             if (existing.length > 0 && existing[0].status === 'Paid') {
                 // Skip: protect paid records from drift
@@ -347,9 +357,12 @@ exports.getSalaryRecords = async (req, res) => {
             SELECT s.*
             FROM salary_records s
             WHERE TRIM(s.emp_id) = ANY($1::text[])
-              AND s.from_date::date = $2::date
-              AND s.to_date::date = $3::date
-        `, [empIds, period.fromDate, period.toDate]);
+              AND (
+                  (s.from_date IS NOT NULL AND s.to_date IS NOT NULL AND s.from_date::date = $2::date AND s.to_date::date = $3::date)
+                  OR (s.month = $4 AND s.year = $5)
+              )
+            ORDER BY s.id DESC
+          `, [empIds, period.fromDate, period.toDate, period.month, period.year]);
 
         const recMap = {};
         records.forEach((r) => {
@@ -595,8 +608,12 @@ exports.publishSalaries = async (req, res) => {
         const { rowCount } = await pool.query(
             `UPDATE salary_records
              SET status = 'Paid', paid_at = COALESCE(paid_at, NOW())
-             WHERE from_date::date = $1::date AND to_date::date = $2::date AND status = 'Pending'`,
-            [period.fromDate, period.toDate]
+             WHERE status = 'Pending'
+               AND (
+                    (from_date IS NOT NULL AND to_date IS NOT NULL AND from_date::date = $1::date AND to_date::date = $2::date)
+                    OR (month = $3 AND year = $4)
+               )`,
+            [period.fromDate, period.toDate, period.month, period.year]
         );
 
         const io = req.app.get('io');
