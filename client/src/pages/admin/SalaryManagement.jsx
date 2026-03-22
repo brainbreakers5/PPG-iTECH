@@ -9,6 +9,7 @@ import {
     FaBuilding,
     FaCheckCircle,
     FaClock,
+    FaCog,
     FaEnvelope,
     FaExclamationCircle,
     FaFileAlt,
@@ -79,6 +80,7 @@ const SalaryManagement = () => {
     const canInstitutionWide = user?.role === 'admin' || user?.role === 'management';
     const isHistoryPage = /\/payroll\/history$/.test(location.pathname);
     const isPersonalView = !canInstitutionWide;
+    const isAdmin = user?.role === 'admin';
 
     const currentCycle = useMemo(() => getCurrentPayrollCycle(), []);
     const [selectedMonth, setSelectedMonth] = useState(currentCycle.month);
@@ -105,8 +107,6 @@ const SalaryManagement = () => {
         return saved ? JSON.parse(saved) : ['Absent', 'LOP'];
     });
 
-    const [newStatus, setNewStatus] = useState('');
-
     const filteredRows = useMemo(() => {
         return rows.filter((r) => {
             const roleMatch = activeRole === 'all' || String(r.role || '').toLowerCase() === activeRole;
@@ -128,9 +128,7 @@ const SalaryManagement = () => {
     const summary = useMemo(() => {
         const gross = filteredRows.reduce((acc, row) => acc + Number(row.gross_salary || row.monthly_salary || 0), 0);
         const net = filteredRows.reduce((acc, row) => acc + Number(row.calculated_salary || 0), 0);
-        const paidCount = filteredRows.filter((row) => String(row.status || '').toLowerCase() === 'paid').length;
-        const pendingCount = filteredRows.length - paidCount;
-        return { gross, net, paidCount, pendingCount };
+        return { gross, net };
     }, [filteredRows]);
 
     const refreshRows = async () => {
@@ -201,40 +199,57 @@ const SalaryManagement = () => {
         fetchDepartments();
     }, [canInstitutionWide]);
 
-    const saveAttendanceConfig = async () => {
-        localStorage.setItem('salary_paid_statuses', JSON.stringify(paidStatuses));
-        localStorage.setItem('salary_unpaid_statuses', JSON.stringify(unpaidStatuses));
-
-        try {
-            if (canInstitutionWide && !isHistoryPage) {
-                await api.post('/salary/calculate', {
-                    month: currentCycle.month,
-                    year: currentCycle.year,
-                    fromDate: currentCycle.fromDate,
-                    toDate: currentCycle.toDate,
-                    paidStatuses,
-                    unpaidStatuses
-                });
+    const openAttendanceConfig = () => {
+        Swal.fire({
+            title: 'Attendance Status Rules',
+            html: `
+                <div class="text-left text-sm">
+                    <div class="mb-4">
+                        <label class="block font-bold text-gray-600 mb-2">Statuses with Pay</label>
+                        <input id="swal-paid" class="swal2-input" value="${paidStatuses.join(', ')}">
+                    </div>
+                    <div>
+                        <label class="block font-bold text-gray-600 mb-2">Statuses without Pay (LOP)</label>
+                        <input id="swal-unpaid" class="swal2-input" value="${unpaidStatuses.join(', ')}">
+                    </div>
+                    <p class="text-xs text-gray-500 mt-4">Enter comma-separated values. Changes will trigger a salary recalculation for the current period.</p>
+                </div>
+            `,
+            focusConfirm: false,
+            showCancelButton: true,
+            confirmButtonText: 'Save & Recalculate',
+            preConfirm: () => {
+                const paid = document.getElementById('swal-paid').value.split(',').map(s => s.trim()).filter(Boolean);
+                const unpaid = document.getElementById('swal-unpaid').value.split(',').map(s => s.trim()).filter(Boolean);
+                return { paid, unpaid };
             }
-            await refreshRows();
-            Swal.fire('Saved', 'Attendance status rules updated.', 'success');
-        } catch (error) {
-            console.error('Failed to save config:', error);
-            Swal.fire('Warning', 'Configuration saved locally. Recalculation failed.', 'warning');
-        }
-    };
+        }).then(async (result) => {
+            if (result.isConfirmed) {
+                const { paid, unpaid } = result.value;
+                setPaidStatuses(paid);
+                setUnpaidStatuses(unpaid);
+                localStorage.setItem('salary_paid_statuses', JSON.stringify(paid));
+                localStorage.setItem('salary_unpaid_statuses', JSON.stringify(unpaid));
 
-    const handleAddStatus = (isPaid) => {
-        const value = newStatus.trim();
-        if (!value) return;
-
-        if (isPaid) {
-            if (!paidStatuses.includes(value)) setPaidStatuses((prev) => [...prev, value]);
-        } else {
-            if (!unpaidStatuses.includes(value)) setUnpaidStatuses((prev) => [...prev, value]);
-        }
-
-        setNewStatus('');
+                try {
+                    if (canInstitutionWide && !isHistoryPage) {
+                        await api.post('/salary/calculate', {
+                            month: currentCycle.month,
+                            year: currentCycle.year,
+                            fromDate: currentCycle.fromDate,
+                            toDate: currentCycle.toDate,
+                            paidStatuses: paid,
+                            unpaidStatuses: unpaid
+                        });
+                    }
+                    await refreshRows();
+                    Swal.fire('Saved!', 'Attendance rules updated and salaries recalculated.', 'success');
+                } catch (error) {
+                    console.error('Failed to save config:', error);
+                    Swal.fire('Warning', 'Configuration saved locally. Recalculation failed.', 'warning');
+                }
+            }
+        });
     };
 
     const updateStatus = async (row, nextStatus) => {
@@ -350,7 +365,7 @@ const SalaryManagement = () => {
             className="modern-card p-6 border-sky-100 mb-6"
         >
             <div className="flex items-center gap-3 mb-4">
-                <div className="h-10 w-10 rounded-2xl bg-sky-100 text-sky-600 flex items-center justify-center">
+                <div className="h-10 w-10 rounded-xl bg-sky-500 flex items-center justify-center text-white shadow-lg shadow-sky-100">
                     <FaFilter size={14} />
                 </div>
                 <div>
@@ -419,148 +434,103 @@ const SalaryManagement = () => {
                         </p>
                     </div>
 
-                    {canInstitutionWide && (
-                        <div className="flex flex-wrap gap-4">
-                            {!isHistoryPage && (
-                                <>
+                    <div className="flex flex-wrap gap-4">
+                        {isAdmin && !isHistoryPage && (
+                            <button
+                                onClick={openAttendanceConfig}
+                                className="bg-sky-600 text-white px-8 py-4 rounded-2xl shadow-xl shadow-sky-100 hover:bg-sky-700 transition-all active:scale-95 flex items-center font-black uppercase tracking-[0.2em] text-[10px]"
+                            >
+                                <FaCog className="mr-3 group-hover:-rotate-12 transition-transform" /> Rules
+                            </button>
+                        )}
+                        {canInstitutionWide && (
+                            <>
+                                {!isHistoryPage && (
                                     <button
                                         onClick={() => navigate(`/${user.role}/payroll/history`)}
                                         className="bg-sky-600 text-white px-8 py-4 rounded-2xl shadow-xl shadow-sky-100 hover:bg-sky-700 transition-all active:scale-95 flex items-center font-black uppercase tracking-[0.2em] text-[10px]"
                                     >
-                                        <FaHistory className="mr-3 group-hover:-rotate-12 transition-transform" /> History Page
+                                        <FaHistory className="mr-3 group-hover:-rotate-12 transition-transform" /> History
                                     </button>
+                                )}
+                                {isHistoryPage && (
                                     <button
-                                        onClick={() => navigate(`/${user.role}/payroll/reports`)}
+                                        onClick={() => navigate(`/${user.role}/payroll`)}
                                         className="bg-sky-600 text-white px-8 py-4 rounded-2xl shadow-xl shadow-sky-100 hover:bg-sky-700 transition-all active:scale-95 flex items-center font-black uppercase tracking-[0.2em] text-[10px]"
                                     >
-                                        <FaEnvelope className="mr-3 group-hover:scale-110 transition-transform" /> Reports Page
+                                        <FaSearch className="mr-3 group-hover:scale-110 transition-transform" /> Live
                                     </button>
-                                </>
-                            )}
-                            {isHistoryPage && (
-                                <button
-                                    onClick={() => navigate(`/${user.role}/payroll`)}
-                                    className="bg-sky-600 text-white px-8 py-4 rounded-2xl shadow-xl shadow-sky-100 hover:bg-sky-700 transition-all active:scale-95 flex items-center font-black uppercase tracking-[0.2em] text-[10px]"
-                                >
-                                    <FaSearch className="mr-3 group-hover:scale-110 transition-transform" /> Live Management
-                                </button>
-                            )}
-                        </div>
-                    )}
+                                )}
+                            </>
+                        )}
+                    </div>
                 </div>
 
-                <motion.div variants={staggerWrap} className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-                    <motion.div variants={fadeUp} transition={{ duration: 0.35 }} className="modern-card p-6 border-sky-100 flex items-center gap-4 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl group">
-                        <div className="h-12 w-12 rounded-2xl bg-sky-50 text-sky-600 flex items-center justify-center shadow-lg shadow-sky-100 group-hover:scale-110 group-hover:-translate-y-1 transition-transform"><FaMoneyBillWave size={20} /></div>
+                <motion.div variants={staggerWrap} className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                    <motion.div variants={fadeUp} transition={{ duration: 0.35 }} className="modern-card p-6 border-sky-50 shadow-xl shadow-sky-50/50 flex items-center gap-4 transition-all duration-300 hover:-translate-y-1 group">
+                        <div className="h-12 w-12 rounded-xl bg-sky-500 flex items-center justify-center text-white shadow-lg shadow-sky-100 group-hover:scale-110 group-hover:-translate-y-1 transition-transform"><FaMoneyBillWave size={20} /></div>
                         <div>
                             <p className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">Gross Total</p>
                             <p className="text-xl font-black text-gray-800 tracking-tighter">Rs {toCurrency(summary.gross)}</p>
                         </div>
                     </motion.div>
-                    <motion.div variants={fadeUp} transition={{ duration: 0.35 }} className="modern-card p-6 border-emerald-100 flex items-center gap-4 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl group">
-                        <div className="h-12 w-12 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center shadow-lg shadow-emerald-100 group-hover:scale-110 group-hover:-translate-y-1 transition-transform"><FaWallet size={20} /></div>
+                    <motion.div variants={fadeUp} transition={{ duration: 0.35 }} className="modern-card p-6 border-emerald-50 shadow-xl shadow-emerald-50/50 flex items-center gap-4 transition-all duration-300 hover:-translate-y-1 group">
+                        <div className="h-12 w-12 rounded-xl bg-emerald-500 flex items-center justify-center text-white shadow-lg shadow-emerald-100 group-hover:scale-110 group-hover:-translate-y-1 transition-transform"><FaWallet size={20} /></div>
                         <div>
                             <p className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">Net Total</p>
                             <p className="text-xl font-black text-emerald-700 tracking-tighter">Rs {toCurrency(summary.net)}</p>
                         </div>
                     </motion.div>
-                    <motion.div variants={fadeUp} transition={{ duration: 0.35 }} className="modern-card p-6 border-indigo-100 flex items-center gap-4 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl group">
-                        <div className="h-12 w-12 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center shadow-lg shadow-indigo-100 group-hover:scale-110 group-hover:-translate-y-1 transition-transform"><FaUserTie size={20} /></div>
-                        <div>
-                            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">Paid Records</p>
-                            <p className="text-xl font-black text-gray-800 tracking-tighter">{summary.paidCount}</p>
-                        </div>
-                    </motion.div>
-                    <motion.div variants={fadeUp} transition={{ duration: 0.35 }} className="modern-card p-6 border-amber-100 flex items-center gap-4 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl group">
-                        <div className="h-12 w-12 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center shadow-lg shadow-amber-100 group-hover:scale-110 group-hover:-translate-y-1 transition-transform"><FaBuilding size={20} /></div>
-                        <div>
-                            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">Pending</p>
-                            <p className="text-xl font-black text-gray-800 tracking-tighter">{summary.pendingCount}</p>
-                        </div>
-                    </motion.div>
                 </motion.div>
-
-                <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
-                    <div>
-                        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">Payroll Period</p>
-                    </div>
-                </div>
 
                 {!isPersonalView && (
                     <motion.div
                         variants={fadeUp}
                         transition={{ duration: 0.35, ease: 'easeOut' }}
-                        className="modern-card p-6 border-sky-100 mb-6 flex flex-wrap items-center gap-4"
-                    >
-                        {!isHistoryPage && (
-                            <>
-                                <span className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">Fixed Period</span>
-                                <span className="px-4 py-2.5 rounded-2xl bg-sky-50 text-sm font-black text-sky-700 border border-sky-100">{selectedCycle.fromDate}</span>
-                                <span className="text-gray-300 font-black">to</span>
-                                <span className="px-4 py-2.5 rounded-2xl bg-sky-50 text-sm font-black text-sky-700 border border-sky-100">{selectedCycle.toDate}</span>
-                            </>
-                        )}
-
-                        {isHistoryPage && (
-                            <>
-                                <label className="text-xs font-bold text-gray-500 uppercase">Month</label>
-                                <select
-                                    className="px-4 py-2.5 rounded-2xl border border-gray-100 bg-gray-50"
-                                    value={selectedMonth}
-                                    onChange={(e) => setSelectedMonth(Number(e.target.value))}
-                                >
-                                    {Array.from({ length: 12 }).map((_, i) => (
-                                        <option key={i + 1} value={i + 1}>{i + 1}</option>
-                                    ))}
-                                </select>
-                                <label className="text-xs font-bold text-gray-500 uppercase">Year</label>
-                                <input
-                                    type="number"
-                                    className="px-4 py-2.5 rounded-2xl border border-gray-100 bg-gray-50 w-28"
-                                    value={selectedYear}
-                                    onChange={(e) => setSelectedYear(Number(e.target.value))}
-                                />
-                                <span className="text-xs text-gray-500">Cycle: {selectedCycle.fromDate} to {selectedCycle.toDate}</span>
-                            </>
-                        )}
-                    </motion.div>
-                )}
-
-                {!isPersonalView && !isHistoryPage && (
-                    <motion.div
-                        variants={fadeUp}
-                        transition={{ duration: 0.35, ease: 'easeOut' }}
                         className="modern-card p-6 border-sky-100 mb-6"
                     >
-                        <div className="flex flex-wrap gap-4 items-center mb-6">
-                            <h2 className="text-sm font-black text-gray-800 tracking-tight">Attendance Status Rules</h2>
-                            <button onClick={saveAttendanceConfig} className="bg-sky-600 text-white px-6 py-3 rounded-2xl shadow-lg shadow-sky-100 hover:bg-sky-700 transition-all active:scale-95 font-black uppercase tracking-[0.2em] text-[10px]">Save Config</button>
+                        <div className="flex items-center gap-3 mb-4">
+                            <div className="h-10 w-10 rounded-xl bg-sky-500 flex items-center justify-center text-white shadow-lg shadow-sky-100">
+                                <FaClock size={14} />
+                            </div>
+                            <div>
+                                <p className="text-sm font-black text-gray-800 tracking-tight">Payroll Period</p>
+                                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">Select a period to view records</p>
+                            </div>
                         </div>
-                        <div className="flex flex-wrap gap-2 items-center mb-3">
-                            <input
-                                value={newStatus}
-                                onChange={(e) => setNewStatus(e.target.value)}
-                                placeholder="Add status"
-                                className="px-3 py-2 rounded-2xl border border-gray-100 bg-gray-50 text-sm"
-                            />
-                            <button onClick={() => handleAddStatus(true)} className="px-3 py-2 rounded-2xl bg-emerald-600 text-white text-xs font-bold">Add With Pay</button>
-                            <button onClick={() => handleAddStatus(false)} className="px-3 py-2 rounded-2xl bg-rose-600 text-white text-xs font-bold">Add Without Pay</button>
-                        </div>
-                        <div className="text-xs text-gray-600">
-                            <p><b>With Pay:</b> {paidStatuses.join(', ')}</p>
-                            <p><b>Without Pay:</b> {unpaidStatuses.join(', ')}</p>
-                        </div>
-                    </motion.div>
-                )}
+                        <div className="flex flex-wrap items-center gap-4">
+                            {!isHistoryPage && (
+                                <>
+                                    <span className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">Fixed Period</span>
+                                    <span className="px-4 py-2.5 rounded-2xl bg-sky-50 text-sm font-black text-sky-700 border border-sky-100">{selectedCycle.fromDate}</span>
+                                    <span className="text-gray-300 font-black">to</span>
+                                    <span className="px-4 py-2.5 rounded-2xl bg-sky-50 text-sm font-black text-sky-700 border border-sky-100">{selectedCycle.toDate}</span>
+                                </>
+                            )}
 
-                {isPersonalView && (
-                    <motion.div
-                        variants={fadeUp}
-                        transition={{ duration: 0.35, ease: 'easeOut' }}
-                        className="bg-white p-5 rounded-[28px] shadow-xl shadow-sky-50/70 border border-sky-50 mb-6 text-xs text-gray-600"
-                    >
-                        <p><b>Admin With Pay statuses:</b> {paidStatuses.join(', ')}</p>
-                        <p><b>Admin Without Pay statuses:</b> {unpaidStatuses.join(', ')}</p>
+                            {isHistoryPage && (
+                                <>
+                                    <label className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">Month</label>
+                                    <select
+                                        className="px-4 py-2.5 rounded-2xl border border-gray-100 bg-gray-50 text-sm font-bold text-gray-700"
+                                        value={selectedMonth}
+                                        onChange={(e) => setSelectedMonth(Number(e.target.value))}
+                                    >
+                                        {Array.from({ length: 12 }).map((_, i) => (
+                                            <option key={i + 1} value={i + 1}>{i + 1}</option>
+                                        ))}
+                                    </select>
+                                    <label className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">Year</label>
+                                    <input
+                                        type="number"
+                                        className="px-4 py-2.5 rounded-2xl border border-gray-100 bg-gray-50 w-28 text-sm font-bold text-gray-700"
+                                        value={selectedYear}
+                                        onChange={(e) => setSelectedYear(Number(e.target.value))}
+                                    />
+                                    <span className="text-xs text-gray-500 ml-auto">Cycle: {selectedCycle.fromDate} to {selectedCycle.toDate}</span>
+                                </>
+                            )}
+                        </div>
                     </motion.div>
                 )}
 
@@ -586,19 +556,18 @@ const SalaryManagement = () => {
                 >
                     <div className="bg-sky-50/30 p-6 border-b border-sky-50 flex items-center justify-between">
                         <div className="flex items-center gap-3">
-                            <div className="h-10 w-10 rounded-xl bg-sky-100 flex items-center justify-center text-sky-600 shadow-sm">
+                            <div className="h-10 w-10 rounded-xl bg-sky-500 flex items-center justify-center text-white shadow-lg shadow-sky-100">
                                 <FaFileAlt size={18} />
                             </div>
-                            <h2 className="text-lg font-black text-gray-800 uppercase tracking-widest">Salary Ledger</h2>
+                            <h2 className="text-lg font-black text-gray-800 uppercase tracking-widest">Salary Records</h2>
                         </div>
                     </div>
                     <div className="overflow-x-auto">
                         <table className="w-full text-left border-collapse">
                             <thead>
-                                <tr className="bg-gray-50/50">
-                                    {canInstitutionWide && isHistoryPage && <th className="p-6 w-12 border-b border-sky-50"><div className="flex justify-center">Select</div></th>}
+                                <tr className="bg-sky-50/30">
+                                    {canInstitutionWide && isHistoryPage && <th className="p-6 w-12 text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-sky-50"><div className="flex justify-center">Select</div></th>}
                                     <th className="p-6 text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-sky-50">Employee</th>
-                                    <th className="p-6 text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-sky-50">Period</th>
                                     <th className="p-6 text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-sky-50 text-right">With/Without Pay</th>
                                     <th className="p-6 text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-sky-50 text-right">Gross</th>
                                     <th className="p-6 text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-sky-50 text-right">Deductions</th>
@@ -612,8 +581,8 @@ const SalaryManagement = () => {
                                 {!loading && filteredRows.map((r, idx) => (
                                 <motion.tr
                                     key={r.id}
-                                    initial={{ opacity: 0 }}
-                                    animate={{ opacity: 1 }}
+                                    initial={{ opacity: 0, y: 10 }}
+                                    animate={{ opacity: 1, y: 0 }}
                                     exit={{ opacity: 0, scale: 0.98 }}
                                     transition={{ delay: idx * 0.03 }}
                                     className="hover:bg-sky-50/20 transition-all group border-b border-sky-50/10"
@@ -632,8 +601,8 @@ const SalaryManagement = () => {
                                     )}
                                     <td className="p-6">
                                         <div className="flex items-center gap-4">
-                                            <div className="h-12 w-12 rounded-2xl bg-white border border-sky-100 flex items-center justify-center text-sky-600 shadow-sm group-hover:scale-110 group-hover:rotate-3 transition-all duration-500 hide-on-mobile">
-                                                <FaUserTie size={20} />
+                                            <div className="h-12 w-12 rounded-full bg-white border-2 border-sky-100 flex items-center justify-center overflow-hidden shadow-sm group-hover:scale-110 group-hover:border-sky-300 transition-all duration-300">
+                                                <img src={r.profile_picture_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(r.name)}&background=random`} alt={r.name} className="h-full w-full object-cover group-hover:scale-110 group-hover:rotate-3 transition-all duration-500" />
                                             </div>
                                             <div>
                                                 <p className="text-sm font-black text-gray-800 tracking-tight">{r.name}</p>
@@ -649,9 +618,6 @@ const SalaryManagement = () => {
                                             </div>
                                         </div>
                                     </td>
-                                    <td className="p-6">
-                                        <span className="text-xs font-black text-gray-600 bg-gray-50 px-3 py-1.5 rounded-xl border border-gray-100 whitespace-nowrap">{r.from_date || '-'} to {r.to_date || '-'}</span>
-                                    </td>
                                     <td className="p-6 text-right">
                                         <div className="flex flex-col items-end gap-1">
                                             <span className="text-sm font-black text-emerald-600">{Number(r.total_present || r.with_pay_count || 0).toFixed(1)} <span className="text-[9px] text-gray-400 uppercase">Paid</span></span>
@@ -659,10 +625,10 @@ const SalaryManagement = () => {
                                         </div>
                                     </td>
                                     <td className="p-6 text-right">
-                                        <span className="text-sm font-black text-gray-700 bg-gray-50 px-3 py-1.5 rounded-lg border border-gray-100 whitespace-nowrap">Rs {toCurrency(r.gross_salary || r.monthly_salary || 0)}</span>
+                                        <span className="text-sm font-bold text-gray-700 bg-gray-50 px-3 py-1.5 rounded-lg border border-gray-100 whitespace-nowrap">Rs {toCurrency(r.gross_salary || r.monthly_salary || 0)}</span>
                                     </td>
                                     <td className="p-6 text-right">
-                                        <span className="text-sm font-black text-rose-600 bg-rose-50 px-3 py-1.5 rounded-lg border border-rose-100 whitespace-nowrap">Rs {toCurrency(r.deductions_applied || 0)}</span>
+                                        <span className="text-sm font-bold text-rose-600 bg-rose-50 px-3 py-1.5 rounded-lg border border-rose-100 whitespace-nowrap">Rs {toCurrency(r.deductions_applied || 0)}</span>
                                     </td>
                                     <td className="p-6 text-right">
                                         <span className="text-sm font-black text-emerald-700 bg-emerald-50 px-3 py-1.5 rounded-lg border border-emerald-100 whitespace-nowrap">Rs {toCurrency(r.calculated_salary || 0)}</span>
@@ -679,7 +645,7 @@ const SalaryManagement = () => {
                                             {!isPersonalView && (
                                                 <button
                                                     onClick={() => window.print()}
-                                                    className="h-10 w-10 bg-sky-50 text-sky-600 rounded-xl hover:bg-sky-600 hover:text-white transition-all shadow-sm flex items-center justify-center active:scale-90 group/btn"
+                                                    className="h-10 w-10 bg-sky-50 text-sky-600 rounded-xl hover:bg-sky-600 hover:text-white transition-all active:scale-95 group/btn"
                                                     title="Print"
                                                 >
                                                     <FaFileAlt className="group-hover/btn:scale-125 transition-transform" />
@@ -747,7 +713,7 @@ const SalaryManagement = () => {
 
                             {loading && (
                                         <tr>
-                                            <td colSpan={canInstitutionWide && isHistoryPage ? 9 : 8} className="p-32 text-center text-gray-500">
+                                            <td colSpan={canInstitutionWide && isHistoryPage ? 8 : 7} className="p-32 text-center text-gray-500">
                                                 <div className="flex flex-col items-center gap-4">
                                                     <div className="h-14 w-14 border-4 border-sky-100 border-t-sky-600 rounded-full animate-spin"></div>
                                                     <p className="text-[10px] font-black text-sky-500 uppercase tracking-[0.2em] mt-2">Loading payroll records...</p>
@@ -758,7 +724,7 @@ const SalaryManagement = () => {
 
                                     {!loading && filteredRows.length === 0 && (
                                         <tr>
-                                            <td colSpan={canInstitutionWide && isHistoryPage ? 9 : 8} className="p-32 text-center">
+                                            <td colSpan={canInstitutionWide && isHistoryPage ? 8 : 7} className="p-32 text-center">
                                                 <div className="flex flex-col items-center gap-6 opacity-20 grayscale">
                                                     <FaMoneyBillWave size={64} className="text-gray-400" />
                                                     <div>
