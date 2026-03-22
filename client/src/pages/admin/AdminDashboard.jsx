@@ -311,80 +311,59 @@ const AdminDashboard = () => {
                 )}
             </AnimatePresence>
             {/* Stats Grid */}
-            <div id="attendance-cores" className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-12">
-                {roleConfigs.map((role) => (
-                    <motion.div
-                        key={role.key}
-                        whileHover={{ y: -8, scale: 1.02 }}
-                        className="modern-card p-10 bg-white/70 backdrop-blur-xl border border-white/50 group relative overflow-hidden"
-                    >
-                        {/* Card Header */}
-                        <div className="flex justify-between items-center mb-6 relative z-10">
-                            <div>
-                                <h2 className="text-[11px] font-black text-gray-400 uppercase tracking-[0.3em]">{role.title}</h2>
-                                <p className="text-xl font-black text-gray-800 tracking-tighter mt-1">Attendance Core</p>
-                            </div>
-                            <div className={`p-3 rounded-2xl bg-gradient-to-br ${role.accentClass} text-white shadow-lg`}>
-                                <FaUserCheck />
-                            </div>
-                        </div>
+            <div id="attendance-cores" className="modern-card !p-0 overflow-hidden border-sky-100 mb-12">
+                <div className="overflow-x-auto">
+                    <table className="w-full text-left border-collapse">
+                        <thead>
+                            <tr className="bg-gray-50/50">
+                                <th className="p-6 text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] border-b border-sky-50">Core Role / Entity</th>
+                                <th className="p-6 text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] border-b border-sky-50 text-center">Total</th>
+                                <th className="p-6 text-[10px] font-black text-emerald-500 uppercase tracking-[0.2em] border-b border-sky-50 text-center">Present</th>
+                                <th className="p-6 text-[10px] font-black text-rose-500 uppercase tracking-[0.2em] border-b border-sky-50 text-center">Absent</th>
+                                <th className="p-6 text-[10px] font-black text-amber-500 uppercase tracking-[0.2em] border-b border-sky-50 text-center">On Leave (CL/ML/Comp)</th>
+                                <th className="p-6 text-[10px] font-black text-violet-500 uppercase tracking-[0.2em] border-b border-sky-50 text-center">Others (OD/LE)</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-sky-50/10">
+                            {roleConfigs.map((role) => {
+                                const roleStats = stats[role.key] || {};
+                                const leaves = (roleStats.cl || 0) + (roleStats.ml || 0) + (roleStats.comp_leave || 0);
+                                const others = (roleStats.od || 0) + (roleStats.late_entry || 0);
 
-                        {/* "Total" button for HOD and Staff */}
-                        {role.canViewAll && (
-                            <button
-                                onClick={() => {
-                                    navigate(`/admin/personnel/${role.modalRole}`);
-                                    window.dispatchEvent(new CustomEvent('closeSidebar'));
-                                }}
-                                className="w-full mb-6 py-3 px-4 rounded-2xl bg-gray-50 border border-gray-100 text-[10px] font-black text-gray-500 uppercase tracking-widest hover:bg-sky-50 hover:border-sky-100 hover:text-sky-600 transition-all flex items-center justify-between group/btn relative z-10"
-                            >
-                                <span>Total {role.title}</span>
-                                <div className="flex items-center gap-2">
-                                    <span className="flex items-center gap-1 bg-emerald-50 border border-emerald-100 text-emerald-600 font-black px-2 py-1 rounded-xl text-[9px] uppercase tracking-widest">
-                                        <FaUserCheck size={8} /> {stats[role.key]?.present || 0} Available
-                                    </span>
-                                    <span className="bg-white border border-gray-200 text-gray-800 font-black px-3 py-1 rounded-xl text-sm group-hover/btn:bg-sky-600 group-hover/btn:text-white group-hover/btn:border-sky-600 transition-all">
-                                        {role.totalCount}
-                                    </span>
-                                </div>
-                            </button>
-                        )}
-
-                        {/* Attendance Stats */}
-                        <div className="space-y-4 relative z-10">
-                            {[
-                                { label: 'Present', value: stats[role.key]?.present, icon: <FaUserCheck />, color: 'text-sky-600', bg: 'bg-sky-50' },
-                                { label: 'Absent', value: stats[role.key]?.absent, icon: <FaUserTimes />, color: 'text-rose-600', bg: 'bg-rose-50' },
-                                { label: 'Loss Of Pay', value: stats[role.key]?.lop, icon: <FaTimes />, color: 'text-rose-800', bg: 'bg-rose-100' },
-                                { label: 'On Duty', value: stats[role.key]?.od, icon: <FaBriefcase />, color: 'text-emerald-600', bg: 'bg-emerald-50' },
-                                { label: 'Casual Leave', value: stats[role.key]?.cl, icon: <FaCalendarDay />, color: 'text-amber-600', bg: 'bg-amber-50' },
-                                { label: 'Medical Leave', value: stats[role.key]?.ml, icon: <FaFileAlt />, color: 'text-purple-600', bg: 'bg-purple-50' },
-                                { label: 'Comp Leave', value: stats[role.key]?.comp_leave, icon: <FaStar />, color: 'text-indigo-600', bg: 'bg-indigo-50' },
-                                { label: 'Late Entry', value: stats[role.key]?.late_entry, icon: <FaClock />, color: 'text-orange-600', bg: 'bg-orange-50' }
-                            ].map((stat) => (
-                                <div
-                                    key={stat.label}
-                                    onClick={() => {
-                                        document.querySelector('main')?.scrollTo({ top: 0, behavior: 'smooth' });
-                                        setEmployeeModal({ role: role.key, statusLabel: stat.label, title: role.title });
-                                    }}
-                                    className="flex items-center justify-between p-3 rounded-2xl bg-gray-50/50 hover:bg-white transition-all border border-transparent hover:border-gray-100 group/item cursor-pointer"
-                                >
-                                    <div className="flex items-center gap-3">
-                                        <div className={`h-9 w-9 rounded-xl ${stat.bg} ${stat.color} flex items-center justify-center text-sm shadow-sm transition-transform group-hover/item:rotate-12`}>
-                                            {stat.icon}
-                                        </div>
-                                        <span className="text-[10px] font-black text-gray-500 uppercase tracking-widest">{stat.label}</span>
-                                    </div>
-                                    <span className="text-lg font-black text-gray-800 tracking-tighter">{stat.value || 0}</span>
-                                </div>
-                            ))}
-                        </div>
-
-                        {/* Background Decor */}
-                        <div className="absolute -bottom-10 -right-10 w-32 h-32 bg-gray-50 rounded-full blur-3xl opacity-50" />
-                    </motion.div>
-                ))}
+                                return (
+                                    <tr key={role.key} className="hover:bg-sky-50/20 transition-all group">
+                                        <td className="p-6">
+                                            <div className="flex items-center gap-4">
+                                                <div className={`h-12 w-12 rounded-2xl bg-gradient-to-br ${role.accentClass} text-white flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform`}>
+                                                    <FaUserCheck />
+                                                </div>
+                                                <div>
+                                                    <p className="text-sm font-black text-gray-800 tracking-tight">{role.title}</p>
+                                                    <p className="text-[10px] font-black text-sky-500 uppercase tracking-widest mt-0.5">Summary Detail</p>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td className="p-6 text-center">
+                                            <span className="text-lg font-black text-gray-800 bg-gray-50 px-4 py-2 rounded-xl border border-gray-100">{role.totalCount}</span>
+                                        </td>
+                                        <td className="p-6 text-center">
+                                            <span className="text-sm font-black text-emerald-600 bg-emerald-50 px-3 py-1.5 rounded-lg border border-emerald-100">{roleStats.present || 0}</span>
+                                        </td>
+                                        <td className="p-6 text-center">
+                                            <span className="text-sm font-black text-rose-600 bg-rose-50 px-3 py-1.5 rounded-lg border border-rose-100">{roleStats.absent || 0}</span>
+                                        </td>
+                                        <td className="p-6 text-center">
+                                            <span className="text-sm font-black text-amber-600 bg-amber-50 px-3 py-1.5 rounded-lg border border-amber-100">{leaves}</span>
+                                        </td>
+                                        <td className="p-6 text-center">
+                                            <span className="text-sm font-black text-violet-600 bg-violet-50 px-3 py-1.5 rounded-lg border border-violet-100">{others}</span>
+                                        </td>
+                                    </tr>
+                                );
+                            })}
+                        </tbody>
+                    </table>
+                </div>
             </div>
 
             {/* Quick Access Menu Grid Removed */}
@@ -502,15 +481,14 @@ const AdminDashboard = () => {
                                                     </td>
                                                     <td className="px-5 py-4 text-sm font-medium text-gray-600">{emp.department_name || '—'}</td>
                                                     <td className="px-5 py-4">
-                                                        <span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest border ${
-                                                            (attendanceMap[emp.emp_id]?.remarks || '').includes('Late Entry') ? 'bg-orange-50 text-orange-600 border-orange-100' :
-                                                            attendanceMap[emp.emp_id]?.status?.startsWith('Present') ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 
-                                                            'bg-sky-50 text-sky-600 border-sky-100'
-                                                        }`}>
+                                                        <span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest border ${(attendanceMap[emp.emp_id]?.remarks || '').includes('Late Entry') ? 'bg-orange-50 text-orange-600 border-orange-100' :
+                                                                attendanceMap[emp.emp_id]?.status?.startsWith('Present') ? 'bg-emerald-50 text-emerald-600 border-emerald-100' :
+                                                                    'bg-sky-50 text-sky-600 border-sky-100'
+                                                            }`}>
                                                             {(attendanceMap[emp.emp_id]?.remarks || '').includes('Late Entry') ? (
                                                                 <span>{attendanceMap[emp.emp_id]?.status === 'Present' ? 'LE' : `${attendanceMap[emp.emp_id]?.status} (LE)`}</span>
-                                                            ) : attendanceMap[emp.emp_id]?.status?.startsWith('Present +') 
-                                                                ? `P / ${attendanceMap[emp.emp_id].status.replace('Present +', '').trim()}` 
+                                                            ) : attendanceMap[emp.emp_id]?.status?.startsWith('Present +')
+                                                                ? `P / ${attendanceMap[emp.emp_id].status.replace('Present +', '').trim()}`
                                                                 : (attendanceMap[emp.emp_id]?.status || 'N/A')}
                                                             {attendanceMap[emp.emp_id]?.status?.startsWith('Present') === false && attendanceMap[emp.emp_id]?.status !== 'Absent' && attendanceMap[emp.emp_id]?.in_time && attendanceMap[emp.emp_id]?.out_time && (
                                                                 <> ({formatTo12Hr(attendanceMap[emp.emp_id].in_time)} - {formatTo12Hr(attendanceMap[emp.emp_id].out_time)})</>
@@ -524,7 +502,7 @@ const AdminDashboard = () => {
                                                     </td>
                                                     <td className="px-5 py-4 text-center no-print">
                                                         <div className="flex items-center justify-center gap-2">
-                                                            <button 
+                                                            <button
                                                                 onClick={(e) => {
                                                                     e.stopPropagation();
                                                                     setSelectedEmployeeHistory({ emp_id: emp.emp_id, name: emp.name });
@@ -534,7 +512,7 @@ const AdminDashboard = () => {
                                                             >
                                                                 <FaHistory size={14} />
                                                             </button>
-                                                            <button 
+                                                            <button
                                                                 onClick={(e) => {
                                                                     e.stopPropagation();
                                                                     navigate(`/admin/timetable/${emp.emp_id}`);
@@ -545,7 +523,17 @@ const AdminDashboard = () => {
                                                             >
                                                                 <FaCalendarAlt size={14} />
                                                             </button>
-                                                            <FaEye className="text-gray-300 group-hover:text-sky-500" size={14} />
+                                                            <button
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    navigate(`/admin/profile/${emp.emp_id}`);
+                                                                    window.dispatchEvent(new CustomEvent('closeSidebar'));
+                                                                }}
+                                                                className="p-2 hover:bg-sky-50 text-sky-400 hover:text-sky-600 rounded-lg transition-colors"
+                                                                title="View Profile"
+                                                            >
+                                                                <FaEye size={14} />
+                                                            </button>
                                                         </div>
                                                     </td>
                                                 </motion.tr>
@@ -584,9 +572,9 @@ const AdminDashboard = () => {
                         </div>
                         <div className="flex-1 overflow-auto px-6 md:px-10 py-8 bg-gray-50/30">
                             <div className="max-w-5xl mx-auto">
-                                <AttendanceHistory 
-                                    empId={selectedEmployeeHistory.emp_id} 
-                                    recentOnly={false} 
+                                <AttendanceHistory
+                                    empId={selectedEmployeeHistory.emp_id}
+                                    recentOnly={false}
                                     month={new Date().toISOString().slice(0, 7)}
                                 />
                             </div>
