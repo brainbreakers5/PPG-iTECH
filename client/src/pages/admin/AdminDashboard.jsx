@@ -499,8 +499,7 @@ const AdminDashboard = () => {
                                                 <th className="px-5 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Name</th>
                                                 <th className="px-5 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Department</th>
                                                 <th className="px-5 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Status</th>
-                                                <th className="px-5 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Remarks</th>
-                                                <th className="px-5 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-center no-print">Action</th>
+                                                <th className="px-5 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-right">Remarks</th>
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-gray-50">
@@ -537,36 +536,10 @@ const AdminDashboard = () => {
                                                             )}
                                                         </span>
                                                     </td>
-                                                    <td className="px-5 py-4">
-                                                        <p className="text-[10px] font-bold text-gray-500 italic truncate max-w-[150px]" title={attendanceMap[emp.emp_id]?.remarks}>
+                                                    <td className="px-5 py-4 text-right">
+                                                        <p className="text-[10px] font-bold text-gray-500 italic truncate max-w-[150px] ml-auto" title={attendanceMap[emp.emp_id]?.remarks}>
                                                             {attendanceMap[emp.emp_id]?.remarks || '—'}
                                                         </p>
-                                                    </td>
-                                                    <td className="px-5 py-4 text-center no-print">
-                                                        <div className="flex items-center justify-center gap-2">
-                                                            <button
-                                                                onClick={(e) => {
-                                                                    e.stopPropagation();
-                                                                    setSelectedEmployeeHistory({ emp_id: emp.emp_id, name: emp.name });
-                                                                }}
-                                                                className="p-2 hover:bg-sky-50 text-sky-600 rounded-lg transition-colors"
-                                                                title="View Attendance History"
-                                                            >
-                                                                <FaHistory size={14} />
-                                                            </button>
-                                                            <button
-                                                                onClick={(e) => {
-                                                                    e.stopPropagation();
-                                                                    navigate(`/admin/timetable/${emp.emp_id}`);
-                                                                    window.dispatchEvent(new CustomEvent('closeSidebar'));
-                                                                }}
-                                                                className="p-2 hover:bg-sky-50 text-indigo-600 rounded-lg transition-colors"
-                                                                title="View Schedule"
-                                                            >
-                                                                <FaCalendarAlt size={14} />
-                                                            </button>
-                                                            <FaEye className="text-gray-300 group-hover:text-sky-500" size={14} />
-                                                        </div>
                                                     </td>
                                                 </motion.tr>
                                             ))}
