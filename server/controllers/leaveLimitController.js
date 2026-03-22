@@ -205,6 +205,10 @@ exports.getMyLeaveLimits = async (req, res) => {
 exports.updateLeaveLimit = async (req, res) => {
     try {
         const { emp_id } = req.params;
+        const normalizedEmpId = decodeURIComponent(String(emp_id || '')).trim();
+        if (!normalizedEmpId) {
+            return res.status(400).json({ message: 'emp_id is required' });
+        }
         const year = parseInt(req.body.year) || currentYear();
         const {
             cl_limit,
@@ -245,7 +249,7 @@ exports.updateLeaveLimit = async (req, res) => {
                 to_month = COALESCE($10, leave_limits.to_month),
                 updated_at = NOW()
         `, [
-            emp_id,
+            normalizedEmpId,
             year,
             normalizedClLimit,
             normalizedMlLimit,
@@ -261,14 +265,14 @@ exports.updateLeaveLimit = async (req, res) => {
         const monthKey = currentMonthKey();
         const client = await pool.connect();
         try {
-            await ensureMonthlyPermissionReset(client, emp_id, year, monthKey);
+            await ensureMonthlyPermissionReset(client, normalizedEmpId, year, monthKey);
         } finally {
             client.release();
         }
 
         // Notify all clients that leave limits were updated
         const io = req.app.get('io');
-        if (io) io.emit('leave_limits_updated', { emp_id, year });
+        if (io) io.emit('leave_limits_updated', { emp_id: normalizedEmpId, year });
 
         res.json({ message: 'Leave limits updated successfully' });
     } catch (error) {

@@ -55,7 +55,12 @@ const getCycleByMonthYear = (month, year) => {
 };
 
 const toCurrency = (v) => Number(v || 0).toLocaleString('en-IN');
-const normalizeEmpId = (v) => String(v || '').trim();
+const normalizeEmpId = (v) => String(v || '').trim().toLowerCase();
+const normalizeDateOnly = (v) => {
+    if (!v) return '';
+    const raw = String(v);
+    return raw.includes('T') ? raw.slice(0, 10) : raw;
+};
 const formatGeneratedAt = () => {
     const now = new Date();
     return `${now.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })} ${now.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}`;
@@ -163,8 +168,8 @@ const SalaryManagement = () => {
                 const myCurrent = currentRows.find((r) => normalizeEmpId(r.emp_id) === normalizeEmpId(user?.emp_id));
                 const hasCurrentInTimeline = normalizedTimeline.some((r) => (
                     normalizeEmpId(r.emp_id) === normalizeEmpId(user?.emp_id)
-                    && String(r.from_date || '') === String(currentCycle.fromDate)
-                    && String(r.to_date || '') === String(currentCycle.toDate)
+                    && normalizeDateOnly(r.from_date) === normalizeDateOnly(currentCycle.fromDate)
+                    && normalizeDateOnly(r.to_date) === normalizeDateOnly(currentCycle.toDate)
                 ));
 
                 const merged = hasCurrentInTimeline || !myCurrent
@@ -223,7 +228,7 @@ const SalaryManagement = () => {
     useEffect(() => {
         refreshRows();
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [selectedMonth, selectedYear, isHistoryPage, isPersonalView]);
+    }, [selectedMonth, selectedYear, isHistoryPage, isPersonalView, user?.emp_id, selectedCycle.fromDate, selectedCycle.toDate]);
 
     useEffect(() => {
         if (!isPersonalView) return undefined;
@@ -232,7 +237,7 @@ const SalaryManagement = () => {
         }, 10000);
         return () => clearInterval(intervalId);
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [isPersonalView]);
+    }, [isPersonalView, user?.emp_id, selectedCycle.fromDate, selectedCycle.toDate]);
 
     useEffect(() => {
         const fetchDepartments = async () => {

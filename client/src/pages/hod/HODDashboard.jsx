@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
     FaUserCheck, FaUserTimes, FaBus, FaFileAlt, FaBirthdayCake,
     FaCalendarDay, FaClipboardList, FaBuilding, FaComments, FaShoppingBag,
@@ -62,6 +62,11 @@ const HODDashboard = () => {
     const historyRef = useRef(null);
     const { getPeriodConfig } = useTimetableConfig();
     const socket = useSocket();
+    const currentDeptId = useMemo(() => {
+        if (user?.department_id !== undefined && user?.department_id !== null) return String(user.department_id);
+        const me = (allEmployees || []).find((e) => String(e.emp_id) === String(user?.emp_id));
+        return me?.department_id !== undefined && me?.department_id !== null ? String(me.department_id) : null;
+    }, [user?.department_id, user?.emp_id, allEmployees]);
 
     const fetchDashboardData = useCallback(async () => {
         if (!user) return;
@@ -119,7 +124,7 @@ const HODDashboard = () => {
             (summary || []).forEach(r => {
                 const role = (r.role || '').toLowerCase();
                 const isHod = role === 'hod';
-                const isInDept = String(r.department_id) === String(user.department_id);
+                const isInDept = currentDeptId !== null && String(r.department_id) === String(currentDeptId);
                 // HOD core should show all HODs institution-wide like principal.
                 // Staff core remains scoped to current HOD's department.
                 if (!isHod && !isInDept) return;
@@ -151,7 +156,7 @@ const HODDashboard = () => {
             (emps || []).forEach(emp => {
                 const role = (emp.role || '').toLowerCase();
                 const isHod = role === 'hod';
-                const isInDept = String(emp.department_id) === String(user.department_id);
+                const isInDept = currentDeptId !== null && String(emp.department_id) === String(currentDeptId);
                 if (!isHod && !isInDept) return;
 
                 const rec = map[emp.emp_id] || {};
@@ -187,7 +192,7 @@ const HODDashboard = () => {
                 .sort((a, b) => (a.period_number - b.period_number));
             setTodayTimetable(entries);
         } catch (error) { console.error("Error fetching dashboard data", error); }
-    }, [user]);
+    }, [user, currentDeptId]);
 
     useEffect(() => {
         fetchDashboardData();
@@ -206,14 +211,14 @@ const HODDashboard = () => {
     }, [socket, fetchDashboardData]);
 
     const hodList = allEmployees.filter(e => (e.role || '').toLowerCase() === 'hod');
-    const staffList = allEmployees.filter(e => (e.role || '').toLowerCase() === 'staff' && String(e.department_id) === String(user.department_id));
+    const staffList = allEmployees.filter(e => (e.role || '').toLowerCase() === 'staff' && currentDeptId !== null && String(e.department_id) === String(currentDeptId));
 
     const getFilteredEmployees = (roleKey, statusLabel) => {
         // Only return employees matching the role AND (if staff) in the correct department
         const roleEmps = allEmployees.filter(e => {
             const r = (e.role || '').toLowerCase();
             if (r !== roleKey) return false;
-            if (r === 'staff') return String(e.department_id) === String(user.department_id);
+            if (r === 'staff') return currentDeptId !== null && String(e.department_id) === String(currentDeptId);
             return true;
         });
 

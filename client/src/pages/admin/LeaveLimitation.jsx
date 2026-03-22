@@ -428,12 +428,19 @@ const LeaveLimitation = () => {
                 try {
                     const year = new Date(formValues.fromDate || fromDate).getFullYear();
                     const { data: employees } = await api.get('/employees?all=true');
-                    const targets = (employees || []).filter((e) => e?.emp_id);
-                    const settled = await Promise.allSettled(
-                        targets.map((emp) => api.put(`/leave-limits/${encodeURIComponent(emp.emp_id)}`, { year, ...formValues }))
-                    );
-                    const successCount = settled.filter((s) => s.status === 'fulfilled').length;
-                    const failCount = settled.length - successCount;
+                    const targets = (employees || []).filter((e) => e?.emp_id).map((e) => String(e.emp_id).trim()).filter(Boolean);
+                    let successCount = 0;
+                    let failCount = 0;
+
+                    // Run sequentially for higher reliability on constrained backends.
+                    for (const empId of targets) {
+                        try {
+                            await api.put(`/leave-limits/${encodeURIComponent(empId)}`, { year, ...formValues });
+                            successCount += 1;
+                        } catch {
+                            failCount += 1;
+                        }
+                    }
 
                     if (successCount > 0) {
                         Swal.fire({

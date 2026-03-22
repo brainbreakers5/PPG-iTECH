@@ -64,24 +64,51 @@ export const finalizePrintWindow = async ({
     title,
     delay = 250,
     modeLabel = 'this report',
-    closeAfterPrint = false
+    closeAfterPrint = false,
+    windowFeatures = 'width=1200,height=800'
 }) => {
     if (!printWindow) return false;
 
-    const mode = await choosePrintMode(modeLabel);
-    if (!mode) {
+    // Preserve the prepared document, then reopen only after user picks output mode.
+    const preparedHtml = printWindow.document?.documentElement
+        ? `<!doctype html>${printWindow.document.documentElement.outerHTML}`
+        : null;
+
+    const inferredFeatures = `width=${printWindow.outerWidth || 1200},height=${printWindow.outerHeight || 800}`;
+
+    try {
         printWindow.close();
+    } catch {
+        // Ignore close errors and continue.
+    }
+
+    if (!preparedHtml) return false;
+
+    const mode = await choosePrintMode(modeLabel);
+    if (!mode) return false;
+
+    const targetWindow = window.open('', '_blank', windowFeatures || inferredFeatures);
+    if (!targetWindow) {
+        await Swal.fire({
+            title: 'Popup blocked',
+            text: 'Please allow popups to continue printing.',
+            icon: 'warning',
+            confirmButtonColor: '#2563eb'
+        });
         return false;
     }
 
-    printWindow.focus();
+    targetWindow.document.write(preparedHtml);
+    targetWindow.document.close();
+    targetWindow.focus();
+
     setTimeout(() => {
         if (mode === 'pdf') {
-            printWindow.document.title = `${title} - PDF`;
+            targetWindow.document.title = `${title} - PDF`;
         }
-        printWindow.print();
+        targetWindow.print();
         if (closeAfterPrint) {
-            printWindow.close();
+            targetWindow.close();
         }
     }, delay);
 
