@@ -304,7 +304,7 @@ const LeaveLimitation = () => {
         // Exclude no-limit types (Permission is included now)
         const editableTypes = leaveTypes.filter(t => !noLimitTypes.includes(t.key));
         const { value: formValues } = await Swal.fire({
-            title: 'Set Default Limits for All Staff',
+            title: 'Set Default Limits for All Employees',
             html: `
                 <div style="display:grid; gap:16px; text-align:left; padding:10px 0;">
                     <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px; padding:12px; background:#f8fafc; border-radius:12px; margin-bottom:8px;">
