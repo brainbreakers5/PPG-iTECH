@@ -6,12 +6,9 @@ import Swal from 'sweetalert2';
 import { useAuth } from '../../context/AuthContext';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-    FaBuilding,
     FaCheckCircle,
     FaClock,
     FaCog,
-    FaEnvelope,
-    FaExclamationCircle,
     FaFileAlt,
     FaFilter,
     FaHistory,
@@ -184,6 +181,15 @@ const SalaryManagement = () => {
         refreshRows();
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [selectedMonth, selectedYear, isHistoryPage, isPersonalView]);
+
+    useEffect(() => {
+        if (!isPersonalView) return undefined;
+        const intervalId = setInterval(() => {
+            refreshRows();
+        }, 30000);
+        return () => clearInterval(intervalId);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [isPersonalView]);
 
     useEffect(() => {
         const fetchDepartments = async () => {
@@ -466,71 +472,22 @@ const SalaryManagement = () => {
                     </div>
                 </div>
 
-                <motion.div variants={staggerWrap} className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-                    <motion.div variants={fadeUp} transition={{ duration: 0.35 }} className="modern-card p-6 border-sky-50 shadow-xl shadow-sky-50/50 flex items-center gap-4 transition-all duration-300 hover:-translate-y-1 group">
-                        <div className="h-12 w-12 rounded-xl bg-sky-500 flex items-center justify-center text-white shadow-lg shadow-sky-100 group-hover:scale-110 group-hover:-translate-y-1 transition-transform"><FaMoneyBillWave size={20} /></div>
-                        <div>
-                            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">Gross Total</p>
-                            <p className="text-xl font-black text-gray-800 tracking-tighter">Rs {toCurrency(summary.gross)}</p>
-                        </div>
-                    </motion.div>
-                    <motion.div variants={fadeUp} transition={{ duration: 0.35 }} className="modern-card p-6 border-emerald-50 shadow-xl shadow-emerald-50/50 flex items-center gap-4 transition-all duration-300 hover:-translate-y-1 group">
-                        <div className="h-12 w-12 rounded-xl bg-emerald-500 flex items-center justify-center text-white shadow-lg shadow-emerald-100 group-hover:scale-110 group-hover:-translate-y-1 transition-transform"><FaWallet size={20} /></div>
-                        <div>
-                            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">Net Total</p>
-                            <p className="text-xl font-black text-emerald-700 tracking-tighter">Rs {toCurrency(summary.net)}</p>
-                        </div>
-                    </motion.div>
-                </motion.div>
-
                 {!isPersonalView && (
-                    <motion.div
-                        variants={fadeUp}
-                        transition={{ duration: 0.35, ease: 'easeOut' }}
-                        className="modern-card p-6 border-sky-100 mb-6"
-                    >
-                        <div className="flex items-center gap-3 mb-4">
-                            <div className="h-10 w-10 rounded-xl bg-sky-500 flex items-center justify-center text-white shadow-lg shadow-sky-100">
-                                <FaClock size={14} />
-                            </div>
+                    <motion.div variants={staggerWrap} className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                        <motion.div variants={fadeUp} transition={{ duration: 0.35 }} className="modern-card p-6 border-sky-50 shadow-xl shadow-sky-50/50 flex items-center gap-4 transition-all duration-300 hover:-translate-y-1 group">
+                            <div className="h-12 w-12 rounded-xl bg-sky-500 flex items-center justify-center text-white shadow-lg shadow-sky-100 group-hover:scale-110 group-hover:-translate-y-1 transition-transform"><FaMoneyBillWave size={20} /></div>
                             <div>
-                                <p className="text-sm font-black text-gray-800 tracking-tight">Payroll Period</p>
-                                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">Select a period to view records</p>
+                                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">Gross Total</p>
+                                <p className="text-xl font-black text-gray-800 tracking-tighter">Rs {toCurrency(summary.gross)}</p>
                             </div>
-                        </div>
-                        <div className="flex flex-wrap items-center gap-4">
-                            {!isHistoryPage && (
-                                <>
-                                    <span className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">Fixed Period</span>
-                                    <span className="px-4 py-2.5 rounded-2xl bg-sky-50 text-sm font-black text-sky-700 border border-sky-100">{selectedCycle.fromDate}</span>
-                                    <span className="text-gray-300 font-black">to</span>
-                                    <span className="px-4 py-2.5 rounded-2xl bg-sky-50 text-sm font-black text-sky-700 border border-sky-100">{selectedCycle.toDate}</span>
-                                </>
-                            )}
-
-                            {isHistoryPage && (
-                                <>
-                                    <label className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">Month</label>
-                                    <select
-                                        className="px-4 py-2.5 rounded-2xl border border-gray-100 bg-gray-50 text-sm font-bold text-gray-700"
-                                        value={selectedMonth}
-                                        onChange={(e) => setSelectedMonth(Number(e.target.value))}
-                                    >
-                                        {Array.from({ length: 12 }).map((_, i) => (
-                                            <option key={i + 1} value={i + 1}>{i + 1}</option>
-                                        ))}
-                                    </select>
-                                    <label className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">Year</label>
-                                    <input
-                                        type="number"
-                                        className="px-4 py-2.5 rounded-2xl border border-gray-100 bg-gray-50 w-28 text-sm font-bold text-gray-700"
-                                        value={selectedYear}
-                                        onChange={(e) => setSelectedYear(Number(e.target.value))}
-                                    />
-                                    <span className="text-xs text-gray-500 ml-auto">Cycle: {selectedCycle.fromDate} to {selectedCycle.toDate}</span>
-                                </>
-                            )}
-                        </div>
+                        </motion.div>
+                        <motion.div variants={fadeUp} transition={{ duration: 0.35 }} className="modern-card p-6 border-emerald-50 shadow-xl shadow-emerald-50/50 flex items-center gap-4 transition-all duration-300 hover:-translate-y-1 group">
+                            <div className="h-12 w-12 rounded-xl bg-emerald-500 flex items-center justify-center text-white shadow-lg shadow-emerald-100 group-hover:scale-110 group-hover:-translate-y-1 transition-transform"><FaWallet size={20} /></div>
+                            <div>
+                                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">Net Total</p>
+                                <p className="text-xl font-black text-emerald-700 tracking-tighter">Rs {toCurrency(summary.net)}</p>
+                            </div>
+                        </motion.div>
                     </motion.div>
                 )}
 
@@ -561,13 +518,51 @@ const SalaryManagement = () => {
                             </div>
                             <h2 className="text-lg font-black text-gray-800 uppercase tracking-widest">Salary Records</h2>
                         </div>
+                        <div className="flex flex-wrap items-center justify-end gap-3">
+                            {!isPersonalView && !isHistoryPage && (
+                                <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">
+                                    <span>Payroll Period</span>
+                                    <span className="px-3 py-2 rounded-xl bg-sky-50 text-sky-700 border border-sky-100 normal-case tracking-normal text-xs font-bold">{selectedCycle.fromDate} to {selectedCycle.toDate}</span>
+                                </div>
+                            )}
+                            {isHistoryPage && (
+                                <>
+                                    <div className="flex items-center gap-2">
+                                        <label className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">Month</label>
+                                        <select
+                                            className="px-3 py-2 rounded-xl border border-gray-100 bg-gray-50 text-sm font-bold text-gray-700"
+                                            value={selectedMonth}
+                                            onChange={(e) => setSelectedMonth(Number(e.target.value))}
+                                        >
+                                            {Array.from({ length: 12 }).map((_, i) => (
+                                                <option key={i + 1} value={i + 1}>{i + 1}</option>
+                                            ))}
+                                        </select>
+                                        <label className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">Year</label>
+                                        <input
+                                            type="number"
+                                            className="px-3 py-2 rounded-xl border border-gray-100 bg-gray-50 w-24 text-sm font-bold text-gray-700"
+                                            value={selectedYear}
+                                            onChange={(e) => setSelectedYear(Number(e.target.value))}
+                                        />
+                                    </div>
+                                    <button
+                                        onClick={() => window.print()}
+                                        className="bg-sky-600 text-white px-4 py-2 rounded-xl shadow-lg shadow-sky-100 hover:bg-sky-700 transition-all active:scale-95 flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em]"
+                                    >
+                                        <FaFileAlt /> Print All
+                                    </button>
+                                </>
+                            )}
+                        </div>
                     </div>
                     <div className="overflow-x-auto">
                         <table className="w-full text-left border-collapse">
                             <thead>
                                 <tr className="bg-sky-50/30">
                                     {canInstitutionWide && isHistoryPage && <th className="p-6 w-12 text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-sky-50"><div className="flex justify-center">Select</div></th>}
-                                    <th className="p-6 text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-sky-50">Employee</th>
+                                    {!isPersonalView && <th className="p-6 text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-sky-50">Employee</th>}
+                                    {isPersonalView && <th className="p-6 text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-sky-50">Period</th>}
                                     <th className="p-6 text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-sky-50 text-right">With/Without Pay</th>
                                     <th className="p-6 text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-sky-50 text-right">Gross</th>
                                     <th className="p-6 text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-sky-50 text-right">Deductions</th>
@@ -599,25 +594,27 @@ const SalaryManagement = () => {
                                             </div>
                                         </td>
                                     )}
-                                    <td className="p-6">
-                                        <div className="flex items-center gap-4">
-                                            <div className="h-12 w-12 rounded-full bg-white border-2 border-sky-100 flex items-center justify-center overflow-hidden shadow-sm group-hover:scale-110 group-hover:border-sky-300 transition-all duration-300">
-                                                <img src={r.profile_picture_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(r.name)}&background=random`} alt={r.name} className="h-full w-full object-cover group-hover:scale-110 group-hover:rotate-3 transition-all duration-500" />
-                                            </div>
+                                    {!isPersonalView && (
+                                        <td className="p-6">
                                             <div>
                                                 <p className="text-sm font-black text-gray-800 tracking-tight">{r.name}</p>
                                                 <div className="flex flex-wrap gap-2 items-center mt-1">
-                                                     <p className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.2em]"><span className="text-sky-500 font-black">{r.emp_id}</span></p>
-                                                     {r.department_name && (
-                                                         <>
-                                                             <span className="h-1 w-1 bg-gray-300 rounded-full"></span>
-                                                             <p className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.2em]"><span className="text-gray-600 font-black">{r.department_name}</span></p>
-                                                         </>
-                                                     )}
+                                                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.2em]"><span className="text-sky-500 font-black">{r.emp_id}</span></p>
+                                                    {r.department_name && (
+                                                        <>
+                                                            <span className="h-1 w-1 bg-gray-300 rounded-full"></span>
+                                                            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.2em]"><span className="text-gray-600 font-black">{r.department_name}</span></p>
+                                                        </>
+                                                    )}
                                                 </div>
                                             </div>
-                                        </div>
-                                    </td>
+                                        </td>
+                                    )}
+                                    {isPersonalView && (
+                                        <td className="p-6">
+                                            <span className="text-sm font-bold text-gray-700 bg-gray-50 px-3 py-1.5 rounded-lg border border-gray-100 whitespace-nowrap">{r.from_date || '-'} to {r.to_date || '-'}</span>
+                                        </td>
+                                    )}
                                     <td className="p-6 text-right">
                                         <div className="flex flex-col items-end gap-1">
                                             <span className="text-sm font-black text-emerald-600">{Number(r.total_present || r.with_pay_count || 0).toFixed(1)} <span className="text-[9px] text-gray-400 uppercase">Paid</span></span>
