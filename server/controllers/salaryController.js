@@ -93,6 +93,20 @@ const ensureSalarySchema = async () => {
             archived_at TIMESTAMP DEFAULT NOW()
         )
     `);
+
+    await pool.query(`
+        CREATE TABLE IF NOT EXISTS salary_reports (
+            id SERIAL PRIMARY KEY,
+            emp_id VARCHAR(50) NOT NULL,
+            report_type VARCHAR(80) NOT NULL,
+            reason TEXT NOT NULL,
+            status VARCHAR(30) DEFAULT 'Open',
+            admin_reply TEXT,
+            replied_by VARCHAR(50),
+            replied_at TIMESTAMP,
+            created_at TIMESTAMP DEFAULT NOW()
+        )
+    `);
 };
 
 const getAttendanceAggregateMap = async ({ fromDate, toDate, paidStatuses, unpaidStatuses }) => {
@@ -738,7 +752,7 @@ exports.publishSalaries = async (req, res) => {
 // @route   POST /api/salary/notify-paid
 // @access  Private (Admin)
 exports.notifyPaid = async (req, res) => {
-    const { emp_id, name, email, fromDate, toDate, amount } = req.body;
+    const { emp_id, name, email, fromDate, toDate, amount, viewUrl } = req.body;
 
     try {
         // Fetch employee email if not provided in body
@@ -752,11 +766,12 @@ exports.notifyPaid = async (req, res) => {
             const sendEmail = require('../utils/sendEmail');
             const periodText = `${fromDate} to ${toDate}`;
             const amountFormatted = Number(amount || 0).toLocaleString('en-IN', { style: 'currency', currency: 'INR' });
+            const safeViewUrl = typeof viewUrl === 'string' && /^https?:\/\//i.test(viewUrl) ? viewUrl : null;
 
             await sendEmail({
                 email: recipientEmail,
                 subject: `Salary Credited – PPG Management (${periodText})`,
-                message: `Dear ${name},\n\nYour salary for the period ${periodText} has been credited.\nAmount: ${amountFormatted}\n\nPlease check your bank account.\n\nRegards,\nPPG Management`,
+                message: `Dear ${name},\n\nYour salary for the period ${periodText} has been credited.\nAmount: ${amountFormatted}\n\nPlease check your bank account.${safeViewUrl ? `\n\nView details: ${safeViewUrl}` : ''}\n\nRegards,\nPPG Management`,
                 html: `
                     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 30px; border: 1px solid #e2e8f0; border-radius: 16px;">
                         <div style="text-align:center; margin-bottom:24px;">
@@ -777,6 +792,11 @@ exports.notifyPaid = async (req, res) => {
                             </table>
                         </div>
                         <p style="color:#374151;">Please check your bank account and verify the credit. For any queries, contact PPG Management.</p>
+                        ${safeViewUrl ? `
+                        <div style="text-align:center; margin: 24px 0;">
+                            <a href="${safeViewUrl}" style="display:inline-block; background:#0ea5e9; color:#fff; text-decoration:none; font-weight:700; font-size:13px; padding:10px 16px; border-radius:10px;">View Salary Page</a>
+                        </div>
+                        ` : ''}
                         <div style="text-align:center; margin-top:30px; padding-top:20px; border-top:1px solid #e2e8f0;">
                             <p style="color:#94a3b8; font-size:11px;">PPG Education Institutions · Powered by ZORVIAN TECHNOLOGIES</p>
                         </div>
@@ -790,6 +810,237 @@ exports.notifyPaid = async (req, res) => {
         console.error('NOTIFY PAID ERROR:', error);
         // Don't fail if email bounces – just log and return OK
         res.json({ message: 'Salary marked paid (email notification may have failed)' });
+    }
+};
+
+// @desc    Get salary timeline (all periods) for one employee
+// @route   GET /api/salary/timeline?empId=
+// @access  Private
+exports.getSalaryTimeline = async (req, res) => {
+    try {
+        await ensureSalarySchema();
+        const scopeWide = isInstitutionWideRole(req.user.role);
+        const requestedEmp = String(req.query.empId || req.query.emp_id || '').trim();
+        const targetEmpId = scopeWide ? requestedEmp : String(req.user.emp_id || '').trim();
+
+        if (!targetEmpId) {
+            return res.status(400).json({ message: 'empId is required' });
+        }
+
+        const { rows } = await pool.query(
+            `
+            SELECT
+                merged.id,
+                merged.is_history,
+                merged.emp_id,
+                merged.month,
+                merged.year,
+                merged.total_present,
+                merged.total_leave,
+                merged.total_lop,
+                merged.calculated_salary,
+                merged.status,
+                merged.with_pay_count,
+                merged.without_pay_count,
+                merged.deductions_applied,
+                merged.gross_salary,
+                merged.total_days_in_period,
+                merged.from_date,
+                merged.to_date,
+                merged.paid_at,
+                merged.archived_at,
+                u.name,
+                u.role,
+                u.profile_pic,
+                u.monthly_salary,
+                u.deductions,
+                d.name AS department_name
+            FROM (
+                SELECT
+                    CAST(s.id AS TEXT) AS id,
+                    FALSE AS is_history,
+                    s.emp_id,
+                    s.month,
+                    s.year,
+                    s.total_present,
+                    s.total_leave,
+                    s.total_lop,
+                    s.calculated_salary,
+                    s.status,
+                    s.with_pay_count,
+                    s.without_pay_count,
+                    s.deductions_applied,
+                    s.gross_salary,
+                    s.total_days_in_period,
+                    s.from_date,
+                    s.to_date,
+                    s.paid_at,
+                    NULL::timestamp AS archived_at
+                FROM salary_records s
+                WHERE TRIM(s.emp_id) = $1
+
+                UNION ALL
+
+                SELECT
+                    CONCAT('history_', h.id) AS id,
+                    TRUE AS is_history,
+                    h.emp_id,
+                    h.month,
+                    h.year,
+                    h.total_present,
+                    h.total_leave,
+                    h.total_lop,
+                    h.calculated_salary,
+                    h.status,
+                    h.with_pay_count,
+                    h.without_pay_count,
+                    h.deductions_applied,
+                    h.gross_salary,
+                    h.total_days_in_period,
+                    h.from_date,
+                    h.to_date,
+                    h.paid_at,
+                    h.archived_at
+                FROM salary_history h
+                WHERE TRIM(h.emp_id) = $1
+            ) merged
+            LEFT JOIN users u ON TRIM(u.emp_id) = TRIM(merged.emp_id)
+            LEFT JOIN departments d ON u.department_id = d.id
+            ORDER BY COALESCE(merged.to_date, merged.from_date, merged.archived_at, merged.paid_at) DESC, merged.id DESC
+            `,
+            [targetEmpId]
+        );
+
+        const mapped = rows.map((r) => ({
+            ...r,
+            from_date: toIsoDate(r.from_date),
+            to_date: toIsoDate(r.to_date),
+            monthly_salary: parseFloat(r.gross_salary) || parseFloat(r.monthly_salary) || 0,
+            gross_salary: parseFloat(r.gross_salary) || parseFloat(r.monthly_salary) || 0,
+            calculated_salary: parseFloat(r.calculated_salary) || 0,
+            deductions_applied: parseFloat(r.deductions_applied) || 0,
+            total_present: parseFloat(r.total_present) || 0,
+            total_lop: parseFloat(r.total_lop) || 0,
+            with_pay_count: parseFloat(r.with_pay_count) || 0,
+            without_pay_count: parseFloat(r.without_pay_count) || 0,
+            total_days_in_period: parseInt(r.total_days_in_period, 10) || 0
+        }));
+
+        res.json(mapped);
+    } catch (error) {
+        console.error('GET SALARY TIMELINE ERROR:', error);
+        res.status(500).json({ message: 'Server Error' });
+    }
+};
+
+// @desc    Create salary report by employee
+// @route   POST /api/salary/reports
+// @access  Private
+exports.createSalaryReport = async (req, res) => {
+    try {
+        await ensureSalarySchema();
+        const empId = String(req.user.emp_id || '').trim();
+        const reportType = String(req.body.reportType || req.body.report_type || 'Other').trim();
+        const reason = String(req.body.reason || '').trim();
+
+        if (!empId) return res.status(400).json({ message: 'Employee ID missing in token' });
+        if (!reason) return res.status(400).json({ message: 'Reason is required' });
+
+        const { rows } = await pool.query(
+            `INSERT INTO salary_reports (emp_id, report_type, reason, status)
+             VALUES ($1, $2, $3, 'Open')
+             RETURNING *`,
+            [empId, reportType || 'Other', reason]
+        );
+
+        const io = req.app.get('io');
+        if (io) io.emit('salary_report_created', { id: rows[0].id, emp_id: empId, report_type: reportType });
+
+        res.status(201).json(rows[0]);
+    } catch (error) {
+        console.error('CREATE SALARY REPORT ERROR:', error);
+        res.status(500).json({ message: 'Server Error' });
+    }
+};
+
+// @desc    Get salary reports (admin gets all, employee gets own)
+// @route   GET /api/salary/reports
+// @access  Private
+exports.getSalaryReports = async (req, res) => {
+    try {
+        await ensureSalarySchema();
+        const scopeWide = isInstitutionWideRole(req.user.role);
+
+        let query = `
+            SELECT
+                sr.*,
+                u.name AS employee_name,
+                u.role AS employee_role,
+                u.email AS employee_email,
+                d.name AS department_name,
+                au.name AS replied_by_name
+            FROM salary_reports sr
+            LEFT JOIN users u ON TRIM(u.emp_id) = TRIM(sr.emp_id)
+            LEFT JOIN users au ON TRIM(au.emp_id) = TRIM(sr.replied_by)
+            LEFT JOIN departments d ON u.department_id = d.id
+            WHERE 1=1
+        `;
+        const params = [];
+
+        if (!scopeWide) {
+            params.push(String(req.user.emp_id || '').trim());
+            query += ` AND TRIM(sr.emp_id) = $${params.length}`;
+        }
+
+        const statusFilter = String(req.query.status || '').trim();
+        if (statusFilter) {
+            params.push(statusFilter);
+            query += ` AND sr.status = $${params.length}`;
+        }
+
+        query += ' ORDER BY sr.created_at DESC, sr.id DESC';
+
+        const { rows } = await pool.query(query, params);
+        res.json(rows);
+    } catch (error) {
+        console.error('GET SALARY REPORTS ERROR:', error);
+        res.status(500).json({ message: 'Server Error' });
+    }
+};
+
+// @desc    Reply to salary report
+// @route   PUT /api/salary/reports/:id/reply
+// @access  Private (Admin/Management)
+exports.replySalaryReport = async (req, res) => {
+    try {
+        await ensureSalarySchema();
+        const reportId = parseInt(req.params.id, 10);
+        const reply = String(req.body.reply || req.body.admin_reply || '').trim();
+        if (!Number.isInteger(reportId) || reportId <= 0) {
+            return res.status(400).json({ message: 'Invalid report id' });
+        }
+        if (!reply) return res.status(400).json({ message: 'Reply is required' });
+
+        const { rows } = await pool.query(
+            `UPDATE salary_reports
+             SET admin_reply = $1,
+                 status = 'Replied',
+                 replied_by = $2,
+                 replied_at = NOW()
+             WHERE id = $3
+             RETURNING *`,
+            [reply, String(req.user.emp_id || '').trim(), reportId]
+        );
+
+        if (!rows.length) return res.status(404).json({ message: 'Report not found' });
+
+        const io = req.app.get('io');
+        if (io) io.emit('salary_report_replied', { id: rows[0].id, emp_id: rows[0].emp_id });
+
+        res.json(rows[0]);
+    } catch (error) {
+        console.error('REPLY SALARY REPORT ERROR:', error);
+        res.status(500).json({ message: 'Server Error' });
     }
 };
 

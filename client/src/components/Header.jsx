@@ -43,6 +43,8 @@ const Header = ({ toggleSidebar, sidebarOpen }) => {
             { label: 'Employee Management', path: '/admin/employees' },
             { label: 'Department Management', path: '/admin/departments' },
             { label: 'Salary Management', path: '/admin/payroll' },
+            { label: 'Salary History', path: '/admin/payroll/history' },
+            { label: 'Salary Reports', path: '/admin/payroll/reports' },
             { label: 'Attendance Records', path: '/admin/attendance' },
             { label: 'Leave Balances', path: '/admin/leave-limits' },
             { label: 'Timetable Setup', path: '/admin/timetable-setup' },
@@ -83,6 +85,8 @@ const Header = ({ toggleSidebar, sidebarOpen }) => {
             { label: 'Dashboard', path: '/management' },
             { label: 'Departments', path: '/management/departments' },
             { label: 'Salary Overview', path: '/management/payroll' },
+            { label: 'Salary History', path: '/management/payroll/history' },
+            { label: 'Salary Reports', path: '/management/payroll/reports' },
             { label: 'Calendar', path: '/management/calendar' },
         ],
     };

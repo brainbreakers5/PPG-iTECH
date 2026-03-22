@@ -34,6 +34,8 @@ import StaffTimetable from './pages/staff/StaffTimetable';
 import EmployeeManagement from './pages/admin/EmployeeManagement';
 import DepartmentManagement from './pages/admin/DepartmentManagement';
 import SalaryManagement from './pages/admin/SalaryManagement';
+import SalaryReports from './pages/admin/SalaryReports';
+import EmployeeSalaryView from './pages/admin/EmployeeSalaryView';
 import AdminDashboard from './pages/admin/AdminDashboard';
 import AdminPurchase from './pages/admin/AdminPurchase';
 import AdminCalendar from './pages/admin/AdminCalendar';
@@ -206,6 +208,9 @@ const AppContent = () => {
             <Route path="departments/edit/:id" element={<DepartmentFormPage />} />
             <Route path="departments/:id/staff" element={<DepartmentStaffPage />} />
             <Route path="payroll" element={<SalaryManagement />} />
+            <Route path="payroll/history" element={<SalaryManagement />} />
+            <Route path="payroll/reports" element={<SalaryReports />} />
+            <Route path="payroll/employee/:empId" element={<EmployeeSalaryView />} />
             <Route path="purchase" element={<AdminPurchase />} />
             <Route path="purchase/new" element={<PurchaseRequestPage />} />
             <Route path="attendance" element={<PrincipalAttendance />} />
@@ -300,6 +305,9 @@ const AppContent = () => {
             <Route path="departments" element={<ManagementDepartment />} />
             <Route path="departments/:id/staff" element={<DepartmentStaffPage rolePrefix="management" />} />
             <Route path="payroll" element={<SalaryManagement />} />
+            <Route path="payroll/history" element={<SalaryManagement />} />
+            <Route path="payroll/reports" element={<SalaryReports />} />
+            <Route path="payroll/employee/:empId" element={<EmployeeSalaryView />} />
             <Route path="attendance" element={<PrincipalAttendance />} />
             <Route path="attendance/:empId/:month" element={<DetailedAttendancePage />} />
             <Route path="attendance/:empId/:startDate/:endDate" element={<DetailedAttendancePage />} />

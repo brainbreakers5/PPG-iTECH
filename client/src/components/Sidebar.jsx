@@ -49,6 +49,8 @@ const Sidebar = ({ userRole = 'staff', isOpen, onClose }) => {
       { label: 'Employee Management', path: '/admin/employees', icon: <FaUsers /> },
       { label: 'Department Management', path: '/admin/departments', icon: <FaBuilding /> },
       { label: 'Salary Management', path: '/admin/payroll', icon: <FaMoneyBillWave /> },
+      { label: 'Salary History', path: '/admin/payroll/history', icon: <FaMoneyBillWave /> },
+      { label: 'Salary Reports', path: '/admin/payroll/reports', icon: <FaMoneyBillWave /> },
       { label: 'Attendance Records', path: '/admin/attendance', icon: <FaCalendarCheck /> },
       { label: 'Leave Balances', path: '/admin/leave-limits', icon: <FaClipboardCheck /> },
       { label: 'Timetable Setup', path: '/admin/timetable-setup', icon: <FaCalendarAlt /> },
@@ -90,6 +92,8 @@ const Sidebar = ({ userRole = 'staff', isOpen, onClose }) => {
       { label: 'Dashboard', path: '/management', icon: <FaTachometerAlt /> },
       { label: 'Departments', path: '/management/departments', icon: <FaBuilding /> },
       { label: 'Salary Overview', path: '/management/payroll', icon: <FaMoneyBillWave /> },
+      { label: 'Salary History', path: '/management/payroll/history', icon: <FaMoneyBillWave /> },
+      { label: 'Salary Reports', path: '/management/payroll/reports', icon: <FaMoneyBillWave /> },
       { label: 'Attendance Records', path: '/management/attendance', icon: <FaCalendarCheck /> },
     ],
   };
