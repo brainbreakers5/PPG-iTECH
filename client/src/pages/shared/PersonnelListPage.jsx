@@ -84,7 +84,6 @@ const PersonnelListPage = () => {
                                     <th className="py-5 px-6 text-[10px] font-black text-sky-600 uppercase tracking-[0.2em] whitespace-nowrap">Emp ID</th>
                                     <th className="py-5 px-6 text-[10px] font-black text-sky-600 uppercase tracking-[0.2em] whitespace-nowrap">Department</th>
                                     <th className="py-5 px-6 text-[10px] font-black text-sky-600 uppercase tracking-[0.2em] whitespace-nowrap">Email Identifier</th>
-                                    <th className="py-5 px-6 text-[10px] font-black text-sky-600 uppercase tracking-[0.2em] whitespace-nowrap text-right">Actions</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-50">
@@ -124,46 +123,6 @@ const PersonnelListPage = () => {
                                                 <div className="flex flex-col gap-0.5">
                                                     <span className="text-[10px] font-black text-gray-700 tracking-tight lowercase">{member.email || '—'}</span>
                                                     <span className="text-[8px] font-black text-gray-400 uppercase tracking-widest">Office Email</span>
-                                                </div>
-                                            </td>
-                                            <td className="py-4 px-6 text-right">
-                                                <div className="flex items-center justify-end gap-2">
-                                                    {!( (user?.role === 'principal' || user?.role === 'hod') && member.emp_id !== user?.emp_id ) && (
-                                                        <button
-                                                            onClick={() => {
-                                                                const rolePrefix = user?.role === 'admin' ? 'admin' :
-                                                                    user?.role === 'principal' ? 'principal' :
-                                                                    user?.role === 'hod' ? 'hod' : 
-                                                                    user?.role === 'management' ? 'management' : 'staff';
-                                                                navigate(`/${rolePrefix}/profile/${member.emp_id}`);
-                                                                window.dispatchEvent(new CustomEvent('closeSidebar'));
-                                                            }}
-                                                            className="h-10 px-4 bg-white border border-gray-100 rounded-xl flex items-center justify-center text-gray-500 hover:text-sky-600 hover:border-sky-200 shadow-sm active:scale-95 transition-all text-[9.5px] font-black uppercase tracking-wider gap-2"
-                                                            title="View Profile"
-                                                        >
-                                                            <FaEye size={12} /> <span className="hidden sm:inline">Profile</span>
-                                                        </button>
-                                                    )}
-                                                    {(user?.role !== 'staff' && user?.role !== 'management' || member.emp_id === user?.emp_id) && (
-                                                        <button
-                                                            onClick={() => {
-                                                                if (user?.role === 'admin') {
-                                                                    navigate(`/admin/timetable/${member.emp_id}`);
-                                                                } else if (user?.role === 'principal') {
-                                                                    navigate(`/principal/timetable/${member.emp_id}`);
-                                                                } else if (user?.role === 'hod') {
-                                                                    navigate(`/hod/timetable/${member.emp_id}`);
-                                                                } else {
-                                                                    navigate(`/staff/timetables/${member.emp_id}`);
-                                                                }
-                                                                window.dispatchEvent(new CustomEvent('closeSidebar'));
-                                                            }}
-                                                            className="h-10 px-4 bg-gray-900 text-white rounded-xl flex items-center justify-center hover:bg-black shadow-lg shadow-gray-200 active:scale-95 transition-all text-[9.5px] font-black uppercase tracking-wider gap-2"
-                                                            title="View Schedule"
-                                                        >
-                                                            <FaCalendarAlt size={12} /> <span className="hidden xl:inline">Schedule</span>
-                                                        </button>
-                                                    )}
                                                 </div>
                                             </td>
                                         </motion.tr>
