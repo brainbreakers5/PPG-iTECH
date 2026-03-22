@@ -17,6 +17,7 @@ const SalaryManagement = () => {
     const now = new Date();
     const socket = useSocket();
     const canInstitutionWide = user.role === 'admin' || user.role === 'management';
+    const normalizeEmpId = (v) => String(v || '').trim();
 
     // Fetch all employees
     useEffect(() => {
@@ -110,6 +111,12 @@ const SalaryManagement = () => {
         };
     }, [fromDate, toDate, paidStatuses, unpaidStatuses, canInstitutionWide, socket]);
 
+    // Non-admin/self roles must fetch directly (they do not trigger auto-calculate).
+    useEffect(() => {
+        if (canInstitutionWide) return;
+        fetchSalaries();
+    }, [canInstitutionWide, fromDate, toDate, paidStatuses, unpaidStatuses]);
+
     const handleAddStatus = (isPaid) => {
         if (!newStatus.trim()) return;
         const status = newStatus.trim();
@@ -173,7 +180,8 @@ const SalaryManagement = () => {
             const { data } = await api.get(`/salary?${params.toString()}`);
 
             if (!canInstitutionWide) {
-                setSalaries(data.filter(s => s.emp_id === user.emp_id));
+                const selfEmpId = normalizeEmpId(user.emp_id);
+                setSalaries(data.filter(s => normalizeEmpId(s.emp_id) === selfEmpId));
             } else {
                 setSalaries(data);
             }
@@ -195,7 +203,7 @@ const SalaryManagement = () => {
         const currentY = dForContext.getFullYear();
 
         return allEmployees.map(emp => {
-            const calc = salaries.find(s => s.emp_id === emp.emp_id);
+            const calc = salaries.find(s => normalizeEmpId(s.emp_id) === normalizeEmpId(emp.emp_id));
             // Use the salary record's monthly_salary first (it's joined fresh from users table in /salary API)
             // Then fallback to allEmployees monthly_salary (now also included after backend fix)
             const grossPay = parseFloat(calc?.monthly_salary) || parseFloat(emp.monthly_salary) || parseFloat(emp.base_salary) || 0;
