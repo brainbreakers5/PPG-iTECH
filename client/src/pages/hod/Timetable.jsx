@@ -466,12 +466,6 @@ const Timetable = ({ showToggle = true }) => {
                                                                         </div>
                                                                     </div>
                                                                     <p className="text-sm font-black text-gray-800 tracking-tight line-clamp-2 leading-snug">{entry.subject}</p>
-                                                                    <div className="flex items-center gap-1.5 mt-1">
-                                                                        <div className="h-4 w-4 rounded-full bg-sky-50 flex items-center justify-center text-sky-500">
-                                                                            <FaUserTie size={10} />
-                                                                        </div>
-                                                                        <span className="text-[9px] font-bold text-gray-500 uppercase tracking-widest truncate">{entry.staff_name}</span>
-                                                                    </div>
                                                                 </div>
 
                                                                 <div className="mt-4 pt-3 border-t border-gray-50 flex items-center justify-between">
