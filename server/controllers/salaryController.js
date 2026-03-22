@@ -15,6 +15,13 @@ const getWorkingDays = (from, to) => {
 
 const toIsoDate = (v) => String(v || '').slice(0, 10);
 
+const getTodayIso = () => new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
+
+const getEffectiveCalcTo = (toDate) => {
+    const today = getTodayIso();
+    return toIsoDate(toDate) > today ? today : toIsoDate(toDate);
+};
+
 const isInstitutionWideRole = (role) => ['admin', 'management'].includes(String(role || '').toLowerCase());
 
 const buildPeriod = ({ month, year, fromDate, toDate }) => {
@@ -61,6 +68,30 @@ const ensureSalarySchema = async () => {
         ADD COLUMN IF NOT EXISTS from_date DATE,
         ADD COLUMN IF NOT EXISTS to_date DATE,
         ADD COLUMN IF NOT EXISTS paid_at TIMESTAMP
+    `);
+
+    await pool.query(`
+        CREATE TABLE IF NOT EXISTS salary_history (
+            id SERIAL PRIMARY KEY,
+            source_salary_id INTEGER,
+            emp_id VARCHAR(50) NOT NULL,
+            month INTEGER,
+            year INTEGER,
+            total_present NUMERIC(10, 2),
+            total_leave NUMERIC(10, 2),
+            total_lop NUMERIC(10, 2),
+            calculated_salary NUMERIC(12, 2),
+            status VARCHAR(30),
+            with_pay_count NUMERIC(10, 2),
+            without_pay_count NUMERIC(10, 2),
+            deductions_applied NUMERIC(12, 2),
+            gross_salary NUMERIC(12, 2),
+            total_days_in_period INTEGER,
+            from_date DATE,
+            to_date DATE,
+            paid_at TIMESTAMP,
+            archived_at TIMESTAMP DEFAULT NOW()
+        )
     `);
 };
 
@@ -168,7 +199,8 @@ exports.calculateSalary = async (req, res) => {
         const period = buildPeriod({ month, year, fromDate, toDate });
         const rangeFrom = period.fromDate;
         const rangeTo = period.toDate;
-        const totalWorkingDays = getWorkingDays(rangeFrom, rangeTo);
+        const effectiveCalcTo = getEffectiveCalcTo(rangeTo);
+        const totalWorkingDays = getWorkingDays(rangeFrom, effectiveCalcTo);
 
         // 1. Fetch all eligible employees
         let usersQuery = `
@@ -189,18 +221,18 @@ exports.calculateSalary = async (req, res) => {
         // 2. Fetch attendance aggregate within exact date range
         const statsMap = await getAttendanceAggregateMap({
             fromDate: rangeFrom,
-            toDate: rangeTo,
+            toDate: effectiveCalcTo,
             paidStatuses,
             unpaidStatuses
         });
 
-        // 3. Calculate and persist — SKIP records already marked as Paid for same period
+        // 3. Calculate and persist. Paid records are archived to history and reset to Pending.
         const results = [];
         for (const user of users) {
             const userEmpId = (user.emp_id || '').trim();
             if (!userEmpId) continue;
 
-            // Check if already published (Paid) — do NOT overwrite paid records
+            // Fetch latest salary record for this period (exact date first, then month/year fallback)
             const { rows: existing } = await pool.query(
                                 `SELECT id, status
                                  FROM salary_records
@@ -215,10 +247,6 @@ exports.calculateSalary = async (req, res) => {
                                  LIMIT 1`,
                                 [userEmpId, rangeFrom, rangeTo, period.month, period.year]
             );
-            if (existing.length > 0 && existing[0].status === 'Paid') {
-                // Skip: protect paid records from drift
-                continue;
-            }
 
             const stats = statsMap[userEmpId] || { payable_days: 0, unpaid_days: 0 };
             const resolvedPayableDays = (stats.payable_days > 0 || stats.total_records === 0)
@@ -234,6 +262,24 @@ exports.calculateSalary = async (req, res) => {
             });
 
             if (existing.length > 0) {
+                if (existing[0].status === 'Paid') {
+                    await pool.query(`
+                        INSERT INTO salary_history (
+                            source_salary_id, emp_id, month, year, total_present, total_leave, total_lop,
+                            calculated_salary, status, with_pay_count, without_pay_count,
+                            deductions_applied, gross_salary, total_days_in_period,
+                            from_date, to_date, paid_at, archived_at
+                        )
+                        SELECT
+                            id, emp_id, month, year, total_present, total_leave, total_lop,
+                            calculated_salary, status, with_pay_count, without_pay_count,
+                            deductions_applied, gross_salary, total_days_in_period,
+                            from_date, to_date, paid_at, NOW()
+                        FROM salary_records
+                        WHERE id = $1
+                    `, [existing[0].id]);
+                }
+
                 await pool.query(`
                     UPDATE salary_records
                     SET month = $2,
@@ -247,7 +293,10 @@ exports.calculateSalary = async (req, res) => {
                         deductions_applied = $10,
                         gross_salary = $11,
                         total_days_in_period = $12,
-                        status = CASE WHEN status = 'Paid' THEN status ELSE 'Pending' END
+                        from_date = $13::date,
+                        to_date = $14::date,
+                        status = 'Pending',
+                        paid_at = NULL
                     WHERE id = $1
                 `, [
                     existing[0].id,
@@ -261,7 +310,9 @@ exports.calculateSalary = async (req, res) => {
                     metrics.lopDays,
                     metrics.deductionsApplied.toFixed(2),
                     metrics.grossSalary.toFixed(2),
-                    totalWorkingDays
+                    totalWorkingDays,
+                    rangeFrom,
+                    rangeTo
                 ]);
             } else {
                 await pool.query(`
@@ -325,6 +376,7 @@ exports.calculateSalary = async (req, res) => {
 exports.getSalaryRecords = async (req, res) => {
     try {
         await ensureSalarySchema();
+        const isHistoryMode = String(req.query.history || '').toLowerCase() === 'true';
         const { month, year, fromDate, toDate } = req.query;
         const paidStatuses = req.query.paidStatuses
             ? JSON.parse(req.query.paidStatuses)
@@ -333,7 +385,63 @@ exports.getSalaryRecords = async (req, res) => {
             ? JSON.parse(req.query.unpaidStatuses)
             : ['Absent', 'LOP'];
         const period = buildPeriod({ month, year, fromDate, toDate });
+        const effectiveCalcTo = getEffectiveCalcTo(period.toDate);
         const scopeWide = isInstitutionWideRole(req.user.role);
+
+        if (isHistoryMode) {
+            let historyQuery = `
+                SELECT
+                    h.id,
+                    h.emp_id,
+                    h.month,
+                    h.year,
+                    h.total_present,
+                    h.total_leave,
+                    h.total_lop,
+                    h.calculated_salary,
+                    h.status,
+                    h.with_pay_count,
+                    h.without_pay_count,
+                    h.deductions_applied,
+                    h.gross_salary,
+                    h.total_days_in_period,
+                    h.from_date,
+                    h.to_date,
+                    h.paid_at,
+                    h.archived_at,
+                    u.name,
+                    u.role,
+                    u.profile_pic,
+                    u.monthly_salary,
+                    u.deductions,
+                    d.name AS department_name
+                FROM salary_history h
+                LEFT JOIN users u ON TRIM(u.emp_id) = TRIM(h.emp_id)
+                LEFT JOIN departments d ON u.department_id = d.id
+                WHERE 1=1
+            `;
+            const historyParams = [];
+
+            if (!scopeWide) {
+                historyParams.push(String(req.user.emp_id || '').trim());
+                historyQuery += ` AND TRIM(h.emp_id) = $${historyParams.length}`;
+            }
+
+            historyQuery += ' ORDER BY COALESCE(h.paid_at, h.archived_at) DESC, h.id DESC';
+            const { rows: historyRows } = await pool.query(historyQuery, historyParams);
+
+            const historyMapped = historyRows.map((r) => ({
+                ...r,
+                id: `history_${r.id}`,
+                is_history: true,
+                from_date: toIsoDate(r.from_date),
+                to_date: toIsoDate(r.to_date),
+                monthly_salary: parseFloat(r.gross_salary) || parseFloat(r.monthly_salary) || 0,
+                gross_salary: parseFloat(r.gross_salary) || parseFloat(r.monthly_salary) || 0
+            }));
+
+            return res.json(historyMapped);
+        }
 
         let usersQuery = `
             SELECT u.emp_id, u.name, u.role, u.profile_pic, u.monthly_salary, u.deductions, d.name AS department_name
@@ -371,11 +479,11 @@ exports.getSalaryRecords = async (req, res) => {
 
         const attendanceMap = await getAttendanceAggregateMap({
             fromDate: period.fromDate,
-            toDate: period.toDate,
+            toDate: effectiveCalcTo,
             paidStatuses,
             unpaidStatuses
         });
-        const totalWorkingDays = getWorkingDays(period.fromDate, period.toDate);
+        const totalWorkingDays = getWorkingDays(period.fromDate, effectiveCalcTo);
 
         const merged = users.map((u) => {
             const key = String(u.emp_id || '').trim();

@@ -11,8 +11,6 @@ const SalaryManagement = () => {
     const { user } = useAuth();
     const [salaries, setSalaries] = useState([]);
     const [allEmployees, setAllEmployees] = useState([]);
-    const [dailyBreakdown, setDailyBreakdown] = useState(null);
-    const [loadingBreakdown, setLoadingBreakdown] = useState(false);
     const [selectedIds, setSelectedIds] = useState([]); // for bulk mark paid
     const now = new Date();
     const socket = useSocket();
@@ -28,10 +26,15 @@ const SalaryManagement = () => {
 
     const getDefaultDates = () => {
         const nowDate = new Date();
-        const year = nowDate.getFullYear();
-        const month = nowDate.getMonth() + 1;
-        const fromDateStr = `${year}-${String(month).padStart(2, '0')}-01`;
-        const toDateStr = nowDate.toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
+        const currentYear = nowDate.getFullYear();
+        const currentMonth = nowDate.getMonth();
+
+        // Payroll default cycle: previous month 26 -> current month 25
+        const cycleStart = new Date(currentYear, currentMonth - 1, 26);
+        const cycleEnd = new Date(currentYear, currentMonth, 25);
+
+        const fromDateStr = cycleStart.toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
+        const toDateStr = cycleEnd.toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
 
         return { from: fromDateStr, to: toDateStr };
     };
@@ -75,7 +78,7 @@ const SalaryManagement = () => {
         
         // Auto-calculate on period change, config change, or attendance updates
         const silentCalculate = async () => {
-            if (!canInstitutionWide) return;
+            if (!canInstitutionWide || isHistoryMode) return;
             try {
                 // Send explicit range to handle cases like single day or custom windows
                 await api.post('/salary/calculate', { 
@@ -109,13 +112,13 @@ const SalaryManagement = () => {
                 socket.off('punch_out', silentCalculate);
             }
         };
-    }, [fromDate, toDate, paidStatuses, unpaidStatuses, canInstitutionWide, socket]);
+    }, [fromDate, toDate, paidStatuses, unpaidStatuses, canInstitutionWide, isHistoryMode, socket]);
 
-    // Non-admin/self roles must fetch directly (they do not trigger auto-calculate).
+    // History mode and non-institution roles fetch directly (no auto-calculate trigger).
     useEffect(() => {
-        if (canInstitutionWide) return;
+        if (canInstitutionWide && !isHistoryMode) return;
         fetchSalaries();
-    }, [canInstitutionWide, fromDate, toDate, paidStatuses, unpaidStatuses]);
+    }, [canInstitutionWide, isHistoryMode, fromDate, toDate, paidStatuses, unpaidStatuses]);
 
     const handleAddStatus = (isPaid) => {
         if (!newStatus.trim()) return;
@@ -141,42 +144,23 @@ const SalaryManagement = () => {
         };
     }, [socket, fromDate, toDate]);
 
-    // Fetch daily breakdown for a specific employee
-    const fetchDailyBreakdown = async (emp) => {
-        setLoadingBreakdown(true);
-        setDailyBreakdown({ emp, data: null });
-        try {
-            const { data } = await api.get(`/salary/daily`, {
-                params: {
-                    emp_id: emp.emp_id,
-                    fromDate,
-                    toDate,
-                    paidStatuses: JSON.stringify(paidStatuses)
-                }
-            });
-            setDailyBreakdown({ emp, data });
-        } catch (err) {
-            console.error('Daily breakdown fetch failed:', err);
-            setDailyBreakdown({ emp, data: null });
-        } finally {
-            setLoadingBreakdown(false);
-        }
-    };
-
     const fetchSalaries = async () => {
         setLoading(true);
         try {
-            const d = new Date(toDate); // Target month is defined by the end date
-            const m = d.getMonth() + 1;
-            const y = d.getFullYear();
-            const params = new URLSearchParams({
-                month: String(m),
-                year: String(y),
-                fromDate,
-                toDate,
-                paidStatuses: JSON.stringify(paidStatuses),
-                unpaidStatuses: JSON.stringify(unpaidStatuses)
-            });
+            const params = new URLSearchParams();
+            if (isHistoryMode) {
+                params.set('history', 'true');
+            } else {
+                const d = new Date(toDate); // Target month is defined by the end date
+                const m = d.getMonth() + 1;
+                const y = d.getFullYear();
+                params.set('month', String(m));
+                params.set('year', String(y));
+                params.set('fromDate', fromDate);
+                params.set('toDate', toDate);
+                params.set('paidStatuses', JSON.stringify(paidStatuses));
+                params.set('unpaidStatuses', JSON.stringify(unpaidStatuses));
+            }
             const { data } = await api.get(`/salary?${params.toString()}`);
 
             if (!canInstitutionWide) {
@@ -193,6 +177,7 @@ const SalaryManagement = () => {
     };
 
     const getMergedSalaries = () => {
+        if (isHistoryMode) return salaries;
         if (!canInstitutionWide) return salaries;
 
         const employeeByEmpId = new Map(
@@ -700,7 +685,7 @@ const SalaryManagement = () => {
                             {isHistoryMode ? 'Salary History' : 'Salary Management'}
                         </h1>
                         <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-2">
-                            {isHistoryMode ? 'Viewing published payroll records' : 'Manage employee payroll & attendance rules'}
+                            {isHistoryMode ? 'Viewing archived payroll records' : 'Manage employee payroll & attendance rules'}
                         </p>
                     </div>
                     <div className="flex flex-wrap items-center gap-4 w-full md:w-auto">
@@ -1096,13 +1081,6 @@ const SalaryManagement = () => {
                                                     </td>
                                                     <td className="p-8 text-right flex justify-end gap-2">
                                                         <button
-                                                            onClick={() => fetchDailyBreakdown(s)}
-                                                            className="h-12 w-12 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center hover:bg-indigo-100 transition-all active:scale-90 shadow-sm border border-indigo-100"
-                                                            title="Day-Wise Breakdown"
-                                                        >
-                                                            <FaChartLine size={16} />
-                                                        </button>
-                                                        <button
                                                             onClick={() => handlePrintSlip(s)}
                                                             className="h-12 w-12 bg-sky-50 text-sky-600 rounded-2xl flex items-center justify-center hover:bg-sky-100 transition-all active:scale-90 shadow-sm border border-sky-100"
                                                             title="Print Salary Slip"
@@ -1150,115 +1128,6 @@ const SalaryManagement = () => {
                     </div>
                 </div>
             </motion.div>
-
-            {/* Daily Breakdown Modal */}
-            <AnimatePresence>
-                {dailyBreakdown && (
-                    <motion.div
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[9999] flex items-center justify-center p-4"
-                        onClick={() => setDailyBreakdown(null)}
-                    >
-                        <motion.div
-                            initial={{ scale: 0.9, y: 40 }}
-                            animate={{ scale: 1, y: 0 }}
-                            exit={{ scale: 0.9, y: 40 }}
-                            onClick={e => e.stopPropagation()}
-                            className="bg-white rounded-[32px] shadow-2xl w-full max-w-3xl max-h-[85vh] overflow-hidden flex flex-col"
-                        >
-                            {/* Modal Header */}
-                            <div className="p-8 border-b border-gray-50 flex items-center justify-between">
-                                <div className="flex items-center gap-4">
-                                    <div className="h-12 w-12 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
-                                        <FaChartLine size={18} />
-                                    </div>
-                                    <div>
-                                        <h2 className="text-lg font-black text-gray-800 tracking-tight">{dailyBreakdown.emp.name}</h2>
-                                        <p className="text-[10px] font-black text-indigo-500 uppercase tracking-widest mt-0.5">Day-Wise Salary Breakdown · {fromDate} → {toDate}</p>
-                                    </div>
-                                </div>
-                                <button onClick={() => setDailyBreakdown(null)} className="h-10 w-10 rounded-2xl bg-gray-100 text-gray-500 flex items-center justify-center hover:bg-rose-50 hover:text-rose-500 transition-all text-lg font-black">×</button>
-                            </div>
-
-                            {/* Modal Body */}
-                            <div className="flex-1 overflow-y-auto p-8">
-                                {loadingBreakdown ? (
-                                    <div className="flex items-center justify-center h-40"><div className="animate-spin h-8 w-8 rounded-full border-2 border-indigo-500 border-t-transparent"></div></div>
-                                ) : dailyBreakdown.data ? (
-                                    <>
-                                        {/* Summary Cards */}
-                                        <div className="grid grid-cols-3 gap-4 mb-8">
-                                            <div className="bg-gray-50 p-4 rounded-2xl border border-gray-100">
-                                                <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Base Salary</p>
-                                                <p className="text-lg font-black text-gray-800">₹{Number(dailyBreakdown.data.base_salary).toLocaleString()}</p>
-                                            </div>
-                                            <div className="bg-sky-50 p-4 rounded-2xl border border-sky-100">
-                                                <p className="text-[9px] font-black text-sky-500 uppercase tracking-widest">Daily Rate</p>
-                                                <p className="text-lg font-black text-sky-700">₹{Number(dailyBreakdown.data.daily_rate).toLocaleString()}</p>
-                                            </div>
-                                            <div className="bg-emerald-50 p-4 rounded-2xl border border-emerald-100">
-                                                <p className="text-[9px] font-black text-emerald-500 uppercase tracking-widest">Total Earned</p>
-                                                <p className="text-lg font-black text-emerald-700">₹{Number(dailyBreakdown.data.total_gross).toLocaleString()}</p>
-                                            </div>
-                                        </div>
-
-                                        {/* Day Table */}
-                                        {dailyBreakdown.data.breakdown.length > 0 ? (
-                                            <div className="overflow-x-auto rounded-2xl border border-gray-100">
-                                                <table className="w-full">
-                                                    <thead>
-                                                        <tr className="bg-gray-50 border-b border-gray-100">
-                                                            <th className="p-4 text-[9px] font-black text-gray-400 uppercase tracking-widest text-left">Date</th>
-                                                            <th className="p-4 text-[9px] font-black text-gray-400 uppercase tracking-widest text-center">Status</th>
-                                                            <th className="p-4 text-[9px] font-black text-gray-400 uppercase tracking-widest text-center">Punch In</th>
-                                                            <th className="p-4 text-[9px] font-black text-gray-400 uppercase tracking-widest text-center">Punch Out</th>
-                                                            <th className="p-4 text-[9px] font-black text-gray-400 uppercase tracking-widest text-right">Gross Earned</th>
-                                                        </tr>
-                                                    </thead>
-                                                    <tbody className="divide-y divide-gray-50">
-                                                        {dailyBreakdown.data.breakdown.map((day, i) => (
-                                                            <tr key={i} className={`${day.day_factor > 0 ? 'bg-emerald-50/30' : 'bg-rose-50/20'}`}>
-                                                                <td className="p-4 text-xs font-bold text-gray-700">{new Date(day.date).toLocaleDateString('en-IN', { weekday:'short', day:'2-digit', month:'short' })}</td>
-                                                                <td className="p-4 text-center">
-                                                                    <span className={`text-[9px] font-black uppercase px-3 py-1 rounded-xl tracking-widest ${
-                                                                        day.day_factor >= 1 ? 'bg-emerald-100 text-emerald-700'
-                                                                        : day.day_factor === 0.5 ? 'bg-amber-100 text-amber-700'
-                                                                        : 'bg-rose-100 text-rose-700'
-                                                                    }`}>{day.status}{day.day_factor === 0.5 ? ' (Half)' : ''}</span>
-                                                                </td>
-                                                                <td className="p-4 text-center text-xs text-gray-500 font-bold">{day.punch_in || '—'}</td>
-                                                                <td className="p-4 text-center text-xs text-gray-500 font-bold">{day.punch_out || '—'}</td>
-                                                                <td className="p-4 text-right font-black text-emerald-600">₹{Number(day.gross_earned).toLocaleString()}</td>
-                                                            </tr>
-                                                        ))}
-                                                    </tbody>
-                                                    <tfoot>
-                                                        <tr className="bg-gray-50 border-t-2 border-gray-200">
-                                                            <td colSpan="4" className="p-4 text-[10px] font-black text-gray-600 uppercase tracking-widest">Total Earned ({dailyBreakdown.data.days_recorded} Days Recorded)</td>
-                                                            <td className="p-4 text-right font-black text-lg text-emerald-700">₹{Number(dailyBreakdown.data.total_gross).toLocaleString()}</td>
-                                                        </tr>
-                                                    </tfoot>
-                                                </table>
-                                            </div>
-                                        ) : (
-                                            <div className="text-center py-16 text-gray-400">
-                                                <FaMoneyBillWave size={32} className="mx-auto mb-4 opacity-20" />
-                                                <p className="font-black text-sm uppercase tracking-widest">No Attendance Records in This Period</p>
-                                            </div>
-                                        )}
-                                    </>
-                                ) : (
-                                    <div className="text-center py-16 text-gray-400">
-                                        <p className="font-black text-sm">Could not load breakdown.</p>
-                                    </div>
-                                )}
-                            </div>
-                        </motion.div>
-                    </motion.div>
-                )}
-            </AnimatePresence>
         </Layout>
     );
 };
