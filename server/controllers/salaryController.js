@@ -174,7 +174,7 @@ exports.calculateSalary = async (req, res) => {
         let usersQuery = `
             SELECT id, emp_id, name, monthly_salary, base_salary, role, deductions
             FROM users
-            WHERE LOWER(role) IN ('principal', 'hod', 'staff', 'management')
+            WHERE LOWER(role::text) IN ('principal', 'hod', 'staff', 'management')
         `;
         const usersParams = [];
         if (emp_id) {
@@ -339,7 +339,7 @@ exports.getSalaryRecords = async (req, res) => {
             SELECT u.emp_id, u.name, u.role, u.profile_pic, u.monthly_salary, u.base_salary, u.deductions, d.name AS department_name
             FROM users u
             LEFT JOIN departments d ON u.department_id = d.id
-            WHERE LOWER(u.role) IN ('principal', 'hod', 'staff', 'management')
+            WHERE LOWER(u.role::text) IN ('principal', 'hod', 'staff', 'management')
         `;
         const usersParams = [];
 
