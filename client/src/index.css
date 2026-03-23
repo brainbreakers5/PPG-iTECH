@@ -226,17 +226,25 @@ button:active:not(:disabled) {
     font-size: 1rem !important;
   }
 
-  h3,
-  h4,
-  h5,
+  h3 {
+    font-size: 0.92rem !important;
+  }
+
+  h4 {
+    font-size: 0.86rem !important;
+  }
+
+  h5 {
+    font-size: 0.8rem !important;
+  }
+
   h6 {
-    font-size: 0.9rem !important;
+    font-size: 0.74rem !important;
   }
 
   p,
   span,
   label,
-  button,
   input,
   select,
   textarea,
@@ -247,18 +255,38 @@ button:active:not(:disabled) {
     font-size: 12px !important;
   }
 
+  button,
+  [role="button"],
+  .btn {
+    font-size: 11px !important;
+  }
+
   table {
+    display: block;
     width: 100% !important;
-    table-layout: fixed;
+    max-width: 100% !important;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    table-layout: auto;
     font-size: 11px;
+  }
+
+  .styled-table-container,
+  .table-responsive,
+  .overflow-x-auto {
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  table > thead,
+  table > tbody {
+    white-space: nowrap;
   }
 
   th,
   td {
     padding: 6px 4px !important;
-    white-space: normal;
-    word-break: break-word;
-    overflow-wrap: anywhere;
+    white-space: nowrap;
   }
 }
 
