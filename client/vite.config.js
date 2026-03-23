@@ -16,29 +16,52 @@ export default defineConfig({
       manifestFilename: 'manifest.json',
       includeAssets: ['ppg-logo.png', 'ppg-bg.jpg'],
       manifest: {
-        name: 'PPG EMP HUB',
+        name: 'PPG iTECH HUB',
         short_name: 'PPG HUB',
-        description: 'PPG Employee Management Hub',
+        description: 'PPG Employee Management System',
         theme_color: '#0ea5e9',
         background_color: '#0ea5e9',
         display: 'standalone',
+        scope: '/',
         start_url: '/',
-        icons: [
+        orientation: 'portrait-primary',
+        categories: ['business', 'productivity'],
+        screenshots: [
           {
             src: 'ppg-logo.png',
-            sizes: '192x192',
-            type: 'image/png'
+            sizes: '540x720',
+            form_factor: 'narrow'
           },
           {
             src: 'ppg-logo.png',
-            sizes: '512x512',
-            type: 'image/png'
+            sizes: '1280x720',
+            form_factor: 'wide'
+          }
+        ],
+        icons: [
+          {
+            src: 'ppg-logo.png',
+            sizes: '144x144',
+            type: 'image/png',
+            purpose: 'any'
+          },
+          {
+            src: 'ppg-logo.png',
+            sizes: '192x192',
+            type: 'image/png',
+            purpose: 'any'
+          },
+          {
+            src: 'ppg-logo.png',
+            sizes: '256x256',
+            type: 'image/png',
+            purpose: 'any'
           },
           {
             src: 'ppg-logo.png',
             sizes: '512x512',
             type: 'image/png',
-            purpose: 'any maskable'
+            purpose: 'any'
           }
         ]
       },

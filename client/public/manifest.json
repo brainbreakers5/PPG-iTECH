@@ -2,9 +2,25 @@
   "name": "PPG iTECH HUB",
   "short_name": "PPG HUB",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
+  "orientation": "portrait-primary",
   "background_color": "#0ea5e9",
   "theme_color": "#0ea5e9",
+  "description": "PPG Employee Management System",
+  "categories": ["business", "productivity"],
+  "screenshots": [
+    {
+      "src": "/ppg-logo.png",
+      "sizes": "540x720",
+      "form_factor": "narrow"
+    },
+    {
+      "src": "/ppg-logo.png",
+      "sizes": "1280x720",
+      "form_factor": "wide"
+    }
+  ],
   "icons": [
     {
       "src": "/ppg-logo.png",
