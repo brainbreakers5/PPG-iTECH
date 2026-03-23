@@ -3,8 +3,10 @@ import { useNavigate } from 'react-router-dom';
 import Layout from '../../components/Layout';
 import api from '../../utils/api';
 import Swal from 'sweetalert2';
-import { finalizePrintWindow } from '../../utils/printUtils';
-import { FaEdit, FaTrash, FaUserPlus, FaSearch, FaFilter, FaUsers, FaIdBadge, FaEnvelope, FaPhone, FaPrint, FaDownload, FaFileImport, FaHistory, FaUndo } from 'react-icons/fa';
+import * as XLSX from 'xlsx';
+import { jsPDF } from 'jspdf';
+import autoTable from 'jspdf-autotable';
+import { FaEdit, FaTrash, FaUserPlus, FaSearch, FaFilter, FaUsers, FaIdBadge, FaEnvelope, FaPhone, FaPrint, FaFileImport, FaHistory, FaUndo } from 'react-icons/fa';
 import { motion, AnimatePresence } from 'framer-motion';
 
 
@@ -139,22 +141,6 @@ const EmployeeManagement = () => {
         window.dispatchEvent(new CustomEvent('closeSidebar'));
     };
 
-    const handleDownloadSample = async () => {
-        try {
-            const { data } = await api.get('/employees/import/sample', { responseType: 'blob' });
-            const url = window.URL.createObjectURL(new Blob([data]));
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = 'employee_import_sample.csv';
-            document.body.appendChild(a);
-            a.click();
-            a.remove();
-            window.URL.revokeObjectURL(url);
-        } catch (error) {
-            Swal.fire({ title: 'Download Failed', text: error.response?.data?.message || 'Could not download sample file.', icon: 'error' });
-        }
-    };
-
     const triggerImportPicker = () => {
         if (isImporting) return;
         fileInputRef.current?.click();
@@ -179,7 +165,10 @@ const EmployeeManagement = () => {
             setUploadProgress(0);
 
             const { data } = await api.post('/employees/import', formData, {
-                headers: { 'Content-Type': 'multipart/form-data' },
+                headers: {
+                    'Content-Type': 'multipart/form-data',
+                    'X-Disable-Encrypt': '1'
+                },
                 onUploadProgress: (progressEvent) => {
                     const total = progressEvent.total || 0;
                     if (!total) return;
@@ -247,80 +236,105 @@ const EmployeeManagement = () => {
         }
     };
 
+    const getExportRows = () => filteredEmployees.map((emp) => ({
+        emp_id: emp.emp_id || '',
+        employee_name: emp.name || '',
+        role: emp.role || '',
+        department: emp.department_name || '',
+        designation: emp.designation || '',
+        email: emp.email || '',
+        phone: emp.mobile || '',
+        status: emp.employment_status || 'active'
+    }));
+
+    const downloadCsv = (rows) => {
+        const headers = ['emp_id', 'employee_name', 'role', 'department', 'designation', 'email', 'phone', 'status'];
+        const esc = (value) => `"${String(value ?? '').replace(/"/g, '""')}"`;
+        const csv = [
+            headers.join(','),
+            ...rows.map((r) => headers.map((h) => esc(r[h])).join(','))
+        ].join('\n');
+
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `employee_report_${new Date().toISOString().slice(0, 10)}.csv`;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        window.URL.revokeObjectURL(url);
+    };
+
+    const downloadXlsx = (rows) => {
+        const ws = XLSX.utils.json_to_sheet(rows);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, 'Employees');
+        XLSX.writeFile(wb, `employee_report_${new Date().toISOString().slice(0, 10)}.xlsx`);
+    };
+
+    const downloadPdf = (rows) => {
+        const doc = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a4' });
+        doc.setFontSize(14);
+        doc.text('Employee Management Report', 40, 36);
+        doc.setFontSize(9);
+        doc.text(`Generated: ${new Date().toLocaleString()}`, 40, 52);
+
+        autoTable(doc, {
+            startY: 70,
+            head: [['Emp ID', 'Name', 'Role', 'Department', 'Designation', 'Email', 'Phone', 'Status']],
+            body: rows.map((r) => [
+                r.emp_id,
+                r.employee_name,
+                String(r.role || '').toUpperCase(),
+                r.department,
+                r.designation,
+                r.email,
+                r.phone,
+                r.status
+            ]),
+            styles: { fontSize: 8, cellPadding: 4 },
+            headStyles: { fillColor: [30, 58, 138] }
+        });
+
+        doc.save(`employee_report_${new Date().toISOString().slice(0, 10)}.pdf`);
+    };
+
     const handlePrint = async () => {
         if (!filteredEmployees || filteredEmployees.length === 0) {
             Swal.fire({ icon: 'warning', title: 'No Data', text: 'No employees to print.' });
             return;
         }
-        const printWindow = window.open('', '_blank', 'width=1200,height=800');
-        if (!printWindow) return;
+        const rows = getExportRows();
 
-        const roleColors = { admin: '#7c3aed', management: '#db2777', principal: '#2563eb', hod: '#0891b2', staff: '#16a34a' };
-        const escHtml = (v) => String(v ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+        const result = await Swal.fire({
+            title: 'Download Employee Report',
+            input: 'radio',
+            inputOptions: {
+                pdf: 'PDF (.pdf)',
+                xlsx: 'Excel (.xlsx)',
+                csv: 'CSV (.csv)'
+            },
+            inputValue: 'pdf',
+            showCancelButton: true,
+            confirmButtonText: 'Download',
+            confirmButtonColor: '#2563eb',
+            cancelButtonColor: '#64748b',
+            inputValidator: (value) => (!value ? 'Please select a download format.' : null)
+        });
 
-        const rowsHtml = filteredEmployees.map((emp, idx) => `
-            <tr style="border-bottom: 1px solid #f1f5f9; ${idx % 2 === 0 ? 'background:#fff;' : 'background:#f8fafc;'}">
-                <td style="padding:10px 12px; font-size:9pt; font-weight:900; color:#1e3a8a;">${escHtml(emp.emp_id)}</td>
-                <td style="padding:10px 12px; font-size:9pt; font-weight:700; color:#1e293b;">${escHtml(emp.name)}</td>
-                <td style="padding:10px 12px;">
-                    <span style="background:${roleColors[emp.role] || '#475569'}22; color:${roleColors[emp.role] || '#475569'}; border:1px solid ${roleColors[emp.role] || '#475569'}44; padding:2px 8px; border-radius:12px; font-size:8pt; font-weight:900; text-transform:uppercase; letter-spacing:0.05em;">${escHtml(emp.role)}</span>
-                </td>
-                <td style="padding:10px 12px; font-size:9pt; color:#334155;">${escHtml(emp.department_name || '—')}</td>
-                <td style="padding:10px 12px; font-size:9pt; color:#334155;">${escHtml(emp.designation || '—')}</td>
-                <td style="padding:10px 12px; font-size:8.5pt; color:#475569;">${escHtml(emp.email || '—')}</td>
-                <td style="padding:10px 12px; font-size:9pt; color:#475569;">${escHtml(emp.mobile || '—')}</td>
-            </tr>
-        `).join('');
+        if (!result.isConfirmed || !result.value) return;
 
-        const filterLabel = [
-            filterRole ? `Role: ${filterRole}` : '',
-            filterDept ? `Dept: ${departments.find(d => String(d.id) === filterDept)?.name || filterDept}` : '',
-            searchQuery ? `Search: "${searchQuery}"` : ''
-        ].filter(Boolean).join(' | ') || 'All Employees';
+        if (result.value === 'pdf') downloadPdf(rows);
+        if (result.value === 'xlsx') downloadXlsx(rows);
+        if (result.value === 'csv') downloadCsv(rows);
 
-        printWindow.document.write(`
-            <!doctype html><html><head><meta charset="UTF-8">
-            <title>Employee Management Report</title>
-            <style>
-                @page { size: landscape; margin: 0.7cm; }
-                body { font-family: 'Segoe UI', Arial, sans-serif; color: #1e293b; margin: 0; padding: 10px; }
-                .header { display:flex; justify-content:space-between; align-items:flex-end; margin-bottom:20px; border-bottom:3px solid #1e3a8a; padding-bottom:12px; }
-                .header h1 { margin:0; color:#1e3a8a; font-size:18pt; font-weight:900; letter-spacing:-0.5px; }
-                .meta { font-size:9pt; color:#64748b; font-weight:bold; margin-top:5px; }
-                .brand { font-weight:900; color:#1e3a8a; font-size:11pt; text-align:right; }
-                .gen-date { font-size:8pt; color:#94a3b8; text-align:right; }
-                .stat-bar { display:flex; gap:12px; margin-bottom:16px; }
-                .stat { background:#f8fafc; border:1px solid #e2e8f0; padding:8px 14px; border-radius:10px; font-size:9pt; }
-                .stat span { font-weight:900; color:#1e3a8a; }
-                table { width:100%; border-collapse:collapse; }
-                thead tr { background:#1e3a8a; }
-                thead th { padding:10px 12px; font-size:8pt; font-weight:900; color:#fff; text-transform:uppercase; letter-spacing:0.08em; text-align:left; border:none; }
-                tbody tr:last-child td { border-bottom:none; }
-            </style></head><body>
-            <div class="header">
-                <div>
-                    <h1>Employee Management Report</h1>
-                    <p class="meta">${escHtml(filterLabel)} &nbsp;|&nbsp; Total: ${filteredEmployees.length} employees</p>
-                </div>
-                <div>
-                    <div class="brand">PPG EMP HUB</div>
-                    <div class="gen-date">Generated: ${new Date().toLocaleString('en-GB')}</div>
-                </div>
-            </div>
-            <table>
-                <thead><tr>
-                    <th>Emp ID</th><th>Name</th><th>Role</th><th>Department</th><th>Designation</th><th>Email</th><th>Mobile</th>
-                </tr></thead>
-                <tbody>${rowsHtml}</tbody>
-            </table>
-            </body></html>
-        `);
-        printWindow.document.close();
-        await finalizePrintWindow({
-            printWindow,
-            title: 'Employee Management Report',
-            delay: 250,
-            modeLabel: 'the employee management report'
+        Swal.fire({
+            title: 'Download Started',
+            text: `Employee report is downloading as ${String(result.value).toUpperCase()}.`,
+            icon: 'success',
+            timer: 1500,
+            showConfirmButton: false
         });
     };
 
@@ -344,14 +358,6 @@ const EmployeeManagement = () => {
                             onChange={handleImportFileChange}
                             className="hidden"
                         />
-                        <button
-                            onClick={handleDownloadSample}
-                            className="p-4 bg-emerald-600 text-white rounded-2xl shadow-lg shadow-emerald-100 hover:bg-emerald-700 transition-all flex items-center justify-center gap-2 group font-black uppercase tracking-widest text-[10px]"
-                            title="Download Sample Import Format"
-                        >
-                            <FaDownload className="group-hover:scale-110 transition-transform" />
-                            <span className="hidden sm:inline">Sample</span>
-                        </button>
                         <button
                             onClick={triggerImportPicker}
                             disabled={isImporting}

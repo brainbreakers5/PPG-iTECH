@@ -23,7 +23,8 @@ api.interceptors.request.use(
 
         // Only encrypt for mutating requests and when explicit opt-out header is not set
         const method = (config.method || '').toLowerCase();
-        if (['post', 'put', 'patch', 'delete'].includes(method) && !config.headers['X-Disable-Encrypt']) {
+        const isFormData = typeof FormData !== 'undefined' && config.data instanceof FormData;
+        if (['post', 'put', 'patch', 'delete'].includes(method) && !config.headers['X-Disable-Encrypt'] && !isFormData) {
             try {
                 const encrypted = await encryptPayload(config.data || {});
                 // Replace payload with encrypted object and mark header
@@ -34,6 +35,12 @@ api.interceptors.request.use(
                 // If encryption fails, reject the request
                 return Promise.reject(err);
             }
+        }
+
+        // Ensure multipart uploads are sent as-is for server-side multer parsing.
+        if (isFormData) {
+            if (config.headers['X-Encrypted']) delete config.headers['X-Encrypted'];
+            if (config.headers['Content-Type']) delete config.headers['Content-Type'];
         }
 
         return config;
