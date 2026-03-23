@@ -416,65 +416,91 @@ const LeaveLimitation = () => {
         });
 
         if (formValues) {
+            const year = new Date(formValues.fromDate || fromDate).getFullYear();
+            const payload = {
+                year,
+                fromDate: formValues.fromDate,
+                toDate: formValues.toDate,
+                cl_limit: formValues.cl_limit,
+                ml_limit: formValues.ml_limit,
+                od_limit: formValues.od_limit,
+                comp_limit: formValues.comp_limit ?? formValues.comp_leave_limit,
+                lop_limit: formValues.lop_limit,
+                permission_limit: formValues.permission_limit
+            };
+
+            Swal.fire({
+                title: 'Applying...',
+                text: 'Updating registry limits for all personnel...',
+                didOpen: () => Swal.showLoading(),
+                allowOutsideClick: false,
+                allowEscapeKey: false
+            });
+
             try {
-                const year = new Date(formValues.fromDate || fromDate).getFullYear();
-                Swal.fire({ title: 'Applying...', text: 'Updating registry limits for all personnel...', didOpen: () => Swal.showLoading() });
+                const localTargets = (staffData || [])
+                    .map((emp) => String(emp?.emp_id || '').trim())
+                    .filter(Boolean);
 
-                const { data } = await api.post('/leave-limits/bulk', { year, ...formValues });
+                const targets = localTargets.length > 0
+                    ? Array.from(new Set(localTargets))
+                    : await (async () => {
+                        const { data: employees } = await api.get('/employees?all=true');
+                        return Array.from(new Set((employees || [])
+                            .map((e) => String(e?.emp_id || '').trim())
+                            .filter(Boolean)));
+                    })();
 
-                const updatedCount = data?.updatedCount || 0;
-                const failedCount = data?.failedCount || 0;
+                if (!targets.length) {
+                    throw new Error('No valid employees found for bulk update.');
+                }
 
-                Swal.fire({
-                    title: failedCount > 0 ? 'Bulk Set Partial' : 'Bulk Set Complete!',
-                    text: failedCount > 0
-                        ? `Updated ${updatedCount} personnel, ${failedCount} failed.`
-                        : `Synchronized limits for ${updatedCount || staffData.length} personnel.`,
-                    icon: failedCount > 0 ? 'warning' : 'success',
-                    confirmButtonColor: '#2563eb'
-                });
-                fetchLimits();
-            } catch (error) {
-                console.error('Bulk update fail:', error);
-                try {
-                    const year = new Date(formValues.fromDate || fromDate).getFullYear();
-                    const { data: employees } = await api.get('/employees?all=true');
-                    const targets = (employees || []).filter((e) => e?.emp_id).map((e) => String(e.emp_id).trim()).filter(Boolean);
-                    let successCount = 0;
-                    let failCount = 0;
+                let successCount = 0;
+                let failCount = 0;
+                let firstFailure = null;
 
-                    // Run sequentially for higher reliability on constrained backends.
-                    for (const empId of targets) {
-                        try {
-                            await api.put(`/leave-limits/${encodeURIComponent(empId)}`, { year, ...formValues });
+                const batchSize = 10;
+                for (let i = 0; i < targets.length; i += batchSize) {
+                    const batch = targets.slice(i, i + batchSize);
+                    const settled = await Promise.allSettled(
+                        batch.map((empId) => api.put(`/leave-limits/${encodeURIComponent(empId)}`, payload))
+                    );
+
+                    settled.forEach((result, idx) => {
+                        if (result.status === 'fulfilled') {
                             successCount += 1;
-                        } catch {
+                        } else {
                             failCount += 1;
+                            if (!firstFailure) {
+                                firstFailure = {
+                                    empId: batch[idx],
+                                    message: result.reason?.response?.data?.message || result.reason?.response?.data?.error || result.reason?.message || 'Unknown error'
+                                };
+                            }
                         }
-                    }
-
-                    if (successCount > 0) {
-                        Swal.fire({
-                            title: failCount > 0 ? 'Bulk Set Partial' : 'Bulk Set Complete!',
-                            text: `${successCount} updated${failCount > 0 ? `, ${failCount} failed` : ''}.`,
-                            icon: failCount > 0 ? 'warning' : 'success',
-                            confirmButtonColor: '#2563eb'
-                        });
-                        fetchLimits();
-                    } else {
-                        throw new Error('Fallback per-employee update failed for all users.');
-                    }
-                } catch (fallbackError) {
-                    const failedFirst = fallbackError?.response?.data?.failedEmployees?.[0];
-                    const detailedMsg = failedFirst?.error
-                        ? `First failure (${failedFirst.emp_id}): ${failedFirst.error}`
-                        : null;
-                    Swal.fire({
-                        title: 'Critical Error',
-                        text: detailedMsg || fallbackError?.response?.data?.message || fallbackError?.response?.data?.error || fallbackError.message || error.response?.data?.message || error.response?.data?.error || error.message || 'The bulk operation could not be completed.',
-                        icon: 'error'
                     });
                 }
+
+                if (successCount === 0) {
+                    throw new Error(firstFailure ? `First failure (${firstFailure.empId}): ${firstFailure.message}` : 'Bulk update failed for all employees.');
+                }
+
+                await fetchLimits();
+                Swal.fire({
+                    title: failCount > 0 ? 'Bulk Set Partial' : 'Bulk Set Complete!',
+                    text: failCount > 0
+                        ? `${successCount} updated, ${failCount} failed.${firstFailure ? ` ${firstFailure.empId}: ${firstFailure.message}` : ''}`
+                        : `Synchronized limits for ${successCount} personnel.`,
+                    icon: failCount > 0 ? 'warning' : 'success',
+                    confirmButtonColor: '#2563eb'
+                });
+            } catch (error) {
+                console.error('Bulk update fail:', error);
+                Swal.fire({
+                    title: 'Critical Error',
+                    text: error?.response?.data?.message || error?.response?.data?.error || error.message || 'The bulk operation could not be completed.',
+                    icon: 'error'
+                });
             }
         }
     };

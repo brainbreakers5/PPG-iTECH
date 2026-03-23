@@ -395,6 +395,10 @@ const SalaryManagement = () => {
         const net = Number(row.calculated_salary || 0);
         const withPay = Number(row.total_present || row.with_pay_count || 0).toFixed(1);
         const withoutPay = Number(row.total_lop || row.without_pay_count || 0).toFixed(1);
+        const deductionBreakdown = getDeductionBreakdownText(row.deductions);
+        const deductionLabel = deductionBreakdown
+            ? `Deductions (${escapeHtml(deductionBreakdown)})`
+            : 'Deductions';
         const generatedAt = formatGeneratedAt();
 
         const html = `
@@ -490,10 +494,10 @@ const SalaryManagement = () => {
                                 </tr>
                             </thead>
                             <tbody>
-                                <tr><td>Gross Salary</td><td class="right">${toCurrency(gross)}</td></tr>
-                                <tr><td>Deductions</td><td class="right">${toCurrency(deduction)}</td></tr>
-                                <tr><td>Net Salary</td><td class="right">${toCurrency(net)}</td></tr>
                                 <tr><td>With Pay / Without Pay Days</td><td class="right">${withPay} / ${withoutPay}</td></tr>
+                                <tr><td>Gross Salary</td><td class="right">${toCurrency(gross)}</td></tr>
+                                <tr><td>${deductionLabel}</td><td class="right">${toCurrency(deduction)}</td></tr>
+                                <tr><td>Net Salary</td><td class="right">${toCurrency(net)}</td></tr>
                             </tbody>
                         </table>
 

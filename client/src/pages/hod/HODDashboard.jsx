@@ -51,6 +51,7 @@ const HODDashboard = () => {
     const [myStats, setMyStats] = useState({ present: 0, absent: 0, od: 0, cl: 0, ml: 0, comp_leave: 0, lop: 0, late_entry: 0 });
     const [birthdays, setBirthdays] = useState([]);
     const [allEmployees, setAllEmployees] = useState([]);
+    const [summaryRows, setSummaryRows] = useState([]);
     const [attendanceMap, setAttendanceMap] = useState({});
     const [monthStats, setMonthStats] = useState({ workingDays: 0, holidays: 0, specialEvents: 0 });
     const [currentDayStatus, setCurrentDayStatus] = useState({ type: 'workingDays', detail: 'Regular working day' });
@@ -74,6 +75,7 @@ const HODDashboard = () => {
             const date = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
             // Fetch overall summary (without department filter) to see all HODs
             const { data: summary } = await api.get(`/attendance/summary?date=${date}`);
+            setSummaryRows(Array.isArray(summary) ? summary : []);
             const { data: bdays } = await api.get('/employees/birthdays/today');
             setBirthdays(bdays);
             const { data: emps } = await api.get('/employees?all=true');
@@ -212,6 +214,16 @@ const HODDashboard = () => {
 
     const hodList = allEmployees.filter(e => (e.role || '').toLowerCase() === 'hod');
     const staffList = allEmployees.filter(e => (e.role || '').toLowerCase() === 'staff' && currentDeptId !== null && String(e.department_id) === String(currentDeptId));
+    const totalHodCountForCore = useMemo(() => {
+        const fromEmployees = hodList.length;
+        const fromSummary = new Set(
+            (summaryRows || [])
+                .filter((r) => String(r?.role || '').toLowerCase() === 'hod')
+                .map((r) => String(r?.emp_id || '').trim())
+                .filter(Boolean)
+        ).size;
+        return Math.max(fromEmployees, fromSummary);
+    }, [hodList, summaryRows]);
 
     const getFilteredEmployees = (roleKey, statusLabel) => {
         // Only return employees matching the role AND (if staff) in the correct department
@@ -475,7 +487,7 @@ const HODDashboard = () => {
                                     <FaUserCheck size={8} /> {stats[role.key]?.present || 0} Available
                                 </span>
                                 <span className="bg-white border border-gray-200 text-gray-800 font-black px-3 py-1 rounded-xl text-sm group-hover/btn:bg-sky-600 group-hover/btn:text-white group-hover/btn:border-sky-600 transition-all">
-                                    {role.key === 'hod' ? hodList.length : staffList.length}
+                                    {role.key === 'hod' ? totalHodCountForCore : staffList.length}
                                 </span>
                             </div>
                         </button>
