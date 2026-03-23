@@ -242,6 +242,13 @@ table:has(tbody td[colspan]) tbody td[colspan] {
   background: #EF4444;
 }
 
+/* Logo / image sharpness — prevent backdrop-blur bleed */
+img {
+  image-rendering: -webkit-optimize-contrast;
+  image-rendering: high-quality;
+  -ms-interpolation-mode: bicubic;
+}
+
 /* Global Transitions */
 button,
 a,

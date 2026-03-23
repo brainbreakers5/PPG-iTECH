@@ -418,8 +418,8 @@ const Header = () => {
                 <div className="flex items-center gap-3 max-[320px]:gap-2">
                     <div className="flex items-center gap-3 max-[320px]:gap-2">
                         {/* Institutional Logo */}
-                        <div className="h-11 w-11 md:h-12 md:w-12 rounded-xl p-1 bg-white shadow-sm ring-1 ring-gray-200 flex-shrink-0">
-                            <img src="/ppg-logo.png" alt="PPG Logo" className="w-full h-full object-contain" />
+                        <div className="h-11 w-11 md:h-12 md:w-12 rounded-xl overflow-hidden bg-white shadow-sm ring-1 ring-gray-200 flex-shrink-0" style={{ isolation: 'isolate' }}>
+                            <img src="/ppg-logo.png" alt="PPG Logo" className="w-full h-full object-contain" style={{ imageRendering: 'high-quality', display: 'block' }} />
                         </div>
                         <div className="ml-1 max-[320px]:ml-0">
                             <h2 className="text-base max-[320px]:text-[13px] md:text-lg font-black text-gray-800 tracking-tight max-[320px]:tracking-normal">

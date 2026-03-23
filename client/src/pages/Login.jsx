@@ -307,8 +307,9 @@ const Login = () => {
                         whileHover={{ rotate: 5, scale: 1.05 }}
                         transition={{ type: 'spring', stiffness: 300 }}
                         className="w-[88px] h-[88px] mx-auto mb-6 flex items-center justify-center drop-shadow-xl"
+                        style={{ isolation: 'isolate' }}
                     >
-                        <img src="/ppg-logo.png" alt="PPG Institute of Technology" className="w-full h-full object-contain" />
+                        <img src="/ppg-logo.png" alt="PPG Institute of Technology" className="w-full h-full object-contain" style={{ imageRendering: 'high-quality', display: 'block' }} />
                     </motion.div>
 
                     <h1 className="text-3xl max-sm:text-4xl font-black text-white tracking-tight leading-tight max-sm:leading-[1.05]">
