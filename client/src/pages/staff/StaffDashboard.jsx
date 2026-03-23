@@ -241,9 +241,6 @@ const StaffDashboard = () => {
                         <div>
                             <p className="text-[9px] font-black text-emerald-500 uppercase tracking-widest">Working Days</p>
                             <p className="text-2xl font-black text-emerald-700 tracking-tighter">{monthStats.workingDays}</p>
-                            {currentDayStatus.type === 'workingDays' && (
-                                <p className="text-[8px] font-black text-blue-600 uppercase tracking-widest mt-1">Today: {currentDayStatus.detail}</p>
-                            )}
                         </div>
                     </motion.div>
                     <motion.div
@@ -258,9 +255,6 @@ const StaffDashboard = () => {
                         <div>
                             <p className="text-[9px] font-black text-rose-500 uppercase tracking-widest">Holidays</p>
                             <p className="text-2xl font-black text-rose-700 tracking-tighter">{monthStats.holidays}</p>
-                            {currentDayStatus.type === 'holidays' && (
-                                <p className="text-[8px] font-black text-blue-600 uppercase tracking-widest mt-1">Today: {currentDayStatus.detail}</p>
-                            )}
                         </div>
                     </motion.div>
                     <motion.div
@@ -275,9 +269,6 @@ const StaffDashboard = () => {
                         <div>
                             <p className="text-[9px] font-black text-amber-500 uppercase tracking-widest">Special Events</p>
                             <p className="text-2xl font-black text-amber-700 tracking-tighter">{monthStats.specialEvents}</p>
-                            {currentDayStatus.type === 'specialEvents' && (
-                                <p className="text-[8px] font-black text-blue-600 uppercase tracking-widest mt-1">Today: {currentDayStatus.detail}</p>
-                            )}
                         </div>
                     </motion.div>
                 </div>

@@ -1463,11 +1463,12 @@ const LeaveApply = () => {
                                 )}
                             </div>
 
+                            {pendingApprovals.length > 0 ? (
                             <div className="overflow-x-auto">
                                 <table className="w-full text-left border-collapse">
                                     <thead>
                                         <tr className="bg-gray-50/50">
-                                            <th className="p-6 w-12 border-b border-sky-50">
+                                            <th className="p-4 md:p-6 w-12 border-b border-sky-50">
                                                 <div className="flex justify-center">
                                                     <input
                                                         type="checkbox"
@@ -1477,16 +1478,16 @@ const LeaveApply = () => {
                                                     />
                                                 </div>
                                             </th>
-                                            <th className="p-6 text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-sky-50">Employee</th>
-                                            <th className="p-6 text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-sky-50">Details</th>
-                                            <th className="p-6 text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-sky-50">Reason</th>
-                                            <th className="p-6 text-[10px] font-black text-gray-500 uppercase tracking-widest border-b border-sky-50 text-center">Actions</th>
+                                            <th className="p-4 md:p-6 text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-sky-50">Employee</th>
+                                            <th className="p-4 md:p-6 text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-sky-50">Details</th>
+                                            <th className="p-4 md:p-6 text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-sky-50">Reason</th>
+                                            <th className="p-4 md:p-6 text-[10px] font-black text-gray-500 uppercase tracking-widest border-b border-sky-50 text-center">Actions</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-sky-50/50">
                                         {pendingApprovals.map((leave) => (
                                             <tr key={leave.id} className={`transition-all group ${selectedIds.includes(leave.id) ? 'bg-sky-50/40' : 'hover:bg-sky-50/20'}`}>
-                                                <td className="p-6">
+                                                <td className="p-4 md:p-6 align-top">
                                                     <div className="flex justify-center">
                                                         <input
                                                             type="checkbox"
@@ -1496,7 +1497,7 @@ const LeaveApply = () => {
                                                         />
                                                     </div>
                                                 </td>
-                                                <td className="p-6">
+                                                <td className="p-4 md:p-6 align-top">
                                                     <div className="flex items-center gap-4">
                                                         <img
                                                             src={leave.applicant_pic || `https://ui-avatars.com/api/?name=${encodeURIComponent(leave.applicant_name || '?')}&size=80&background=0ea5e9&color=fff&bold=true`}
@@ -1504,12 +1505,12 @@ const LeaveApply = () => {
                                                             className="h-10 w-10 rounded-xl object-cover shadow-lg group-hover:scale-110 transition-transform"
                                                         />
                                                         <div>
-                                                            <p className="text-sm font-black text-gray-800 tracking-tight">{leave.applicant_name}</p>
+                                                            <p className="text-sm font-black text-gray-800 tracking-tight break-words whitespace-normal">{leave.applicant_name}</p>
                                                             <p className="text-[9px] font-black text-sky-500 uppercase tracking-widest mt-0.5">{leave.department_name}</p>
                                                         </div>
                                                     </div>
                                                 </td>
-                                                <td className="p-6">
+                                                <td className="p-4 md:p-6 align-top">
                                                     <div className="space-y-1">
                                                         {leave.request_type === 'comp_credit' ? (
                                                             <span className="inline-block px-2 py-0.5 bg-purple-100 text-purple-600 rounded-md text-[8px] font-black uppercase tracking-widest mb-1">
@@ -1548,16 +1549,16 @@ const LeaveApply = () => {
                                                         </div>
                                                     </div>
                                                 </td>
-                                                <td className="p-6 max-w-xs">
-                                                    <p className="text-sm font-black text-gray-800 tracking-tight truncate">{leave.subject || (leave.request_type === 'comp_credit' ? 'Comp Off Request' : 'Leave Request')}</p>
+                                                <td className="p-4 md:p-6 max-w-xs align-top">
+                                                    <p className="text-sm font-black text-gray-800 tracking-tight break-words whitespace-normal sm:truncate">{leave.subject || (leave.request_type === 'comp_credit' ? 'Comp Off Request' : 'Leave Request')}</p>
                                                     {leave.my_approver_type === 'replacement' && (
                                                         <p className="text-[10px] text-amber-600 font-bold mt-1 uppercase tracking-widest border border-amber-200 bg-amber-50 inline-block px-2 py-0.5 rounded-lg">
                                                             {leave.approval_notes || 'Requested as substitution'}
                                                         </p>
                                                     )}
-                                                    <p className="text-[10px] text-gray-400 font-medium line-clamp-1 mt-1 leading-relaxed">{leave.reason}</p>
+                                                    <p className="text-[10px] text-gray-400 font-medium mt-1 leading-relaxed break-words whitespace-normal sm:line-clamp-1">{leave.reason}</p>
                                                 </td>
-                                                <td className="p-6">
+                                                <td className="p-4 md:p-6 align-top">
                                                     <div className="flex justify-center gap-3">
                                                         <button onClick={() => handleAction(leave.id, 'Approved')} className="h-10 w-10 bg-emerald-50 text-emerald-600 rounded-xl hover:bg-emerald-600 hover:text-white transition-all flex items-center justify-center group/btn active:scale-90 shadow-sm" title="Approve">
                                                             <FaCheck />
@@ -1569,17 +1570,15 @@ const LeaveApply = () => {
                                                 </td>
                                             </tr>
                                         ))}
-                                        {pendingApprovals.length === 0 && (
-                                            <tr>
-                                                <td colSpan="5" className="p-20 text-center opacity-30">
-                                                    <FaInbox size={48} className="mx-auto mb-4" />
-                                                    <p className="text-lg font-black tracking-tight">All caught up!</p>
-                                                </td>
-                                            </tr>
-                                        )}
                                     </tbody>
                                 </table>
                             </div>
+                            ) : (
+                            <div className="p-20 text-center opacity-30">
+                                <FaInbox size={48} className="mx-auto mb-4" />
+                                <p className="text-lg font-black tracking-tight">All caught up!</p>
+                            </div>
+                            )}
 
                             {/* Past Requests Section */}
                             {pastApprovals.length > 0 && (
@@ -1609,7 +1608,7 @@ const LeaveApply = () => {
                                             <tbody className="divide-y divide-gray-50">
                                                 {pastApprovals.map((leave) => (
                                                     <tr key={leave.id} className="hover:bg-gray-50/30 transition-all group">
-                                                        <td className="p-6">
+                                                        <td className="p-4 md:p-6 align-top">
                                                             <div className="flex items-center gap-4">
                                                                 <img
                                                                     src={leave.applicant_pic || `https://ui-avatars.com/api/?name=${encodeURIComponent(leave.applicant_name || '?')}&size=80&background=0ea5e9&color=fff&bold=true`}
@@ -1617,12 +1616,12 @@ const LeaveApply = () => {
                                                                     className="h-10 w-10 rounded-xl object-cover shadow-lg"
                                                                 />
                                                                 <div>
-                                                                    <p className="text-sm font-black text-gray-800 tracking-tight">{leave.applicant_name}</p>
+                                                                    <p className="text-sm font-black text-gray-800 tracking-tight break-words whitespace-normal">{leave.applicant_name}</p>
                                                                     <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mt-0.5">{leave.department_name}</p>
                                                                 </div>
                                                             </div>
                                                         </td>
-                                                        <td className="p-6">
+                                                        <td className="p-4 md:p-6 align-top">
                                                             <div className="space-y-1">
                                                                 {leave.request_type === 'comp_credit' ? (
                                                                     <span className="inline-block px-2 py-0.5 bg-purple-100 text-purple-600 rounded-md text-[8px] font-black uppercase tracking-widest mb-1">
@@ -1652,16 +1651,16 @@ const LeaveApply = () => {
                                                                 </div>
                                                             </div>
                                                         </td>
-                                                        <td className="p-6 max-w-xs">
-                                                            <p className="text-sm font-black text-gray-800 tracking-tight truncate">{leave.subject || (leave.request_type === 'comp_credit' ? 'Comp Off Request' : 'Leave Request')}</p>
+                                                        <td className="p-4 md:p-6 max-w-xs align-top">
+                                                            <p className="text-sm font-black text-gray-800 tracking-tight break-words whitespace-normal sm:truncate">{leave.subject || (leave.request_type === 'comp_credit' ? 'Comp Off Request' : 'Leave Request')}</p>
                                                             {leave.my_approver_type === 'replacement' && (
                                                                 <p className="text-[10px] text-amber-600 font-bold mt-1 uppercase tracking-widest border border-amber-200 bg-amber-50 inline-block px-2 py-0.5 rounded-lg">
                                                                     {leave.approval_notes || 'Requested as substitution'}
                                                                 </p>
                                                             )}
-                                                            <p className="text-[10px] text-gray-400 font-medium line-clamp-1 mt-1 leading-relaxed">{leave.reason}</p>
+                                                            <p className="text-[10px] text-gray-400 font-medium mt-1 leading-relaxed break-words whitespace-normal sm:line-clamp-1">{leave.reason}</p>
                                                         </td>
-                                                        <td className="p-6 text-center">
+                                                        <td className="p-4 md:p-6 text-center align-top">
                                                             <div className="flex flex-col items-center gap-1">
                                                                 <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-widest ${leave.my_approval_status === 'Approved'
                                                                     ? 'bg-emerald-50 text-emerald-600 border border-emerald-100'

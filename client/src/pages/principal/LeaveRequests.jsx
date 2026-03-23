@@ -427,7 +427,7 @@ const LeaveRequests = () => {
                             <div className="h-12 w-12 border-4 border-sky-100 border-t-sky-600 rounded-full animate-spin"></div>
                             <p className="text-[10px] font-black text-sky-500 uppercase tracking-[0.2em]">Synchronizing Requests...</p>
                         </div>
-                    ) : (
+                    ) : pendingLeaves.length > 0 ? (
                         <div className="overflow-x-auto">
                             <table className="w-full text-left border-collapse">
                                 <thead>
@@ -442,11 +442,11 @@ const LeaveRequests = () => {
                                                 />
                                             </div>
                                         </th>
-                                        <th className="p-5 text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-sky-50">Employee</th>
-                                        <th className="p-5 text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-sky-50">Leave Details</th>
-                                        <th className="p-5 text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-sky-50">Reason</th>
-                                        <th className="p-5 text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-sky-50">Role</th>
-                                        <th className="p-5 text-[10px] font-black text-gray-500 uppercase tracking-widest border-b border-sky-50 text-center">Actions</th>
+                                        <th className="p-3 md:p-5 text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-sky-50">Employee</th>
+                                        <th className="p-3 md:p-5 text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-sky-50">Leave Details</th>
+                                        <th className="p-3 md:p-5 text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-sky-50">Reason</th>
+                                        <th className="p-3 md:p-5 text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-sky-50">Role</th>
+                                        <th className="p-3 md:p-5 text-[10px] font-black text-gray-500 uppercase tracking-widest border-b border-sky-50 text-center">Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-sky-50/50">
@@ -460,7 +460,7 @@ const LeaveRequests = () => {
                                                 transition={{ delay: idx * 0.05 }}
                                                 className={`transition-all group ${selectedIds.includes(leave.id) ? 'bg-sky-50/40' : 'hover:bg-sky-50/20'}`}
                                             >
-                                                <td className="p-5">
+                                                <td className="p-3 md:p-5 align-top">
                                                     <div className="flex justify-center">
                                                         <input
                                                             type="checkbox"
@@ -470,7 +470,7 @@ const LeaveRequests = () => {
                                                         />
                                                     </div>
                                                 </td>
-                                                <td className="p-5">
+                                                <td className="p-3 md:p-5 align-top">
                                                     <div
                                                         className="flex items-center gap-4 cursor-pointer group/profile"
                                                         onClick={() => {
@@ -487,12 +487,12 @@ const LeaveRequests = () => {
                                                             className="h-12 w-12 rounded-2xl object-cover shadow-lg group-hover/profile:scale-110 transition-transform"
                                                         />
                                                         <div>
-                                                            <p className="text-sm font-black text-gray-800 tracking-tight group-hover/profile:text-sky-600 transition-colors">{leave.applicant_name}</p>
+                                                            <p className="text-sm font-black text-gray-800 tracking-tight group-hover/profile:text-sky-600 transition-colors break-words whitespace-normal">{leave.applicant_name}</p>
                                                             <p className="text-[10px] font-black text-sky-500 uppercase tracking-widest mt-0.5">{leave.department_name}</p>
                                                         </div>
                                                     </div>
                                                 </td>
-                                                <td className="p-5">
+                                                <td className="p-3 md:p-5 align-top">
                                                     <div className="space-y-1.5">
                                                         {leave.request_type === 'comp_credit' ? (
                                                             <span className="inline-block px-2 py-0.5 bg-purple-100 text-purple-600 rounded-md text-[8px] font-black uppercase tracking-widest mb-1">
@@ -540,11 +540,11 @@ const LeaveRequests = () => {
                                                         </div>
                                                     </div>
                                                 </td>
-                                                <td className="p-5 max-w-xs">
-                                                    <p className="text-sm font-black text-gray-800 tracking-tight truncate">{leave.subject || (leave.request_type === 'comp_credit' ? 'Comp Off Request' : 'Leave Request')}</p>
-                                                    <p className="text-xs text-gray-400 font-medium line-clamp-2 mt-1 leading-relaxed">{leave.reason}</p>
+                                                <td className="p-3 md:p-5 max-w-xs align-top">
+                                                    <p className="text-sm font-black text-gray-800 tracking-tight break-words whitespace-normal sm:truncate">{leave.subject || (leave.request_type === 'comp_credit' ? 'Comp Off Request' : 'Leave Request')}</p>
+                                                    <p className="text-xs text-gray-400 font-medium mt-1 leading-relaxed break-words whitespace-normal sm:line-clamp-2">{leave.reason}</p>
                                                 </td>
-                                                <td className="p-5">
+                                                <td className="p-3 md:p-5 align-top">
                                                     <div className="flex flex-col gap-2">
                                                         <div className="flex items-center gap-2">
                                                             <div className="h-6 w-6 rounded-lg bg-gray-50 flex items-center justify-center text-gray-400 border border-gray-100">
@@ -561,7 +561,7 @@ const LeaveRequests = () => {
                                                         )}
                                                     </div>
                                                 </td>
-                                                <td className="p-5">
+                                                <td className="p-3 md:p-5 align-top">
                                                     <div className="flex justify-center gap-3">
                                                         <button
                                                             onClick={() => handleAction(leave.id, 'Approved')}
@@ -582,23 +582,18 @@ const LeaveRequests = () => {
                                             </motion.tr>
                                         ))}
                                     </AnimatePresence>
-                                    {pendingLeaves.length === 0 && !loading && (
-                                        <tr>
-                                            <td colSpan="5" className="p-24 text-center">
-                                                <div className="flex flex-col items-center gap-6 opacity-20">
-                                                    <div className="h-20 w-20 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center">
-                                                        <FaCheckCircle size={48} />
-                                                    </div>
-                                                    <div>
-                                                        <p className="text-lg font-black text-gray-800 tracking-tight">No Pending Requests</p>
-                                                        <p className="text-sm font-bold uppercase tracking-widest text-gray-500 mt-1">All leave requests have been processed.</p>
-                                                    </div>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    )}
                                 </tbody>
                             </table>
+                        </div>
+                    ) : (
+                        <div className="p-20 text-center flex flex-col items-center gap-6 opacity-20">
+                            <div className="h-20 w-20 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                                <FaCheckCircle size={48} />
+                            </div>
+                            <div>
+                                <p className="text-lg font-black text-gray-800 tracking-tight">No Pending Requests</p>
+                                <p className="text-sm font-bold uppercase tracking-widest text-gray-500 mt-1">All leave requests have been processed.</p>
+                            </div>
                         </div>
                     )}
                 </div>
@@ -638,7 +633,7 @@ const LeaveRequests = () => {
                                                 transition={{ delay: idx * 0.03 }}
                                                 className="hover:bg-gray-50/30 transition-all group"
                                             >
-                                                <td className="p-5">
+                                                <td className="p-3 md:p-5 align-top">
                                                     <div
                                                         className="flex items-center gap-4 cursor-pointer group/profile"
                                                         onClick={() => {
@@ -655,12 +650,12 @@ const LeaveRequests = () => {
                                                             className="h-12 w-12 rounded-2xl object-cover shadow-lg group-hover/profile:scale-110 transition-transform"
                                                         />
                                                         <div>
-                                                            <p className="text-sm font-black text-gray-800 tracking-tight group-hover/profile:text-sky-600 transition-colors">{leave.applicant_name}</p>
+                                                            <p className="text-sm font-black text-gray-800 tracking-tight group-hover/profile:text-sky-600 transition-colors break-words whitespace-normal">{leave.applicant_name}</p>
                                                             <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mt-0.5">{leave.department_name}</p>
                                                         </div>
                                                     </div>
                                                 </td>
-                                                <td className="p-5">
+                                                <td className="p-3 md:p-5 align-top">
                                                     <div className="space-y-1.5">
                                                         {leave.request_type === 'comp_credit' ? (
                                                             <span className="inline-block px-2 py-0.5 bg-purple-100 text-purple-600 rounded-md text-[8px] font-black uppercase tracking-widest mb-1">
@@ -686,11 +681,11 @@ const LeaveRequests = () => {
                                                         </div>
                                                     </div>
                                                 </td>
-                                                <td className="p-5 max-w-xs">
-                                                    <p className="text-sm font-black text-gray-800 tracking-tight truncate">{leave.subject || (leave.request_type === 'comp_credit' ? 'Comp Off Request' : 'Leave Request')}</p>
-                                                    <p className="text-xs text-gray-400 font-medium line-clamp-2 mt-1 leading-relaxed">{leave.reason}</p>
+                                                <td className="p-3 md:p-5 max-w-xs align-top">
+                                                    <p className="text-sm font-black text-gray-800 tracking-tight break-words whitespace-normal sm:truncate">{leave.subject || (leave.request_type === 'comp_credit' ? 'Comp Off Request' : 'Leave Request')}</p>
+                                                    <p className="text-xs text-gray-400 font-medium mt-1 leading-relaxed break-words whitespace-normal sm:line-clamp-2">{leave.reason}</p>
                                                 </td>
-                                                <td className="p-5 text-center">
+                                                <td className="p-3 md:p-5 text-center align-top">
                                                     <div className="flex flex-col items-center gap-1">
                                                         <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-widest ${leave.my_approval_status === 'Approved'
                                                             ? 'bg-emerald-50 text-emerald-600 border border-emerald-100'
@@ -706,7 +701,7 @@ const LeaveRequests = () => {
                                                         )}
                                                     </div>
                                                 </td>
-                                                <td className="p-5 text-center">
+                                                <td className="p-3 md:p-5 text-center align-top">
                                                     <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-widest ${leave.status === 'Approved' ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' :
                                                         leave.status === 'Rejected' ? 'bg-rose-50 text-rose-600 border border-rose-100' :
                                                             'bg-amber-50 text-amber-600 border border-amber-100'
