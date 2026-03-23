@@ -173,7 +173,13 @@ const LeaveLimitation = () => {
             setEditingId(null);
             fetchLimits();
         } catch (error) {
-            Swal.fire({ title: 'Error', text: error.response?.data?.message || 'Failed to save.', icon: 'error' });
+            const backendMsg = error.response?.data?.message;
+            const backendErr = error.response?.data?.error;
+            Swal.fire({
+                title: 'Error',
+                text: backendErr ? `${backendMsg || 'Failed to save.'} (${backendErr})` : (backendMsg || 'Failed to save.'),
+                icon: 'error'
+            });
         }
     };
 
@@ -459,9 +465,13 @@ const LeaveLimitation = () => {
                         throw new Error('Fallback per-employee update failed for all users.');
                     }
                 } catch (fallbackError) {
+                    const failedFirst = fallbackError?.response?.data?.failedEmployees?.[0];
+                    const detailedMsg = failedFirst?.error
+                        ? `First failure (${failedFirst.emp_id}): ${failedFirst.error}`
+                        : null;
                     Swal.fire({
                         title: 'Critical Error',
-                        text: fallbackError?.response?.data?.message || fallbackError.message || error.response?.data?.message || error.message || 'The bulk operation could not be completed.',
+                        text: detailedMsg || fallbackError?.response?.data?.message || fallbackError?.response?.data?.error || fallbackError.message || error.response?.data?.message || error.response?.data?.error || error.message || 'The bulk operation could not be completed.',
                         icon: 'error'
                     });
                 }

@@ -7,15 +7,21 @@ dotenv.config();
 // Return DATE values as plain 'YYYY-MM-DD' strings so they stay accurate.
 types.setTypeParser(1082, (val) => val);
 
+const normalizeFlag = (value) => String(value || '').trim().toLowerCase();
+const sslFlag = normalizeFlag(process.env.DB_SSL || process.env.PGSSLMODE);
+const host = String(process.env.DB_HOST || '').toLowerCase();
+const sslDisabled = ['0', 'false', 'no', 'disable'].includes(sslFlag);
+const sslEnabledByFlag = ['1', 'true', 'yes', 'require', 'verify-ca', 'verify-full'].includes(sslFlag);
+const sslEnabledByHost = host.includes('supabase.co') || host.includes('neon.tech') || host.includes('render.com');
+const useSsl = !sslDisabled && (sslEnabledByFlag || (!sslFlag && sslEnabledByHost));
+
 const pool = new Pool({
     host: process.env.DB_HOST,
     user: process.env.DB_USER,
     password: process.env.DB_PASSWORD,
     database: process.env.DB_NAME,
     port: process.env.DB_PORT || 5432,
-    ssl: {
-        rejectUnauthorized: false // Required for Supabase connection
-    },
+    ssl: useSsl ? { rejectUnauthorized: false } : false,
     max: 20,
     idleTimeoutMillis: 30000,
     connectionTimeoutMillis: 10000,

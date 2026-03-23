@@ -48,6 +48,33 @@ const ensureLeaveLimitSchema = async (db) => {
             ADD COLUMN IF NOT EXISTS permission_taken INT DEFAULT 0,
             ADD COLUMN IF NOT EXISTS last_permission_reset_month VARCHAR(7)
     `);
+
+    // Make ON CONFLICT (emp_id, year) reliable on older databases.
+    await db.query(`
+        DELETE FROM leave_limits a
+        USING leave_limits b
+        WHERE a.ctid < b.ctid
+          AND a.emp_id = b.emp_id
+          AND a.year = b.year
+    `);
+
+    await db.query(`
+        DELETE FROM leave_balances a
+        USING leave_balances b
+        WHERE a.ctid < b.ctid
+          AND a.emp_id = b.emp_id
+          AND a.year = b.year
+    `);
+
+    await db.query(`
+        CREATE UNIQUE INDEX IF NOT EXISTS ux_leave_limits_emp_year
+        ON leave_limits(emp_id, year)
+    `);
+
+    await db.query(`
+        CREATE UNIQUE INDEX IF NOT EXISTS ux_leave_balances_emp_year
+        ON leave_balances(emp_id, year)
+    `);
 };
 
 // Ensure a leave_limits row exists for an employee for the given year, also fix NULLs
