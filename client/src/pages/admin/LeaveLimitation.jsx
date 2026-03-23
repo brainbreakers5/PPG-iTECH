@@ -30,6 +30,7 @@ const LeaveLimitation = () => {
     const [search, setSearch] = useState('');
     const [editingId, setEditingId] = useState(null);  // emp_id being edited
     const [editValues, setEditValues] = useState({});
+    const [selectedEmpIds, setSelectedEmpIds] = useState([]);
     const [fromDate, setFromDate] = useState(firstDay);
     const [toDate, setToDate] = useState(lastDay);
     const [leaveTypes, setLeaveTypes] = useState([]);
@@ -417,6 +418,16 @@ const LeaveLimitation = () => {
 
         if (formValues) {
             const year = new Date(formValues.fromDate || fromDate).getFullYear();
+            const selectedTargets = Array.from(new Set(selectedEmpIds.map((id) => String(id || '').trim()).filter(Boolean)));
+            if (!selectedTargets.length) {
+                Swal.fire({
+                    title: 'Select Employees',
+                    text: 'Please select at least one employee or use Select All before bulk update.',
+                    icon: 'info',
+                    confirmButtonColor: '#2563eb'
+                });
+                return;
+            }
             const payload = {
                 year,
                 fromDate: formValues.fromDate,
@@ -438,18 +449,7 @@ const LeaveLimitation = () => {
             });
 
             try {
-                const localTargets = (staffData || [])
-                    .map((emp) => String(emp?.emp_id || '').trim())
-                    .filter(Boolean);
-
-                const targets = localTargets.length > 0
-                    ? Array.from(new Set(localTargets))
-                    : await (async () => {
-                        const { data: employees } = await api.get('/employees?all=true');
-                        return Array.from(new Set((employees || [])
-                            .map((e) => String(e?.emp_id || '').trim())
-                            .filter(Boolean)));
-                    })();
+                const targets = selectedTargets;
 
                 if (!targets.length) {
                     throw new Error('No valid employees found for bulk update.');
@@ -494,6 +494,9 @@ const LeaveLimitation = () => {
                     icon: failCount > 0 ? 'warning' : 'success',
                     confirmButtonColor: '#2563eb'
                 });
+                if (failCount === 0) {
+                    setSelectedEmpIds([]);
+                }
             } catch (error) {
                 console.error('Bulk update fail:', error);
                 Swal.fire({
@@ -511,6 +514,25 @@ const LeaveLimitation = () => {
         emp.department_name?.toLowerCase().includes(search.toLowerCase()) ||
         emp.designation?.toLowerCase().includes(search.toLowerCase())
     );
+
+    const visibleEmpIds = filtered
+        .map((emp) => String(emp?.emp_id || '').trim())
+        .filter(Boolean);
+    const allVisibleSelected = visibleEmpIds.length > 0 && visibleEmpIds.every((id) => selectedEmpIds.includes(id));
+
+    const toggleSelectAllVisible = () => {
+        if (!visibleEmpIds.length) return;
+        if (allVisibleSelected) {
+            setSelectedEmpIds((prev) => prev.filter((id) => !visibleEmpIds.includes(id)));
+            return;
+        }
+        setSelectedEmpIds((prev) => Array.from(new Set([...prev, ...visibleEmpIds])));
+    };
+
+    useEffect(() => {
+        const validIds = new Set((staffData || []).map((emp) => String(emp?.emp_id || '').trim()).filter(Boolean));
+        setSelectedEmpIds((prev) => prev.filter((id) => validIds.has(id)));
+    }, [staffData]);
 
     const inputClass = "w-16 text-center border-2 border-gray-100 rounded-xl p-2 font-black text-sm focus:border-sky-500 focus:ring-4 focus:ring-sky-50 outline-none transition-all";
 
@@ -548,10 +570,22 @@ const LeaveLimitation = () => {
                         {/* Bulk Set Buttons */}
                         <div className="flex items-center gap-2">
                             <button
+                                onClick={toggleSelectAllVisible}
+                                className="bg-white text-sky-600 border border-sky-200 px-4 py-3 rounded-2xl font-black text-xs uppercase tracking-widest shadow-sm hover:bg-sky-50 transition-all active:scale-95"
+                            >
+                                {allVisibleSelected ? 'Unselect All' : 'Select All'}
+                            </button>
+                            <button
+                                onClick={() => setSelectedEmpIds([])}
+                                className="bg-white text-gray-600 border border-gray-200 px-4 py-3 rounded-2xl font-black text-xs uppercase tracking-widest shadow-sm hover:bg-gray-50 transition-all active:scale-95"
+                            >
+                                Clear Selection
+                            </button>
+                            <button
                                 onClick={handleBulkSet}
                                 className="bg-sky-600 text-white px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-widest shadow-lg shadow-sky-100 hover:bg-sky-700 transition-all flex items-center gap-2 active:scale-95"
                             >
-                                <FaClipboardList size={14} /> Bulk Set
+                                <FaClipboardList size={14} /> Bulk Set ({selectedEmpIds.length})
                             </button>
                         </div>
                     </div>
@@ -618,6 +652,15 @@ const LeaveLimitation = () => {
                         <table className="w-full border-collapse text-left">
                             <thead>
                                 <tr className="bg-sky-50/50 border-b border-sky-100">
+                                    <th className="p-5 text-center w-14">
+                                        <input
+                                            type="checkbox"
+                                            checked={allVisibleSelected}
+                                            onChange={toggleSelectAllVisible}
+                                            className="h-4 w-4 accent-sky-600 cursor-pointer"
+                                            aria-label="Select all visible employees"
+                                        />
+                                    </th>
                                     <th className="p-5 text-[10px] font-black text-gray-400 uppercase tracking-widest min-w-[220px]">Employee</th>
                                     {leaveTypes.map(t => (
                                         <th key={t.key} className="p-5 text-[10px] font-black text-gray-400 uppercase tracking-widest text-center min-w-[120px]">
@@ -631,7 +674,7 @@ const LeaveLimitation = () => {
                             <tbody className="divide-y divide-sky-50/80">
                                 {loading ? (
                                     <tr>
-                                        <td colSpan={leaveTypes.length + 2} className="p-16 text-center">
+                                        <td colSpan={leaveTypes.length + 3} className="p-16 text-center">
                                             <div className="flex items-center justify-center gap-3">
                                                 <div className="h-2 w-2 bg-sky-600 rounded-full animate-bounce" />
                                                 <div className="h-2 w-2 bg-sky-600 rounded-full animate-bounce delay-100" />
@@ -641,7 +684,7 @@ const LeaveLimitation = () => {
                                     </tr>
                                 ) : filtered.length === 0 ? (
                                     <tr>
-                                        <td colSpan={leaveTypes.length + 2} className="p-16 text-center opacity-30">
+                                        <td colSpan={leaveTypes.length + 3} className="p-16 text-center opacity-30">
                                             <FaUserTie size={40} className="mx-auto mb-3" />
                                             <p className="font-black text-sm">No employee found</p>
                                         </td>
@@ -656,6 +699,20 @@ const LeaveLimitation = () => {
                                             transition={{ delay: idx * 0.02 }}
                                             className={`group transition-all ${isEditing ? 'bg-sky-50/40' : 'hover:bg-gray-50/50'}`}
                                         >
+                                            <td className="p-5 text-center">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={selectedEmpIds.includes(String(emp.emp_id))}
+                                                    onChange={() => setSelectedEmpIds((prev) => (
+                                                        prev.includes(String(emp.emp_id))
+                                                            ? prev.filter((id) => id !== String(emp.emp_id))
+                                                            : [...prev, String(emp.emp_id)]
+                                                    ))}
+                                                    className="h-4 w-4 accent-sky-600 cursor-pointer"
+                                                    aria-label={`Select ${emp.name}`}
+                                                />
+                                            </td>
+
                                             {/* Employee Info */}
                                             <td className="p-5">
                                                 <div className="flex items-center gap-3">
