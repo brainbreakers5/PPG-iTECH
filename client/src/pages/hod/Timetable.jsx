@@ -404,7 +404,7 @@ const Timetable = ({ showToggle = true }) => {
                         <table className="w-full border-collapse min-w-[800px] table-auto">
                             <thead>
                                 <tr className="bg-sky-50/50">
-                                    <th className="p-3 border-b border-r border-sky-100 font-black text-[10px] text-sky-500 uppercase tracking-[0.2em] text-center w-20">Timeline</th>
+                                    <th className="p-3 border-b border-r border-sky-100 font-black text-[10px] text-sky-500 uppercase tracking-[0.2em] text-center w-20 lg:w-32 whitespace-nowrap">Timeline</th>
                                     {displaySlots.map((slot, idx) => {
                                         const isBreak = slot.is_break;
                                         return (
@@ -431,7 +431,7 @@ const Timetable = ({ showToggle = true }) => {
                             <tbody>
                                 {days.map((day, dIdx) => (
                                     <tr key={day} className="group">
-                                        <td className="p-3 border-b border-r border-sky-50 bg-gray-50/30 text-center font-black text-gray-700 text-[10px] uppercase tracking-widest">{day.slice(0, 3)}</td>
+                                        <td className="p-3 border-b border-r border-sky-50 bg-gray-50/30 text-center font-black text-gray-700 text-[10px] lg:text-xs uppercase tracking-widest whitespace-nowrap">{day.slice(0, 3)}<span className="hidden lg:inline">{day.slice(3)}</span></td>
                                         {displaySlots.map((slot, idx) => {
                                             const isBreak = slot.is_break;
                                             if (isBreak) {

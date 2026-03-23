@@ -1,4 +1,57 @@
-import Swal from 'sweetalert2';
+const printWithHiddenIframe = ({ html, title, delay = 250, closeAfterPrint = true }) => {
+    return new Promise((resolve) => {
+        const iframe = document.createElement('iframe');
+        iframe.style.position = 'fixed';
+        iframe.style.right = '0';
+        iframe.style.bottom = '0';
+        iframe.style.width = '0';
+        iframe.style.height = '0';
+        iframe.style.border = '0';
+        iframe.style.visibility = 'hidden';
+
+        iframe.onload = () => {
+            const frameWindow = iframe.contentWindow;
+            if (!frameWindow) {
+                document.body.removeChild(iframe);
+                resolve(false);
+                return;
+            }
+
+            try {
+                frameWindow.document.title = title;
+            } catch {
+                // Ignore title assignment errors.
+            }
+
+            setTimeout(() => {
+                frameWindow.focus();
+                frameWindow.print();
+                if (closeAfterPrint) {
+                    setTimeout(() => {
+                        if (document.body.contains(iframe)) {
+                            document.body.removeChild(iframe);
+                        }
+                    }, 300);
+                }
+                resolve(true);
+            }, delay);
+        };
+
+        document.body.appendChild(iframe);
+        const doc = iframe.contentDocument || iframe.contentWindow?.document;
+        if (!doc) {
+            if (document.body.contains(iframe)) {
+                document.body.removeChild(iframe);
+            }
+            resolve(false);
+            return;
+        }
+
+        doc.open();
+        doc.write(html);
+        doc.close();
+    });
+};
 
 export const choosePrintMode = async (documentLabel = 'this report') => {
     return 'print';
@@ -16,13 +69,7 @@ export const runPrintWindow = async ({
 
     const printWindow = window.open('', '_blank', windowFeatures);
     if (!printWindow) {
-        await Swal.fire({
-            title: 'Popup blocked',
-            text: 'Please allow popups to continue printing.',
-            icon: 'warning',
-            confirmButtonColor: '#2563eb'
-        });
-        return false;
+        return await printWithHiddenIframe({ html, title, delay, closeAfterPrint });
     }
 
     printWindow.document.write(html);
@@ -68,13 +115,7 @@ export const finalizePrintWindow = async ({
 
     const targetWindow = window.open('', '_blank', windowFeatures || inferredFeatures);
     if (!targetWindow) {
-        await Swal.fire({
-            title: 'Popup blocked',
-            text: 'Please allow popups to continue printing.',
-            icon: 'warning',
-            confirmButtonColor: '#2563eb'
-        });
-        return false;
+        return await printWithHiddenIframe({ html: preparedHtml, title, delay, closeAfterPrint });
     }
 
     targetWindow.document.write(preparedHtml);
