@@ -319,56 +319,85 @@ exports.bulkUpdateLeaveLimits = async (req, res) => {
             return res.status(400).json({ message: 'Invalid period. From Date cannot be after To Date.' });
         }
 
-        await client.query('BEGIN');
-
         const { rows: employees } = await client.query(
-            `SELECT emp_id FROM users WHERE emp_id IS NOT NULL`
+            `SELECT DISTINCT TRIM(emp_id) AS emp_id
+             FROM users
+             WHERE emp_id IS NOT NULL
+               AND TRIM(emp_id) <> ''`
         );
 
+        const failedEmployees = [];
+        let updatedCount = 0;
+
         for (const emp of employees) {
-            await ensureLimitRow(client, emp.emp_id, year);
+            const normalizedEmpId = String(emp.emp_id || '').trim();
+            if (!normalizedEmpId) {
+                continue;
+            }
 
-            await client.query(
-                `INSERT INTO leave_limits (emp_id, year, cl_limit, ml_limit, od_limit, comp_limit, lop_limit, permission_limit, from_month, to_month, updated_at)
-                 VALUES ($1, $2, COALESCE($3, 12), COALESCE($4, 12), COALESCE($5, 10), COALESCE($6, 6), COALESCE($7, 30), COALESCE($8, 2), $9, $10, NOW())
-                 ON CONFLICT (emp_id, year)
-                 DO UPDATE SET
-                    cl_limit = COALESCE($3, leave_limits.cl_limit),
-                    ml_limit = COALESCE($4, leave_limits.ml_limit),
-                    od_limit = COALESCE($5, leave_limits.od_limit),
-                    comp_limit = COALESCE($6, leave_limits.comp_limit),
-                    lop_limit = COALESCE($7, leave_limits.lop_limit),
-                    permission_limit = COALESCE($8, leave_limits.permission_limit),
-                    from_month = COALESCE($9, leave_limits.from_month),
-                    to_month = COALESCE($10, leave_limits.to_month),
-                    updated_at = NOW()`,
-                [
-                    emp.emp_id,
-                    year,
-                    normalizedClLimit,
-                    normalizedMlLimit,
-                    normalizedOdLimit,
-                    normalizedCompLimit,
-                    normalizedLopLimit,
-                    normalizedPermissionLimit,
-                    resolvedFromDate,
-                    resolvedToDate
-                ]
-            );
+            try {
+                await ensureLimitRow(client, normalizedEmpId, year);
 
-            // If period moves to a new month, PL counters reset for that month.
-            const resetMonthKey = toMonthKey(resolvedFromDate) || currentMonthKey();
-            await ensureMonthlyPermissionReset(client, emp.emp_id, year, resetMonthKey);
+                await client.query(
+                    `INSERT INTO leave_limits (emp_id, year, cl_limit, ml_limit, od_limit, comp_limit, lop_limit, permission_limit, from_month, to_month, updated_at)
+                     VALUES ($1, $2, COALESCE($3, 12), COALESCE($4, 12), COALESCE($5, 10), COALESCE($6, 6), COALESCE($7, 30), COALESCE($8, 2), $9, $10, NOW())
+                     ON CONFLICT (emp_id, year)
+                     DO UPDATE SET
+                        cl_limit = COALESCE($3, leave_limits.cl_limit),
+                        ml_limit = COALESCE($4, leave_limits.ml_limit),
+                        od_limit = COALESCE($5, leave_limits.od_limit),
+                        comp_limit = COALESCE($6, leave_limits.comp_limit),
+                        lop_limit = COALESCE($7, leave_limits.lop_limit),
+                        permission_limit = COALESCE($8, leave_limits.permission_limit),
+                        from_month = COALESCE($9, leave_limits.from_month),
+                        to_month = COALESCE($10, leave_limits.to_month),
+                        updated_at = NOW()`,
+                    [
+                        normalizedEmpId,
+                        year,
+                        normalizedClLimit,
+                        normalizedMlLimit,
+                        normalizedOdLimit,
+                        normalizedCompLimit,
+                        normalizedLopLimit,
+                        normalizedPermissionLimit,
+                        resolvedFromDate,
+                        resolvedToDate
+                    ]
+                );
+
+                // If period moves to a new month, PL counters reset for that month.
+                const resetMonthKey = toMonthKey(resolvedFromDate) || currentMonthKey();
+                await ensureMonthlyPermissionReset(client, normalizedEmpId, year, resetMonthKey);
+                updatedCount += 1;
+            } catch (employeeError) {
+                failedEmployees.push({ emp_id: normalizedEmpId, error: employeeError.message });
+            }
         }
 
-        await client.query('COMMIT');
+        if (updatedCount === 0) {
+            return res.status(500).json({
+                message: 'Bulk leave limits update failed for all employees',
+                updatedCount: 0,
+                failedCount: failedEmployees.length,
+                failedEmployees
+            });
+        }
 
         const io = req.app.get('io');
         if (io) io.emit('leave_limits_updated', { year, bulk: true });
 
-        res.json({ message: 'Bulk leave limits updated successfully', updatedCount: employees.length });
+        const failedCount = failedEmployees.length;
+        const statusCode = failedCount > 0 ? 207 : 200;
+        res.status(statusCode).json({
+            message: failedCount > 0
+                ? 'Bulk leave limits updated with partial failures'
+                : 'Bulk leave limits updated successfully',
+            updatedCount,
+            failedCount,
+            failedEmployees
+        });
     } catch (error) {
-        await client.query('ROLLBACK');
         console.error('bulkUpdateLeaveLimits ERROR:', error);
         res.status(500).json({ message: 'Server Error', error: error.message });
     } finally {

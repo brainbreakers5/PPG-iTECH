@@ -416,10 +416,15 @@ const LeaveLimitation = () => {
 
                 const { data } = await api.post('/leave-limits/bulk', { year, ...formValues });
 
+                const updatedCount = data?.updatedCount || 0;
+                const failedCount = data?.failedCount || 0;
+
                 Swal.fire({
-                    title: 'Bulk Set Complete!',
-                    text: `Synchronized limits for ${data?.updatedCount || staffData.length} personnel.`,
-                    icon: 'success',
+                    title: failedCount > 0 ? 'Bulk Set Partial' : 'Bulk Set Complete!',
+                    text: failedCount > 0
+                        ? `Updated ${updatedCount} personnel, ${failedCount} failed.`
+                        : `Synchronized limits for ${updatedCount || staffData.length} personnel.`,
+                    icon: failedCount > 0 ? 'warning' : 'success',
                     confirmButtonColor: '#2563eb'
                 });
                 fetchLimits();
