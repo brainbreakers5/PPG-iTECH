@@ -311,10 +311,10 @@ const Login = () => {
                         <img src="/ppg-logo.png" alt="PPG Institute of Technology" className="w-full h-full object-contain" />
                     </motion.div>
 
-                    <h1 className="text-3xl font-black text-white tracking-tight leading-tight">
+                    <h1 className="text-3xl max-sm:text-4xl font-black text-white tracking-tight leading-tight max-sm:leading-[1.05]">
                         PPG <span className="text-transparent bg-clip-text" style={{ backgroundImage: 'linear-gradient(135deg, #60a5fa, #22d3ee)' }}>iTech - HUB</span>
                     </h1>
-                    <p className="text-[7.5px] font-black text-sky-200 uppercase tracking-[0.35em] mt-2 whitespace-nowrap text-center mx-auto">
+                    <p className="text-[7.5px] max-sm:text-[6px] font-black text-sky-200 uppercase tracking-[0.35em] max-sm:tracking-[0.2em] mt-2 whitespace-nowrap max-sm:whitespace-normal text-center mx-auto max-sm:px-2">
                         Enterprise & Attendance Management System
                     </p>
                 </div>

@@ -87,7 +87,7 @@ const Splash = ({ onFinish, isFast = false }) => {
                             transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
                             className="text-center mb-4"
                         >
-                            <h1 className="text-4xl font-black text-white tracking-tight">
+                            <h1 className="text-4xl max-sm:text-5xl font-black text-white tracking-tight">
                                 PPG{' '}
                                 <span
                                     className="text-transparent bg-clip-text"
@@ -109,7 +109,7 @@ const Splash = ({ onFinish, isFast = false }) => {
                             initial={{ opacity: 0, y: 15 }}
                             animate={phase >= 2 ? { opacity: 1, y: 0 } : {}}
                             transition={{ duration: 0.6, delay: 0.4, ease: 'easeOut' }}
-                            className="text-[10px] font-bold text-sky-300/70 uppercase tracking-[0.4em] mb-10 text-center max-w-[280px] sm:max-w-none px-4 mx-auto whitespace-normal sm:whitespace-nowrap"
+                            className="text-[10px] max-sm:text-[8px] font-bold text-sky-300/70 uppercase tracking-[0.4em] mb-10 text-center max-w-[280px] sm:max-w-none px-4 mx-auto whitespace-normal sm:whitespace-nowrap"
                         >
                             Enterprise & Attendance Management System
                         </motion.p>
@@ -144,7 +144,7 @@ const Splash = ({ onFinish, isFast = false }) => {
                             initial={{ opacity: 0 }}
                             animate={phase >= 3 ? { opacity: 0.4 } : {}}
                             transition={{ duration: 0.5, delay: 0.3 }}
-                            className="text-[8px] font-bold text-sky-200 uppercase tracking-[0.3em] mt-10"
+                            className="text-[8px] max-sm:text-[7px] font-bold text-sky-200 uppercase tracking-[0.3em] mt-10"
                         >
                             Powered by Zorvian Technologies
                         </motion.p>
