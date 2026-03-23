@@ -109,7 +109,7 @@ const Sidebar = ({ userRole = 'staff', isOpen, onClose }) => {
         }`}
     >
       {/* Header - No top border, below Header line */}
-      <div className="p-4 lg:p-3 bg-transparent shrink-0">
+      <div className="p-4 max-[320px]:p-3 lg:p-3 bg-transparent shrink-0">
         {/* User Role Portal removed */}
         
         {/* Close button with real-time clock */}
@@ -122,9 +122,9 @@ const Sidebar = ({ userRole = 'staff', isOpen, onClose }) => {
       </div>
 
       {/* Nav Items */}
-      <div className="flex-1 overflow-y-auto no-scrollbar py-2 px-1">
+      <div className="flex-1 overflow-y-auto no-scrollbar py-2 max-[320px]:py-1.5 px-1 max-[320px]:px-0.5">
         <nav>
-          <ul className="space-y-3">
+          <ul className="space-y-3 max-[320px]:space-y-2">
             {currentMenuItems.map((item) => (
               <li key={item.label}>
                 <NavLink
@@ -137,8 +137,8 @@ const Sidebar = ({ userRole = 'staff', isOpen, onClose }) => {
                 >
                   {({ isActive }) => (
                     <>
-                      <span className={`text-xl mb-1 transition-colors ${isActive ? 'text-sky-600' : 'text-gray-400'}`}>{item.icon}</span>
-                      <span className="text-[7px] font-bold uppercase tracking-tighter text-center leading-[1.1] px-1 line-clamp-2">
+                      <span className={`text-xl max-[320px]:text-lg mb-1 max-[320px]:mb-0.5 transition-colors ${isActive ? 'text-sky-600' : 'text-gray-400'}`}>{item.icon}</span>
+                      <span className="text-[7px] max-[320px]:text-[6px] font-bold uppercase tracking-tighter max-[320px]:tracking-normal text-center leading-[1.1] px-1 max-[320px]:px-0.5 line-clamp-2">
                         {item.label}
                       </span>
                     </>

@@ -414,15 +414,15 @@ const Header = () => {
                 </div>
             )}
 
-            <header className="header flex items-center justify-between px-4 md:px-6 py-4 bg-white/70 backdrop-blur-xl no-print sticky top-0 transition-all shadow-sm">
-                <div className="flex items-center gap-3">
-                    <div className="flex items-center gap-3">
+            <header className="header flex items-center justify-between px-4 max-[320px]:px-2.5 md:px-6 py-4 max-[320px]:py-3 bg-white/70 backdrop-blur-xl no-print sticky top-0 transition-all shadow-sm">
+                <div className="flex items-center gap-3 max-[320px]:gap-2">
+                    <div className="flex items-center gap-3 max-[320px]:gap-2">
                         {/* Institutional Logo */}
                         <div className="h-9 w-9 md:h-10 md:w-10 rounded-xl overflow-hidden shadow-sm ring-1 ring-gray-100 flex-shrink-0">
                             <img src="/ppg-logo.png" alt="PPG Logo" className="w-full h-full object-contain bg-white" />
                         </div>
-                        <div className="ml-1">
-                            <h2 className="text-base md:text-lg font-black text-gray-800 tracking-tight">
+                        <div className="ml-1 max-[320px]:ml-0">
+                            <h2 className="text-base max-[320px]:text-[13px] md:text-lg font-black text-gray-800 tracking-tight max-[320px]:tracking-normal">
                                 PPG <span className="text-sky-600 ">iTech HUB</span>
                             </h2>
                         </div>
@@ -496,7 +496,7 @@ const Header = () => {
                     {/* AI Assistant Trigger - Updated: Blinking Image */}
                     <button
                         onClick={() => window.dispatchEvent(new CustomEvent('TOGGLE_AI_ASSISTANT'))}
-                        className="h-10 w-10 lg:h-12 lg:w-12 active:scale-95 transition-transform overflow-hidden no-print rounded-full"
+                        className="h-10 w-10 max-[320px]:h-9 max-[320px]:w-9 lg:h-12 lg:w-12 active:scale-95 transition-transform overflow-hidden no-print rounded-full"
                         title="Zorvian AI Assistant"
                     >
                         <motion.img 
@@ -512,7 +512,7 @@ const Header = () => {
                         <div className="relative" ref={notifRef}>
                             <button
                                 onClick={() => setShowNotifs(!showNotifs)}
-                                className="text-gray-400 hover:text-sky-600 transition-all relative p-2.5 rounded-xl hover:bg-sky-50 shadow-sm border border-transparent hover:border-sky-100"
+                                className="text-gray-400 hover:text-sky-600 transition-all relative p-2.5 max-[320px]:p-2 rounded-xl hover:bg-sky-50 shadow-sm border border-transparent hover:border-sky-100"
                             >
                                 <FaBell className="text-lg" />
                                 {unreadCount > 0 && (
@@ -583,7 +583,7 @@ const Header = () => {
                         ref={profileRef}
                     >
                         <div
-                            className="flex items-center space-x-3 cursor-pointer hover:bg-gray-50 transition-all px-2 py-1 rounded-2xl group shadow-sm border border-transparent hover:border-gray-100"
+                            className="flex items-center space-x-3 max-[320px]:space-x-2 cursor-pointer hover:bg-gray-50 transition-all px-2 max-[320px]:px-1.5 py-1 rounded-2xl group shadow-sm border border-transparent hover:border-gray-100"
                             onClick={() => setShowProfileMenu(!showProfileMenu)}
                         >
                             <div className="hidden md:text-right md:block">
@@ -598,7 +598,7 @@ const Header = () => {
                                     <img
                                         src={user?.profile_pic || `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.name || 'U')}&background=ffffff&color=0EA5E9`}
                                         alt="Profile"
-                                        className="relative w-11 h-11 rounded-2xl border-2 border-white shadow-xl group-hover:scale-105 transition-all object-cover"
+                                        className="relative w-11 h-11 max-[320px]:w-9 max-[320px]:h-9 rounded-2xl border-2 border-white shadow-xl group-hover:scale-105 transition-all object-cover"
                                     />
                                 )}
                             </div>
