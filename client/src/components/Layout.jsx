@@ -155,7 +155,7 @@ const Layout = ({ children }) => {
                     <div
                         className="fixed inset-0 bg-sky-900/20 backdrop-blur-sm lg:hidden z-30 transition-all duration-500"
                         onClick={() => setSidebarOpen(false)}
-                        style={{ top: '73px' }}
+                        style={{ top: '72px' }}
                     />
                 )}
 

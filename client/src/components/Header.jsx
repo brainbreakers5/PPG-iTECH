@@ -414,7 +414,7 @@ const Header = () => {
                 </div>
             )}
 
-            <header className="header flex items-center justify-between px-4 max-[320px]:px-2.5 md:px-6 py-4 max-[320px]:py-3 bg-white/70 backdrop-blur-xl no-print sticky top-0 transition-all shadow-sm">
+            <header className="header h-[72px] flex items-center justify-between px-4 max-[320px]:px-2.5 md:px-6 bg-white/70 backdrop-blur-xl no-print sticky top-0 transition-all shadow-sm">
                 <div className="flex items-center gap-3 max-[320px]:gap-2">
                     <div className="flex items-center gap-3 max-[320px]:gap-2">
                         {/* Institutional Logo */}

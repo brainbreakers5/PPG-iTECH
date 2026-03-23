@@ -105,7 +105,7 @@ const Sidebar = ({ userRole = 'staff', isOpen, onClose }) => {
 
   return (
     <div
-      className={`fixed left-0 top-[73px] h-[calc(100vh-73px)] w-16 md:w-20 bg-white/70 backdrop-blur-xl shadow-2xl z-40 flex flex-col overflow-hidden transition-all duration-300 ease-in-out lg:translate-x-0 ${isOpen ? 'translate-x-0' : '-translate-x-full'
+      className={`fixed left-0 top-[72px] h-[calc(100vh-72px)] w-16 md:w-20 bg-white/70 backdrop-blur-xl shadow-2xl z-40 flex flex-col overflow-hidden transition-all duration-300 ease-in-out lg:translate-x-0 ${isOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
     >
       {/* Header - No top border, below Header line */}
