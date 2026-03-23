@@ -33,6 +33,23 @@ const sanitizeLimit = (value, fallback = null) => {
     return Math.max(0, Math.min(365, parsed));
 };
 
+// Backward-compatible guard for deployments where migrations were missed.
+const ensureLeaveLimitSchema = async (db) => {
+    await db.query(`
+        ALTER TABLE leave_limits
+            ADD COLUMN IF NOT EXISTS permission_limit INT DEFAULT 2,
+            ADD COLUMN IF NOT EXISTS from_month VARCHAR(10),
+            ADD COLUMN IF NOT EXISTS to_month VARCHAR(10),
+            ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    `);
+
+    await db.query(`
+        ALTER TABLE leave_balances
+            ADD COLUMN IF NOT EXISTS permission_taken INT DEFAULT 0,
+            ADD COLUMN IF NOT EXISTS last_permission_reset_month VARCHAR(7)
+    `);
+};
+
 // Ensure a leave_limits row exists for an employee for the given year, also fix NULLs
 const ensureLimitRow = async (client, emp_id, year) => {
     await client.query(`
@@ -68,6 +85,8 @@ const ensureMonthlyPermissionReset = async (client, emp_id, year, monthKey) => {
 // @access  Admin
 exports.getAllLeaveLimits = async (req, res) => {
     try {
+        await ensureLeaveLimitSchema(pool);
+
         const year = parseInt(req.query.year) || currentYear();
         const monthKey = currentMonthKey();
 
@@ -136,6 +155,8 @@ exports.getAllLeaveLimits = async (req, res) => {
 // @access  Private
 exports.getMyLeaveLimits = async (req, res) => {
     try {
+        await ensureLeaveLimitSchema(pool);
+
         const year = parseInt(req.query.year) || currentYear();
         const emp_id = req.user.emp_id;
         const monthKey = currentMonthKey();
@@ -204,6 +225,8 @@ exports.getMyLeaveLimits = async (req, res) => {
 // @access  Admin
 exports.updateLeaveLimit = async (req, res) => {
     try {
+        await ensureLeaveLimitSchema(pool);
+
         const { emp_id } = req.params;
         const normalizedEmpId = decodeURIComponent(String(emp_id || '')).trim();
         if (!normalizedEmpId) {
@@ -287,6 +310,8 @@ exports.updateLeaveLimit = async (req, res) => {
 exports.bulkUpdateLeaveLimits = async (req, res) => {
     const client = await pool.connect();
     try {
+        await ensureLeaveLimitSchema(client);
+
         const year = parseInt(req.body.year) || currentYear();
         const {
             cl_limit,
