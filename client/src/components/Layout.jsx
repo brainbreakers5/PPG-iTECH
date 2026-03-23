@@ -160,9 +160,9 @@ const Layout = ({ children }) => {
                 )}
 
                 {/* Split Logic: 75% Content / 25% AI Assistant */}
-                <div className="flex flex-1 overflow-hidden transition-all duration-500 ease-in-out ml-16 md:ml-20">
+                <div className="flex flex-1 overflow-hidden transition-all duration-500 ease-in-out ml-0 lg:ml-20">
                     <main 
-                        className={`overflow-x-hidden ${sidebarOpen && window.innerWidth >= 1024 ? 'overflow-y-hidden lg:overflow-y-auto' : 'overflow-y-auto'} px-3 py-3 sm:px-4 sm:py-4 md:p-8 no-scrollbar scroll-smooth transition-all duration-500 ease-in-out ${
+                        className={`overflow-x-hidden ${sidebarOpen && window.innerWidth >= 1024 ? 'overflow-y-hidden lg:overflow-y-auto' : 'overflow-y-auto'} px-3 pt-3 pb-24 sm:px-4 sm:pt-4 sm:pb-24 lg:p-8 no-scrollbar scroll-smooth transition-all duration-500 ease-in-out ${
                             isAiOpen && window.innerWidth >= 1024 ? 'lg:w-3/4' : 'w-full'
                         }`}
                     >

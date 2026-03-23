@@ -105,11 +105,11 @@ const Sidebar = ({ userRole = 'staff', isOpen, onClose }) => {
 
   return (
     <div
-      className={`fixed left-0 top-[72px] h-[calc(100vh-72px)] w-16 md:w-20 bg-white/70 backdrop-blur-xl shadow-2xl z-40 flex flex-col overflow-hidden transition-all duration-300 ease-in-out lg:translate-x-0 ${isOpen ? 'translate-x-0' : '-translate-x-full'
+      className={`fixed bottom-0 left-0 right-0 top-auto h-[78px] w-full bg-white/80 backdrop-blur-xl shadow-2xl z-40 flex flex-col overflow-hidden transition-all duration-300 ease-in-out lg:left-0 lg:top-[72px] lg:bottom-auto lg:right-auto lg:h-[calc(100vh-72px)] lg:w-20 lg:bg-white/70 lg:translate-x-0 ${isOpen ? 'translate-y-0 lg:translate-x-0' : 'translate-y-full lg:translate-y-0 lg:-translate-x-full'
         }`}
     >
       {/* Header - No top border, below Header line */}
-      <div className="p-4 max-[320px]:p-3 lg:p-3 bg-transparent shrink-0">
+      <div className="hidden lg:block p-4 max-[320px]:p-3 lg:p-3 bg-transparent shrink-0">
         {/* User Role Portal removed */}
         
         {/* Close button with real-time clock */}
@@ -122,23 +122,23 @@ const Sidebar = ({ userRole = 'staff', isOpen, onClose }) => {
       </div>
 
       {/* Nav Items */}
-      <div className="flex-1 overflow-y-auto no-scrollbar py-2 max-[320px]:py-1.5 px-1 max-[320px]:px-0.5">
+      <div className="flex-1 overflow-x-auto overflow-y-hidden no-scrollbar py-2 px-2 max-[320px]:px-1 lg:overflow-y-auto lg:overflow-x-hidden lg:py-2 lg:max-[320px]:py-1.5 lg:px-1 lg:max-[320px]:px-0.5">
         <nav>
-          <ul className="space-y-3 max-[320px]:space-y-2">
+          <ul className="flex items-center gap-1.5 min-w-max max-[320px]:gap-1 lg:block lg:min-w-0 lg:space-y-3 lg:max-[320px]:space-y-2">
             {currentMenuItems.map((item) => (
-              <li key={item.label}>
+              <li key={item.label} className="shrink-0 lg:shrink">
                 <NavLink
                   to={item.path}
                   end={item.path.split('/').length <= 2}
                   className={({ isActive }) =>
-                    `flex flex-col items-center justify-center py-2 rounded-xl transition-all duration-300 ${isActive ? activeClass : inactiveClass}`
+                    `flex flex-col items-center justify-center min-w-[64px] h-[60px] px-1 rounded-xl transition-all duration-300 lg:min-w-0 lg:h-auto lg:py-2 ${isActive ? activeClass : inactiveClass}`
                   }
                   onClick={() => onClose()}
                 >
                   {({ isActive }) => (
                     <>
-                      <span className={`text-xl max-[320px]:text-lg mb-1 max-[320px]:mb-0.5 transition-colors ${isActive ? 'text-sky-600' : 'text-gray-400'}`}>{item.icon}</span>
-                      <span className="text-[7px] max-[320px]:text-[6px] font-bold uppercase tracking-tighter max-[320px]:tracking-normal text-center leading-[1.1] px-1 max-[320px]:px-0.5 line-clamp-2">
+                      <span className={`text-base max-[320px]:text-sm mb-1 max-[320px]:mb-0.5 transition-colors lg:text-xl lg:max-[320px]:text-lg ${isActive ? 'text-sky-600' : 'text-gray-400'}`}>{item.icon}</span>
+                      <span className="text-[8px] max-[320px]:text-[7px] font-bold uppercase tracking-tight max-[320px]:tracking-normal text-center leading-[1.1] px-0.5 line-clamp-2 lg:text-[7px] lg:max-[320px]:text-[6px] lg:tracking-tighter lg:px-1 lg:max-[320px]:px-0.5">
                         {item.label}
                       </span>
                     </>
