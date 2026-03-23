@@ -21,8 +21,8 @@ const OUTPUT_PATH = path.join(__dirname, 'public', 'ppg-logo.png');
 
 // Icon sizes to generate
 const SIZES = [144, 192, 256, 512];
-const LOGO_SCALE = 0.95; // Logo takes 95% of the canvas for maximum visibility
-const PADDING_PERCENT = 0.025; // Only 2.5% padding on each side
+const LOGO_SCALE = 0.55; // Logo takes 55% of canvas - reduced for crisper appearance with less upscaling
+const PADDING_PERCENT = 0.225; // 22.5% padding for balanced appearance
 
 async function regenerateIcon() {
   try {
@@ -51,11 +51,17 @@ async function regenerateIcon() {
 
       console.log(`📦 Processing ${size}x${size} icon (logo: ${logoSize}x${logoSize}, padding: ${padding}px)...`);
 
-      // Read trimmed logo and resize it
+      // Read trimmed logo and resize it with high-quality resampling
       const resizedLogo = await sharp(trimmedLogoBuffer)
         .resize(logoSize, logoSize, {
           fit: 'contain',
+          kernel: sharp.kernel.lanczos3, // High-quality Lanczos resampling
           background: { r: 255, g: 255, b: 255, alpha: 0 } // Transparent background
+        })
+        .sharpen({ sigma: 2 }) // Apply aggressive sharpening to crisp edges
+        .modulate({
+          brightness: 1.05,     // Slightly brighten
+          saturation: 1.15      // Increase color saturation for more vivid appearance
         })
         .toBuffer();
 
