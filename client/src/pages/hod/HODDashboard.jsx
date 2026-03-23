@@ -56,6 +56,7 @@ const HODDashboard = () => {
     const [monthStats, setMonthStats] = useState({ workingDays: 0, holidays: 0, specialEvents: 0 });
     const [currentDayStatus, setCurrentDayStatus] = useState({ type: 'workingDays', detail: 'Regular working day' });
     const [employeeModal, setEmployeeModal] = useState(null);
+    const [hodDetailsModal, setHodDetailsModal] = useState(false);
     const [selectedEmployeeHistory, setSelectedEmployeeHistory] = useState(null); // { emp_id, name }
     const [todayTimetable, setTodayTimetable] = useState([]);
     const [statusFilter, setStatusFilter] = useState(null);
@@ -476,8 +477,12 @@ const HODDashboard = () => {
                         {/* Total Count Button */}
                         <button
                             onClick={() => {
-                                navigate(`/hod/personnel/${role.key === 'hod' ? 'hod' : 'staff'}`);
-                                window.dispatchEvent(new CustomEvent('closeSidebar'));
+                                if (role.key === 'hod') {
+                                    setHodDetailsModal(true);
+                                } else {
+                                    navigate(`/hod/personnel/${role.key === 'hod' ? 'hod' : 'staff'}`);
+                                    window.dispatchEvent(new CustomEvent('closeSidebar'));
+                                }
                             }}
                             className="w-full mb-6 py-3 px-5 rounded-[20px] bg-gray-50 border border-gray-100 text-[10px] font-black text-gray-500 uppercase tracking-widest hover:bg-sky-50 hover:border-sky-100 hover:text-sky-600 transition-all flex items-center justify-between group/btn relative z-10"
                         >
@@ -656,6 +661,99 @@ const HODDashboard = () => {
                                                                         ({formatTo12Hr(attendanceMap[emp.emp_id].in_time)} - {formatTo12Hr(attendanceMap[emp.emp_id].out_time)})
                                                                     </span>
                                                                 )}
+                                                            </span>
+                                                        </td>
+                                                        <td className="px-5 py-4 text-right">
+                                                            <p className="text-[10px] font-bold text-gray-500 italic truncate max-w-[150px] ml-auto" title={attendanceMap[emp.emp_id]?.remarks}>
+                                                                {attendanceMap[emp.emp_id]?.remarks || '—'}
+                                                            </p>
+                                                        </td>
+                                                    </motion.tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                )}
+                            </div>
+                        </motion.div>
+                    );
+                })()}
+            </AnimatePresence>
+
+            {/* HOD Details Modal */}
+            <AnimatePresence>
+                {hodDetailsModal && (() => {
+                    const hodEmployees = hodList;
+                    return (
+                        <motion.div
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            className="fixed inset-0 bg-white z-50 flex flex-col"
+                        >
+                            {/* Full Screen Header */}
+                            <div className="px-6 md:px-10 py-5 border-b border-gray-100 bg-gradient-to-r from-amber-50 to-yellow-50 flex items-center justify-between flex-shrink-0">
+                                <div className="flex items-center gap-4">
+                                    <div className="h-12 w-12 rounded-2xl bg-gradient-to-br from-amber-500 to-yellow-700 flex items-center justify-center text-white shadow-lg">
+                                        <FaChalkboardTeacher size={20} />
+                                    </div>
+                                    <div>
+                                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">All HODs</p>
+                                        <p className="text-xl font-black text-gray-800 tracking-tight">Head of Departments</p>
+                                    </div>
+                                    <span className="ml-2 bg-amber-100 text-amber-700 px-4 py-1.5 rounded-xl text-xs font-black">{hodEmployees.length} HODs</span>
+                                </div>
+                                <button onClick={() => setHodDetailsModal(false)} className="p-3 rounded-2xl bg-white hover:bg-rose-50 text-gray-400 hover:text-rose-500 transition-all border border-gray-200 shadow-sm">
+                                    <FaTimes size={18} />
+                                </button>
+                            </div>
+                            {/* Full Screen Table */}
+                            <div className="flex-1 overflow-auto px-6 md:px-10 py-6">
+                                {hodEmployees.length === 0 ? (
+                                    <div className="flex items-center justify-center h-full">
+                                        <p className="text-gray-400 text-lg font-bold">No HODs found</p>
+                                    </div>
+                                ) : (
+                                    <div className="overflow-x-auto">
+                                        <table className="min-w-[800px] w-full text-left">
+                                            <thead className="sticky top-0 z-10">
+                                                <tr className="bg-gray-50">
+                                                    <th className="px-5 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest whitespace-nowrap">#</th>
+                                                    <th className="px-5 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest whitespace-nowrap">Emp ID</th>
+                                                    <th className="px-5 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest whitespace-nowrap">Name</th>
+                                                    <th className="px-5 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest whitespace-nowrap">Department</th>
+                                                    <th className="px-5 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest whitespace-nowrap">Email</th>
+                                                    <th className="px-5 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest whitespace-nowrap">Status</th>
+                                                    <th className="px-5 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-right whitespace-nowrap">Remarks</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-gray-50">
+                                                {hodEmployees.map((emp, idx) => (
+                                                    <motion.tr
+                                                        key={emp.id || emp.emp_id}
+                                                        initial={{ opacity: 0, y: 5 }}
+                                                        animate={{ opacity: 1, y: 0 }}
+                                                        transition={{ delay: idx * 0.02 }}
+                                                        className="hover:bg-amber-50/50 transition-colors cursor-pointer group"
+                                                        onClick={() => { navigate(`/hod/profile/${emp.emp_id}`); setHodDetailsModal(false); window.dispatchEvent(new CustomEvent('closeSidebar')); }}
+                                                    >
+                                                        <td className="px-5 py-4 text-sm font-black text-gray-400 whitespace-nowrap">{idx + 1}</td>
+                                                        <td className="px-5 py-4 text-sm font-black text-amber-900 whitespace-nowrap">{emp.emp_id}</td>
+                                                        <td className="px-5 py-4 whitespace-nowrap">
+                                                            <div className="flex items-center gap-3">
+                                                                <img src={emp.profile_pic || `https://ui-avatars.com/api/?name=${encodeURIComponent(emp.name || '?')}&size=80&background=f59e0b&color=fff&bold=true`} alt="" className="h-9 w-9 rounded-xl object-cover shrink-0" />
+                                                                <span className="text-sm font-bold text-gray-800">{emp.name}</span>
+                                                            </div>
+                                                        </td>
+                                                        <td className="px-5 py-4 text-sm font-medium text-gray-600 whitespace-nowrap">{emp.department_name || '—'}</td>
+                                                        <td className="px-5 py-4 text-sm text-gray-600 whitespace-nowrap">{emp.email || '—'}</td>
+                                                        <td className="px-5 py-4 whitespace-nowrap">
+                                                            <span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest border ${
+                                                                attendanceMap[emp.emp_id]?.status?.startsWith('Present') ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 
+                                                                attendanceMap[emp.emp_id]?.status === 'Absent' ? 'bg-rose-50 text-rose-600 border-rose-100' :
+                                                                'bg-amber-50 text-amber-600 border-amber-100'
+                                                            }`}>
+                                                                {attendanceMap[emp.emp_id]?.status || 'N/A'}
                                                             </span>
                                                         </td>
                                                         <td className="px-5 py-4 text-right">
