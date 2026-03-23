@@ -105,11 +105,11 @@ const Sidebar = ({ userRole = 'staff', isOpen, onClose }) => {
 
   return (
     <div
-      className={`fixed left-0 top-[73px] h-[calc(100vh-73px)] w-20 bg-white/60 backdrop-blur-2xl border-r border-white/50 shadow-2xl z-40 flex flex-col overflow-hidden transition-all duration-300 ease-in-out lg:translate-x-0 ${isOpen ? 'translate-x-0' : '-translate-x-full'
+      className={`fixed left-0 top-[73px] h-[calc(100vh-73px)] w-20 bg-white/70 backdrop-blur-xl shadow-2xl z-40 flex flex-col overflow-hidden transition-all duration-300 ease-in-out lg:translate-x-0 ${isOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
     >
       {/* Header - No top border, below Header line */}
-      <div className="p-4 lg:p-3 bg-white/40 shrink-0">
+      <div className="p-4 lg:p-3 bg-transparent shrink-0">
         {/* User Role Portal removed */}
         
         {/* Close button with real-time clock */}

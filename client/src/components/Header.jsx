@@ -7,7 +7,7 @@ import api from '../utils/api';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Sparkles } from 'lucide-react';
 
-const Header = ({ toggleSidebar, sidebarOpen }) => {
+const Header = () => {
     const navigate = useNavigate();
     const location = useLocation();
     const { user } = useAuth();
@@ -414,28 +414,15 @@ const Header = ({ toggleSidebar, sidebarOpen }) => {
                 </div>
             )}
 
-            <header className="header flex items-center justify-between px-6 py-4 bg-white/70 backdrop-blur-xl border-b border-white/50 no-print sticky top-0 transition-all shadow-sm">
+            <header className="header flex items-center justify-between px-4 md:px-6 py-4 bg-white/70 backdrop-blur-xl no-print sticky top-0 transition-all shadow-sm">
                 <div className="flex items-center gap-3">
-                    {!sidebarOpen && (
-                        <button
-                            onClick={toggleSidebar}
-                            className="lg:hidden flex items-center justify-center h-10 w-10 rounded-xl bg-sky-50 text-sky-600 hover:bg-sky-100 border border-sky-100 hover:border-sky-200 transition-all duration-200 active:scale-90 focus:outline-none no-print group"
-                            title="Open Menu"
-                        >
-                            <div className="relative w-5 h-4 flex flex-col justify-between overflow-hidden text-sky-600">
-                                <span className="block h-0.5 w-full bg-current rounded-full transition-all duration-300" />
-                                <span className="block h-0.5 w-full bg-current rounded-full transition-all duration-300" />
-                                <span className="block h-0.5 w-full bg-current rounded-full transition-all duration-300" />
-                            </div>
-                        </button>
-                    )}
                     <div className="flex items-center gap-3">
-                        {/* Institutional Logo (Desktop Only) */}
-                        <div className="hidden lg:block h-10 w-10 rounded-xl overflow-hidden shadow-sm ring-1 ring-gray-100 flex-shrink-0">
+                        {/* Institutional Logo */}
+                        <div className="h-9 w-9 md:h-10 md:w-10 rounded-xl overflow-hidden shadow-sm ring-1 ring-gray-100 flex-shrink-0">
                             <img src="/ppg-logo.png" alt="PPG Logo" className="w-full h-full object-contain bg-white" />
                         </div>
                         <div className="ml-1">
-                            <h2 className="text-lg font-black text-gray-800 tracking-tight">
+                            <h2 className="text-base md:text-lg font-black text-gray-800 tracking-tight">
                                 PPG <span className="text-sky-600 ">iTech HUB</span>
                             </h2>
                         </div>

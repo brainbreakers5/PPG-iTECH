@@ -8,7 +8,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import Swal from 'sweetalert2';
 
 const Layout = ({ children }) => {
-    const [sidebarOpen, setSidebarOpen] = useState(false);
+    const [sidebarOpen, setSidebarOpen] = useState(() => window.innerWidth < 1024);
     const [isAiOpen, setIsAiOpen] = useState(() => localStorage.getItem('isAiOpen') === 'true');
     const [isAiMinimized, setIsAiMinimized] = useState(false);
     const { user, loading } = useAuth();
@@ -19,7 +19,9 @@ const Layout = ({ children }) => {
 
     useEffect(() => {
         const handleCloseSidebar = () => {
-            setSidebarOpen(false);
+            if (window.innerWidth >= 1024) {
+                setSidebarOpen(false);
+            }
             setIsAiOpen(false);
             window.dispatchEvent(new CustomEvent('AI_STATUS', { detail: { open: false } }));
         };
@@ -47,6 +49,19 @@ const Layout = ({ children }) => {
             window.removeEventListener('TOGGLE_AI_ASSISTANT', handleToggleAi);
             window.removeEventListener('AI_MINIMIZE', handleMinimizeAi);
         };
+    }, []);
+
+    useEffect(() => {
+        const syncSidebarByViewport = () => {
+            if (window.innerWidth < 1024) {
+                setSidebarOpen(true);
+            }
+        };
+
+        syncSidebarByViewport();
+        window.addEventListener('resize', syncSidebarByViewport);
+
+        return () => window.removeEventListener('resize', syncSidebarByViewport);
     }, []);
 
     // Persist AI state and notify app
@@ -120,10 +135,7 @@ const Layout = ({ children }) => {
     return (
         <div className="flex flex-col h-screen bg-transparent overflow-hidden font-sans">
             {/* Full-width Top Header */}
-            <Header
-                toggleSidebar={() => setSidebarOpen(!sidebarOpen)}
-                sidebarOpen={sidebarOpen}
-            />
+            <Header />
 
             <div className="flex flex-1 overflow-hidden relative">
                 {/* Sidebar */}
@@ -131,11 +143,15 @@ const Layout = ({ children }) => {
                     userRole={effectiveRole}
                     isOpen={sidebarOpen}
                     onToggle={() => setSidebarOpen(!sidebarOpen)}
-                    onClose={() => setSidebarOpen(false)}
+                    onClose={() => {
+                        if (window.innerWidth >= 1024) {
+                            setSidebarOpen(false);
+                        }
+                    }}
                 />
 
                 {/* Backdrop for mobile */}
-                {sidebarOpen && (
+                {sidebarOpen && window.innerWidth >= 1024 && (
                     <div
                         className="fixed inset-0 bg-sky-900/20 backdrop-blur-sm lg:hidden z-30 transition-all duration-500"
                         onClick={() => setSidebarOpen(false)}
@@ -144,7 +160,7 @@ const Layout = ({ children }) => {
                 )}
 
                 {/* Split Logic: 75% Content / 25% AI Assistant */}
-                <div className="flex flex-1 overflow-hidden transition-all duration-500 ease-in-out ml-0 lg:ml-20">
+                <div className="flex flex-1 overflow-hidden transition-all duration-500 ease-in-out ml-20">
                     <main 
                         className={`overflow-x-hidden ${sidebarOpen ? 'overflow-y-hidden lg:overflow-y-auto' : 'overflow-y-auto'} p-4 md:p-8 no-scrollbar scroll-smooth transition-all duration-500 ease-in-out ${
                             isAiOpen && window.innerWidth >= 1024 ? 'lg:w-3/4' : 'w-full'
