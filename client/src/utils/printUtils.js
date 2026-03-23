@@ -1,23 +1,7 @@
 import Swal from 'sweetalert2';
 
 export const choosePrintMode = async (documentLabel = 'this report') => {
-    const result = await Swal.fire({
-        title: 'Choose output',
-        text: `How would you like to open ${documentLabel}?`,
-        icon: 'question',
-        showCancelButton: true,
-        showDenyButton: true,
-        confirmButtonText: 'Print',
-        denyButtonText: 'Download PDF',
-        cancelButtonText: 'Cancel',
-        confirmButtonColor: '#2563eb',
-        denyButtonColor: '#475569',
-        cancelButtonColor: '#94a3b8'
-    });
-
-    if (result.isConfirmed) return 'print';
-    if (result.isDenied) return 'pdf';
-    return null;
+    return 'print';
 };
 
 export const runPrintWindow = async ({
@@ -28,8 +12,7 @@ export const runPrintWindow = async ({
     modeLabel = 'this report',
     closeAfterPrint = false
 }) => {
-    const mode = await choosePrintMode(modeLabel);
-    if (!mode) return false;
+    const mode = 'print';
 
     const printWindow = window.open('', '_blank', windowFeatures);
     if (!printWindow) {
@@ -47,9 +30,6 @@ export const runPrintWindow = async ({
     printWindow.focus();
 
     setTimeout(() => {
-        if (mode === 'pdf') {
-            printWindow.document.title = `${title} - PDF`;
-        }
         printWindow.print();
         if (closeAfterPrint) {
             printWindow.close();
@@ -84,8 +64,7 @@ export const finalizePrintWindow = async ({
 
     if (!preparedHtml) return false;
 
-    const mode = await choosePrintMode(modeLabel);
-    if (!mode) return false;
+    const mode = 'print';
 
     const targetWindow = window.open('', '_blank', windowFeatures || inferredFeatures);
     if (!targetWindow) {
@@ -103,9 +82,6 @@ export const finalizePrintWindow = async ({
     targetWindow.focus();
 
     setTimeout(() => {
-        if (mode === 'pdf') {
-            targetWindow.document.title = `${title} - PDF`;
-        }
         targetWindow.print();
         if (closeAfterPrint) {
             targetWindow.close();

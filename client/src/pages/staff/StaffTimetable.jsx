@@ -294,7 +294,7 @@ const StaffTimetable = () => {
         <Layout>
             <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
                 {/* Header */}
-                <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-10 gap-6">
+                <div className="flex flex-col justify-between items-start mb-10 gap-6">
                     <div className="flex items-center gap-4">
                         {viewOnlyMode && (
                             <button
@@ -351,7 +351,7 @@ const StaffTimetable = () => {
                     <motion.div
                         initial={{ opacity: 0, y: -10 }}
                         animate={{ opacity: 1, y: 0 }}
-                        className="bg-white p-8 rounded-3xl shadow-xl shadow-sky-50/50 mb-10 border border-sky-50 flex flex-col md:flex-row gap-6 items-end"
+                        className="bg-white p-8 rounded-3xl shadow-xl shadow-sky-50/50 mb-10 border border-sky-50 flex flex-col gap-6 items-end"
                     >
                         <div className="flex-1 w-full text-left">
                             <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3 ml-1">Select Staff</label>
@@ -385,11 +385,11 @@ const StaffTimetable = () => {
 const TimetableGrid = ({ days, displaySlots, timetable, loading, showStaffName, getPeriodConfig, handleAction, handleDelete, view }) => (
     <>
         <div className="styled-table-container modern-card !p-0 overflow-hidden border-sky-100">
-            <div className="overflow-x-auto md:overflow-x-visible -mx-0">
-                <table className="w-full border-collapse min-w-[800px] md:min-w-full md:table-fixed">
+            <div className="overflow-x-auto -mx-0">
+                <table className="w-full border-collapse min-w-[800px] table-auto">
                     <thead>
                         <tr className="bg-sky-50/50">
-                            <th className="p-3 md:p-6 border-b border-r border-sky-100 font-black text-[10px] text-sky-500 uppercase tracking-[0.2em] text-center w-20 md:w-32">Timeline</th>
+                            <th className="p-3 border-b border-r border-sky-100 font-black text-[10px] text-sky-500 uppercase tracking-[0.2em] text-center w-20">Timeline</th>
                             {displaySlots.map((slot, idx) => {
                                 const isBreak = slot.is_break;
                                 return (
@@ -416,7 +416,7 @@ const TimetableGrid = ({ days, displaySlots, timetable, loading, showStaffName, 
                     <tbody>
                         {days.map((day, dayIdx) => (
                             <tr key={day} className="group">
-                                <td className="p-3 md:p-6 border-b border-r border-sky-50 bg-gray-50/30 text-center font-black text-gray-700 text-[10px] md:text-xs uppercase tracking-widest">{day.slice(0, 3)}<span className="hidden md:inline">{day.slice(3)}</span></td>
+                                <td className="p-3 border-b border-r border-sky-50 bg-gray-50/30 text-center font-black text-gray-700 text-[10px] uppercase tracking-widest">{day.slice(0, 3)}</td>
                                 {displaySlots.map((slot, idx) => {
                                     const isBreak = slot.is_break;
                                     if (isBreak) {
@@ -438,7 +438,7 @@ const TimetableGrid = ({ days, displaySlots, timetable, loading, showStaffName, 
                                     const p = slot.period_number;
                                     const entries = timetable.filter(t => t.day_of_week === day && t.period_number === p);
                                     return (
-                                        <td key={idx} className="p-2 md:p-3 border-b border-r border-sky-50 align-top min-h-[80px] md:min-h-[120px] h-24 md:h-36 relative">
+                                        <td key={idx} className="p-2 border-b border-r border-sky-50 align-top min-h-[80px] h-24 relative">
                                             <AnimatePresence>
                                                 {entries.map(entry => (
                                                     <motion.div

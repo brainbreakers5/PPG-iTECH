@@ -98,17 +98,7 @@ const Layout = ({ children }) => {
                 );
                 
                 if (printBtn) {
-                    Swal.fire({
-                        title: 'Report Ready',
-                        text: 'Your document is ready. Click below to view the report.',
-                        icon: 'success',
-                        confirmButtonText: 'Open Report',
-                        confirmButtonColor: '#0ea5e9'
-                    }).then((result) => {
-                        if (result.isConfirmed) {
-                            printBtn.click();
-                        }
-                    });
+                    printBtn.click();
                 } else {
                     console.log('No custom print button found, falling back to window.print()...');
                     window.print();

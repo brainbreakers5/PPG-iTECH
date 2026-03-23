@@ -312,18 +312,8 @@ const AiAssistant = ({ isSidebar, onClose, userRole, isAiMinimized }) => {
                 );
                 
                 if (printBtn) {
-                    setMessages(prev => [...prev, { type: 'ai', text: "Report found! Asking for your confirmation...", time: new Date() }]);
-                    Swal.fire({
-                        title: 'Report Ready',
-                        text: 'Click below to directly view the exact printed report.',
-                        icon: 'success',
-                        confirmButtonText: 'Open Report',
-                        confirmButtonColor: '#0ea5e9'
-                    }).then((result) => {
-                        if (result.isConfirmed) {
-                            printBtn.click();
-                        }
-                    });
+                    setMessages(prev => [...prev, { type: 'ai', text: "Report found. Opening print directly...", time: new Date() }]);
+                    printBtn.click();
                 } else {
                     setMessages(prev => [...prev, { type: 'ai', text: "I couldn't find a direct print/report button on this current page.", time: new Date() }]);
                 }
@@ -376,17 +366,7 @@ const AiAssistant = ({ isSidebar, onClose, userRole, isAiMinimized }) => {
                                     (btn.textContent && btn.textContent.toLowerCase().includes('print'))
                                 );
                                 if (printBtn) {
-                                    Swal.fire({
-                                        title: 'Report Ready',
-                                        text: `Your ${exactMatch.q} report is ready. Click below to view.`,
-                                        icon: 'success',
-                                        confirmButtonText: 'Open Report',
-                                        confirmButtonColor: '#0ea5e9'
-                                    }).then((result) => {
-                                        if (result.isConfirmed) {
-                                            printBtn.click();
-                                        }
-                                    });
+                                    printBtn.click();
                                 } else {
                                     window.print();
                                 }

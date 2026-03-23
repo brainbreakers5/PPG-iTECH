@@ -1465,7 +1465,7 @@ const LeaveApply = () => {
 
                             {pendingApprovals.length > 0 ? (
                             <div className="overflow-x-auto">
-                                <table className="w-full text-left border-collapse">
+                                <table className="w-full min-w-[1050px] text-left border-collapse table-auto">
                                     <thead>
                                         <tr className="bg-gray-50/50">
                                             <th className="p-4 md:p-6 w-12 border-b border-sky-50">
@@ -1478,10 +1478,10 @@ const LeaveApply = () => {
                                                     />
                                                 </div>
                                             </th>
-                                            <th className="p-4 md:p-6 text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-sky-50">Employee</th>
-                                            <th className="p-4 md:p-6 text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-sky-50">Details</th>
-                                            <th className="p-4 md:p-6 text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-sky-50">Reason</th>
-                                            <th className="p-4 md:p-6 text-[10px] font-black text-gray-500 uppercase tracking-widest border-b border-sky-50 text-center">Actions</th>
+                                            <th className="p-4 md:p-6 w-[250px] text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-sky-50 whitespace-nowrap">Employee</th>
+                                            <th className="p-4 md:p-6 w-[330px] text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-sky-50 whitespace-nowrap">Details</th>
+                                            <th className="p-4 md:p-6 w-[300px] text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-sky-50 whitespace-nowrap">Reason</th>
+                                            <th className="p-4 md:p-6 w-[160px] text-[10px] font-black text-gray-500 uppercase tracking-widest border-b border-sky-50 text-center whitespace-nowrap">Actions</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-sky-50/50">
@@ -1504,9 +1504,9 @@ const LeaveApply = () => {
                                                             alt=""
                                                             className="h-10 w-10 rounded-xl object-cover shadow-lg group-hover:scale-110 transition-transform"
                                                         />
-                                                        <div>
-                                                            <p className="text-sm font-black text-gray-800 tracking-tight break-words whitespace-normal">{leave.applicant_name}</p>
-                                                            <p className="text-[9px] font-black text-sky-500 uppercase tracking-widest mt-0.5">{leave.department_name}</p>
+                                                        <div className="min-w-0">
+                                                            <p className="text-sm font-black text-gray-800 tracking-tight whitespace-nowrap overflow-hidden text-ellipsis max-w-[170px]">{leave.applicant_name}</p>
+                                                            <p className="text-[9px] font-black text-sky-500 uppercase tracking-widest mt-0.5 whitespace-nowrap overflow-hidden text-ellipsis max-w-[170px]">{leave.department_name}</p>
                                                         </div>
                                                     </div>
                                                 </td>
@@ -1550,13 +1550,13 @@ const LeaveApply = () => {
                                                     </div>
                                                 </td>
                                                 <td className="p-4 md:p-6 max-w-xs align-top">
-                                                    <p className="text-sm font-black text-gray-800 tracking-tight break-words whitespace-normal sm:truncate">{leave.subject || (leave.request_type === 'comp_credit' ? 'Comp Off Request' : 'Leave Request')}</p>
+                                                    <p className="text-sm font-black text-gray-800 tracking-tight whitespace-nowrap overflow-hidden text-ellipsis">{leave.subject || (leave.request_type === 'comp_credit' ? 'Comp Off Request' : 'Leave Request')}</p>
                                                     {leave.my_approver_type === 'replacement' && (
                                                         <p className="text-[10px] text-amber-600 font-bold mt-1 uppercase tracking-widest border border-amber-200 bg-amber-50 inline-block px-2 py-0.5 rounded-lg">
                                                             {leave.approval_notes || 'Requested as substitution'}
                                                         </p>
                                                     )}
-                                                    <p className="text-[10px] text-gray-400 font-medium mt-1 leading-relaxed break-words whitespace-normal sm:line-clamp-1">{leave.reason}</p>
+                                                    <p className="text-[10px] text-gray-400 font-medium mt-1 leading-relaxed line-clamp-1">{leave.reason}</p>
                                                 </td>
                                                 <td className="p-4 md:p-6 align-top">
                                                     <div className="flex justify-center gap-3">
@@ -1596,13 +1596,13 @@ const LeaveApply = () => {
                                         </span>
                                     </div>
                                     <div className="overflow-x-auto">
-                                        <table className="w-full text-left border-collapse">
+                                        <table className="w-full min-w-[980px] text-left border-collapse table-auto">
                                             <thead>
                                                 <tr className="bg-gray-50/50">
-                                                    <th className="p-6 text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-100">Employee</th>
-                                                    <th className="p-6 text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-100">Details</th>
-                                                    <th className="p-6 text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-100">Reason</th>
-                                                    <th className="p-6 text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-100 text-center">Your Decision</th>
+                                                    <th className="p-6 w-[250px] text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-100 whitespace-nowrap">Employee</th>
+                                                    <th className="p-6 w-[330px] text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-100 whitespace-nowrap">Details</th>
+                                                    <th className="p-6 w-[250px] text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-100 whitespace-nowrap">Reason</th>
+                                                    <th className="p-6 w-[150px] text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-100 text-center whitespace-nowrap">Your Decision</th>
                                                 </tr>
                                             </thead>
                                             <tbody className="divide-y divide-gray-50">
@@ -1615,9 +1615,9 @@ const LeaveApply = () => {
                                                                     alt=""
                                                                     className="h-10 w-10 rounded-xl object-cover shadow-lg"
                                                                 />
-                                                                <div>
-                                                                    <p className="text-sm font-black text-gray-800 tracking-tight break-words whitespace-normal">{leave.applicant_name}</p>
-                                                                    <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mt-0.5">{leave.department_name}</p>
+                                                                <div className="min-w-0">
+                                                                    <p className="text-sm font-black text-gray-800 tracking-tight whitespace-nowrap overflow-hidden text-ellipsis max-w-[170px]">{leave.applicant_name}</p>
+                                                                    <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mt-0.5 whitespace-nowrap overflow-hidden text-ellipsis max-w-[170px]">{leave.department_name}</p>
                                                                 </div>
                                                             </div>
                                                         </td>
@@ -1652,13 +1652,13 @@ const LeaveApply = () => {
                                                             </div>
                                                         </td>
                                                         <td className="p-4 md:p-6 max-w-xs align-top">
-                                                            <p className="text-sm font-black text-gray-800 tracking-tight break-words whitespace-normal sm:truncate">{leave.subject || (leave.request_type === 'comp_credit' ? 'Comp Off Request' : 'Leave Request')}</p>
+                                                            <p className="text-sm font-black text-gray-800 tracking-tight whitespace-nowrap overflow-hidden text-ellipsis">{leave.subject || (leave.request_type === 'comp_credit' ? 'Comp Off Request' : 'Leave Request')}</p>
                                                             {leave.my_approver_type === 'replacement' && (
                                                                 <p className="text-[10px] text-amber-600 font-bold mt-1 uppercase tracking-widest border border-amber-200 bg-amber-50 inline-block px-2 py-0.5 rounded-lg">
                                                                     {leave.approval_notes || 'Requested as substitution'}
                                                                 </p>
                                                             )}
-                                                            <p className="text-[10px] text-gray-400 font-medium mt-1 leading-relaxed break-words whitespace-normal sm:line-clamp-1">{leave.reason}</p>
+                                                            <p className="text-[10px] text-gray-400 font-medium mt-1 leading-relaxed line-clamp-1">{leave.reason}</p>
                                                         </td>
                                                         <td className="p-4 md:p-6 text-center align-top">
                                                             <div className="flex flex-col items-center gap-1">

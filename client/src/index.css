@@ -80,6 +80,25 @@ td {
   white-space: normal;
 }
 
+/* Global empty-table mode: if a no-data colspan row exists, hide column headers */
+table:has(tbody td[colspan]) thead {
+  display: none;
+}
+
+table:has(tbody td[colspan]) tbody {
+  display: block;
+}
+
+table:has(tbody td[colspan]) tbody tr {
+  display: block;
+}
+
+table:has(tbody td[colspan]) tbody td[colspan] {
+  display: block;
+  width: 100% !important;
+  border: 0 !important;
+}
+
 @media (min-width: 768px) {
   table {
     border-collapse: collapse;
