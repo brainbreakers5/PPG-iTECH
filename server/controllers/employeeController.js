@@ -1,8 +1,98 @@
 const { pool } = require('../config/db');
 const bcrypt = require('bcryptjs');
+const XLSX = require('xlsx');
 const sendEmail = require('../utils/sendEmail');
 const logActivity = require('../utils/activityLogger');
 const { createNotification } = require('./notificationController');
+
+const IMPORT_REQUIRED_COLUMNS = [
+    'emp_id',
+    'employee_name',
+    'email',
+    'phone',
+    'department',
+    'designation',
+    'salary',
+    'joining_date',
+    'status'
+];
+
+const normalizeHeader = (value) => String(value || '').trim().toLowerCase().replace(/\s+/g, '_');
+const normalizeEmpId = (value) => String(value || '').trim();
+const normalizeText = (value) => {
+    const v = String(value || '').trim();
+    return v || null;
+};
+const normalizeEmail = (value) => {
+    const v = String(value || '').trim().toLowerCase();
+    if (!v) return null;
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v) ? v : null;
+};
+const normalizePhone = (value) => {
+    const v = String(value || '').replace(/[^0-9+]/g, '').trim();
+    if (!v) return null;
+    return v.length < 8 || v.length > 16 ? null : v;
+};
+const normalizeSalary = (value) => {
+    if (value === null || value === undefined || value === '') return null;
+    const parsed = Number.parseFloat(String(value).replace(/,/g, '').trim());
+    if (!Number.isFinite(parsed) || parsed < 0) return null;
+    return parsed;
+};
+const normalizeEmploymentStatus = (value) => {
+    const v = String(value || '').trim().toLowerCase();
+    if (!v) return null;
+    if (['active', 'enabled', 'working', 'onboarded'].includes(v)) return 'active';
+    if (['inactive', 'disabled', 'left', 'resigned', 'terminated'].includes(v)) return 'inactive';
+    return null;
+};
+const parseExcelDate = (value) => {
+    if (value === null || value === undefined || value === '') return null;
+    if (typeof value === 'number') {
+        const parsed = XLSX.SSF.parse_date_code(value);
+        if (!parsed || !parsed.y || !parsed.m || !parsed.d) return null;
+        const mm = String(parsed.m).padStart(2, '0');
+        const dd = String(parsed.d).padStart(2, '0');
+        return `${parsed.y}-${mm}-${dd}`;
+    }
+    const raw = String(value).trim();
+    if (!raw) return null;
+    if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw;
+    const d = new Date(raw);
+    if (Number.isNaN(d.getTime())) return null;
+    return d.toISOString().slice(0, 10);
+};
+const makeDefaultPin = (empId) => {
+    const digits = String(empId || '').replace(/\D/g, '');
+    if (digits.length >= 4) return digits.slice(-4);
+    return `9${Math.floor(100 + Math.random() * 900)}`;
+};
+
+const ensureEmployeeImportSchema = async (db) => {
+    await db.query(`
+        ALTER TABLE users
+        ADD COLUMN IF NOT EXISTS employment_status VARCHAR(20) DEFAULT 'active'
+    `);
+
+    await db.query(`
+        CREATE TABLE IF NOT EXISTS employee_import_history (
+            id SERIAL PRIMARY KEY,
+            file_name VARCHAR(255) NOT NULL,
+            total_rows INT NOT NULL DEFAULT 0,
+            created_count INT NOT NULL DEFAULT 0,
+            updated_count INT NOT NULL DEFAULT 0,
+            failed_count INT NOT NULL DEFAULT 0,
+            status VARCHAR(20) NOT NULL DEFAULT 'success',
+            errors JSONB DEFAULT '[]'::jsonb,
+            rollback_data JSONB DEFAULT '{}'::jsonb,
+            rolled_back BOOLEAN NOT NULL DEFAULT false,
+            rollback_message TEXT,
+            imported_by INT REFERENCES users(id) ON DELETE SET NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            rolled_back_at TIMESTAMP
+        )
+    `);
+};
 
 // @desc    Check all birthdays and send notifications (Internal use)
 exports.checkAllBirthdaysAndNotify = async () => {
@@ -159,10 +249,12 @@ Please log in to the portal using these credentials.
 // @access  Private (Admin, Principal, HOD)
 exports.getEmployees = async (req, res) => {
     try {
+        await ensureEmployeeImportSchema(pool);
+
         let query = `
             SELECT u.id, u.emp_id, u.emp_code, u.name, u.role, u.email, u.mobile,
                    u.department_id, u.designation, u.profile_pic,
-                   u.monthly_salary,
+                   u.monthly_salary, COALESCE(u.employment_status, 'active') AS employment_status,
                    TO_CHAR(u.dob, 'YYYY-MM-DD') as dob,
                    TO_CHAR(u.doj, 'YYYY-MM-DD') as doj,
                    d.name as department_name 
@@ -322,6 +414,425 @@ exports.updateEmployee = async (req, res) => {
     } catch (error) {
         console.error('UPDATE ERROR:', error);
         res.status(500).json({ message: 'Server Error: ' + error.message });
+    }
+};
+
+// @desc    Download employee import sample CSV
+// @route   GET /api/employees/import/sample
+// @access  Private (Admin)
+exports.downloadEmployeeImportSample = async (req, res) => {
+    const csv = [
+        IMPORT_REQUIRED_COLUMNS.join(','),
+        'EMP1001,Arun Kumar,arun.kumar@example.com,9876543210,Computer Science,Assistant Professor,35000,2024-06-10,active',
+        'EMP1002,Meena Devi,meena.devi@example.com,9123456780,Mathematics,Lecturer,32000,2023-11-01,inactive'
+    ].join('\n');
+
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', 'attachment; filename="employee_import_sample.csv"');
+    res.status(200).send(csv);
+};
+
+// @desc    Import employees from XLSX/CSV
+// @route   POST /api/employees/import
+// @access  Private (Admin)
+exports.importEmployeesFromFile = async (req, res) => {
+    const client = await pool.connect();
+    try {
+        await ensureEmployeeImportSchema(client);
+
+        if (!req.file || !req.file.buffer) {
+            return res.status(400).json({ message: 'Please upload a valid .xlsx or .csv file.' });
+        }
+
+        const workbook = XLSX.read(req.file.buffer, { type: 'buffer', cellDates: false });
+        const firstSheetName = workbook.SheetNames?.[0];
+        if (!firstSheetName) {
+            return res.status(400).json({ message: 'Uploaded file is empty.' });
+        }
+
+        const worksheet = workbook.Sheets[firstSheetName];
+        const grid = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: '' });
+        if (!Array.isArray(grid) || grid.length < 2) {
+            return res.status(400).json({ message: 'File must include header row and at least one data row.' });
+        }
+
+        const rawHeaders = (grid[0] || []).map((h) => normalizeHeader(h));
+        const headerIndex = new Map();
+        rawHeaders.forEach((h, i) => {
+            if (h && !headerIndex.has(h)) headerIndex.set(h, i);
+        });
+
+        const missingHeaders = IMPORT_REQUIRED_COLUMNS.filter((h) => !headerIndex.has(h));
+        if (missingHeaders.length > 0) {
+            return res.status(400).json({
+                message: `Missing required columns: ${missingHeaders.join(', ')}`
+            });
+        }
+
+        const rows = [];
+        for (let i = 1; i < grid.length; i += 1) {
+            const row = grid[i] || [];
+            const obj = {};
+            for (const col of IMPORT_REQUIRED_COLUMNS) {
+                obj[col] = row[headerIndex.get(col)] ?? '';
+            }
+
+            const hasAnyValue = Object.values(obj).some((v) => String(v || '').trim() !== '');
+            if (hasAnyValue) {
+                rows.push({ ...obj, _rowNo: i + 1 });
+            }
+        }
+
+        if (rows.length === 0) {
+            return res.status(400).json({ message: 'No valid data rows found in file.' });
+        }
+
+        const duplicateEmpIds = [];
+        const seenEmpIds = new Set();
+        rows.forEach((r) => {
+            const empId = normalizeEmpId(r.emp_id).toLowerCase();
+            if (!empId) return;
+            if (seenEmpIds.has(empId)) duplicateEmpIds.push(normalizeEmpId(r.emp_id));
+            seenEmpIds.add(empId);
+        });
+
+        if (duplicateEmpIds.length > 0) {
+            return res.status(400).json({
+                message: `Duplicate emp_id values inside file: ${[...new Set(duplicateEmpIds)].join(', ')}`
+            });
+        }
+
+        const { rows: departmentRows } = await client.query('SELECT id, name, code FROM departments');
+        const deptMap = new Map();
+        departmentRows.forEach((d) => {
+            if (d.name) deptMap.set(String(d.name).trim().toLowerCase(), d.id);
+            if (d.code) deptMap.set(String(d.code).trim().toLowerCase(), d.id);
+        });
+
+        const targetEmpIds = rows.map((r) => normalizeEmpId(r.emp_id)).filter(Boolean);
+        const { rows: existingUsers } = await client.query(
+            `SELECT id, emp_id, name, email, mobile, department_id, designation, monthly_salary, doj,
+                    COALESCE(employment_status, 'active') AS employment_status, role, pin, password
+             FROM users
+             WHERE TRIM(emp_id) = ANY($1::text[])`,
+            [targetEmpIds]
+        );
+        const existingMap = new Map(existingUsers.map((u) => [String(u.emp_id).trim().toLowerCase(), u]));
+
+        const failures = [];
+        const createdEmpIds = [];
+        const updatedSnapshots = [];
+        let createdCount = 0;
+        let updatedCount = 0;
+
+        await client.query('BEGIN');
+
+        for (const row of rows) {
+            const empId = normalizeEmpId(row.emp_id);
+            const employeeName = normalizeText(row.employee_name);
+            const email = normalizeEmail(row.email);
+            const phone = normalizePhone(row.phone);
+            const departmentRaw = normalizeText(row.department);
+            const designation = normalizeText(row.designation);
+            const salary = normalizeSalary(row.salary);
+            const joiningDate = parseExcelDate(row.joining_date);
+            const status = normalizeEmploymentStatus(row.status);
+
+            const missing = [];
+            if (!empId) missing.push('emp_id');
+            if (!employeeName) missing.push('employee_name');
+            if (!departmentRaw) missing.push('department');
+            if (!designation) missing.push('designation');
+            if (!joiningDate) missing.push('joining_date');
+            if (!status) missing.push('status');
+            if (String(row.email || '').trim() && !email) missing.push('email(invalid)');
+            if (String(row.phone || '').trim() && !phone) missing.push('phone(invalid)');
+            if (String(row.salary || '').trim() && salary === null) missing.push('salary(invalid)');
+
+            const departmentId = departmentRaw ? deptMap.get(departmentRaw.toLowerCase()) : null;
+            if (departmentRaw && !departmentId) {
+                missing.push(`department(not found: ${departmentRaw})`);
+            }
+
+            if (missing.length > 0) {
+                failures.push({ row: row._rowNo, emp_id: empId || null, reason: `Mandatory/invalid fields: ${missing.join(', ')}` });
+                continue;
+            }
+
+            const existing = existingMap.get(empId.toLowerCase());
+
+            if (existing) {
+                updatedSnapshots.push({
+                    id: existing.id,
+                    emp_id: existing.emp_id,
+                    name: existing.name,
+                    email: existing.email,
+                    mobile: existing.mobile,
+                    department_id: existing.department_id,
+                    designation: existing.designation,
+                    monthly_salary: existing.monthly_salary,
+                    doj: existing.doj,
+                    employment_status: existing.employment_status,
+                    role: existing.role,
+                    pin: existing.pin,
+                    password: existing.password
+                });
+
+                await client.query(
+                    `UPDATE users
+                     SET name = $1,
+                         email = $2,
+                         mobile = $3,
+                         department_id = $4,
+                         designation = $5,
+                         monthly_salary = $6,
+                         doj = $7,
+                         employment_status = $8
+                     WHERE id = $9`,
+                    [
+                        employeeName,
+                        email,
+                        phone,
+                        departmentId,
+                        designation,
+                        salary ?? 0,
+                        joiningDate,
+                        status,
+                        existing.id
+                    ]
+                );
+
+                updatedCount += 1;
+                continue;
+            }
+
+            const defaultPin = makeDefaultPin(empId);
+            const hashedPassword = await bcrypt.hash(defaultPin, 10);
+
+            await client.query(
+                `INSERT INTO users (
+                    emp_id, pin, password, role, name, email, mobile,
+                    department_id, designation, monthly_salary, doj, employment_status
+                ) VALUES (
+                    $1, $2, $3, $4, $5, $6, $7,
+                    $8, $9, $10, $11, $12
+                )`,
+                [
+                    empId,
+                    defaultPin,
+                    hashedPassword,
+                    'staff',
+                    employeeName,
+                    email,
+                    phone,
+                    departmentId,
+                    designation,
+                    salary ?? 0,
+                    joiningDate,
+                    status
+                ]
+            );
+
+            createdEmpIds.push(empId);
+            createdCount += 1;
+        }
+
+        const totalRows = rows.length;
+        const failedCount = failures.length;
+        const importStatus = failedCount > 0
+            ? (createdCount + updatedCount > 0 ? 'partial' : 'failed')
+            : 'success';
+
+        const rollbackData = {
+            createdEmpIds,
+            updatedSnapshots
+        };
+
+        const { rows: historyRows } = await client.query(
+            `INSERT INTO employee_import_history (
+                file_name, total_rows, created_count, updated_count, failed_count,
+                status, errors, rollback_data, imported_by
+            ) VALUES (
+                $1, $2, $3, $4, $5,
+                $6, $7::jsonb, $8::jsonb, $9
+            ) RETURNING id`,
+            [
+                req.file.originalname || 'employee_import',
+                totalRows,
+                createdCount,
+                updatedCount,
+                failedCount,
+                importStatus,
+                JSON.stringify(failures),
+                JSON.stringify(rollbackData),
+                req.user?.id || null
+            ]
+        );
+
+        await client.query('COMMIT');
+
+        const io = req.app.get('io');
+        if (io && (createdCount > 0 || updatedCount > 0)) {
+            io.emit('employee_updated', { action: 'imported', createdCount, updatedCount, failedCount });
+        }
+
+        await logActivity(req.user.id, 'IMPORT_EMPLOYEES', {
+            file_name: req.file.originalname,
+            totalRows,
+            createdCount,
+            updatedCount,
+            failedCount,
+            importId: historyRows[0].id
+        }, req.ip);
+
+        return res.status(200).json({
+            message: 'Employee data imported successfully',
+            importId: historyRows[0].id,
+            totalRows,
+            createdCount,
+            updatedCount,
+            failedCount,
+            failedRecords: failures.slice(0, 200)
+        });
+    } catch (error) {
+        try {
+            await client.query('ROLLBACK');
+        } catch {
+            // no-op
+        }
+        console.error('IMPORT EMPLOYEES ERROR:', error);
+        return res.status(500).json({ message: 'Server Error', error: error.message });
+    } finally {
+        client.release();
+    }
+};
+
+// @desc    Get import history
+// @route   GET /api/employees/import/history
+// @access  Private (Admin)
+exports.getEmployeeImportHistory = async (req, res) => {
+    try {
+        await ensureEmployeeImportSchema(pool);
+
+        const { rows } = await pool.query(
+            `SELECT h.id, h.file_name, h.total_rows, h.created_count, h.updated_count, h.failed_count,
+                    h.status, h.rolled_back, h.rollback_message, h.created_at, h.rolled_back_at,
+                    u.name AS imported_by_name
+             FROM employee_import_history h
+             LEFT JOIN users u ON u.id = h.imported_by
+             ORDER BY h.created_at DESC
+             LIMIT 50`
+        );
+
+        res.json(rows);
+    } catch (error) {
+        console.error('GET IMPORT HISTORY ERROR:', error);
+        res.status(500).json({ message: 'Server Error', error: error.message });
+    }
+};
+
+// @desc    Rollback one employee import batch
+// @route   POST /api/employees/import/:importId/rollback
+// @access  Private (Admin)
+exports.rollbackEmployeeImport = async (req, res) => {
+    const client = await pool.connect();
+    try {
+        await ensureEmployeeImportSchema(client);
+        await client.query('BEGIN');
+
+        const importId = Number.parseInt(req.params.importId, 10);
+        if (!Number.isInteger(importId) || importId <= 0) {
+            await client.query('ROLLBACK');
+            return res.status(400).json({ message: 'Invalid import id' });
+        }
+
+        const { rows: historyRows } = await client.query(
+            'SELECT * FROM employee_import_history WHERE id = $1 FOR UPDATE',
+            [importId]
+        );
+
+        if (historyRows.length === 0) {
+            await client.query('ROLLBACK');
+            return res.status(404).json({ message: 'Import history not found' });
+        }
+
+        const history = historyRows[0];
+        if (history.rolled_back) {
+            await client.query('ROLLBACK');
+            return res.status(400).json({ message: 'This import has already been rolled back.' });
+        }
+
+        const rollbackData = history.rollback_data || {};
+        const createdEmpIds = Array.isArray(rollbackData.createdEmpIds) ? rollbackData.createdEmpIds : [];
+        const updatedSnapshots = Array.isArray(rollbackData.updatedSnapshots) ? rollbackData.updatedSnapshots : [];
+
+        if (createdEmpIds.length > 0) {
+            await client.query('DELETE FROM users WHERE emp_id = ANY($1::text[])', [createdEmpIds]);
+        }
+
+        for (const prev of updatedSnapshots) {
+            await client.query(
+                `UPDATE users
+                 SET name = $1,
+                     email = $2,
+                     mobile = $3,
+                     department_id = $4,
+                     designation = $5,
+                     monthly_salary = $6,
+                     doj = $7,
+                     employment_status = $8,
+                     role = $9,
+                     pin = $10,
+                     password = $11
+                 WHERE id = $12`,
+                [
+                    prev.name || null,
+                    prev.email || null,
+                    prev.mobile || null,
+                    prev.department_id || null,
+                    prev.designation || null,
+                    prev.monthly_salary ?? 0,
+                    prev.doj || null,
+                    prev.employment_status || 'active',
+                    prev.role || 'staff',
+                    prev.pin || null,
+                    prev.password || null,
+                    prev.id
+                ]
+            );
+        }
+
+        await client.query(
+            `UPDATE employee_import_history
+             SET rolled_back = true,
+                 rolled_back_at = CURRENT_TIMESTAMP,
+                 rollback_message = $2
+             WHERE id = $1`,
+            [importId, `Rolled back by admin ${req.user?.name || req.user?.emp_id || ''}`.trim()]
+        );
+
+        await client.query('COMMIT');
+
+        const io = req.app.get('io');
+        if (io) io.emit('employee_updated', { action: 'import_rollback', importId });
+
+        await logActivity(req.user.id, 'ROLLBACK_EMPLOYEE_IMPORT', { importId }, req.ip);
+
+        return res.json({
+            message: 'Import rollback completed successfully.',
+            removedCreatedEmployees: createdEmpIds.length,
+            restoredUpdatedEmployees: updatedSnapshots.length
+        });
+    } catch (error) {
+        try {
+            await client.query('ROLLBACK');
+        } catch {
+            // no-op
+        }
+        console.error('ROLLBACK IMPORT ERROR:', error);
+        return res.status(500).json({ message: 'Server Error', error: error.message });
+    } finally {
+        client.release();
     }
 };
 
