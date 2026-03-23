@@ -60,6 +60,19 @@ body {
   background: rgba(255, 255, 255, 0.95);
 }
 
+/* Global Table – column & row break lines */
+table {
+  border-collapse: collapse;
+}
+
+th,
+td {
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  word-break: break-word;
+  overflow-wrap: break-word;
+  white-space: normal;
+}
+
 /* Styled Table with Glassmorphism */
 .styled-table-container {
   overflow: hidden;
@@ -219,19 +232,19 @@ button:active:not(:disabled) {
   }
 
   h1 {
-    font-size: 1.1rem !important;
+    font-size: 1.25rem !important;
   }
 
   h2 {
-    font-size: 1rem !important;
+    font-size: 1.1rem !important;
   }
 
   h3 {
-    font-size: 0.92rem !important;
+    font-size: 0.975rem !important;
   }
 
   h4 {
-    font-size: 0.86rem !important;
+    font-size: 0.875rem !important;
   }
 
   h5 {
@@ -239,7 +252,7 @@ button:active:not(:disabled) {
   }
 
   h6 {
-    font-size: 0.74rem !important;
+    font-size: 0.72rem !important;
   }
 
   p,
@@ -280,13 +293,16 @@ button:active:not(:disabled) {
 
   table > thead,
   table > tbody {
-    white-space: nowrap;
+    white-space: normal;
   }
 
   th,
   td {
     padding: 6px 4px !important;
-    white-space: nowrap;
+    white-space: normal;
+    word-break: break-word !important;
+    overflow-wrap: break-word !important;
+    border: 1px solid rgba(0, 0, 0, 0.15) !important;
   }
 }
 
