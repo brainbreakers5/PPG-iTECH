@@ -208,6 +208,60 @@ button:active:not(:disabled) {
   transform: scale(0.96);
 }
 
+/* Mobile-only typography and table density tuning */
+@media (max-width: 767px) {
+  html,
+  body,
+  #root {
+    font-family: Arial, Helvetica, sans-serif !important;
+    font-size: 13px;
+    line-height: 1.35;
+  }
+
+  h1 {
+    font-size: 1.1rem !important;
+  }
+
+  h2 {
+    font-size: 1rem !important;
+  }
+
+  h3,
+  h4,
+  h5,
+  h6 {
+    font-size: 0.9rem !important;
+  }
+
+  p,
+  span,
+  label,
+  button,
+  input,
+  select,
+  textarea,
+  a,
+  li,
+  td,
+  th {
+    font-size: 12px !important;
+  }
+
+  table {
+    width: 100% !important;
+    table-layout: fixed;
+    font-size: 11px;
+  }
+
+  th,
+  td {
+    padding: 6px 4px !important;
+    white-space: normal;
+    word-break: break-word;
+    overflow-wrap: anywhere;
+  }
+}
+
 
 @keyframes fadeIn {
   from {
