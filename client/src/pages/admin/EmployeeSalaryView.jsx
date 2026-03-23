@@ -6,6 +6,27 @@ import { FaArrowLeft } from 'react-icons/fa';
 import { useAuth } from '../../context/AuthContext';
 
 const toCurrency = (v) => Number(v || 0).toLocaleString('en-IN');
+const parseDeductionItems = (raw) => {
+    if (!raw) return [];
+    try {
+        const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
+        if (!Array.isArray(parsed)) return [];
+        return parsed
+            .map((item) => {
+                const label = String(item?.type || item?.name || item?.label || 'Deduction').trim();
+                const amount = Number(item?.amount ?? item?.value ?? item?.deductionAmount ?? item?.deduction_amount ?? 0) || 0;
+                return { label, amount };
+            })
+            .filter((item) => item.label && item.amount > 0);
+    } catch {
+        return [];
+    }
+};
+const getDeductionBreakdownText = (raw) => {
+    const items = parseDeductionItems(raw);
+    if (!items.length) return '';
+    return items.map((item) => `${item.label}=${toCurrency(item.amount)}`).join(', ');
+};
 
 const EmployeeSalaryView = () => {
     const { empId } = useParams();
@@ -81,7 +102,14 @@ const EmployeeSalaryView = () => {
                                         <span className="text-sm font-black text-gray-700 bg-gray-50 px-3 py-1.5 rounded-lg border border-gray-100 whitespace-nowrap">Rs {toCurrency(r.gross_salary || r.monthly_salary || 0)}</span>
                                     </td>
                                     <td className="p-6 text-right">
-                                        <span className="text-sm font-black text-rose-600 bg-rose-50 px-3 py-1.5 rounded-lg border border-rose-100 whitespace-nowrap">Rs {toCurrency(r.deductions_applied || 0)}</span>
+                                        <div className="flex flex-col items-end gap-1">
+                                            <span className="text-sm font-black text-rose-600 bg-rose-50 px-3 py-1.5 rounded-lg border border-rose-100 whitespace-nowrap">Rs {toCurrency(r.deductions_applied || 0)}</span>
+                                            {getDeductionBreakdownText(r.deductions) && (
+                                                <span className="text-[10px] font-black text-rose-500 uppercase tracking-[0.08em] max-w-[240px] text-right" title={getDeductionBreakdownText(r.deductions)}>
+                                                    {getDeductionBreakdownText(r.deductions)}
+                                                </span>
+                                            )}
+                                        </div>
                                     </td>
                                     <td className="p-6 text-right">
                                         <span className="text-sm font-black text-emerald-700 bg-emerald-50 px-3 py-1.5 rounded-lg border border-emerald-100 whitespace-nowrap">Rs {toCurrency(r.calculated_salary || 0)}</span>

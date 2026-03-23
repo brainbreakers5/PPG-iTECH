@@ -61,6 +61,42 @@ const normalizeDateOnly = (v) => {
     const raw = String(v);
     return raw.includes('T') ? raw.slice(0, 10) : raw;
 };
+const getWorkingDaysFromRange = (fromDate, toDate) => {
+    if (!fromDate || !toDate) return 0;
+    const from = new Date(fromDate);
+    const to = new Date(toDate);
+    if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime()) || from > to) return 0;
+
+    let workingDays = 0;
+    const cursor = new Date(from);
+    while (cursor <= to) {
+        const day = cursor.getDay();
+        if (day !== 0 && day !== 6) workingDays += 1;
+        cursor.setDate(cursor.getDate() + 1);
+    }
+    return workingDays;
+};
+const parseDeductionItems = (raw) => {
+    if (!raw) return [];
+    try {
+        const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
+        if (!Array.isArray(parsed)) return [];
+        return parsed
+            .map((item) => {
+                const label = String(item?.type || item?.name || item?.label || 'Deduction').trim();
+                const amount = Number(item?.amount ?? item?.value ?? item?.deductionAmount ?? item?.deduction_amount ?? 0) || 0;
+                return { label, amount };
+            })
+            .filter((item) => item.label && item.amount > 0);
+    } catch {
+        return [];
+    }
+};
+const getDeductionBreakdownText = (raw) => {
+    const items = parseDeductionItems(raw);
+    if (!items.length) return '';
+    return items.map((item) => `${item.label}=${toCurrency(item.amount)}`).join(', ');
+};
 const formatGeneratedAt = () => {
     const now = new Date();
     return `${now.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })} ${now.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}`;
@@ -147,12 +183,32 @@ const SalaryManagement = () => {
         return { gross, net };
     }, [filteredRows]);
 
-    const cycleDays = useMemo(() => {
-        const from = new Date(selectedCycle.fromDate);
-        const to = new Date(selectedCycle.toDate);
-        const diffMs = to.setHours(0, 0, 0, 0) - from.setHours(0, 0, 0, 0);
-        return Number.isFinite(diffMs) ? Math.floor(diffMs / (1000 * 60 * 60 * 24)) + 1 : 0;
+    const cycleWorkingDays = useMemo(() => {
+        return getWorkingDaysFromRange(selectedCycle.fromDate, selectedCycle.toDate);
     }, [selectedCycle]);
+
+    const livePersonalOverview = useMemo(() => {
+        if (!isPersonalView || !rows.length) return null;
+
+        const currentCycleRecord = rows.find((r) => (
+            normalizeDateOnly(r.from_date) === normalizeDateOnly(selectedCycle.fromDate)
+            && normalizeDateOnly(r.to_date) === normalizeDateOnly(selectedCycle.toDate)
+        ));
+        const liveRow = currentCycleRecord || rows[0];
+        if (!liveRow) return null;
+
+        return {
+            gross: Number(liveRow.gross_salary || liveRow.monthly_salary || 0),
+            deductions: Number(liveRow.deductions_applied || 0),
+            net: Number(liveRow.calculated_salary || 0),
+            paidDays: Number(liveRow.total_present || liveRow.with_pay_count || 0),
+            unpaidDays: Number(liveRow.total_lop || liveRow.without_pay_count || 0),
+            workingDays: Number(liveRow.total_days_in_period || 0) || cycleWorkingDays,
+            fromDate: liveRow.from_date || selectedCycle.fromDate,
+            toDate: liveRow.to_date || selectedCycle.toDate,
+            deductionBreakdown: getDeductionBreakdownText(liveRow.deductions)
+        };
+    }, [isPersonalView, rows, selectedCycle, cycleWorkingDays]);
 
     const refreshRows = async () => {
         setLoading(true);
@@ -755,6 +811,33 @@ const SalaryManagement = () => {
 
                 {renderFilterControls}
 
+                {isPersonalView && livePersonalOverview && (
+                    <motion.div variants={staggerWrap} className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                        <motion.div variants={fadeUp} transition={{ duration: 0.35 }} className="modern-card p-5 border-sky-50">
+                            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">Live Gross</p>
+                            <p className="mt-2 text-xl font-black text-gray-800 tracking-tighter">Rs {toCurrency(livePersonalOverview.gross)}</p>
+                            <p className="text-[10px] font-bold text-gray-400 mt-2">{livePersonalOverview.fromDate} to {livePersonalOverview.toDate}</p>
+                        </motion.div>
+                        <motion.div variants={fadeUp} transition={{ duration: 0.35 }} className="modern-card p-5 border-rose-50">
+                            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">Live Deductions</p>
+                            <p className="mt-2 text-xl font-black text-rose-700 tracking-tighter">Rs {toCurrency(livePersonalOverview.deductions)}</p>
+                            {livePersonalOverview.deductionBreakdown && (
+                                <p className="text-[10px] font-bold text-rose-500 mt-2 uppercase tracking-[0.08em]">{livePersonalOverview.deductionBreakdown}</p>
+                            )}
+                        </motion.div>
+                        <motion.div variants={fadeUp} transition={{ duration: 0.35 }} className="modern-card p-5 border-emerald-50">
+                            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">Live Net Salary</p>
+                            <p className="mt-2 text-xl font-black text-emerald-700 tracking-tighter">Rs {toCurrency(livePersonalOverview.net)}</p>
+                            <p className="text-[10px] font-bold text-gray-400 mt-2">Paid {livePersonalOverview.paidDays.toFixed(1)} | Unpaid {livePersonalOverview.unpaidDays.toFixed(1)}</p>
+                        </motion.div>
+                        <motion.div variants={fadeUp} transition={{ duration: 0.35 }} className="modern-card p-5 border-indigo-50">
+                            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">Total Working Days</p>
+                            <p className="mt-2 text-xl font-black text-indigo-700 tracking-tighter">{livePersonalOverview.workingDays}</p>
+                            <p className="text-[10px] font-bold text-gray-400 mt-2">Selected calendar period</p>
+                        </motion.div>
+                    </motion.div>
+                )}
+
                 {canInstitutionWide && isHistoryPage && (
                     <motion.div
                         variants={fadeUp}
@@ -785,7 +868,7 @@ const SalaryManagement = () => {
                                 <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">
                                     <span>Payroll Period</span>
                                     <span className="px-3 py-2 rounded-xl bg-sky-50 text-sky-700 border border-sky-100 normal-case tracking-normal text-xs font-bold">{selectedCycle.fromDate} to {selectedCycle.toDate}</span>
-                                    <span className="px-3 py-2 rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-100 normal-case tracking-normal text-xs font-bold">Total Days: {cycleDays}</span>
+                                    <span className="px-3 py-2 rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-100 normal-case tracking-normal text-xs font-bold">Total Working Days: {cycleWorkingDays}</span>
                                 </div>
                             )}
                             {isHistoryPage && (
@@ -895,7 +978,14 @@ const SalaryManagement = () => {
                                         <span className="text-sm font-bold text-gray-700 bg-gray-50 px-3 py-1.5 rounded-lg border border-gray-100 whitespace-nowrap">Rs {toCurrency(r.gross_salary || r.monthly_salary || 0)}</span>
                                     </td>
                                     <td className="p-6 text-right">
-                                        <span className="text-sm font-bold text-rose-600 bg-rose-50 px-3 py-1.5 rounded-lg border border-rose-100 whitespace-nowrap">Rs {toCurrency(r.deductions_applied || 0)}</span>
+                                        <div className="flex flex-col items-end gap-1">
+                                            <span className="text-sm font-bold text-rose-600 bg-rose-50 px-3 py-1.5 rounded-lg border border-rose-100 whitespace-nowrap">Rs {toCurrency(r.deductions_applied || 0)}</span>
+                                            {getDeductionBreakdownText(r.deductions) && (
+                                                <span className="text-[10px] font-black text-rose-500 uppercase tracking-[0.08em] max-w-[260px] text-right" title={getDeductionBreakdownText(r.deductions)}>
+                                                    {getDeductionBreakdownText(r.deductions)}
+                                                </span>
+                                            )}
+                                        </div>
                                     </td>
                                     <td className="p-6 text-right">
                                         <span className="text-sm font-black text-emerald-700 bg-emerald-50 px-3 py-1.5 rounded-lg border border-emerald-100 whitespace-nowrap">Rs {toCurrency(r.calculated_salary || 0)}</span>
