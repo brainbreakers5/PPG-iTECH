@@ -245,52 +245,8 @@ button:active:not(:disabled) {
   body,
   #root {
     font-family: Arial, Helvetica, sans-serif !important;
-    font-size: 13px;
-    line-height: 1.35;
-  }
-
-  /* Mobile heading hierarchy: h6 (largest) → h1 (smallest) */
-  h1 {
-    font-size: 0.7rem !important;
-  }
-
-  h2 {
-    font-size: 0.78rem !important;
-  }
-
-  h3 {
-    font-size: 0.86rem !important;
-  }
-
-  h4 {
-    font-size: 0.94rem !important;
-  }
-
-  h5 {
-    font-size: 1.02rem !important;
-  }
-
-  h6 {
-    font-size: 1.1rem !important;
-  }
-
-  p,
-  span,
-  label,
-  input,
-  select,
-  textarea,
-  a,
-  li,
-  td,
-  th {
-    font-size: 12px !important;
-  }
-
-  button,
-  [role="button"],
-  .btn {
-    font-size: 11px !important;
+    font-size: 16px;
+    line-height: 1.5;
   }
 
   /* Mobile tables: horizontally scrollable */
