@@ -1,3 +1,58 @@
+const DEFAULT_PRINT_PAGINATION_CSS = `
+<style id="global-print-pagination-fix">
+    html, body {
+        height: auto !important;
+        overflow: visible !important;
+    }
+    table {
+        width: 100%;
+        border-collapse: collapse;
+        table-layout: auto;
+    }
+    thead { display: table-header-group; }
+    tfoot { display: table-footer-group; }
+    tr, td, th, img, svg, .print-avoid-break {
+        break-inside: avoid;
+        page-break-inside: avoid;
+    }
+    .print-allow-break {
+        break-inside: auto;
+        page-break-inside: auto;
+    }
+    @media print {
+        html, body {
+            height: auto !important;
+            overflow: visible !important;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+        }
+        .print-page {
+            break-after: page;
+            page-break-after: always;
+        }
+        .print-page:last-child {
+            break-after: auto;
+            page-break-after: auto;
+        }
+    }
+</style>`;
+
+const withPrintPaginationCss = (html) => {
+    const raw = String(html || '');
+    if (!raw) return raw;
+    if (raw.includes('global-print-pagination-fix')) return raw;
+
+    if (/<head[^>]*>/i.test(raw)) {
+        return raw.replace(/<head[^>]*>/i, (match) => `${match}${DEFAULT_PRINT_PAGINATION_CSS}`);
+    }
+
+    if (/<html[^>]*>/i.test(raw)) {
+        return raw.replace(/<html[^>]*>/i, (match) => `${match}<head>${DEFAULT_PRINT_PAGINATION_CSS}</head>`);
+    }
+
+    return `<!doctype html><html><head>${DEFAULT_PRINT_PAGINATION_CSS}</head><body>${raw}</body></html>`;
+};
+
 const printWithHiddenIframe = ({ html, title, delay = 250, closeAfterPrint = true }) => {
     return new Promise((resolve) => {
         const iframe = document.createElement('iframe');
@@ -48,7 +103,7 @@ const printWithHiddenIframe = ({ html, title, delay = 250, closeAfterPrint = tru
         }
 
         doc.open();
-        doc.write(html);
+        doc.write(withPrintPaginationCss(html));
         doc.close();
     });
 };
@@ -72,7 +127,7 @@ export const runPrintWindow = async ({
         return await printWithHiddenIframe({ html, title, delay, closeAfterPrint });
     }
 
-    printWindow.document.write(html);
+    printWindow.document.write(withPrintPaginationCss(html));
     printWindow.document.close();
     printWindow.focus();
 
@@ -98,7 +153,7 @@ export const finalizePrintWindow = async ({
 
     // Preserve the prepared document, then reopen only after user picks output mode.
     const preparedHtml = printWindow.document?.documentElement
-        ? `<!doctype html>${printWindow.document.documentElement.outerHTML}`
+        ? withPrintPaginationCss(`<!doctype html>${printWindow.document.documentElement.outerHTML}`)
         : null;
 
     const inferredFeatures = `width=${printWindow.outerWidth || 1200},height=${printWindow.outerHeight || 800}`;
@@ -118,7 +173,7 @@ export const finalizePrintWindow = async ({
         return await printWithHiddenIframe({ html: preparedHtml, title, delay, closeAfterPrint });
     }
 
-    targetWindow.document.write(preparedHtml);
+    targetWindow.document.write(withPrintPaginationCss(preparedHtml));
     targetWindow.document.close();
     targetWindow.focus();
 

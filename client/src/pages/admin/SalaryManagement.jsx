@@ -5,6 +5,7 @@ import api from '../../utils/api';
 import Swal from 'sweetalert2';
 import { runPrintWindow } from '../../utils/printUtils';
 import { useAuth } from '../../context/AuthContext';
+import { useSocket } from '../../context/SocketContext';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
     FaCheckCircle,
@@ -123,6 +124,7 @@ const staggerWrap = {
 
 const SalaryManagement = () => {
     const { user } = useAuth();
+    const socket = useSocket();
     const navigate = useNavigate();
     const location = useLocation();
 
@@ -159,11 +161,9 @@ const SalaryManagement = () => {
     const filteredRows = useMemo(() => {
         return rows.filter((r) => {
             const roleValue = String(r.role || '').toLowerCase();
-            const nameValue = String(r.name || '').toLowerCase();
             const roleMatch = activeRole === 'all' || roleValue === activeRole;
             const deptMatch = activeDepartment === 'all' || String(r.department_name || '').toLowerCase() === activeDepartment;
-            const hideManagementDetails = roleValue === 'management' || nameValue.includes('institutional management');
-            return roleMatch && deptMatch && !hideManagementDetails;
+            return roleMatch && deptMatch;
         });
     }, [rows, activeRole, activeDepartment]);
 
@@ -287,13 +287,29 @@ const SalaryManagement = () => {
     }, [selectedMonth, selectedYear, isHistoryPage, isPersonalView, user?.emp_id, selectedCycle.fromDate, selectedCycle.toDate]);
 
     useEffect(() => {
-        if (!isPersonalView) return undefined;
         const intervalId = setInterval(() => {
             refreshRows();
         }, 10000);
         return () => clearInterval(intervalId);
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [isPersonalView, user?.emp_id, selectedCycle.fromDate, selectedCycle.toDate]);
+    }, [isPersonalView, canInstitutionWide, isHistoryPage, user?.emp_id, selectedCycle.fromDate, selectedCycle.toDate]);
+
+    useEffect(() => {
+        if (!socket) return undefined;
+
+        const handleSalaryRealtime = () => {
+            refreshRows();
+        };
+
+        socket.on('salary_calculated', handleSalaryRealtime);
+        socket.on('salary_published', handleSalaryRealtime);
+
+        return () => {
+            socket.off('salary_calculated', handleSalaryRealtime);
+            socket.off('salary_published', handleSalaryRealtime);
+        };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [socket, selectedCycle.fromDate, selectedCycle.toDate, isHistoryPage, isPersonalView]);
 
     useEffect(() => {
         const fetchDepartments = async () => {

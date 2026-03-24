@@ -304,7 +304,7 @@ const LeaveApply = () => {
     }, [socket, limitYear]);
 
     // Compute pending permission approvals count for current user
-    const approverTypesForUser = user.role === 'principal' ? ['principal', 'admin'] : [user.role];
+    const approverTypesForUser = user.role === 'principal' ? ['principal', 'admin', 'replacement'] : [user.role, 'replacement'];
     const pendingPermissionCount = permissions.filter(
         p => p.my_approval_status === 'Pending' && p.emp_id !== user.emp_id && p.my_approver_type && approverTypesForUser.includes(p.my_approver_type)
     ).length;
@@ -1023,14 +1023,11 @@ const LeaveApply = () => {
                             animate={{ opacity: 1, y: 0 }}
                             exit={{ opacity: 0, y: -10 }}
                         >
-                            {/* Incoming Permission Approvals (for HOD and Principal) */}
+                            {/* Incoming Permission Approvals */}
                             {(() => {
-                                // Show for both HOD and Principal roles
-                                const isHodOrPrincipal = user.role === 'hod' || user.role === 'principal';
-                                if (!isHodOrPrincipal) return null;
                                 // Only show requests where this user is the approver and approval is pending
-                                // Principals should see approvals assigned to 'principal' and also 'admin'
-                                const approverTypesForUser = user.role === 'principal' ? ['principal', 'admin'] : [user.role];
+                                // Principals can see principal/admin assignments; all users can also get replacement approvals.
+                                const approverTypesForUser = user.role === 'principal' ? ['principal', 'admin', 'replacement'] : [user.role, 'replacement'];
                                 const pendingPerms = permissions.filter(
                                     p => p.my_approval_status === 'Pending' && p.emp_id !== user.emp_id && p.my_approver_type && approverTypesForUser.includes(p.my_approver_type)
                                 );

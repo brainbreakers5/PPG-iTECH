@@ -293,6 +293,8 @@ const ProfileViewer = ({ user, onClose }) => {
                 <head>
                     <title>${title}</title>
                     <style>
+                        @page { size: A4 portrait; margin: 12mm; }
+                        html, body { height: auto; overflow: visible; }
                         body { font-family: 'Segoe UI', Arial, sans-serif; padding: 40px; color: #1e293b; background: #fff; line-height: 1.5; }
                         .container { max-width: 800px; margin: 0 auto; }
                         .header { display: flex; align-items: center; gap: 30px; margin-bottom: 40px; border-bottom: 2px solid #f1f5f9; padding-bottom: 30px; }
@@ -309,7 +311,12 @@ const ProfileViewer = ({ user, onClose }) => {
                         .address-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
                         .address-box { background: #f8fafc; padding: 15px; border-radius: 16px; border: 1px solid #f1f5f9; }
                         .address-box .info-value { border: none; font-size: 9.5pt; line-height: 1.4; color: #475569; }
-                        @media print { body { padding: 0; } .no-print { display: none; } .section { break-inside: avoid; } }
+                        @media print {
+                            body { padding: 0; }
+                            .no-print { display: none; }
+                            .section { break-inside: avoid; page-break-inside: avoid; }
+                            img, .address-box, .header { break-inside: avoid; page-break-inside: avoid; }
+                        }
                     </style>
                 </head>
                 <body>
