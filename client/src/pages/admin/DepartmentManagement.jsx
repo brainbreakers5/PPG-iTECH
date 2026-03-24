@@ -3,7 +3,6 @@ import Layout from '../../components/Layout';
 import api from '../../utils/api';
 import { useNavigate } from 'react-router-dom';
 import Swal from 'sweetalert2';
-import { finalizePrintWindow } from '../../utils/printUtils';
 import { FaTrash, FaPlus, FaLayerGroup, FaBuilding, FaProjectDiagram, FaArrowRight, FaPen, FaPrint } from 'react-icons/fa';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -175,12 +174,10 @@ const DepartmentManagement = () => {
             </body></html>
         `);
         printWindow.document.close();
-        await finalizePrintWindow({
-            printWindow,
-            title: 'Department Personnel Registry',
-            delay: 500,
-            modeLabel: 'the department personnel registry'
-        });
+        setTimeout(() => {
+            printWindow.focus();
+            printWindow.print();
+        }, 350);
     };
 
     return (
