@@ -1,5 +1,103 @@
 const { pool } = require('../config/db');
 const { createNotification } = require('./notificationController');
+const bcrypt = require('bcryptjs');
+const fs = require('fs');
+const path = require('path');
+
+const PENDING_DIR = path.join(__dirname, '..', 'data');
+const PENDING_FILE = path.join(PENDING_DIR, 'biometric_pending_logs.jsonl');
+
+const isTransientDbError = (error) => {
+    if (!error) return false;
+    const code = String(error.code || '').toUpperCase();
+    const msg = String(error.message || '').toLowerCase();
+    return (
+        ['ENOTFOUND', 'EAI_AGAIN', 'ECONNREFUSED', 'ETIMEDOUT', '53300'].includes(code) ||
+        msg.includes('maxclientsinsessionmode') ||
+        msg.includes('getaddrinfo enotfound') ||
+        msg.includes('too many clients')
+    );
+};
+
+const queuePendingBiometricLog = (payload, error) => {
+    try {
+        if (!fs.existsSync(PENDING_DIR)) {
+            fs.mkdirSync(PENDING_DIR, { recursive: true });
+        }
+
+        const entry = {
+            queued_at: new Date().toISOString(),
+            reason: error?.message || 'Unknown DB error',
+            payload,
+        };
+
+        fs.appendFileSync(PENDING_FILE, `${JSON.stringify(entry)}\n`, 'utf8');
+    } catch (queueErr) {
+        console.error('Failed to queue pending biometric log:', queueErr.message);
+    }
+};
+
+const drainPendingBiometricLogs = async (limit = 25) => {
+    if (!fs.existsSync(PENDING_FILE)) return { replayed: 0, remaining: 0 };
+
+    const raw = fs.readFileSync(PENDING_FILE, 'utf8');
+    const lines = raw.split('\n').filter(Boolean);
+    if (lines.length === 0) return { replayed: 0, remaining: 0 };
+
+    let replayed = 0;
+    const keep = [];
+
+    for (let i = 0; i < lines.length; i += 1) {
+        const line = lines[i];
+        if (replayed >= limit) {
+            keep.push(line);
+            continue;
+        }
+
+        try {
+            const entry = JSON.parse(line);
+            const payload = entry && entry.payload ? entry.payload : {};
+            const queuedEmpId = String(payload.emp_id || '').trim();
+            if (!queuedEmpId) {
+                continue;
+            }
+
+            const queuedLogDate = payload.timestamp ? new Date(payload.timestamp) : new Date(entry.queued_at || Date.now());
+            await ensureBiometricUser(queuedEmpId);
+            await runWithSequenceFix(
+                'INSERT INTO biometric_logs (device_id, emp_id, log_time, type) VALUES ($1, $2, $3, $4)',
+                [payload.device_id || 'PENDING_QUEUE', queuedEmpId, queuedLogDate, payload.type || (queuedLogDate.getHours() < 12 ? 'IN' : 'OUT')],
+                'biometric_logs'
+            );
+            replayed += 1;
+        } catch (err) {
+            keep.push(line);
+        }
+    }
+
+    if (keep.length > 0) {
+        fs.writeFileSync(PENDING_FILE, `${keep.join('\n')}\n`, 'utf8');
+    } else {
+        fs.unlinkSync(PENDING_FILE);
+    }
+
+    return { replayed, remaining: keep.length };
+};
+
+const ensureBiometricUser = async (empId) => {
+    const safeEmpId = String(empId || '').trim();
+    if (!safeEmpId) return;
+
+    const placeholderPassword = `AUTO_BIOMETRIC_${safeEmpId}_${Date.now()}`;
+    const passwordHash = await bcrypt.hash(placeholderPassword, 10);
+
+    await pool.query(
+        `INSERT INTO users (emp_id, password, role, name, designation)
+         VALUES ($1, $2, 'staff', $3, 'Biometric Imported')
+         ON CONFLICT (emp_id) DO NOTHING`,
+        [safeEmpId, passwordHash, `Biometric User ${safeEmpId}`]
+    );
+};
 
 // Helper: run a query, and on unique-violation (23505) attempt to reset sequence for given table and retry once
 async function runWithSequenceFix(queryText, params = [], tableName = null) {
@@ -36,7 +134,8 @@ exports.receiveLog = async (req, res) => {
     }
 
     try {
-        console.log(`Processing punch for User: ${emp_id}, Device: ${device_id}`);
+        const normalizedEmpId = String(emp_id).trim();
+        console.log(`Processing punch for User: ${normalizedEmpId}, Device: ${device_id}`);
 
         // Use provided timestamp or current server time
         const logDate = timestamp ? new Date(timestamp) : new Date();
@@ -46,18 +145,47 @@ exports.receiveLog = async (req, res) => {
         // 1. Check if User exists in the system
         const { rows: userRows } = await pool.query(
             'SELECT id, name, emp_id FROM users WHERE emp_id = $1',
-            [emp_id]
+            [normalizedEmpId]
         );
 
-        const userExists = userRows.length > 0;
-        const userName = userExists ? userRows[0].name : `Unknown (${emp_id})`;
+        let userExists = userRows.length > 0;
+        if (!userExists) {
+            await ensureBiometricUser(normalizedEmpId);
+        }
 
-        // 2. Store raw log in biometric_logs (Audit Trail) - No foreign key constraint usually here, but let's be safe
-        await runWithSequenceFix(
-            'INSERT INTO biometric_logs (device_id, emp_id, log_time, type) VALUES ($1, $2, $3, $4)',
-            [device_id, emp_id, logDate, type || (logDate.getHours() < 12 ? 'IN' : 'OUT')],
-            'biometric_logs'
+        const { rows: refreshedUserRows } = await pool.query(
+            'SELECT id, name, emp_id FROM users WHERE emp_id = $1',
+            [normalizedEmpId]
         );
+
+        userExists = refreshedUserRows.length > 0;
+        const userName = userExists ? refreshedUserRows[0].name : `Unknown (${normalizedEmpId})`;
+
+        // 2. Store raw log in biometric_logs (Audit Trail)
+        try {
+            await runWithSequenceFix(
+                'INSERT INTO biometric_logs (device_id, emp_id, log_time, type) VALUES ($1, $2, $3, $4)',
+                [device_id, normalizedEmpId, logDate, type || (logDate.getHours() < 12 ? 'IN' : 'OUT')],
+                'biometric_logs'
+            );
+        } catch (logInsertError) {
+            const isUserFkError =
+                logInsertError &&
+                logInsertError.code === '23503' &&
+                String(logInsertError.constraint || '').includes('biometric_logs_emp_id_fkey');
+
+            if (!isUserFkError) {
+                throw logInsertError;
+            }
+
+            // Race-safe fallback: create user again and retry insert once.
+            await ensureBiometricUser(normalizedEmpId);
+            await runWithSequenceFix(
+                'INSERT INTO biometric_logs (device_id, emp_id, log_time, type) VALUES ($1, $2, $3, $4)',
+                [device_id, normalizedEmpId, logDate, type || (logDate.getHours() < 12 ? 'IN' : 'OUT')],
+                'biometric_logs'
+            );
+        }
 
         if (!userExists) {
             console.warn(`⚠️ User ${emp_id} not found in users table. Skipping attendance sync.`);
@@ -69,14 +197,14 @@ exports.receiveLog = async (req, res) => {
         // 3. Update biometric_attendance summary
         const { rows: existing } = await pool.query(
             'SELECT * FROM biometric_attendance WHERE user_id = $1 AND date = $2',
-            [emp_id, dateStr]
+            [normalizedEmpId, dateStr]
         );
 
         const isFirstPunch = existing.length === 0;
         if (existing.length === 0) {
             await runWithSequenceFix(
                 'INSERT INTO biometric_attendance (user_id, date, intime) VALUES ($1, $2, $3)',
-                [emp_id, dateStr, timeStr],
+                [normalizedEmpId, dateStr, timeStr],
                 'biometric_attendance'
             );
         } else {
@@ -243,7 +371,7 @@ exports.receiveLog = async (req, res) => {
                 approvedInfoList.length > 0 ? `Approved Segments: ${approvedInfoList.join(' | ')}` : null
             ].filter(Boolean).join(' | ');
 
-            console.log(`Syncing Attendance for ${userRows[0].emp_id} on ${dateStr}: Status=${dbStatus}, In=${physIn}, Out=${physOut}`);
+            console.log(`Syncing Attendance for ${refreshedUserRows[0].emp_id} on ${dateStr}: Status=${dbStatus}, In=${physIn}, Out=${physOut}`);
 
             // We ALWAYS overwrite status, in_time, and out_time here because segments reflect the full truth
             await runWithSequenceFix(
@@ -255,7 +383,7 @@ exports.receiveLog = async (req, res) => {
                     out_time = EXCLUDED.out_time,
                     status = EXCLUDED.status,
                     remarks = EXCLUDED.remarks`,
-                [userRows[0].emp_id, dateStr, physIn || null, physOut || null, dbStatus, finalRemarks || null],
+                [refreshedUserRows[0].emp_id, dateStr, physIn || null, physOut || null, dbStatus, finalRemarks || null],
                 'attendance_records'
             );
 
@@ -268,12 +396,12 @@ exports.receiveLog = async (req, res) => {
         const message = `Biometric Punch Recorded: ${type || (isFirstPunch ? 'IN' : 'OUT')} at ${timeStr} for ${userName}`;
 
         // Notification for the user
-        await createNotification(emp_id, message, 'attendance', null, null, false);
+        await createNotification(normalizedEmpId, message, 'attendance', null, null, false);
 
         // Notifications for all admins
         const { rows: admins } = await pool.query("SELECT emp_id, id FROM users WHERE role = 'admin'");
         for (const admin of admins) {
-            if (admin.emp_id !== emp_id) { // Don't duplicate if user is also an admin
+            if (admin.emp_id !== normalizedEmpId) { // Don't duplicate if user is also an admin
                 await createNotification(admin.emp_id, message, 'attendance', null, null, false);
             }
         }
@@ -282,7 +410,7 @@ exports.receiveLog = async (req, res) => {
         const io = req.app.get('io');
         if (io) {
             const punchData = {
-                emp_id,
+                emp_id: normalizedEmpId,
                 name: userName,
                 type: type || (isFirstPunch ? 'IN' : 'OUT'),
                 time: timeStr,
@@ -290,21 +418,38 @@ exports.receiveLog = async (req, res) => {
             };
 
             // Emit to the user (identified by their ID as sent in the join event)
-            if (userRows[0].id) {
-                io.to(userRows[0].id).emit('biometric_punch', punchData);
+            if (refreshedUserRows[0].id) {
+                io.to(refreshedUserRows[0].id).emit('biometric_punch', punchData);
             }
 
             // Emit to each admin
             admins.forEach(admin => {
-                if (admin.id && admin.id !== userRows[0].id) {
+                if (admin.id && admin.id !== refreshedUserRows[0].id) {
                     io.to(admin.id).emit('biometric_punch', punchData);
                 }
             });
         }
 
+        // Best-effort replay of previously queued logs whenever DB is healthy again.
+        try {
+            const replay = await drainPendingBiometricLogs(25);
+            if (replay.replayed > 0) {
+                console.log(`Replayed ${replay.replayed} queued biometric logs. Remaining: ${replay.remaining}`);
+            }
+        } catch (replayErr) {
+            console.warn('Queued biometric replay skipped:', replayErr.message);
+        }
+
         res.status(200).json({ message: 'Log processed successfully' });
     } catch (error) {
         console.error('🔴 Biometric processing error:', error);
+        if (isTransientDbError(error)) {
+            queuePendingBiometricLog(req.body, error);
+            return res.status(202).json({
+                message: 'Biometric punch queued due to temporary DB connectivity issue',
+                error: error.message,
+            });
+        }
         res.status(500).json({
             message: 'Server Error during biometric processing',
             error: error.message

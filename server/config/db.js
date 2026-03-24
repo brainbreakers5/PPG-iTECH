@@ -14,6 +14,8 @@ const sslDisabled = ['0', 'false', 'no', 'disable'].includes(sslFlag);
 const sslEnabledByFlag = ['1', 'true', 'yes', 'require', 'verify-ca', 'verify-full'].includes(sslFlag);
 const sslEnabledByHost = host.includes('supabase.co') || host.includes('neon.tech') || host.includes('render.com');
 const useSsl = !sslDisabled && (sslEnabledByFlag || (!sslFlag && sslEnabledByHost));
+const configuredPoolMax = Number(process.env.DB_POOL_MAX || process.env.PGPOOL_MAX || 5);
+const poolMax = Number.isFinite(configuredPoolMax) && configuredPoolMax > 0 ? configuredPoolMax : 5;
 
 const pool = new Pool({
     host: process.env.DB_HOST,
@@ -22,9 +24,10 @@ const pool = new Pool({
     database: process.env.DB_NAME,
     port: process.env.DB_PORT || 5432,
     ssl: useSsl ? { rejectUnauthorized: false } : false,
-    max: 20,
+    max: poolMax,
     idleTimeoutMillis: 30000,
     connectionTimeoutMillis: 10000,
+    keepAlive: true,
 });
 
 const connectDB = async () => {
