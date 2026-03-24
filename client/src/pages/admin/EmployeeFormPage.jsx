@@ -74,7 +74,7 @@ const EmployeeFormPage = () => {
 
     const fetchEmployee = async () => {
         try {
-            const { data } = await api.get(`/employees/${id}`);
+            const { data } = await api.get(`/employees/${id}?lookup=id`);
             setFormData({ ...data, confirm_pin: data.pin });
             // Load existing deductions if stored
             if (data.deductions) {
@@ -217,7 +217,7 @@ const EmployeeFormPage = () => {
                 await api.post('/employees', payload);
                 // Fetch newly created employee to get userId for certificate uploads
                 try {
-                    const { data: newEmp } = await api.get(`/employees/${formData.emp_id}`);
+                    const { data: newEmp } = await api.get(`/employees/${formData.emp_id}?lookup=emp_id`);
                     userId = newEmp.id;
                 } catch (_) {}
                 Swal.fire({

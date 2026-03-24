@@ -299,13 +299,41 @@ exports.getEmployees = async (req, res) => {
 exports.getEmployeeById = async (req, res) => {
     try {
         const paramId = req.params.id;
+        const lookupMode = String(req.query.lookup || '').trim().toLowerCase();
 
         // Build a safe query: only compare to u.id if the param looks like a number
         // to avoid a PostgreSQL integer cast error on string emp_ids like '@PPG ZORVIAN'
         const isNumeric = /^\d+$/.test(paramId);
 
         let query, values;
-        if (isNumeric) {
+        if (lookupMode === 'id') {
+            if (!isNumeric) {
+                return res.status(400).json({ message: 'Invalid numeric id for lookup=id' });
+            }
+            query = `
+                SELECT u.*, 
+                       TO_CHAR(u.dob, 'YYYY-MM-DD') as dob,
+                       TO_CHAR(u.doj, 'YYYY-MM-DD') as doj,
+                       d.name as department_name
+                FROM users u
+                LEFT JOIN departments d ON u.department_id = d.id
+                WHERE u.id = $1
+                LIMIT 1
+            `;
+            values = [parseInt(paramId, 10)];
+        } else if (lookupMode === 'emp_id') {
+            query = `
+                SELECT u.*, 
+                       TO_CHAR(u.dob, 'YYYY-MM-DD') as dob,
+                       TO_CHAR(u.doj, 'YYYY-MM-DD') as doj,
+                       d.name as department_name
+                FROM users u
+                LEFT JOIN departments d ON u.department_id = d.id
+                WHERE TRIM(u.emp_id) = $1
+                LIMIT 1
+            `;
+            values = [paramId.trim()];
+        } else if (isNumeric) {
             // Priority 1: Exact emp_id match (trimmed)
             // Priority 2: Database ID match (numeric)
             query = `
