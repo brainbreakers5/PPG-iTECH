@@ -274,29 +274,29 @@ exports.updateLeaveLimit = async (req, res) => {
             toDate
         } = req.body;
 
-        const normalizedCompLimit = sanitizeLimit(comp_limit ?? comp_leave_limit, null);
-        const normalizedClLimit = sanitizeLimit(cl_limit, null);
-        const normalizedMlLimit = sanitizeLimit(ml_limit, null);
-        const normalizedOdLimit = sanitizeLimit(od_limit, null);
-        const normalizedLopLimit = sanitizeLimit(lop_limit, null);
-        const normalizedPermissionLimit = sanitizeLimit(permission_limit, null);
+        const normalizedCompLimit = sanitizeLimit(comp_limit ?? comp_leave_limit, 6);
+        const normalizedClLimit = sanitizeLimit(cl_limit, 12);
+        const normalizedMlLimit = sanitizeLimit(ml_limit, 12);
+        const normalizedOdLimit = sanitizeLimit(od_limit, 10);
+        const normalizedLopLimit = sanitizeLimit(lop_limit, 30);
+        const normalizedPermissionLimit = sanitizeLimit(permission_limit, 2);
 
         const resolvedFromDate = normalizePeriodDate(fromDate || fromMonth, false);
         const resolvedToDate = normalizePeriodDate(toDate || toMonth, true);
 
         await pool.query(`
             INSERT INTO leave_limits (emp_id, year, cl_limit, ml_limit, od_limit, comp_limit, lop_limit, permission_limit, from_month, to_month, updated_at)
-            VALUES ($1, $2, COALESCE($3, 12), COALESCE($4, 12), COALESCE($5, 10), COALESCE($6, 6), COALESCE($7, 30), COALESCE($8, 2), $9, $10, NOW())
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW())
             ON CONFLICT (emp_id, year) 
             DO UPDATE SET
-                cl_limit = COALESCE($3, leave_limits.cl_limit),
-                ml_limit = COALESCE($4, leave_limits.ml_limit),
-                od_limit = COALESCE($5, leave_limits.od_limit),
-                comp_limit = COALESCE($6, leave_limits.comp_limit),
-                lop_limit = COALESCE($7, leave_limits.lop_limit),
-                permission_limit = COALESCE($8, leave_limits.permission_limit),
-                from_month = COALESCE($9, leave_limits.from_month),
-                to_month = COALESCE($10, leave_limits.to_month),
+                cl_limit = $3,
+                ml_limit = $4,
+                od_limit = $5,
+                comp_limit = $6,
+                lop_limit = $7,
+                permission_limit = $8,
+                from_month = $9,
+                to_month = $10,
                 updated_at = NOW()
         `, [
             normalizedEmpId,
@@ -354,12 +354,12 @@ exports.bulkUpdateLeaveLimits = async (req, res) => {
             toDate
         } = req.body;
 
-        const normalizedCompLimit = sanitizeLimit(comp_limit ?? comp_leave_limit, null);
-        const normalizedClLimit = sanitizeLimit(cl_limit, null);
-        const normalizedMlLimit = sanitizeLimit(ml_limit, null);
-        const normalizedOdLimit = sanitizeLimit(od_limit, null);
-        const normalizedLopLimit = sanitizeLimit(lop_limit, null);
-        const normalizedPermissionLimit = sanitizeLimit(permission_limit, null);
+        const normalizedCompLimit = sanitizeLimit(comp_limit ?? comp_leave_limit, 6);
+        const normalizedClLimit = sanitizeLimit(cl_limit, 12);
+        const normalizedMlLimit = sanitizeLimit(ml_limit, 12);
+        const normalizedOdLimit = sanitizeLimit(od_limit, 10);
+        const normalizedLopLimit = sanitizeLimit(lop_limit, 30);
+        const normalizedPermissionLimit = sanitizeLimit(permission_limit, 2);
 
         const resolvedFromDate = normalizePeriodDate(fromDate || fromMonth, false);
         const resolvedToDate = normalizePeriodDate(toDate || toMonth, true);
@@ -392,17 +392,17 @@ exports.bulkUpdateLeaveLimits = async (req, res) => {
 
                 await client.query(
                     `INSERT INTO leave_limits (emp_id, year, cl_limit, ml_limit, od_limit, comp_limit, lop_limit, permission_limit, from_month, to_month, updated_at)
-                     VALUES ($1, $2, COALESCE($3, 12), COALESCE($4, 12), COALESCE($5, 10), COALESCE($6, 6), COALESCE($7, 30), COALESCE($8, 2), $9, $10, NOW())
+                     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW())
                      ON CONFLICT (emp_id, year)
                      DO UPDATE SET
-                        cl_limit = COALESCE($3, leave_limits.cl_limit),
-                        ml_limit = COALESCE($4, leave_limits.ml_limit),
-                        od_limit = COALESCE($5, leave_limits.od_limit),
-                        comp_limit = COALESCE($6, leave_limits.comp_limit),
-                        lop_limit = COALESCE($7, leave_limits.lop_limit),
-                        permission_limit = COALESCE($8, leave_limits.permission_limit),
-                        from_month = COALESCE($9, leave_limits.from_month),
-                        to_month = COALESCE($10, leave_limits.to_month),
+                        cl_limit = $3,
+                        ml_limit = $4,
+                        od_limit = $5,
+                        comp_limit = $6,
+                        lop_limit = $7,
+                        permission_limit = $8,
+                        from_month = $9,
+                        to_month = $10,
                         updated_at = NOW()`,
                     [
                         normalizedEmpId,
