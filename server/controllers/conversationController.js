@@ -131,7 +131,7 @@ exports.sendMessage = async (req, res) => {
                     id: Date.now(),
                     message: `New message from ${senderName}: ${content.substring(0, 50)}${content.length > 50 ? '...' : ''}`,
                     type: 'message',
-                    metadata: { conversationId },
+                    metadata: { conversationId, messageId: newMessageRows[0].id },
                     created_at: new Date().toISOString()
                 };
 

@@ -122,15 +122,61 @@ const Header = () => {
         return () => clearInterval(interval);
     }, [user]);
 
+    const parseMetadata = (notification) => {
+        try {
+            return typeof notification?.metadata === 'string'
+                ? JSON.parse(notification.metadata)
+                : (notification?.metadata || {});
+        } catch (error) {
+            console.error('Invalid notification metadata:', error);
+            return {};
+        }
+    };
+
+    const getConversationTarget = (notification, role) => {
+        const metadata = parseMetadata(notification);
+        const conversationId = Number(
+            metadata.conversationId ||
+            metadata.conversation_id ||
+            metadata.threadId ||
+            metadata.thread_id ||
+            0
+        );
+        const messageId = Number(
+            metadata.messageId ||
+            metadata.message_id ||
+            0
+        );
+
+        if (!conversationId || role === 'admin') return null;
+
+        const params = new URLSearchParams({ conversationId: String(conversationId) });
+        if (messageId) params.set('messageId', String(messageId));
+
+        return {
+            path: `/${role}/conversation?${params.toString()}`,
+            state: { conversationId, messageId: messageId || null }
+        };
+    };
+
     // Helper to send native notification
-    const sendNativeNotification = (title, message, icon = '/ppg-logo.png') => {
+    const sendNativeNotification = (title, message, notification, icon = '/ppg-logo.png') => {
         if ('Notification' in window && Notification.permission === 'granted') {
-            new Notification(title, {
+            const browserNotification = new Notification(title, {
                 body: message,
                 icon: icon,
                 badge: '/ppg-logo.png',
                 vibrate: [200, 100, 200]
             });
+
+            const role = effectiveRole;
+            const target = getConversationTarget(notification, role);
+            if (target) {
+                browserNotification.onclick = () => {
+                    window.focus();
+                    navigate(target.path, { state: target.state });
+                };
+            }
         }
     };
 
@@ -158,8 +204,8 @@ const Header = () => {
             setUnreadCount(prev => prev + 1);
 
             // Show native notification
-            const title = newNotif.type === 'message' ? 'New Message' : 'New Update - PPG HUB';
-            sendNativeNotification(title, newNotif.message);
+            const title = ['message', 'conversation'].includes(newNotif.type) ? 'New Message' : 'New Update - PPG HUB';
+            sendNativeNotification(title, newNotif.message, newNotif);
         });
 
         // Listen for biometric punch specifically
@@ -167,7 +213,7 @@ const Header = () => {
             console.log('Real-time punch received:', data);
             
             // Show native notification for mandatory punch visibility
-            sendNativeNotification('Biometric Punch Recorded', `${data.message} at ${new Date().toLocaleTimeString()}`);
+            sendNativeNotification('Biometric Punch Recorded', `${data.message} at ${new Date().toLocaleTimeString()}`, null);
 
             // Optional: Internal Toast
             Swal.fire({
@@ -311,8 +357,7 @@ const Header = () => {
         setShowNotifs(false);
 
         const role = effectiveRole;
-        // metadata might be a string or object depending on how it's returned
-        const metadata = typeof notification.metadata === 'string' ? JSON.parse(notification.metadata) : (notification.metadata || {});
+        const metadata = parseMetadata(notification);
 
         switch (notification.type) {
             case 'leave':
@@ -368,10 +413,15 @@ const Header = () => {
                 }
                 break;
             case 'conversation':
-                if (role !== 'admin') {
+            case 'message': {
+                const target = getConversationTarget(notification, role);
+                if (target) {
+                    navigate(target.path, { state: target.state });
+                } else if (role !== 'admin') {
                     navigate(`/${role}/conversation`);
                 }
                 break;
+            }
             case 'attendance':
                 if (role === 'admin') navigate('/admin/attendance');
                 else if (role === 'principal') navigate('/principal/attendance');
@@ -543,7 +593,7 @@ const Header = () => {
                                                             n.type === 'permission' ? <FaFileAlt className="text-teal-500" size={14} /> :
                                                                 n.type === 'purchase' ? <FaBuilding className="text-purple-500" size={14} /> :
                                                                     n.type === 'birthday' ? <FaBirthdayCake className="text-pink-500" size={14} /> :
-                                                                        n.type === 'conversation' ? <FaInfoCircle className="text-blue-500" size={14} /> :
+                                                                        ['conversation', 'message'].includes(n.type) ? <FaInfoCircle className="text-blue-500" size={14} /> :
                                                                             <FaInfoCircle className="text-sky-500" size={14} />}
                                                     </div>
                                                     <div className="flex-1">

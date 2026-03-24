@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { useLocation } from 'react-router-dom';
 import Layout from '../../components/Layout';
 import api from '../../utils/api';
 import Swal from 'sweetalert2';
@@ -21,6 +22,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 const Conversation = () => {
     const { user } = useAuth();
     const { socket } = useSocket();
+    const location = useLocation();
     const [threads, setThreads] = useState([]);
     const [selectedThread, setSelectedThread] = useState(null);
     const [messages, setMessages] = useState([]);
@@ -39,13 +41,40 @@ const Conversation = () => {
     const [searchStaff, setSearchStaff] = useState('');
     const [isParticipantModalOpen, setIsParticipantModalOpen] = useState(false);
     const [mobileShowChat, setMobileShowChat] = useState(false);
+    const [messageTarget, setMessageTarget] = useState({ conversationId: null, messageId: null });
+    const [highlightedMessageId, setHighlightedMessageId] = useState(null);
     const messagesEndRef = useRef(null);
+
+    const parseNumericId = (value) => {
+        const parsed = Number(value);
+        return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+    };
+
+    const getLocationTarget = () => {
+        const params = new URLSearchParams(location.search);
+        const stateConversationId = parseNumericId(location.state?.conversationId);
+        const stateMessageId = parseNumericId(location.state?.messageId);
+        const queryConversationId = parseNumericId(params.get('conversationId'));
+        const queryMessageId = parseNumericId(params.get('messageId'));
+
+        return {
+            conversationId: stateConversationId || queryConversationId,
+            messageId: stateMessageId || queryMessageId
+        };
+    };
 
     useEffect(() => {
         fetchThreads();
         fetchAllStaff();
         fetchDepartments();
     }, []);
+
+    useEffect(() => {
+        const target = getLocationTarget();
+        if (target.conversationId || target.messageId) {
+            setMessageTarget(target);
+        }
+    }, [location.key]);
 
     const fetchDepartments = async () => {
         try {
@@ -156,10 +185,26 @@ const Conversation = () => {
         try {
             const { data } = await api.get('/conversations');
             setThreads(data);
-            if (data.length > 0) setSelectedThread(data[0]);
+            if (data.length > 0) {
+                const target = getLocationTarget();
+                const preferred = target.conversationId
+                    ? data.find(t => Number(t.id) === Number(target.conversationId))
+                    : null;
+                setSelectedThread(preferred || data[0]);
+            }
             setLoading(false);
         } catch (error) { console.error(error); setLoading(false); }
     };
+
+    useEffect(() => {
+        if (!threads.length || !messageTarget.conversationId) return;
+
+        const targetThread = threads.find(t => Number(t.id) === Number(messageTarget.conversationId));
+        if (targetThread && Number(selectedThread?.id) !== Number(targetThread.id)) {
+            setSelectedThread(targetThread);
+            setMobileShowChat(true);
+        }
+    }, [threads, selectedThread, messageTarget]);
 
     const fetchMessages = async (id) => {
         try {
@@ -167,6 +212,26 @@ const Conversation = () => {
             setMessages(data);
         } catch (error) { console.error(error); }
     };
+
+    useEffect(() => {
+        if (!messageTarget.messageId || !selectedThread) return;
+        if (messageTarget.conversationId && Number(selectedThread.id) !== Number(messageTarget.conversationId)) return;
+
+        const targetMessage = messages.find(m => Number(m.id) === Number(messageTarget.messageId));
+        if (!targetMessage) return;
+
+        const timer = setTimeout(() => {
+            const targetElement = document.getElementById(`message-${targetMessage.id}`);
+            if (targetElement) {
+                targetElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                setHighlightedMessageId(targetMessage.id);
+                setTimeout(() => setHighlightedMessageId(null), 3500);
+            }
+        }, 100);
+
+        setMessageTarget(prev => ({ ...prev, messageId: null }));
+        return () => clearTimeout(timer);
+    }, [messages, selectedThread, messageTarget]);
 
     const eligibleEmployees = allStaff.filter(s => ['principal', 'hod', 'staff'].includes((s.role || '').toLowerCase()));
 
@@ -430,6 +495,7 @@ const Conversation = () => {
                                             {messages.map((msg, idx) => (
                                                 <motion.div
                                                     key={msg.id}
+                                                    id={`message-${msg.id}`}
                                                     initial={{ opacity: 0, y: 10, scale: 0.95 }}
                                                     animate={{ opacity: 1, y: 0, scale: 1 }}
                                                     transition={{ delay: idx * 0.05 }}
@@ -446,7 +512,7 @@ const Conversation = () => {
                                                             </div>
                                                         </div>
                                                         <div>
-                                                            <div className={`p-5 rounded-3xl shadow-sm border transition-all ${msg.sender_id === user.emp_id
+                                                            <div className={`p-5 rounded-3xl shadow-sm border transition-all ${highlightedMessageId === msg.id ? 'ring-2 ring-amber-300 ring-offset-2' : ''} ${msg.sender_id === user.emp_id
                                                                 ? 'bg-sky-600 text-white border-sky-700 rounded-br-none shadow-sky-100'
                                                                 : 'bg-white text-gray-800 border-gray-100 rounded-bl-none'
                                                                 }`}>

@@ -5,7 +5,7 @@ require('dotenv').config();
 
 /**
  * BIOMETRIC REAL-TIME BRIDGE
- * This script connects to your device (192.168.1.201) and pushes data 
+ * This script connects to your device (172.16.100.50) and pushes data 
  * to the web application as soon as someone punches their finger.
  */
 

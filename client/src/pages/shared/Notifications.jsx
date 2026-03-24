@@ -136,15 +136,53 @@ const Notifications = () => {
             case 'permission': return 'Permission Update';
             case 'purchase': return 'Purchase Request';
             case 'birthday': return 'Birthday Celebration';
+            case 'message': return 'New Message';
             case 'conversation': return 'New Message';
             case 'system': return 'System Update';
             default: return 'Notification';
         }
     };
 
+    const parseMetadata = (notification) => {
+        try {
+            return typeof notification?.metadata === 'string'
+                ? JSON.parse(notification.metadata)
+                : (notification?.metadata || {});
+        } catch (error) {
+            console.error('Invalid notification metadata:', error);
+            return {};
+        }
+    };
+
+    const getConversationTarget = (notification, role) => {
+        const metadata = parseMetadata(notification);
+        const conversationId = Number(
+            metadata.conversationId ||
+            metadata.conversation_id ||
+            metadata.threadId ||
+            metadata.thread_id ||
+            0
+        );
+        const messageId = Number(
+            metadata.messageId ||
+            metadata.message_id ||
+            0
+        );
+
+        if (!conversationId || role === 'admin') return null;
+
+        const params = new URLSearchParams({ conversationId: String(conversationId) });
+        if (messageId) params.set('messageId', String(messageId));
+
+        return {
+            path: `/${role}/conversation?${params.toString()}`,
+            state: { conversationId, messageId: messageId || null }
+        };
+    };
+
     const handleAction = (notification) => {
         markAsRead(notification.id);
-        const metadata = typeof notification.metadata === 'string' ? JSON.parse(notification.metadata) : (notification.metadata || {});
+        const metadata = parseMetadata(notification);
         const role = user.role;
 
         switch (notification.type) {
@@ -162,8 +200,15 @@ const Notifications = () => {
                 navigate(`/${role}/purchase`);
                 break;
             case 'conversation':
-                navigate(`/${role}/conversation`);
+            case 'message': {
+                const target = getConversationTarget(notification, role);
+                if (target) {
+                    navigate(target.path, { state: target.state });
+                } else {
+                    navigate(`/${role}/conversation`);
+                }
                 break;
+            }
             case 'birthday':
                 if (metadata.emp_id) navigate(`/${role}/profile/${metadata.emp_id}`);
                 break;

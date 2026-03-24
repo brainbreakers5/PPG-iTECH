@@ -39,6 +39,7 @@ self.addEventListener('push', (event) => {
 // Handle Notification Click
 self.addEventListener('notificationclick', (event) => {
   event.notification.close()
+  const targetUrl = event.notification.data?.url || '/'
   event.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
       if (clientList.length > 0) {
@@ -48,9 +49,9 @@ self.addEventListener('notificationclick', (event) => {
             client = clientList[i]
           }
         }
-        return client.focus()
+        return client.focus().then(() => client.navigate(targetUrl))
       }
-      return clients.openWindow(event.notification.data.url)
+      return clients.openWindow(targetUrl)
     })
   )
 })
