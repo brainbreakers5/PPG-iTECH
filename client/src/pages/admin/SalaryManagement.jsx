@@ -231,36 +231,17 @@ const SalaryManagement = () => {
         setLoading(true);
         try {
             if (isPersonalView) {
-                const [{ data: timelineData }, { data: currentCycleRows }, dailyRes] = await Promise.all([
-                    api.get('/salary/timeline'),
-                    api.get(`/salary?month=${selectedCycle.month}&year=${selectedCycle.year}&fromDate=${selectedCycle.fromDate}&toDate=${selectedCycle.toDate}`),
+                const [{ data: currentCycleRows }, dailyRes] = await Promise.all([
+                    api.get(`/salary?month=${currentCycle.month}&year=${currentCycle.year}&fromDate=${currentCycle.fromDate}&toDate=${currentCycle.toDate}`),
                     user?.emp_id
-                        ? api.get(`/salary/daily?emp_id=${encodeURIComponent(user.emp_id)}&fromDate=${selectedCycle.fromDate}&toDate=${selectedCycle.toDate}`)
+                        ? api.get(`/salary/daily?emp_id=${encodeURIComponent(user.emp_id)}&fromDate=${currentCycle.fromDate}&toDate=${currentCycle.toDate}`)
                             .catch(() => ({ data: null }))
                         : Promise.resolve({ data: null })
                 ]);
 
-                const normalizedTimeline = Array.isArray(timelineData) ? timelineData : [];
                 const currentRows = Array.isArray(currentCycleRows) ? currentCycleRows : [];
                 const myCurrent = currentRows.find((r) => normalizeEmpId(r.emp_id) === normalizeEmpId(user?.emp_id));
-
-                // Always keep current cycle row live by replacing timeline's same-period row.
-                let merged = normalizedTimeline;
-                if (myCurrent) {
-                    const withoutCurrentCycle = normalizedTimeline.filter((r) => !(
-                        normalizeEmpId(r.emp_id) === normalizeEmpId(user?.emp_id)
-                        && normalizeDateOnly(r.from_date) === normalizeDateOnly(selectedCycle.fromDate)
-                        && normalizeDateOnly(r.to_date) === normalizeDateOnly(selectedCycle.toDate)
-                    ));
-                    merged = [myCurrent, ...withoutCurrentCycle];
-                }
-
-                const normalized = merged.slice().sort((a, b) => {
-                    const aDate = new Date(a?.to_date || a?.from_date || a?.created_at || 0).getTime();
-                    const bDate = new Date(b?.to_date || b?.from_date || b?.created_at || 0).getTime();
-                    return bDate - aDate;
-                });
-                setRows(normalized);
+                setRows(myCurrent ? [myCurrent] : []);
                 setLiveDaily(dailyRes?.data || null);
                 setLoading(false);
                 return;
@@ -789,7 +770,7 @@ const SalaryManagement = () => {
                         </h1>
                         <p className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400 mt-2">
                             {isPersonalView
-                                ? 'All your past and current salary records are shown here.'
+                                ? 'Your own salary for the exact current payroll month is shown here with live updates.'
                                 : isHistoryPage
                                     ? 'Select period by month and year using fixed cycle 26 to 25.'
                                     : 'Current live payroll period is fixed and not editable.'}
