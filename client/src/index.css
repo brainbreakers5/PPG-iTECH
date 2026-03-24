@@ -91,6 +91,53 @@ td * {
   word-break: break-word;
 }
 
+@media (max-width: 767px) {
+  table {
+    min-width: max-content;
+    width: max-content;
+    border-collapse: separate;
+    border-spacing: 0;
+    border-radius: 12px;
+    overflow: hidden;
+    background: #ffffff;
+    box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
+  }
+
+  th,
+  td {
+    padding: 12px 16px;
+    min-height: 52px;
+    line-height: 1.45;
+    white-space: nowrap;
+    word-break: normal;
+    overflow-wrap: normal;
+    font-size: 14px;
+    border-color: rgba(15, 23, 42, 0.12);
+  }
+
+  th *,
+  td * {
+    white-space: nowrap;
+    word-break: normal;
+    overflow-wrap: normal;
+  }
+
+  thead th {
+    background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
+    color: #0f172a;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+  }
+
+  tbody tr:nth-child(even) {
+    background: #f8fafc;
+  }
+
+  tbody tr:hover {
+    background: #eef2ff;
+  }
+}
+
 /* Global empty-table mode: if a no-data colspan row exists, hide column headers */
 table:has(tbody td[colspan]) thead {
   display: none;
