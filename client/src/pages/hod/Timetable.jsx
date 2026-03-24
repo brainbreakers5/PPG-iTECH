@@ -431,7 +431,7 @@ const Timetable = ({ showToggle = true }) => {
                             <tbody>
                                 {days.map((day, dIdx) => (
                                     <tr key={day} className="group">
-                                        <td className="p-3 border-b border-r border-sky-50 bg-gray-50/30 text-center font-black text-gray-700 text-[10px] lg:text-xs uppercase tracking-widest whitespace-nowrap">{day.slice(0, 3)}<span className="hidden lg:inline">{day.slice(3)}</span></td>
+                                        <td className="p-3 border-b border-r border-sky-50 bg-gray-50/30 text-center font-black text-gray-700 text-[11px] lg:text-xs uppercase tracking-widest whitespace-nowrap min-w-[120px]">{day}</td>
                                         {displaySlots.map((slot, idx) => {
                                             const isBreak = slot.is_break;
                                             if (isBreak) {
