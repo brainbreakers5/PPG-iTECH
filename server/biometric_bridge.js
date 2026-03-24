@@ -9,7 +9,7 @@ require('dotenv').config();
  * to the web application as soon as someone punches their finger.
  */
 
-const DEVICE_IP = '192.168.1.201';
+const DEVICE_IP = '172.16.100.50';
 const DEVICE_PORT = 4370;
 const SERVER_API_URL = process.env.SERVER_API_BIOMETRIC_URL || `http://localhost:${process.env.PORT || 5000}/api/biometric/log`; // Adjust if server is remote
 
