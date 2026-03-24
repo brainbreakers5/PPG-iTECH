@@ -3,9 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import Layout from '../../components/Layout';
 import api from '../../utils/api';
 import Swal from 'sweetalert2';
-import * as XLSX from 'xlsx';
-import { jsPDF } from 'jspdf';
-import autoTable from 'jspdf-autotable';
+import { runPrintWindow } from '../../utils/printUtils';
 import { FaEdit, FaTrash, FaUserPlus, FaSearch, FaFilter, FaUsers, FaIdBadge, FaEnvelope, FaPhone, FaPrint, FaFileImport, FaHistory, FaUndo } from 'react-icons/fa';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -247,94 +245,85 @@ const EmployeeManagement = () => {
         status: emp.employment_status || 'active'
     }));
 
-    const downloadCsv = (rows) => {
-        const headers = ['emp_id', 'employee_name', 'role', 'department', 'designation', 'email', 'phone', 'status'];
-        const esc = (value) => `"${String(value ?? '').replace(/"/g, '""')}"`;
-        const csv = [
-            headers.join(','),
-            ...rows.map((r) => headers.map((h) => esc(r[h])).join(','))
-        ].join('\n');
-
-        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-        const url = window.URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = `employee_report_${new Date().toISOString().slice(0, 10)}.csv`;
-        document.body.appendChild(link);
-        link.click();
-        link.remove();
-        window.URL.revokeObjectURL(url);
-    };
-
-    const downloadXlsx = (rows) => {
-        const ws = XLSX.utils.json_to_sheet(rows);
-        const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, 'Employees');
-        XLSX.writeFile(wb, `employee_report_${new Date().toISOString().slice(0, 10)}.xlsx`);
-    };
-
-    const downloadPdf = (rows) => {
-        const doc = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a4' });
-        doc.setFontSize(14);
-        doc.text('Employee Management Report', 40, 36);
-        doc.setFontSize(9);
-        doc.text(`Generated: ${new Date().toLocaleString()}`, 40, 52);
-
-        autoTable(doc, {
-            startY: 70,
-            head: [['Emp ID', 'Name', 'Role', 'Department', 'Designation', 'Email', 'Phone', 'Status']],
-            body: rows.map((r) => [
-                r.emp_id,
-                r.employee_name,
-                String(r.role || '').toUpperCase(),
-                r.department,
-                r.designation,
-                r.email,
-                r.phone,
-                r.status
-            ]),
-            styles: { fontSize: 8, cellPadding: 4 },
-            headStyles: { fillColor: [30, 58, 138] }
-        });
-
-        doc.save(`employee_report_${new Date().toISOString().slice(0, 10)}.pdf`);
-    };
-
     const handlePrint = async () => {
         if (!filteredEmployees || filteredEmployees.length === 0) {
             Swal.fire({ icon: 'warning', title: 'No Data', text: 'No employees to print.' });
             return;
         }
+
         const rows = getExportRows();
+        const escapeHtml = (value) => String(value ?? '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
 
-        const result = await Swal.fire({
-            title: 'Download Employee Report',
-            input: 'radio',
-            inputOptions: {
-                pdf: 'PDF (.pdf)',
-                xlsx: 'Excel (.xlsx)',
-                csv: 'CSV (.csv)'
-            },
-            inputValue: 'pdf',
-            showCancelButton: true,
-            confirmButtonText: 'Download',
-            confirmButtonColor: '#2563eb',
-            cancelButtonColor: '#64748b',
-            inputValidator: (value) => (!value ? 'Please select a download format.' : null)
-        });
+        const rowsHtml = rows.map((r, idx) => `
+            <tr>
+                <td>${idx + 1}</td>
+                <td>${escapeHtml(r.emp_id)}</td>
+                <td>${escapeHtml(r.employee_name)}</td>
+                <td>${escapeHtml(String(r.role || '').toUpperCase())}</td>
+                <td>${escapeHtml(r.department)}</td>
+                <td>${escapeHtml(r.designation)}</td>
+                <td>${escapeHtml(r.email)}</td>
+                <td>${escapeHtml(r.phone)}</td>
+                <td>${escapeHtml(r.status)}</td>
+            </tr>
+        `).join('');
 
-        if (!result.isConfirmed || !result.value) return;
+        const html = `<!doctype html>
+<html>
+<head>
+    <meta charset="UTF-8" />
+    <title>Employee Management Report</title>
+    <style>
+        @page { size: A4 landscape; margin: 14mm; }
+        body { font-family: Arial, sans-serif; color: #0f172a; }
+        .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 14px; }
+        .title { font-size: 18px; font-weight: 700; margin: 0; }
+        .meta { font-size: 12px; color: #475569; margin-top: 4px; }
+        table { width: 100%; border-collapse: collapse; font-size: 11px; }
+        th, td { border: 1px solid #cbd5e1; padding: 6px 8px; text-align: left; white-space: nowrap; }
+        th { background: #e2e8f0; font-weight: 700; }
+        tbody tr:nth-child(even) { background: #f8fafc; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div>
+            <p class="title">Employee Management Report</p>
+            <p class="meta">Total Employees: ${rows.length}</p>
+        </div>
+        <p class="meta">Generated: ${new Date().toLocaleString('en-GB')}</p>
+    </div>
+    <table>
+        <thead>
+            <tr>
+                <th>#</th>
+                <th>Emp ID</th>
+                <th>Name</th>
+                <th>Role</th>
+                <th>Department</th>
+                <th>Designation</th>
+                <th>Email</th>
+                <th>Phone</th>
+                <th>Status</th>
+            </tr>
+        </thead>
+        <tbody>
+            ${rowsHtml}
+        </tbody>
+    </table>
+</body>
+</html>`;
 
-        if (result.value === 'pdf') downloadPdf(rows);
-        if (result.value === 'xlsx') downloadXlsx(rows);
-        if (result.value === 'csv') downloadCsv(rows);
-
-        Swal.fire({
-            title: 'Download Started',
-            text: `Employee report is downloading as ${String(result.value).toUpperCase()}.`,
-            icon: 'success',
-            timer: 1500,
-            showConfirmButton: false
+        await runPrintWindow({
+            title: 'Employee Management Report',
+            html,
+            windowFeatures: 'width=1200,height=800',
+            closeAfterPrint: false,
         });
     };
 

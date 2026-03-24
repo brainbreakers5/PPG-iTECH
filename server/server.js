@@ -209,6 +209,7 @@ app.use('/api/holidays', holidayRoutes);
 app.use('/api/leave-limits', leaveLimitRoutes);
 app.use('/api/leave-types', leaveTypeRoutes);
 app.use('/api/biometric', biometricRoutes);
+app.use('/iclock', biometricRoutes);
 app.use('/api/certificates', certificateRoutes);
 app.use('/api/permissions', permissionRoutes);
 app.use('/api/settings', settingsRoutes);
