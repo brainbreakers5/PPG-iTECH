@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import {
   FaTachometerAlt,
@@ -27,8 +27,6 @@ const Sidebar = ({ userRole = 'staff', isOpen, onClose }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const [now, setNow] = useState(new Date());
-  const mobileNavRef = useRef(null);
-  const mobileItemRefs = useRef({});
 
   useEffect(() => {
     const timer = setInterval(() => setNow(new Date()), 1000);
@@ -110,25 +108,6 @@ const Sidebar = ({ userRole = 'staff', isOpen, onClose }) => {
     return location.pathname.startsWith(itemPath);
   };
 
-  useEffect(() => {
-    const isMobile = typeof window !== 'undefined' && window.innerWidth < 1024;
-    if (!isMobile || !mobileNavRef.current) return;
-
-    const activeItem = currentMenuItems.find((item) => isItemActive(item.path));
-    if (!activeItem) return;
-
-    const activeEl = mobileItemRefs.current[activeItem.path];
-    if (!activeEl) return;
-
-    requestAnimationFrame(() => {
-      activeEl.scrollIntoView({
-        behavior: 'smooth',
-        inline: 'center',
-        block: 'nearest',
-      });
-    });
-  }, [location.pathname, currentMenuItems]);
-
   const activeClass = "bg-white/70 text-sky-600 shadow-sm backdrop-blur-md transform scale-[1.02] transition-all duration-300 border border-white/50";
   const inactiveClass = "text-gray-500 hover:bg-white/40 hover:text-sky-600 transition-all duration-300";
 
@@ -153,17 +132,11 @@ const Sidebar = ({ userRole = 'staff', isOpen, onClose }) => {
       </div>
 
       {/* Nav Items */}
-      <div ref={mobileNavRef} className="flex-1 overflow-x-auto overflow-y-hidden no-scrollbar py-2 px-2 max-[320px]:px-1 lg:overflow-y-auto lg:overflow-x-hidden lg:py-2 lg:max-[320px]:py-1.5 lg:px-1 lg:max-[320px]:px-0.5">
+      <div className="flex-1 overflow-x-auto overflow-y-hidden no-scrollbar py-2 px-2 max-[320px]:px-1 lg:overflow-y-auto lg:overflow-x-hidden lg:py-2 lg:max-[320px]:py-1.5 lg:px-1 lg:max-[320px]:px-0.5">
         <nav>
           <ul className="flex items-center gap-1.5 min-w-max max-[320px]:gap-1 lg:block lg:min-w-0 lg:space-y-3 lg:max-[320px]:space-y-2">
             {currentMenuItems.map((item) => (
-              <li
-                key={item.label}
-                className="shrink-0 lg:shrink"
-                ref={(el) => {
-                  mobileItemRefs.current[item.path] = el;
-                }}
-              >
+              <li key={item.label} className="shrink-0 lg:shrink">
                 <NavLink
                   to={item.path}
                   end={item.path.split('/').length <= 2}

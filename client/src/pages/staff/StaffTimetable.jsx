@@ -386,10 +386,10 @@ const TimetableGrid = ({ days, displaySlots, timetable, loading, showStaffName, 
     <>
         <div className="styled-table-container modern-card !p-0 overflow-hidden border-sky-100">
             <div className="overflow-x-auto -mx-0">
-                <table className="w-full border-collapse min-w-[980px] md:min-w-[1100px] table-fixed">
+                        <table className="w-full border-collapse min-w-[980px] md:min-w-[1100px] table-fixed">
                     <thead>
                         <tr className="bg-sky-50/50">
-                            <th className="p-3 border-b border-r border-sky-100 font-black text-[10px] text-sky-500 uppercase tracking-[0.2em] text-center w-20 lg:w-32 whitespace-nowrap">Timeline</th>
+                                    <th className="p-3 border-b border-r border-sky-100 font-black text-[10px] text-sky-500 uppercase tracking-[0.2em] text-center w-32 md:w-40 whitespace-nowrap">Timeline</th>
                             {displaySlots.map((slot, idx) => {
                                 const isBreak = slot.is_break;
                                 return (
@@ -416,7 +416,7 @@ const TimetableGrid = ({ days, displaySlots, timetable, loading, showStaffName, 
                     <tbody>
                         {days.map((day, dayIdx) => (
                             <tr key={day} className="group">
-                                <td className="p-3 border-b border-r border-sky-50 bg-gray-50/30 text-center font-black text-gray-700 text-[10px] lg:text-xs uppercase tracking-widest whitespace-nowrap">{day.slice(0, 3)}<span className="hidden lg:inline">{day.slice(3)}</span></td>
+                                <td className="p-3 border-b border-r border-sky-50 bg-gray-50/30 text-center font-black text-gray-700 text-[10px] lg:text-xs uppercase tracking-widest whitespace-nowrap w-32 md:w-40">{day}</td>
                                 {displaySlots.map((slot, idx) => {
                                     const isBreak = slot.is_break;
                                     if (isBreak) {
