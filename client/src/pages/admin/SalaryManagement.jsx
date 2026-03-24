@@ -56,6 +56,7 @@ const getCycleByMonthYear = (month, year) => {
 };
 
 const toCurrency = (v) => Number(v || 0).toLocaleString('en-IN');
+const getTodayIso = () => new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
 const normalizeEmpId = (v) => String(v || '').trim().toLowerCase();
 const normalizeDateOnly = (v) => {
     if (!v) return '';
@@ -143,6 +144,7 @@ const SalaryManagement = () => {
     }, [isHistoryPage, selectedMonth, selectedYear, currentCycle]);
 
     const [rows, setRows] = useState([]);
+    const [liveDaily, setLiveDaily] = useState(null);
     const [loading, setLoading] = useState(true);
     const [selectedIds, setSelectedIds] = useState([]);
     const [activeRole, setActiveRole] = useState('all');
@@ -210,13 +212,32 @@ const SalaryManagement = () => {
         };
     }, [isPersonalView, rows, selectedCycle, cycleWorkingDays]);
 
+    const liveDailyOverview = useMemo(() => {
+        if (!isPersonalView || !liveDaily) return null;
+        const todayIso = getTodayIso();
+        const todayRow = Array.isArray(liveDaily.breakdown)
+            ? liveDaily.breakdown.find((d) => normalizeDateOnly(d?.date) === todayIso)
+            : null;
+
+        return {
+            dailyRate: Number(liveDaily.daily_rate || 0),
+            earnedToDate: Number(liveDaily.total_gross || 0),
+            todayEarned: Number(todayRow?.net_earned || todayRow?.gross_earned || 0),
+            todayStatus: String(todayRow?.status || 'N/A')
+        };
+    }, [isPersonalView, liveDaily]);
+
     const refreshRows = async () => {
         setLoading(true);
         try {
             if (isPersonalView) {
-                const [{ data: timelineData }, { data: currentCycleRows }] = await Promise.all([
+                const [{ data: timelineData }, { data: currentCycleRows }, dailyRes] = await Promise.all([
                     api.get('/salary/timeline'),
-                    api.get(`/salary?month=${currentCycle.month}&year=${currentCycle.year}&fromDate=${currentCycle.fromDate}&toDate=${currentCycle.toDate}`)
+                    api.get(`/salary?month=${currentCycle.month}&year=${currentCycle.year}&fromDate=${currentCycle.fromDate}&toDate=${currentCycle.toDate}`),
+                    user?.emp_id
+                        ? api.get(`/salary/daily?emp_id=${encodeURIComponent(user.emp_id)}&fromDate=${currentCycle.fromDate}&toDate=${currentCycle.toDate}`)
+                            .catch(() => ({ data: null }))
+                        : Promise.resolve({ data: null })
                 ]);
 
                 const normalizedTimeline = Array.isArray(timelineData) ? timelineData : [];
@@ -238,6 +259,7 @@ const SalaryManagement = () => {
                     return bDate - aDate;
                 });
                 setRows(normalized);
+                setLiveDaily(dailyRes?.data || null);
                 setLoading(false);
                 return;
             }
@@ -252,9 +274,11 @@ const SalaryManagement = () => {
 
             const { data } = await api.get(`/salary?${params.toString()}`);
             setRows(Array.isArray(data) ? data : []);
+            setLiveDaily(null);
         } catch (error) {
             console.error('Failed to fetch salaries:', error);
             setRows([]);
+            setLiveDaily(null);
         } finally {
             setLoading(false);
         }
@@ -832,7 +856,7 @@ const SalaryManagement = () => {
                 {renderFilterControls}
 
                 {isPersonalView && livePersonalOverview && (
-                    <motion.div variants={staggerWrap} className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                    <motion.div variants={staggerWrap} className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
                         <motion.div variants={fadeUp} transition={{ duration: 0.35 }} className="modern-card p-5 border-sky-50">
                             <p className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">Live Gross</p>
                             <p className="mt-2 text-xl font-black text-gray-800 tracking-tighter">Rs {toCurrency(livePersonalOverview.gross)}</p>
@@ -855,6 +879,22 @@ const SalaryManagement = () => {
                             <p className="mt-2 text-xl font-black text-indigo-700 tracking-tighter">{livePersonalOverview.workingDays}</p>
                             <p className="text-[10px] font-bold text-gray-400 mt-2">Selected calendar period</p>
                         </motion.div>
+                        <motion.div variants={fadeUp} transition={{ duration: 0.35 }} className="modern-card p-5 border-amber-50">
+                            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">Live Daily Salary</p>
+                            <p className="mt-2 text-xl font-black text-amber-700 tracking-tighter">Rs {toCurrency(liveDailyOverview?.dailyRate || 0)}</p>
+                            <p className="text-[10px] font-bold text-gray-400 mt-2">Today's earned: Rs {toCurrency(liveDailyOverview?.todayEarned || 0)} ({liveDailyOverview?.todayStatus || 'N/A'})</p>
+                        </motion.div>
+                    </motion.div>
+                )}
+
+                {isPersonalView && liveDailyOverview && (
+                    <motion.div
+                        variants={fadeUp}
+                        transition={{ duration: 0.35 }}
+                        className="modern-card p-4 border-amber-100 mb-6"
+                    >
+                        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">Live Earned So Far In Current Cycle</p>
+                        <p className="mt-1 text-lg font-black text-amber-700 tracking-tight">Rs {toCurrency(liveDailyOverview.earnedToDate)}</p>
                     </motion.div>
                 )}
 

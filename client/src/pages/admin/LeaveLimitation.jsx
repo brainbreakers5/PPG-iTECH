@@ -352,37 +352,41 @@ const LeaveLimitation = () => {
     };
 
     const handleBulkSet = async () => {
-        // Exclude no-limit types (Permission is included now)
-        const editableTypes = leaveTypes.filter(t => !noLimitTypes.includes(t.key));
+        const defaultYear = new Date(fromDate || new Date().toISOString().slice(0, 10)).getFullYear();
+        const defaultMonth = (fromDate || new Date().toISOString().slice(0, 10)).slice(0, 7);
         const { value: formValues } = await Swal.fire({
-            title: 'Set Default Limits for All Employees',
+            title: 'Set CL Yearly & PL Monthly',
             html: `
                 <div style="display:grid; gap:16px; text-align:left; padding:10px 0;">
                     <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px; padding:12px; background:#f8fafc; border-radius:12px; margin-bottom:8px;">
                         <div>
-                            <label style="font-size:11px; font-weight:900; color:#64748b; text-transform:uppercase; letter-spacing:0.1em; display:block; margin-bottom:6px;">From Date</label>
-                            <input id="bulk_from_date" type="date" value="${fromDate}" 
+                            <label style="font-size:11px; font-weight:900; color:#64748b; text-transform:uppercase; letter-spacing:0.1em; display:block; margin-bottom:6px;">CL Year</label>
+                            <input id="bulk_year" type="number" min="2000" max="2100" value="${defaultYear}" 
                                 style="width:100%; padding:8px 12px; border:2px solid #e5e7eb; border-radius:10px; font-weight:600; font-size:13px; outline:none;">
                         </div>
                         <div>
-                            <label style="font-size:11px; font-weight:900; color:#64748b; text-transform:uppercase; letter-spacing:0.1em; display:block; margin-bottom:6px;">To Date</label>
-                            <input id="bulk_to_date" type="date" value="${toDate}" 
+                            <label style="font-size:11px; font-weight:900; color:#64748b; text-transform:uppercase; letter-spacing:0.1em; display:block; margin-bottom:6px;">PL Month</label>
+                            <input id="bulk_permission_month" type="month" value="${defaultMonth}" 
                                 style="width:100%; padding:8px 12px; border:2px solid #e5e7eb; border-radius:10px; font-weight:600; font-size:13px; outline:none;">
                         </div>
                     </div>
                     <div style="border-top:2px solid #e5e7eb; padding-top:12px;">
-                        ${editableTypes.map(t => `
-                            <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:10px;">
-                                <label style="font-size:12px; font-weight:900; color:#6b7280; text-transform:uppercase; letter-spacing:0.1em; flex:1;">
-                                    ${t.full} (${t.label}) 
-                                    ${t.key === 'permission' ? '<span style="color:#4f46e5; font-size:9px; margin-left:8px; background:#eef2ff; padding:2px 6px; border-radius:6px; border:1px solid #c7d2fe;">Monthly Limit</span>' : ''}
-                                </label>
-                                <input id="bulk_${t.key}" type="number" min="0" max="365" value="${t.key === 'permission' ? 2 : (t.defaultDays || 12)}"
-                                    style="width:80px; padding:8px 12px; border:2px solid #e5e7eb; border-radius:12px; font-weight:700; font-size:14px; text-align:center; outline:none;">
-                            </div>
-                        `).join('')}
+                        <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:10px;">
+                            <label style="font-size:12px; font-weight:900; color:#6b7280; text-transform:uppercase; letter-spacing:0.1em; flex:1;">
+                                Casual Leave (CL) <span style="color:#0369a1; font-size:9px; margin-left:8px; background:#e0f2fe; padding:2px 6px; border-radius:6px; border:1px solid #bae6fd;">Yearly Limit</span>
+                            </label>
+                            <input id="bulk_cl_limit" type="number" min="0" max="365" value="12"
+                                style="width:80px; padding:8px 12px; border:2px solid #e5e7eb; border-radius:12px; font-weight:700; font-size:14px; text-align:center; outline:none;">
+                        </div>
+                        <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:10px;">
+                            <label style="font-size:12px; font-weight:900; color:#6b7280; text-transform:uppercase; letter-spacing:0.1em; flex:1;">
+                                Permission Letter (PL) <span style="color:#4f46e5; font-size:9px; margin-left:8px; background:#eef2ff; padding:2px 6px; border-radius:6px; border:1px solid #c7d2fe;">Monthly Limit</span>
+                            </label>
+                            <input id="bulk_permission_limit" type="number" min="0" max="31" value="2"
+                                style="width:80px; padding:8px 12px; border:2px solid #e5e7eb; border-radius:12px; font-weight:700; font-size:14px; text-align:center; outline:none;">
+                        </div>
                         <div style="margin-top:8px; padding:8px 12px; background:#f0fdf4; border-radius:10px; font-size:11px; color:#16a34a; font-weight:700;">
-                            ML, OD, and Comp Leave are automatically handled or have no limit. PL is monthly.
+                            CL will be saved as yearly value for selected employees. PL will be saved and reset month-wise for the selected PL month.
                         </div>
                     </div>
                 </div>
@@ -393,31 +397,42 @@ const LeaveLimitation = () => {
             focusConfirm: false,
             width: '550px',
             preConfirm: () => {
-                const values = {};
-                editableTypes.forEach(t => {
-                    const mappedKey = `${colPrefix(t.key)}_limit`;
-                    const raw = document.getElementById(`bulk_${t.key}`)?.value;
-                    const parsed = Number.parseInt(raw, 10);
-                    const fallback = t.key === 'permission' ? 2 : (t.defaultDays || 12);
-                    values[mappedKey] = Number.isFinite(parsed) ? Math.max(0, Math.min(365, parsed)) : fallback;
-                });
-                values.fromDate = document.getElementById('bulk_from_date')?.value;
-                values.toDate = document.getElementById('bulk_to_date')?.value;
+                const yearRaw = document.getElementById('bulk_year')?.value;
+                const clRaw = document.getElementById('bulk_cl_limit')?.value;
+                const plRaw = document.getElementById('bulk_permission_limit')?.value;
+                const permissionMonth = document.getElementById('bulk_permission_month')?.value;
 
-                if (!values.fromDate || !values.toDate) {
-                    Swal.showValidationMessage('From Date and To Date are required.');
+                const year = Number.parseInt(yearRaw, 10);
+                const clLimit = Number.parseInt(clRaw, 10);
+                const permissionLimit = Number.parseInt(plRaw, 10);
+
+                if (!Number.isFinite(year) || year < 2000 || year > 2100) {
+                    Swal.showValidationMessage('Please provide a valid CL year.');
                     return false;
                 }
-                if (new Date(values.fromDate) > new Date(values.toDate)) {
-                    Swal.showValidationMessage('From Date cannot be after To Date.');
+                if (!Number.isFinite(clLimit) || clLimit < 0 || clLimit > 365) {
+                    Swal.showValidationMessage('CL yearly limit should be between 0 and 365.');
                     return false;
                 }
-                return values;
+                if (!Number.isFinite(permissionLimit) || permissionLimit < 0 || permissionLimit > 31) {
+                    Swal.showValidationMessage('PL monthly limit should be between 0 and 31.');
+                    return false;
+                }
+                if (!/^\d{4}-\d{2}$/.test(String(permissionMonth || ''))) {
+                    Swal.showValidationMessage('Please select a valid PL month.');
+                    return false;
+                }
+
+                return {
+                    year,
+                    cl_limit: clLimit,
+                    permission_limit: permissionLimit,
+                    permission_month: permissionMonth,
+                };
             }
         });
 
         if (formValues) {
-            const year = new Date(formValues.fromDate || fromDate).getFullYear();
             const selectedTargets = Array.from(new Set(selectedEmpIds.map((id) => String(id || '').trim()).filter(Boolean)));
             if (!selectedTargets.length) {
                 Swal.fire({
@@ -429,16 +444,11 @@ const LeaveLimitation = () => {
                 return;
             }
             const payload = {
-                year,
-                fromDate: formValues.fromDate,
-                toDate: formValues.toDate,
+                year: formValues.year,
                 emp_ids: selectedTargets,
                 cl_limit: formValues.cl_limit,
-                ml_limit: formValues.ml_limit,
-                od_limit: formValues.od_limit,
-                comp_limit: formValues.comp_limit ?? formValues.comp_leave_limit,
-                lop_limit: formValues.lop_limit,
-                permission_limit: formValues.permission_limit
+                permission_limit: formValues.permission_limit,
+                permission_month: formValues.permission_month
             };
 
             Swal.fire({

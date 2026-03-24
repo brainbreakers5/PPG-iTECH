@@ -348,6 +348,7 @@ exports.bulkUpdateLeaveLimits = async (req, res) => {
             comp_leave_limit,
             lop_limit,
             permission_limit,
+            permission_month,
             fromMonth,
             toMonth,
             fromDate,
@@ -355,22 +356,43 @@ exports.bulkUpdateLeaveLimits = async (req, res) => {
             emp_ids
         } = req.body;
 
-        const normalizedCompLimit = sanitizeLimit(comp_limit ?? comp_leave_limit, 6);
-        const normalizedClLimit = sanitizeLimit(cl_limit, 12);
-        const normalizedMlLimit = sanitizeLimit(ml_limit, 12);
-        const normalizedOdLimit = sanitizeLimit(od_limit, 10);
-        const normalizedLopLimit = sanitizeLimit(lop_limit, 30);
-        const normalizedPermissionLimit = sanitizeLimit(permission_limit, 2);
+        const hasClLimit = cl_limit !== undefined && cl_limit !== null && cl_limit !== '';
+        const hasMlLimit = ml_limit !== undefined && ml_limit !== null && ml_limit !== '';
+        const hasOdLimit = od_limit !== undefined && od_limit !== null && od_limit !== '';
+        const hasCompLimit = (comp_limit !== undefined && comp_limit !== null && comp_limit !== '')
+            || (comp_leave_limit !== undefined && comp_leave_limit !== null && comp_leave_limit !== '');
+        const hasLopLimit = lop_limit !== undefined && lop_limit !== null && lop_limit !== '';
+        const hasPermissionLimit = permission_limit !== undefined && permission_limit !== null && permission_limit !== '';
 
-        const resolvedFromDate = normalizePeriodDate(fromDate || fromMonth, false);
-        const resolvedToDate = normalizePeriodDate(toDate || toMonth, true);
+        if (!hasClLimit && !hasMlLimit && !hasOdLimit && !hasCompLimit && !hasLopLimit && !hasPermissionLimit) {
+            return res.status(400).json({ message: 'Provide at least one limit to update.' });
+        }
 
-        if (!resolvedFromDate || !resolvedToDate) {
-            return res.status(400).json({ message: 'Invalid period. From Date and To Date are required in YYYY-MM-DD format.' });
+        const normalizedCompLimit = hasCompLimit ? sanitizeLimit(comp_limit ?? comp_leave_limit, 6) : null;
+        const normalizedClLimit = hasClLimit ? sanitizeLimit(cl_limit, 12) : null;
+        const normalizedMlLimit = hasMlLimit ? sanitizeLimit(ml_limit, 12) : null;
+        const normalizedOdLimit = hasOdLimit ? sanitizeLimit(od_limit, 10) : null;
+        const normalizedLopLimit = hasLopLimit ? sanitizeLimit(lop_limit, 30) : null;
+        const normalizedPermissionLimit = hasPermissionLimit ? sanitizeLimit(permission_limit, 2) : null;
+
+        const hasPeriod = Boolean(fromDate || toDate || fromMonth || toMonth);
+        let resolvedFromDate = null;
+        let resolvedToDate = null;
+        if (hasPeriod) {
+            resolvedFromDate = normalizePeriodDate(fromDate || fromMonth, false);
+            resolvedToDate = normalizePeriodDate(toDate || toMonth, true);
+
+            if (!resolvedFromDate || !resolvedToDate) {
+                return res.status(400).json({ message: 'Invalid period. From Date and To Date are required in YYYY-MM-DD format.' });
+            }
+            if (new Date(resolvedFromDate) > new Date(resolvedToDate)) {
+                return res.status(400).json({ message: 'Invalid period. From Date cannot be after To Date.' });
+            }
         }
-        if (new Date(resolvedFromDate) > new Date(resolvedToDate)) {
-            return res.status(400).json({ message: 'Invalid period. From Date cannot be after To Date.' });
-        }
+
+        const resolvedPermissionMonth = /^\d{4}-\d{2}$/.test(String(permission_month || '').trim())
+            ? String(permission_month).trim()
+            : (hasPermissionLimit ? currentMonthKey() : null);
 
         let employees = [];
         if (Array.isArray(emp_ids) && emp_ids.length > 0) {
@@ -422,19 +444,18 @@ exports.bulkUpdateLeaveLimits = async (req, res) => {
                 await ensureLimitRow(client, normalizedEmpId, year);
 
                 await client.query(
-                    `INSERT INTO leave_limits (emp_id, year, cl_limit, ml_limit, od_limit, comp_limit, lop_limit, permission_limit, from_month, to_month, updated_at)
-                     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW())
-                     ON CONFLICT (emp_id, year)
-                     DO UPDATE SET
-                        cl_limit = $3,
-                        ml_limit = $4,
-                        od_limit = $5,
-                        comp_limit = $6,
-                        lop_limit = $7,
-                        permission_limit = $8,
-                        from_month = $9,
-                        to_month = $10,
-                        updated_at = NOW()`,
+                    `UPDATE leave_limits
+                     SET
+                        cl_limit = COALESCE($3, cl_limit),
+                        ml_limit = COALESCE($4, ml_limit),
+                        od_limit = COALESCE($5, od_limit),
+                        comp_limit = COALESCE($6, comp_limit),
+                        lop_limit = COALESCE($7, lop_limit),
+                        permission_limit = COALESCE($8, permission_limit),
+                        from_month = COALESCE($9, from_month),
+                        to_month = COALESCE($10, to_month),
+                        updated_at = NOW()
+                     WHERE emp_id = $1 AND year = $2`,
                     [
                         normalizedEmpId,
                         year,
@@ -449,9 +470,11 @@ exports.bulkUpdateLeaveLimits = async (req, res) => {
                     ]
                 );
 
-                // If period moves to a new month, PL counters reset for that month.
-                const resetMonthKey = toMonthKey(resolvedFromDate) || currentMonthKey();
-                await ensureMonthlyPermissionReset(client, normalizedEmpId, year, resetMonthKey);
+                // PL is monthly: reset against the requested month (or current month when omitted).
+                if (hasPermissionLimit) {
+                    const resetMonthKey = resolvedPermissionMonth || toMonthKey(resolvedFromDate) || currentMonthKey();
+                    await ensureMonthlyPermissionReset(client, normalizedEmpId, year, resetMonthKey);
+                }
                 updatedCount += 1;
             } catch (employeeError) {
                 failedEmployees.push({ emp_id: normalizedEmpId, error: employeeError.message });
