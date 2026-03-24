@@ -391,7 +391,7 @@ const TimetableGrid = ({ days, displaySlots, timetable, loading, showStaffName, 
                         <tr className="bg-sky-50/50">
                                     <th
                                         className="p-3 border-b border-r border-sky-100 font-black text-[10px] text-sky-500 tracking-[0.08em] text-center w-32 md:w-40 whitespace-nowrap"
-                                        style={{ writingMode: 'horizontal-tb', textOrientation: 'mixed', transform: 'none' }}
+                                        style={{ writingMode: 'horizontal-tb', textOrientation: 'mixed', transform: 'none', minWidth: '160px', maxWidth: '160px', whiteSpace: 'nowrap', wordBreak: 'normal' }}
                                     >
                                         Timeline
                                     </th>
@@ -423,7 +423,7 @@ const TimetableGrid = ({ days, displaySlots, timetable, loading, showStaffName, 
                             <tr key={day} className="group">
                                 <td
                                     className="p-3 border-b border-r border-sky-50 bg-gray-50/30 text-center font-black text-gray-700 text-[10px] lg:text-xs tracking-[0.08em] whitespace-nowrap w-32 md:w-40"
-                                    style={{ writingMode: 'horizontal-tb', textOrientation: 'mixed', transform: 'none' }}
+                                    style={{ writingMode: 'horizontal-tb', textOrientation: 'mixed', transform: 'none', minWidth: '160px', maxWidth: '160px', whiteSpace: 'nowrap', wordBreak: 'normal' }}
                                 >
                                     {day}
                                 </td>
