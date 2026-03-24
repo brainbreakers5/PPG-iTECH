@@ -83,20 +83,6 @@ const HODDashboard = () => {
             setAllEmployees(emps);
             const month = date.slice(0, 7);
             const { data: records } = await api.get(`/attendance?month=${month}&emp_id=${user.emp_id}`);
-            const counts = { present: 0, absent: 0, od: 0, cl: 0, ml: 0, comp_leave: 0, lop: 0, late_entry: 0 };
-            (records || []).forEach(r => {
-                const s = (r.status || '').toUpperCase();
-                const rem = (r.remarks || '').toUpperCase();
-                if (s.includes('PRESENT')) counts.present++;
-                if (s.includes('ABSENT')) counts.absent++;
-                if (s.includes('OD') || rem.includes('OD')) counts.od++;
-                if ((s.includes('CL') || rem.includes('CL') || rem.includes('CASUAL')) && !s.includes('COMP') && !rem.includes('COMP')) counts.cl++;
-                if (s.includes('ML') || rem.includes('ML') || rem.includes('MEDICAL')) counts.ml++;
-                if (s.includes('COMP LEAVE') || rem.includes('COMP LEAVE')) counts.comp_leave++;
-                if (s.includes('LOP') || rem.includes('LOP')) counts.lop++;
-                if (rem.includes('LATE ENTRY')) counts.late_entry++;
-            });
-            setMyStats(counts);
             // Build today's attendance map
             const { data: todayAtt } = await api.get(`/attendance?date=${date}`);
             const map = {};
@@ -116,6 +102,27 @@ const HODDashboard = () => {
             const todayDOW = new Date().getDay();
             const isTodayNonWorking = isTodayHoliday || todayDOW === 0 || todayDOW === 6;
             setIsNonWorkingDay(isTodayNonWorking);
+
+            const counts = { present: 0, absent: 0, od: 0, cl: 0, ml: 0, comp_leave: 0, lop: 0, late_entry: 0 };
+            (records || []).forEach(r => {
+                const s = (r.status || '').toUpperCase();
+                const rem = (r.remarks || '').toUpperCase();
+                const recordDate = String(r.date).slice(0, 10);
+                const isHoliday = holidayDateSet.has(recordDate);
+                const dow = new Date(recordDate).getDay();
+                const isWeekend = dow === 0 || dow === 6;
+                const isNonWorking = isHoliday || isWeekend;
+
+                if (s.includes('PRESENT')) counts.present++;
+                if (s.includes('ABSENT') && !isNonWorking) counts.absent++;
+                if (s.includes('OD') || rem.includes('OD')) counts.od++;
+                if ((s.includes('CL') || rem.includes('CL') || rem.includes('CASUAL')) && !s.includes('COMP') && !rem.includes('COMP')) counts.cl++;
+                if (s.includes('ML') || rem.includes('ML') || rem.includes('MEDICAL')) counts.ml++;
+                if (s.includes('COMP LEAVE') || rem.includes('COMP LEAVE')) counts.comp_leave++;
+                if (s.includes('LOP') || rem.includes('LOP')) counts.lop++;
+                if (rem.includes('LATE ENTRY')) counts.late_entry++;
+            });
+            setMyStats(counts);
 
             // Aggregate rows into role-based stats
             const agg = { 

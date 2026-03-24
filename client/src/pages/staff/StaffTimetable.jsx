@@ -386,14 +386,14 @@ const TimetableGrid = ({ days, displaySlots, timetable, loading, showStaffName, 
     <>
         <div className="styled-table-container modern-card !p-0 overflow-hidden border-sky-100">
             <div className="overflow-x-auto -mx-0">
-                <table className="w-full border-collapse min-w-[800px] table-auto">
+                <table className="w-full border-collapse min-w-[980px] md:min-w-[1100px] table-fixed">
                     <thead>
                         <tr className="bg-sky-50/50">
                             <th className="p-3 border-b border-r border-sky-100 font-black text-[10px] text-sky-500 uppercase tracking-[0.2em] text-center w-20 lg:w-32 whitespace-nowrap">Timeline</th>
                             {displaySlots.map((slot, idx) => {
                                 const isBreak = slot.is_break;
                                 return (
-                                    <th key={idx} className={`border-r text-center ${isBreak ? 'bg-slate-50 border-sky-100 border-b-0' : 'p-4 border-b border-sky-100'}`} style={{ width: `${100 / displaySlots.length}%` }}>
+                                    <th key={idx} className={`border-r text-center ${isBreak ? 'bg-slate-50 border-sky-100 border-b-0' : 'p-4 border-b border-sky-100'}`} style={{ width: `${100 / displaySlots.length}%`, minWidth: isBreak ? '44px' : '140px' }}>
                                         {!isBreak && (
                                             <>
                                                 <div className="flex items-center justify-center gap-2">
@@ -438,18 +438,18 @@ const TimetableGrid = ({ days, displaySlots, timetable, loading, showStaffName, 
                                     const p = slot.period_number;
                                     const entries = timetable.filter(t => t.day_of_week === day && t.period_number === p);
                                     return (
-                                        <td key={idx} className="p-2 border-b border-r border-sky-50 align-top min-h-[80px] h-24 relative">
+                                        <td key={idx} className="p-2 border-b border-r border-sky-50 align-top min-h-[80px] h-24 relative w-[140px] max-w-[140px]">
                                             <AnimatePresence>
                                                 {entries.map(entry => (
                                                     <motion.div
                                                         key={entry.id}
                                                         initial={{ opacity: 0, scale: 0.95 }}
                                                         animate={{ opacity: 1, scale: 1 }}
-                                                        className="h-full bg-white border-2 border-sky-100 p-4 rounded-2xl shadow-lg shadow-sky-50/50 flex flex-col justify-between overflow-hidden relative group/entry hover:border-sky-400 transition-all"
+                                                        className="h-full min-w-0 bg-white border-2 border-sky-100 p-2.5 md:p-3 rounded-2xl shadow-lg shadow-sky-50/50 flex flex-col justify-between overflow-hidden relative group/entry hover:border-sky-400 transition-all"
                                                     >
-                                                        <div className="space-y-1.5">
+                                                        <div className="space-y-1.5 min-w-0">
                                                             <div className="flex items-start justify-between gap-2">
-                                                                <span className="px-2 py-0.5 bg-sky-100 text-sky-600 rounded-lg text-[8px] font-black uppercase tracking-widest shrink-0">{entry.subject_code || 'N/A'}</span>
+                                                                <span className="px-2 py-0.5 bg-sky-100 text-sky-600 rounded-lg text-[8px] font-black uppercase tracking-widest shrink-0 max-w-[70px] truncate">{entry.subject_code || 'N/A'}</span>
                                                                 {view === 'my' && (
                                                                     <div className="flex gap-2 opacity-0 group-hover/entry:opacity-100 transition-all transform translate-y-[-10px] group-hover/entry:translate-y-0">
                                                                         <button onClick={() => handleAction(entry)} className="text-sky-400 hover:text-sky-600 transition-colors"><FaEdit size={10} /></button>
@@ -457,16 +457,16 @@ const TimetableGrid = ({ days, displaySlots, timetable, loading, showStaffName, 
                                                                     </div>
                                                                 )}
                                                             </div>
-                                                            <p className="text-sm font-black text-gray-800 tracking-tight line-clamp-2 leading-snug">{entry.subject}</p>
+                                                            <p className="text-xs md:text-sm font-black text-gray-800 tracking-tight line-clamp-2 leading-snug break-words">{entry.subject}</p>
                                                         </div>
-                                                        <div className="mt-3 pt-2 border-t border-gray-50 flex items-center justify-between">
-                                                            <div className="flex items-center gap-1.5 text-[9px] font-black text-gray-400 uppercase tracking-widest">
+                                                        <div className="mt-2 pt-2 border-t border-gray-50 flex flex-col gap-1 min-w-0">
+                                                            <div className="flex items-center gap-1.5 text-[8px] md:text-[9px] font-black text-gray-400 uppercase tracking-widest min-w-0">
                                                                 <FaClock className="text-sky-300" />
-                                                                {to12h(getPeriodConfig(entry.period_number)?.start_time || entry.start_time)} – {to12h(getPeriodConfig(entry.period_number)?.end_time || entry.end_time)}
+                                                                <span className="truncate">{to12h(getPeriodConfig(entry.period_number)?.start_time || entry.start_time)} – {to12h(getPeriodConfig(entry.period_number)?.end_time || entry.end_time)}</span>
                                                             </div>
                                                             {entry.room_number && (
-                                                                <div className="flex items-center gap-1 text-[9px] font-black text-sky-500 uppercase tracking-widest">
-                                                                    <FaDoorOpen size={9} /> {entry.room_number}
+                                                                <div className="flex items-center gap-1 text-[8px] md:text-[9px] font-black text-sky-500 uppercase tracking-widest min-w-0">
+                                                                    <FaDoorOpen size={9} /> <span className="truncate">{entry.room_number}</span>
                                                                 </div>
                                                             )}
                                                         </div>

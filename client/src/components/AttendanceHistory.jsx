@@ -7,28 +7,42 @@ import { formatTo12Hr } from '../utils/timeFormatter';
 
 const AttendanceHistory = ({ empId, month: propMonth, startDate, endDate, recentOnly = true, statusFilter = null, onLoadSummary = null }) => {
     const [records, setRecords] = useState([]);
+    const [holidayDateSet, setHolidayDateSet] = useState(new Set());
     const [loading, setLoading] = useState(true);
     const socket = useSocket();
 
     const fetchAttendance = useCallback(async () => {
         let data;
         try {
+            const selectedMonth = propMonth || new Date().toISOString().slice(0, 7);
             let query = `/attendance?emp_id=${empId}`;
             if (statusFilter) {
-                const selectedMonth = propMonth || new Date().toISOString().slice(0, 7);
                 query += `&month=${selectedMonth}`;
             } else if (recentOnly) {
                 query += `&onlyUploaded=true&recent=true&limit=50`;
             } else if (startDate && endDate) {
                 query += `&startDate=${startDate}&endDate=${endDate}`;
             } else {
-                const selectedMonth = propMonth || new Date().toISOString().slice(0, 7);
                 query += `&month=${selectedMonth}`;
             }
 
-            const response = await api.get(query);
+            const [response, holidayResponse] = await Promise.all([
+                api.get(query),
+                (() => {
+                    const [year, month] = String(selectedMonth).split('-');
+                    if (!year || !month) return Promise.resolve({ data: [] });
+                    return api.get(`/holidays?month=${Number(month)}&year=${Number(year)}`).catch(() => ({ data: [] }));
+                })()
+            ]);
+
             data = response.data;
             setRecords(data || []);
+
+            const holidaySet = new Set();
+            (holidayResponse?.data || []).forEach((h) => {
+                if (h?.h_date) holidaySet.add(String(h.h_date).slice(0, 10));
+            });
+            setHolidayDateSet(holidaySet);
         } catch (error) {
             console.error('Error fetching attendance history', error);
         } finally {
@@ -57,7 +71,14 @@ const AttendanceHistory = ({ empId, month: propMonth, startDate, endDate, recent
             const s = r.status || '';
             const rem = r.remarks || '';
             if (statusFilter === 'Present') return s.includes('Present');
-            if (statusFilter === 'Absent') return s.includes('Absent');
+            if (statusFilter === 'Absent') {
+                if (!s.includes('Absent')) return false;
+                const dateStr = String(r.date || '').slice(0, 10);
+                const dow = dateStr ? new Date(`${dateStr}T00:00:00`).getDay() : -1;
+                const isWeekend = dow === 0 || dow === 6;
+                const isHoliday = holidayDateSet.has(dateStr);
+                return !isWeekend && !isHoliday;
+            }
             if (statusFilter === 'OD') return s.includes('OD') || rem.includes('OD') || rem.includes('On Duty');
             if (statusFilter === 'CL') return (s.includes('CL') || rem.includes('CL') || rem.includes('Casual')) && !s.includes('Comp') && !rem.includes('Comp');
             if (statusFilter === 'ML') return s.includes('ML') || rem.includes('ML') || rem.includes('Medical');
