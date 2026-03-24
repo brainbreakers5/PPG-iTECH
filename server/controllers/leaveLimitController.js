@@ -387,15 +387,17 @@ exports.bulkUpdateLeaveLimits = async (req, res) => {
             }
 
             const { rows } = await client.query(
-                `SELECT DISTINCT TRIM(emp_id) AS emp_id
+                `SELECT DISTINCT emp_id
                  FROM users
-                 WHERE TRIM(emp_id) = ANY($1::text[])`,
+                 WHERE emp_id IS NOT NULL
+                   AND TRIM(emp_id) <> ''
+                   AND TRIM(emp_id) = ANY($1::text[])`,
                 [selectedEmpIds]
             );
             employees = rows;
         } else {
             const { rows } = await client.query(
-                `SELECT DISTINCT TRIM(emp_id) AS emp_id
+                `SELECT DISTINCT emp_id
                  FROM users
                  WHERE emp_id IS NOT NULL
                    AND TRIM(emp_id) <> ''`

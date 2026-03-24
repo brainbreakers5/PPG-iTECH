@@ -479,9 +479,16 @@ const LeaveLimitation = () => {
                 }
             } catch (error) {
                 console.error('Bulk update fail:', error);
+                const failedEmployees = error?.response?.data?.failedEmployees;
+                const firstFailure = Array.isArray(failedEmployees) && failedEmployees.length > 0
+                    ? failedEmployees[0]
+                    : null;
+                const detail = firstFailure
+                    ? ` First failure (${firstFailure.emp_id}): ${firstFailure.error || 'Unknown error'}`
+                    : '';
                 Swal.fire({
                     title: 'Critical Error',
-                    text: error?.response?.data?.message || error?.response?.data?.error || error.message || 'The bulk operation could not be completed.',
+                    text: `${error?.response?.data?.message || error?.response?.data?.error || error.message || 'The bulk operation could not be completed.'}${detail}`,
                     icon: 'error'
                 });
             }
