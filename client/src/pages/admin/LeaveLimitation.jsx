@@ -432,6 +432,7 @@ const LeaveLimitation = () => {
                 year,
                 fromDate: formValues.fromDate,
                 toDate: formValues.toDate,
+                emp_ids: selectedTargets,
                 cl_limit: formValues.cl_limit,
                 ml_limit: formValues.ml_limit,
                 od_limit: formValues.od_limit,
@@ -449,37 +450,16 @@ const LeaveLimitation = () => {
             });
 
             try {
-                const targets = selectedTargets;
+                const { data } = await api.post('/leave-limits/bulk', payload);
 
-                if (!targets.length) {
-                    throw new Error('No valid employees found for bulk update.');
-                }
-
-                let successCount = 0;
-                let failCount = 0;
-                let firstFailure = null;
-
-                const batchSize = 10;
-                for (let i = 0; i < targets.length; i += batchSize) {
-                    const batch = targets.slice(i, i + batchSize);
-                    const settled = await Promise.allSettled(
-                        batch.map((empId) => api.put(`/leave-limits/${encodeURIComponent(empId)}`, payload))
-                    );
-
-                    settled.forEach((result, idx) => {
-                        if (result.status === 'fulfilled') {
-                            successCount += 1;
-                        } else {
-                            failCount += 1;
-                            if (!firstFailure) {
-                                firstFailure = {
-                                    empId: batch[idx],
-                                    message: result.reason?.response?.data?.message || result.reason?.response?.data?.error || result.reason?.message || 'Unknown error'
-                                };
-                            }
-                        }
-                    });
-                }
+                const successCount = Number(data?.updatedCount || 0);
+                const failCount = Number(data?.failedCount || 0);
+                const firstFailure = Array.isArray(data?.failedEmployees) && data.failedEmployees.length > 0
+                    ? {
+                        empId: data.failedEmployees[0].emp_id,
+                        message: data.failedEmployees[0].error || 'Unknown error'
+                    }
+                    : null;
 
                 if (successCount === 0) {
                     throw new Error(firstFailure ? `First failure (${firstFailure.empId}): ${firstFailure.message}` : 'Bulk update failed for all employees.');

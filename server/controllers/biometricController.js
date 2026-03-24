@@ -395,14 +395,14 @@ exports.receiveLog = async (req, res) => {
         // 5. Send persistent notifications to the user and all admins
         const message = `Biometric Punch Recorded: ${type || (isFirstPunch ? 'IN' : 'OUT')} at ${timeStr} for ${userName}`;
 
-        // Notification for the user
-        await createNotification(normalizedEmpId, message, 'attendance', null, null, false);
+        // Notification for the user (skip email for punch events)
+        await createNotification(normalizedEmpId, message, 'attendance', null, null, true);
 
         // Notifications for all admins
         const { rows: admins } = await pool.query("SELECT emp_id, id FROM users WHERE role = 'admin'");
         for (const admin of admins) {
             if (admin.emp_id !== normalizedEmpId) { // Don't duplicate if user is also an admin
-                await createNotification(admin.emp_id, message, 'attendance', null, null, false);
+                await createNotification(admin.emp_id, message, 'attendance', null, null, true);
             }
         }
 

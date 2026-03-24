@@ -351,7 +351,8 @@ exports.bulkUpdateLeaveLimits = async (req, res) => {
             fromMonth,
             toMonth,
             fromDate,
-            toDate
+            toDate,
+            emp_ids
         } = req.body;
 
         const normalizedCompLimit = sanitizeLimit(comp_limit ?? comp_leave_limit, 6);
@@ -371,12 +372,40 @@ exports.bulkUpdateLeaveLimits = async (req, res) => {
             return res.status(400).json({ message: 'Invalid period. From Date cannot be after To Date.' });
         }
 
-        const { rows: employees } = await client.query(
-            `SELECT DISTINCT TRIM(emp_id) AS emp_id
-             FROM users
-             WHERE emp_id IS NOT NULL
-               AND TRIM(emp_id) <> ''`
-        );
+        let employees = [];
+        if (Array.isArray(emp_ids) && emp_ids.length > 0) {
+            const selectedEmpIds = Array.from(
+                new Set(
+                    emp_ids
+                        .map((id) => String(id || '').trim())
+                        .filter(Boolean)
+                )
+            );
+
+            if (selectedEmpIds.length === 0) {
+                return res.status(400).json({ message: 'No valid employee IDs provided for bulk update.' });
+            }
+
+            const { rows } = await client.query(
+                `SELECT DISTINCT TRIM(emp_id) AS emp_id
+                 FROM users
+                 WHERE TRIM(emp_id) = ANY($1::text[])`,
+                [selectedEmpIds]
+            );
+            employees = rows;
+        } else {
+            const { rows } = await client.query(
+                `SELECT DISTINCT TRIM(emp_id) AS emp_id
+                 FROM users
+                 WHERE emp_id IS NOT NULL
+                   AND TRIM(emp_id) <> ''`
+            );
+            employees = rows;
+        }
+
+        if (!employees.length) {
+            return res.status(400).json({ message: 'No matching employees found for bulk update.' });
+        }
 
         const failedEmployees = [];
         let updatedCount = 0;
