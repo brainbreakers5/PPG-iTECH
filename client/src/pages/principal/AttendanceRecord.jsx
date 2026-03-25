@@ -259,6 +259,12 @@ const AttendanceRecord = () => {
         return `${hours}h ${String(minutes).padStart(2, '0')}m`;
     };
 
+    const formatDayCount = (value) => {
+        const n = Number(value || 0);
+        if (!Number.isFinite(n)) return '0';
+        return Number.isInteger(n) ? String(n) : n.toFixed(1);
+    };
+
     const escapeHtml = (value) => String(value ?? '')
         .replace(/&/g, '&amp;')
         .replace(/</g, '&lt;')
@@ -365,7 +371,20 @@ const AttendanceRecord = () => {
                 title = 'Attendance Summary report';
                 listItems = summaryRecords;
                 listHeadings = ['#', 'Emp ID', 'Name', 'Role', 'P', 'A', 'LOP', 'CL', 'ML', 'Comp', 'OD', 'LE'];
-                getListRowData = (rec, idx) => [idx + 1, rec.emp_id, rec.name, rec.role, rec.total_present, rec.total_computed_absent || rec.total_absent, rec.total_lop, rec.total_cl, rec.total_ml, rec.total_comp, rec.total_od, rec.total_late];
+                getListRowData = (rec, idx) => [
+                    idx + 1,
+                    rec.emp_id,
+                    rec.name,
+                    rec.role,
+                    formatDayCount(rec.total_present),
+                    formatDayCount((rec.total_computed_absent != null && Number(rec.total_computed_absent) > 0) ? rec.total_computed_absent : rec.total_absent),
+                    formatDayCount(rec.total_lop),
+                    formatDayCount(rec.total_cl),
+                    formatDayCount(rec.total_ml),
+                    formatDayCount(rec.total_comp),
+                    formatDayCount(rec.total_od),
+                    formatDayCount(rec.total_late)
+                ];
             } else if (viewMode === 'biometric') {
                 title = 'Biometric Activity report';
                 listItems = biometricRecords;
@@ -675,14 +694,14 @@ const AttendanceRecord = () => {
                                                 <td className="p-5 text-[10px] font-black uppercase text-gray-400 tracking-wider text-left">
                                                     <span className="px-3 py-1 bg-gray-100 rounded-full">{rec.role}</span>
                                                 </td>
-                                                <td className="p-5 text-sm font-black text-center text-sky-600">{rec.total_present}</td>
-                                                <td className="p-5 text-sm font-black text-center text-rose-500">{(rec.total_computed_absent != null && rec.total_computed_absent > 0) ? rec.total_computed_absent : rec.total_absent}</td>
-                                                <td className="p-5 text-sm font-black text-center text-rose-800">{rec.total_lop}</td>
-                                                <td className="p-5 text-sm font-black text-center text-amber-500">{rec.total_cl}</td>
-                                                <td className="p-5 text-sm font-black text-center text-orange-500">{rec.total_ml}</td>
-                                                <td className="p-5 text-sm font-black text-center text-violet-500">{rec.total_comp}</td>
-                                                <td className="p-5 text-sm font-black text-center text-amber-500">{rec.total_od}</td>
-                                                <td className="p-5 text-sm font-black text-center text-orange-600">{rec.total_late || 0}</td>
+                                                <td className="p-5 text-sm font-black text-center text-sky-600">{formatDayCount(rec.total_present)}</td>
+                                                <td className="p-5 text-sm font-black text-center text-rose-500">{formatDayCount((rec.total_computed_absent != null && Number(rec.total_computed_absent) > 0) ? rec.total_computed_absent : rec.total_absent)}</td>
+                                                <td className="p-5 text-sm font-black text-center text-rose-800">{formatDayCount(rec.total_lop)}</td>
+                                                <td className="p-5 text-sm font-black text-center text-amber-500">{formatDayCount(rec.total_cl)}</td>
+                                                <td className="p-5 text-sm font-black text-center text-orange-500">{formatDayCount(rec.total_ml)}</td>
+                                                <td className="p-5 text-sm font-black text-center text-violet-500">{formatDayCount(rec.total_comp)}</td>
+                                                <td className="p-5 text-sm font-black text-center text-amber-500">{formatDayCount(rec.total_od)}</td>
+                                                <td className="p-5 text-sm font-black text-center text-orange-600">{formatDayCount(rec.total_late || 0)}</td>
                                                 <td className="p-5 text-center no-print">
                                                     <button
                                                         onClick={() => handleViewEmployee(rec)}

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import Layout from '../../components/Layout';
 import api from '../../utils/api';
@@ -172,6 +172,16 @@ const escapeHtml = (value) => String(value ?? '')
     .replaceAll('"', '&quot;')
     .replaceAll("'", '&#039;');
 
+const getEarnedSalary = (row) => {
+    const gross = Number(row?.gross_salary || row?.monthly_salary || 0);
+    const totalDays = Number(row?.total_days_in_period || 0);
+    const payableDays = Number(row?.with_pay_count ?? row?.total_present ?? 0);
+    if (!Number.isFinite(gross) || gross <= 0) return 0;
+    if (!Number.isFinite(totalDays) || totalDays <= 0) return gross;
+    const normalizedPayable = Math.max(0, Math.min(totalDays, payableDays));
+    return (gross / totalDays) * normalizedPayable;
+};
+
 const fadeUp = {
     hidden: { opacity: 0, y: 16 },
     show: { opacity: 1, y: 0 }
@@ -221,6 +231,8 @@ const SalaryManagement = () => {
         const saved = localStorage.getItem('salary_unpaid_statuses');
         return saved ? JSON.parse(saved) : ['Absent', 'LOP'];
     });
+    const refreshOnReturnRef = useRef(true);
+    const autoRefreshInFlightRef = useRef(false);
 
     const filteredRows = useMemo(() => {
         return rows.filter((r) => {
@@ -350,6 +362,57 @@ const SalaryManagement = () => {
     };
 
     useEffect(() => {
+        let mounted = true;
+
+        const triggerAutoRefreshOnce = async () => {
+            if (!mounted || autoRefreshInFlightRef.current || !refreshOnReturnRef.current) return;
+            autoRefreshInFlightRef.current = true;
+            refreshOnReturnRef.current = false;
+            try {
+                await handleRefreshRows();
+            } finally {
+                autoRefreshInFlightRef.current = false;
+            }
+        };
+
+        const markRefreshNeeded = () => {
+            refreshOnReturnRef.current = true;
+        };
+
+        const onVisibilityChange = () => {
+            if (document.visibilityState === 'hidden') {
+                markRefreshNeeded();
+                return;
+            }
+            triggerAutoRefreshOnce();
+        };
+
+        const onWindowBlur = () => {
+            markRefreshNeeded();
+        };
+
+        const onWindowFocus = () => {
+            triggerAutoRefreshOnce();
+        };
+
+        // Route switch to any payroll page should refresh once automatically.
+        markRefreshNeeded();
+        triggerAutoRefreshOnce();
+
+        document.addEventListener('visibilitychange', onVisibilityChange);
+        window.addEventListener('blur', onWindowBlur);
+        window.addEventListener('focus', onWindowFocus);
+
+        return () => {
+            mounted = false;
+            document.removeEventListener('visibilitychange', onVisibilityChange);
+            window.removeEventListener('blur', onWindowBlur);
+            window.removeEventListener('focus', onWindowFocus);
+        };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [location.pathname]);
+
+    useEffect(() => {
         const fetchDepartments = async () => {
             if (!canInstitutionWide) return;
             try {
@@ -365,7 +428,7 @@ const SalaryManagement = () => {
 
     const openAttendanceConfig = () => {
         Swal.fire({
-            title: 'Attendance Status Rules',
+            title: 'Attendance Status Calculations',
             html: `
                 <div class="text-left text-sm">
                     <div class="mb-4">
@@ -860,7 +923,7 @@ const SalaryManagement = () => {
                                 onClick={openAttendanceConfig}
                                 className="bg-sky-600 text-white px-8 py-4 rounded-2xl shadow-xl shadow-sky-100 hover:bg-sky-700 transition-all active:scale-95 flex items-center font-black uppercase tracking-[0.2em] text-[10px]"
                             >
-                                <FaCog className="mr-3 group-hover:-rotate-12 transition-transform" /> Rules
+                                <FaCog className="mr-3 group-hover:-rotate-12 transition-transform" /> Calculations
                             </button>
                         )}
                         {canInstitutionWide && (
@@ -1031,6 +1094,7 @@ const SalaryManagement = () => {
                                     {isPersonalView && <th className="p-6 text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-sky-50">Period</th>}
                                     <th className="p-6 text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-sky-50 text-right">With/Without Pay</th>
                                     <th className="p-6 text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-sky-50 text-right">Gross Salary</th>
+                                    <th className="p-6 text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-sky-50 text-right">Earned Salary</th>
                                     <th className="p-6 text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-sky-50 text-right">Deductions</th>
                                     <th className="p-6 text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-sky-50 text-right">Net Salary</th>
                                     <th className="p-6 text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-sky-50 text-center">Status</th>
@@ -1097,8 +1161,11 @@ const SalaryManagement = () => {
                                     <td className="p-6 text-right">
                                         <div className="flex flex-col items-end gap-1">
                                             <span className="text-sm font-bold text-gray-700 bg-gray-50 px-3 py-1.5 rounded-lg border border-gray-100 whitespace-nowrap">Rs {toCurrency(r.gross_salary || r.monthly_salary || 0)}</span>
-                                            <span className="text-[9px] font-black text-gray-400 uppercase tracking-[0.12em]">Fixed Salary</span>
+                                            <span className="text-[9px] font-black text-gray-400 uppercase tracking-[0.12em]">Fixed Salary = Monthly Salary</span>
                                         </div>
+                                    </td>
+                                    <td className="p-6 text-right">
+                                        <span className="text-sm font-black text-indigo-700 bg-indigo-50 px-3 py-1.5 rounded-lg border border-indigo-100 whitespace-nowrap">Rs {toCurrency(getEarnedSalary(r))}</span>
                                     </td>
                                     <td className="p-6 text-right">
                                         <div className="flex flex-col items-end gap-1">
@@ -1203,7 +1270,7 @@ const SalaryManagement = () => {
 
                             {loading && (
                                         <tr>
-                                            <td colSpan={canInstitutionWide && isHistoryPage ? 8 : 7} className="p-32 text-center text-gray-500">
+                                            <td colSpan={canInstitutionWide && isHistoryPage ? 10 : 9} className="p-32 text-center text-gray-500">
                                                 <div className="flex flex-col items-center gap-4">
                                                     <div className="h-14 w-14 border-4 border-sky-100 border-t-sky-600 rounded-full animate-spin"></div>
                                                     <p className="text-[10px] font-black text-sky-500 uppercase tracking-[0.2em] mt-2">Loading payroll records...</p>
@@ -1214,7 +1281,7 @@ const SalaryManagement = () => {
 
                                     {!loading && filteredRows.length === 0 && (
                                         <tr>
-                                            <td colSpan={canInstitutionWide && isHistoryPage ? 8 : 7} className="p-32 text-center">
+                                            <td colSpan={canInstitutionWide && isHistoryPage ? 10 : 9} className="p-32 text-center">
                                                 <div className="flex flex-col items-center gap-6 opacity-20 grayscale">
                                                     <FaMoneyBillWave size={64} className="text-gray-400" />
                                                     <div>

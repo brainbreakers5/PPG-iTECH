@@ -68,6 +68,13 @@ const EmployeeFormPage = () => {
     const selectedCategory = normalizeEmployeeCategory(formData.community);
     const isTeachingCategory = selectedCategory === 'Teaching';
     const isWorkersCategory = selectedCategory === 'Workers';
+    const roleOptions = isTeachingCategory
+        ? [
+            { value: 'staff', label: 'Staff' },
+            { value: 'hod', label: 'HOD' },
+            { value: 'principal', label: 'Principal' }
+        ]
+        : [{ value: 'staff', label: 'Staff' }];
 
     useEffect(() => {
         fetchDepartments();
@@ -175,6 +182,7 @@ const EmployeeFormPage = () => {
             setFormData(prev => ({
                 ...prev,
                 community: category,
+                role: category === 'Teaching' ? prev.role : 'staff',
                 department_id: category === 'Teaching' ? prev.department_id : ''
             }));
             return;
@@ -433,12 +441,32 @@ const EmployeeFormPage = () => {
                                 </div>
 
                                 <div>
+                                    <label className={labelClass}>Employee Category</label>
+                                    <select
+                                        name="community"
+                                        value={formData.community || ''}
+                                        onChange={handleChange}
+                                        className={inputClass}
+                                        disabled={!isAdmin}
+                                    >
+                                        <option value="">Select Category</option>
+                                        <option value="Teaching">Teaching</option>
+                                        <option value="Non-Teaching">Non-Teaching</option>
+                                        <option value="Workers">Workers</option>
+                                    </select>
+                                </div>
+                                <div>
                                     <label className={labelClass}>User Role</label>
-                                    <select name="role" value={formData.role || 'staff'} onChange={handleChange} className={inputClass} disabled={!isAdmin}>
-                                        <option value="staff">Staff</option>
-                                        <option value="hod">HOD</option>
-                                        <option value="principal">Principal</option>
-                                        <option value="admin">Admin</option>
+                                    <select
+                                        name="role"
+                                        value={isTeachingCategory ? (formData.role || 'staff') : 'staff'}
+                                        onChange={handleChange}
+                                        className={inputClass}
+                                        disabled={!isAdmin || !isTeachingCategory}
+                                    >
+                                        {roleOptions.map((opt) => (
+                                            <option key={opt.value} value={opt.value}>{opt.label}</option>
+                                        ))}
                                     </select>
                                 </div>
                                 {isTeachingCategory && (
@@ -489,25 +517,6 @@ const EmployeeFormPage = () => {
                                 <div>
                                     <label className={labelClass}>Religion</label>
                                     <input name="religion" value={formData.religion || ''} onChange={handleChange} className={inputClass} disabled={!isAdmin} />
-                                </div>
-                            </div>
-                        </FormSection>
-                        <FormSection title="Category Details" icon={<FaUsers />}>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                                <div>
-                                    <label className={labelClass}>Employee Category</label>
-                                    <select
-                                        name="community"
-                                        value={formData.community || ''}
-                                        onChange={handleChange}
-                                        className={inputClass}
-                                        disabled={!isAdmin}
-                                    >
-                                        <option value="">Select Category</option>
-                                        <option value="Teaching">Teaching</option>
-                                        <option value="Non-Teaching">Non-Teaching</option>
-                                        <option value="Workers">Workers</option>
-                                    </select>
                                 </div>
                                 <div>
                                     <label className={labelClass}>Caste</label>

@@ -229,33 +229,156 @@ exports.getAttendanceSummary = async (req, res) => {
                     COALESCE(SUM(CASE WHEN day_type = 'Holiday' THEN 1 ELSE 0 END), 0) AS total_holidays,
                     COALESCE(SUM(CASE WHEN day_type IN ('Working Day', 'Special') THEN 1 ELSE 0 END), 0) AS total_working_days
                 FROM calendar_days
+            ),
+            attendance_units AS (
+                SELECT
+                    u.emp_id,
+                    a.id AS attendance_id,
+                    COALESCE(a.status::text, '') AS status_text,
+                    COALESCE(a.remarks, '') AS remarks_text,
+                    CASE
+                        WHEN COALESCE(a.status::text, '') ILIKE '%+%' THEN 0
+                        WHEN COALESCE(a.remarks, '') ILIKE '%Half Day%'
+                          OR COALESCE(a.remarks, '') ILIKE '%0.5%'
+                          OR COALESCE(a.remarks, '') ILIKE '%1/2%'
+                          OR COALESCE(a.status::text, '') ILIKE '%half%'
+                        THEN 0.5
+                        ELSE 1
+                    END AS unit_value,
+                    CASE
+                        WHEN COALESCE(a.status::text, '') ILIKE '%+%' THEN 0.5
+                        ELSE 0
+                    END AS split_unit
+                FROM public.users u
+                LEFT JOIN attendance_records a ON u.emp_id = a.emp_id
+                    AND a.date BETWEEN $1 AND $2
+                WHERE ${userFilter}
             )
             SELECT 
                 u.emp_id, u.name, u.role, u.department_id,
-                COALESCE(SUM(CASE WHEN a.status::text ILIKE '%Present%' THEN 1 ELSE 0 END), 0) as total_present,
-                COALESCE(SUM(CASE WHEN a.status::text ILIKE '%Absent%' THEN 1 ELSE 0 END), 0) as total_absent,
-                COALESCE(SUM(CASE WHEN 
-                    a.status::text ILIKE '%Comp Leave%' OR a.remarks ILIKE '%Comp Leave%' OR 
-                    a.status::text ILIKE '%CL%' OR a.remarks ILIKE '%CL%' OR 
-                    a.status::text ILIKE '%Casual Leave%' OR a.remarks ILIKE '%Casual Leave%' OR
-                    a.status::text ILIKE '%ML%' OR a.remarks ILIKE '%ML%' OR 
-                    a.status::text ILIKE '%Medical Leave%' OR a.remarks ILIKE '%Medical Leave%' OR
-                    a.status::text ILIKE '%Leave%' OR a.remarks ILIKE '%On Duty%' OR a.status::text ILIKE '%OD%'
-                THEN 1 ELSE 0 END), 0) as total_leave,
-                COALESCE(SUM(CASE WHEN (a.status::text ILIKE '%CL%' OR a.remarks ILIKE '%CL%' OR a.remarks ILIKE '%Casual Leave%') AND a.status::text NOT ILIKE '%Comp Leave%' AND a.remarks NOT ILIKE '%Comp Leave%' THEN 1 ELSE 0 END), 0) as total_cl,
-                COALESCE(SUM(CASE WHEN a.status::text ILIKE '%ML%' OR a.remarks ILIKE '%ML%' OR a.remarks ILIKE '%Medical Leave%' THEN 1 ELSE 0 END), 0) as total_ml,
-                COALESCE(SUM(CASE WHEN a.status::text ILIKE '%Comp Leave%' OR a.remarks ILIKE '%Comp Leave%' THEN 1 ELSE 0 END), 0) as total_comp,
-                COALESCE(SUM(CASE WHEN a.status::text ILIKE '%OD%' OR a.remarks ILIKE '%OD%' OR a.remarks ILIKE '%On Duty%' THEN 1 ELSE 0 END), 0) as total_od,
-                COALESCE(SUM(CASE WHEN a.status::text ILIKE '%LOP%' OR a.remarks ILIKE '%LOP%' OR a.remarks ILIKE '%Loss of Pay%' THEN 1 ELSE 0 END), 0) as total_lop,
-                COALESCE(SUM(CASE WHEN a.remarks ILIKE '%Late Entry%' THEN 1 ELSE 0 END), 0) as total_late,
+                COALESCE(SUM(
+                    CASE
+                        WHEN au.status_text ILIKE '%+%' THEN
+                            (CASE WHEN TRIM(split_part(au.status_text, '+', 1)) ILIKE 'Present' THEN au.split_unit ELSE 0 END)
+                            +
+                            (CASE WHEN TRIM(split_part(au.status_text, '+', 2)) ILIKE 'Present' THEN au.split_unit ELSE 0 END)
+                        WHEN au.status_text ILIKE '%Present%' THEN au.unit_value
+                        ELSE 0
+                    END
+                ), 0) as total_present,
+                COALESCE(SUM(
+                    CASE
+                        WHEN au.status_text ILIKE '%+%' THEN
+                            (CASE WHEN TRIM(split_part(au.status_text, '+', 1)) ILIKE 'Absent' THEN au.split_unit ELSE 0 END)
+                            +
+                            (CASE WHEN TRIM(split_part(au.status_text, '+', 2)) ILIKE 'Absent' THEN au.split_unit ELSE 0 END)
+                        WHEN au.status_text ILIKE '%Absent%' THEN au.unit_value
+                        ELSE 0
+                    END
+                ), 0) as total_absent,
+                COALESCE(SUM(
+                    CASE
+                        WHEN au.status_text ILIKE '%+%' THEN
+                            (CASE WHEN TRIM(split_part(au.status_text, '+', 1)) ILIKE 'CL' OR TRIM(split_part(au.status_text, '+', 1)) ILIKE 'Casual Leave' THEN au.split_unit ELSE 0 END)
+                            +
+                            (CASE WHEN TRIM(split_part(au.status_text, '+', 2)) ILIKE 'CL' OR TRIM(split_part(au.status_text, '+', 2)) ILIKE 'Casual Leave' THEN au.split_unit ELSE 0 END)
+                        WHEN (au.status_text ILIKE '%CL%' OR au.remarks_text ILIKE '%CL%' OR au.remarks_text ILIKE '%Casual Leave%')
+                             AND au.status_text NOT ILIKE '%Comp Leave%'
+                             AND au.remarks_text NOT ILIKE '%Comp Leave%'
+                        THEN au.unit_value
+                        ELSE 0
+                    END
+                ), 0) as total_cl,
+                COALESCE(SUM(
+                    CASE
+                        WHEN au.status_text ILIKE '%+%' THEN
+                            (CASE WHEN TRIM(split_part(au.status_text, '+', 1)) ILIKE 'ML' OR TRIM(split_part(au.status_text, '+', 1)) ILIKE 'Medical Leave' THEN au.split_unit ELSE 0 END)
+                            +
+                            (CASE WHEN TRIM(split_part(au.status_text, '+', 2)) ILIKE 'ML' OR TRIM(split_part(au.status_text, '+', 2)) ILIKE 'Medical Leave' THEN au.split_unit ELSE 0 END)
+                        WHEN au.status_text ILIKE '%ML%' OR au.remarks_text ILIKE '%ML%' OR au.remarks_text ILIKE '%Medical Leave%'
+                        THEN au.unit_value
+                        ELSE 0
+                    END
+                ), 0) as total_ml,
+                COALESCE(SUM(
+                    CASE
+                        WHEN au.status_text ILIKE '%+%' THEN
+                            (CASE WHEN TRIM(split_part(au.status_text, '+', 1)) ILIKE 'Comp Leave' THEN au.split_unit ELSE 0 END)
+                            +
+                            (CASE WHEN TRIM(split_part(au.status_text, '+', 2)) ILIKE 'Comp Leave' THEN au.split_unit ELSE 0 END)
+                        WHEN au.status_text ILIKE '%Comp Leave%' OR au.remarks_text ILIKE '%Comp Leave%'
+                        THEN au.unit_value
+                        ELSE 0
+                    END
+                ), 0) as total_comp,
+                COALESCE(SUM(
+                    CASE
+                        WHEN au.status_text ILIKE '%+%' THEN
+                            (CASE WHEN TRIM(split_part(au.status_text, '+', 1)) ILIKE 'OD' OR TRIM(split_part(au.status_text, '+', 1)) ILIKE 'On Duty' THEN au.split_unit ELSE 0 END)
+                            +
+                            (CASE WHEN TRIM(split_part(au.status_text, '+', 2)) ILIKE 'OD' OR TRIM(split_part(au.status_text, '+', 2)) ILIKE 'On Duty' THEN au.split_unit ELSE 0 END)
+                        WHEN au.status_text ILIKE '%OD%' OR au.remarks_text ILIKE '%OD%' OR au.remarks_text ILIKE '%On Duty%'
+                        THEN au.unit_value
+                        ELSE 0
+                    END
+                ), 0) as total_od,
+                COALESCE(SUM(
+                    CASE
+                        WHEN au.status_text ILIKE '%+%' THEN
+                            (CASE WHEN TRIM(split_part(au.status_text, '+', 1)) ILIKE 'LOP' THEN au.split_unit ELSE 0 END)
+                            +
+                            (CASE WHEN TRIM(split_part(au.status_text, '+', 2)) ILIKE 'LOP' THEN au.split_unit ELSE 0 END)
+                        WHEN au.status_text ILIKE '%LOP%' OR au.remarks_text ILIKE '%LOP%' OR au.remarks_text ILIKE '%Loss of Pay%'
+                        THEN au.unit_value
+                        ELSE 0
+                    END
+                ), 0) as total_lop,
+                COALESCE(SUM(CASE WHEN au.remarks_text ILIKE '%Late Entry%' THEN 1 ELSE 0 END), 0) as total_late,
+                COALESCE(
+                    SUM(
+                        CASE
+                            WHEN au.status_text ILIKE '%+%' THEN
+                                (CASE
+                                    WHEN TRIM(split_part(au.status_text, '+', 1)) ILIKE 'CL'
+                                      OR TRIM(split_part(au.status_text, '+', 1)) ILIKE 'ML'
+                                      OR TRIM(split_part(au.status_text, '+', 1)) ILIKE 'OD'
+                                      OR TRIM(split_part(au.status_text, '+', 1)) ILIKE 'Comp Leave'
+                                      OR TRIM(split_part(au.status_text, '+', 1)) ILIKE 'Casual Leave'
+                                      OR TRIM(split_part(au.status_text, '+', 1)) ILIKE 'Medical Leave'
+                                      OR TRIM(split_part(au.status_text, '+', 1)) ILIKE 'On Duty'
+                                    THEN au.split_unit ELSE 0 END)
+                                +
+                                (CASE
+                                    WHEN TRIM(split_part(au.status_text, '+', 2)) ILIKE 'CL'
+                                      OR TRIM(split_part(au.status_text, '+', 2)) ILIKE 'ML'
+                                      OR TRIM(split_part(au.status_text, '+', 2)) ILIKE 'OD'
+                                      OR TRIM(split_part(au.status_text, '+', 2)) ILIKE 'Comp Leave'
+                                      OR TRIM(split_part(au.status_text, '+', 2)) ILIKE 'Casual Leave'
+                                      OR TRIM(split_part(au.status_text, '+', 2)) ILIKE 'Medical Leave'
+                                      OR TRIM(split_part(au.status_text, '+', 2)) ILIKE 'On Duty'
+                                    THEN au.split_unit ELSE 0 END)
+                            WHEN au.status_text ILIKE '%Comp Leave%'
+                              OR au.remarks_text ILIKE '%Comp Leave%'
+                              OR ((au.status_text ILIKE '%CL%' OR au.remarks_text ILIKE '%CL%' OR au.remarks_text ILIKE '%Casual Leave%') AND au.status_text NOT ILIKE '%Comp Leave%' AND au.remarks_text NOT ILIKE '%Comp Leave%')
+                              OR au.status_text ILIKE '%ML%'
+                              OR au.remarks_text ILIKE '%ML%'
+                              OR au.remarks_text ILIKE '%Medical Leave%'
+                              OR au.status_text ILIKE '%OD%'
+                              OR au.remarks_text ILIKE '%OD%'
+                              OR au.remarks_text ILIKE '%On Duty%'
+                            THEN au.unit_value
+                            ELSE 0
+                        END
+                    ),
+                    0
+                ) as total_leave,
                 ct.total_working_days,
                 ct.total_holidays
-                , GREATEST(0, ct.total_working_days - COALESCE(COUNT(a.id), 0)) as total_computed_absent
+                , GREATEST(0, ct.total_working_days - COALESCE(COUNT(au.attendance_id), 0)) as total_computed_absent
 
             FROM public.users u
             CROSS JOIN calendar_totals ct
-            LEFT JOIN attendance_records a ON u.emp_id = a.emp_id
-                AND a.date BETWEEN $1 AND $2
+            LEFT JOIN attendance_units au ON au.emp_id = u.emp_id
             WHERE ${userFilter}
             GROUP BY u.emp_id, u.name, u.role, u.department_id, ct.total_working_days, ct.total_holidays
             ORDER BY u.name ASC

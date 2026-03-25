@@ -145,7 +145,17 @@ const downloadExcelFromHtml = ({ html, title }) => {
     XLSX.writeFile(wb, `${sanitizeFileName(title)}.xlsx`);
 };
 
-const downloadPdfFromHtml = async ({ html, title }) => {
+const openHtmlPreviewWindow = ({ html, title = 'Report Preview' }) => {
+    const previewWindow = window.open('', '_blank', 'width=1200,height=800');
+    if (!previewWindow) return false;
+    previewWindow.document.write(withPrintPaginationCss(html));
+    previewWindow.document.title = `${title} - Preview`;
+    previewWindow.document.close();
+    previewWindow.focus();
+    return true;
+};
+
+const buildPdfFromHtml = async ({ html }) => {
     const { jsPDF } = await import('jspdf');
 
     const doc = new DOMParser().parseFromString(String(html || ''), 'text/html');
@@ -165,10 +175,90 @@ const downloadPdfFromHtml = async ({ html, title }) => {
             autoPaging: 'text',
             html2canvas: { scale: 0.7, useCORS: true, backgroundColor: '#ffffff' }
         });
-        pdf.save(`${sanitizeFileName(title)}.pdf`);
+        return pdf;
     } finally {
         document.body.removeChild(host);
     }
+};
+
+const downloadPdfFromHtml = async ({ html, title }) => {
+    const pdf = await buildPdfFromHtml({ html });
+    pdf.save(`${sanitizeFileName(title)}.pdf`);
+};
+
+const viewPdfFromHtml = async ({ html, title }) => {
+    const pdf = await buildPdfFromHtml({ html });
+    const blobUrl = pdf.output('bloburl');
+    window.open(blobUrl, '_blank', 'noopener,noreferrer');
+    return true;
+};
+
+const chooseFileAction = async (formatLabel = 'file') => {
+    const { isConfirmed, isDenied } = await Swal.fire({
+        title: `${formatLabel} Report`,
+        text: `Do you want to view the ${formatLabel.toLowerCase()} first or download directly?`,
+        icon: 'question',
+        showCancelButton: true,
+        showDenyButton: true,
+        confirmButtonText: 'View',
+        denyButtonText: 'Download',
+        cancelButtonText: 'Cancel'
+    });
+
+    if (isConfirmed) return 'view';
+    if (isDenied) return 'download';
+    return null;
+};
+
+const handleFileReportAction = async ({ mode, html, title }) => {
+    if (mode !== 'excel' && mode !== 'pdf') return false;
+
+    const action = await chooseFileAction(mode === 'excel' ? 'Excel' : 'PDF');
+    if (!action) return false;
+
+    if (mode === 'excel') {
+        if (action === 'download') {
+            downloadExcelFromHtml({ html, title });
+            return true;
+        }
+
+        const opened = openHtmlPreviewWindow({ html, title: String(title || 'Excel Report') });
+        if (!opened) throw new Error('Popup blocked while opening Excel preview.');
+
+        const followup = await Swal.fire({
+            title: 'Excel Preview Opened',
+            text: 'Do you want to download the Excel file now?',
+            icon: 'info',
+            showCancelButton: true,
+            confirmButtonText: 'Download Excel',
+            cancelButtonText: 'Keep Preview Only'
+        });
+
+        if (followup.isConfirmed) {
+            downloadExcelFromHtml({ html, title });
+        }
+        return true;
+    }
+
+    if (action === 'download') {
+        await downloadPdfFromHtml({ html, title });
+        return true;
+    }
+
+    await viewPdfFromHtml({ html, title });
+    const followup = await Swal.fire({
+        title: 'PDF Preview Opened',
+        text: 'Do you want to download the PDF file now?',
+        icon: 'info',
+        showCancelButton: true,
+        confirmButtonText: 'Download PDF',
+        cancelButtonText: 'Keep Preview Only'
+    });
+
+    if (followup.isConfirmed) {
+        await downloadPdfFromHtml({ html, title });
+    }
+    return true;
 };
 
 const shareReport = async ({ html, title }) => {
@@ -252,10 +342,8 @@ export const runPrintWindow = async ({
 
     if (mode === 'excel' || mode === 'pdf' || mode === 'share') {
         try {
-            if (mode === 'excel') {
-                downloadExcelFromHtml({ html, title });
-            } else if (mode === 'pdf') {
-                await downloadPdfFromHtml({ html, title });
+            if (mode === 'excel' || mode === 'pdf') {
+                await handleFileReportAction({ mode, html, title });
             } else {
                 await shareReport({ html, title });
             }
@@ -319,10 +407,8 @@ export const finalizePrintWindow = async ({
 
     if (mode === 'excel' || mode === 'pdf' || mode === 'share') {
         try {
-            if (mode === 'excel') {
-                downloadExcelFromHtml({ html: preparedHtml, title });
-            } else if (mode === 'pdf') {
-                await downloadPdfFromHtml({ html: preparedHtml, title });
+            if (mode === 'excel' || mode === 'pdf') {
+                await handleFileReportAction({ mode, html: preparedHtml, title });
             } else {
                 await shareReport({ html: preparedHtml, title });
             }
