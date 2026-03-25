@@ -1,13 +1,12 @@
 import { useState, useEffect, useMemo } from 'react';
 import Layout from '../../components/Layout';
 import api from '../../utils/api';
-import { FaFileDownload, FaFilter, FaSearch, FaEye, FaTimes, FaCalendarAlt, FaSync } from 'react-icons/fa';
+import { FaFileDownload, FaFilter, FaSearch, FaEye, FaCalendarAlt, FaSync } from 'react-icons/fa';
 import { motion, AnimatePresence } from 'framer-motion';
 import { finalizePrintWindow } from '../../utils/printUtils';
 import { useSocket } from '../../context/SocketContext';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import AttendanceHistory from '../../components/AttendanceHistory';
 import BiometricMonitor from '../../components/biometric/BiometricMonitor';
 import { formatTo12Hr, formatTimestamp } from '../../utils/timeFormatter.js';
 
@@ -41,8 +40,6 @@ const AttendanceRecord = () => {
         if (hash === 'hod-core' || hash === 'staff-core' || hash === 'principal-core') return 'table';
         return 'summary';
     });
-    const [selectedEmployee, setSelectedEmployee] = useState(null); // For summary view modal
-    const [modalSubView, setModalSubView] = useState('table'); // 'table' or 'history'
 
     // Helper function to expand leave type abbreviations in status
     const expandStatusName = (status) => {
@@ -465,22 +462,10 @@ const AttendanceRecord = () => {
         );
     };
 
-    const scrollToTop = () => {
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-        document.querySelector('main')?.scrollTo({ top: 0, behavior: 'smooth' });
-    };
-
     const handleViewEmployee = (rec) => {
-        const empRecords = detailedRecords.filter(d => d.emp_id === rec.emp_id);
-        setSelectedEmployee({
-            emp_id: rec.emp_id,
-            name: rec.name,
-            role: rec.role,
-            profile_pic: rec.profile_pic,
-            records: empRecords
-        });
-        setModalSubView('table');
-        scrollToTop();
+        const rolePrefix = user?.role || 'admin';
+        navigate(`/${rolePrefix}/attendance/${encodeURIComponent(rec.emp_id)}/${startDate}/${endDate}`);
+        window.dispatchEvent(new CustomEvent('closeSidebar'));
     };
 
     return (
@@ -626,109 +611,6 @@ const AttendanceRecord = () => {
                         </div>
                     )}
                 </motion.div>
-
-                {selectedEmployee && (
-                    <motion.div
-                        initial={{ opacity: 0, y: -8 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        className="sticky top-3 z-40 bg-white rounded-2xl border border-sky-100 shadow-xl shadow-sky-50/60 mb-8 overflow-hidden"
-                    >
-                        <div className="px-4 md:px-6 py-4 border-b border-gray-100 bg-gradient-to-r from-sky-50 to-blue-50 flex flex-wrap items-center justify-between gap-3">
-                            <div className="flex items-center gap-3">
-                                <img
-                                    src={selectedEmployee.profile_pic || `https://ui-avatars.com/api/?name=${encodeURIComponent(selectedEmployee.name || '?')}&size=100&background=0ea5e9&color=fff&bold=true`}
-                                    alt=""
-                                    className="h-11 w-11 rounded-xl object-cover shadow"
-                                />
-                                <div>
-                                    <p className="text-base font-black text-gray-800 tracking-tight">{selectedEmployee.name}</p>
-                                    <p className="text-[10px] font-black text-sky-600 uppercase tracking-widest">
-                                        {selectedEmployee.emp_id}
-                                        {selectedEmployee.role ? ` | ${selectedEmployee.role}` : ''}
-                                    </p>
-                                </div>
-                                <span className="ml-2 bg-sky-100 text-sky-700 px-3 py-1 rounded-xl text-[10px] font-black uppercase tracking-widest">
-                                    {selectedEmployee.records.length} Records
-                                </span>
-                            </div>
-
-                            <div className="flex items-center gap-2">
-                                <div className="flex bg-gray-100 p-1 rounded-xl">
-                                    <button
-                                        onClick={() => setModalSubView('table')}
-                                        className={`px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${modalSubView === 'table' ? 'bg-white text-sky-600 shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
-                                    >
-                                        Detailed Table
-                                    </button>
-                                    <button
-                                        onClick={() => setModalSubView('history')}
-                                        className={`px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${modalSubView === 'history' ? 'bg-white text-sky-600 shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
-                                    >
-                                        Recent History
-                                    </button>
-                                </div>
-                                <button
-                                    onClick={() => {
-                                        setSelectedEmployee(null);
-                                        setModalSubView('table');
-                                    }}
-                                    className="p-2.5 rounded-xl bg-white hover:bg-rose-50 text-gray-400 hover:text-rose-500 transition-all border border-gray-200 shadow-sm"
-                                    title="Close employee details"
-                                >
-                                    <FaTimes size={14} />
-                                </button>
-                            </div>
-                        </div>
-
-                        <div className="max-h-[60vh] overflow-auto p-4 md:p-6">
-                            {modalSubView === 'history' ? (
-                                <AttendanceHistory
-                                    empId={selectedEmployee.emp_id}
-                                    recentOnly={false}
-                                    startDate={startDate}
-                                    endDate={endDate}
-                                />
-                            ) : (
-                                selectedEmployee.records.length === 0 ? (
-                                    <p className="text-gray-400 text-sm font-bold">No detailed records found for this employee in the selected date range.</p>
-                                ) : (
-                                    <table className="min-w-full text-left">
-                                        <thead className="sticky top-0 z-10 bg-white">
-                                            <tr className="bg-gray-50">
-                                                <th className="px-4 py-3 text-[10px] font-black text-gray-400 uppercase tracking-widest">#</th>
-                                                <th className="px-4 py-3 text-[10px] font-black text-gray-400 uppercase tracking-widest">Date</th>
-                                                <th className="px-4 py-3 text-[10px] font-black text-gray-400 uppercase tracking-widest">Status</th>
-                                                <th className="px-4 py-3 text-[10px] font-black text-gray-400 uppercase tracking-widest text-center">In Time</th>
-                                                <th className="px-4 py-3 text-[10px] font-black text-gray-400 uppercase tracking-widest text-center">Out Time</th>
-                                                <th className="px-4 py-3 text-[10px] font-black text-gray-400 uppercase tracking-widest text-center">Total Hours</th>
-                                                <th className="px-4 py-3 text-[10px] font-black text-gray-400 uppercase tracking-widest text-center">Remarks</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody className="divide-y divide-gray-50">
-                                            {selectedEmployee.records.map((log, idx) => (
-                                                <tr key={log.id || idx} className="hover:bg-sky-50/50 transition-colors">
-                                                    <td className="px-4 py-3 text-xs font-black text-gray-400">{idx + 1}</td>
-                                                    <td className="px-4 py-3 text-xs font-bold text-gray-700">
-                                                        {new Date(String(log.date).slice(0, 10) + 'T00:00:00+05:30').toLocaleDateString('en-US', { timeZone: 'Asia/Kolkata', weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' })}
-                                                    </td>
-                                                    <td className="px-4 py-3">
-                                                        <StatusBadge status={log.status} inTime={log.in_time} outTime={log.out_time} />
-                                                    </td>
-                                                    <td className="px-4 py-3 text-xs font-black text-gray-700 text-center">{formatTo12Hr(log.in_time) || '—'}</td>
-                                                    <td className="px-4 py-3 text-xs font-black text-gray-700 text-center">{formatTo12Hr(log.out_time) || '—'}</td>
-                                                    <td className="px-4 py-3 text-xs font-black text-sky-600 text-center">{calculateHours(log.in_time, log.out_time)}</td>
-                                                    <td className="px-4 py-3 text-[10px] font-bold text-gray-500 italic text-center max-w-[220px] truncate" title={log.remarks}>
-                                                        {log.remarks || '—'}
-                                                    </td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
-                                )
-                            )}
-                        </div>
-                    </motion.div>
-                )}
 
                 <AnimatePresence mode="wait">
                     {viewMode === 'summary' ? (
