@@ -1161,7 +1161,7 @@ const SalaryManagement = () => {
                                     <td className="p-6 text-right">
                                         <div className="flex flex-col items-end gap-1">
                                             <span className="text-sm font-bold text-gray-700 bg-gray-50 px-3 py-1.5 rounded-lg border border-gray-100 whitespace-nowrap">Rs {toCurrency(r.gross_salary || r.monthly_salary || 0)}</span>
-                                            <span className="text-[9px] font-black text-gray-400 uppercase tracking-[0.12em]">Fixed Salary = Monthly Salary</span>
+                                            <span className="text-[9px] font-black text-gray-400 uppercase tracking-[0.12em]">Fixed Salary = (Each Employee Monthly Salary Example: 40000)</span>
                                         </div>
                                     </td>
                                     <td className="p-6 text-right">

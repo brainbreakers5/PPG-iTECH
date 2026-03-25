@@ -6,6 +6,7 @@ const path = require('path');
 
 const PENDING_DIR = path.join(__dirname, '..', 'data');
 const PENDING_FILE = path.join(PENDING_DIR, 'biometric_pending_logs.jsonl');
+const MIN_PUNCH_INTERVAL_MS = 10 * 60 * 1000;
 
 const admsLastSeenState = {
     heartbeat: null,
@@ -171,8 +172,40 @@ exports.receiveLog = async (req, res) => {
 
         // Use provided timestamp or current server time
         const logDate = timestamp ? new Date(timestamp) : new Date();
+        if (Number.isNaN(logDate.getTime())) {
+            return res.status(400).json({ message: 'Invalid timestamp format' });
+        }
         const dateStr = logDate.toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' }); // YYYY-MM-DD in IST
         const timeStr = logDate.toLocaleTimeString('en-US', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', hour12: true }); // HH:MM AM/PM in IST
+
+        // Block rapid duplicate punches only for the SAME employee ID.
+        // Different employee IDs are always allowed, even at the same second.
+        const { rows: lastPunchRows } = await pool.query(
+            `SELECT log_time
+             FROM biometric_logs
+             WHERE TRIM(emp_id) = $1
+             ORDER BY log_time DESC
+             LIMIT 1`,
+            [normalizedEmpId]
+        );
+
+        if (lastPunchRows.length > 0) {
+            const lastLogDate = new Date(lastPunchRows[0].log_time);
+            const lastMs = lastLogDate.getTime();
+            const currentMs = logDate.getTime();
+            const nextAllowedAtMs = lastMs + MIN_PUNCH_INTERVAL_MS;
+
+            if (currentMs <= nextAllowedAtMs) {
+                const waitMs = Math.max(0, nextAllowedAtMs - currentMs);
+                const mins = Math.floor(waitMs / 60000);
+                const secs = Math.floor((waitMs % 60000) / 1000);
+                return res.status(200).json({
+                    message: `Duplicate punch ignored. Same employee can punch again only after 10 minutes. Please wait ${mins}m ${secs}s.`,
+                    skipped: true,
+                    reason: 'TOO_SOON'
+                });
+            }
+        }
 
         // 1. Check if User exists in the system
         const { rows: userRows } = await pool.query(
@@ -220,7 +253,7 @@ exports.receiveLog = async (req, res) => {
         }
 
         if (!userExists) {
-            console.warn(`⚠️ User ${emp_id} not found in users table. Skipping attendance sync.`);
+            console.warn(`⚠️ User ${normalizedEmpId} not found in users table. Skipping attendance sync.`);
             return res.status(200).json({
                 message: 'Log saved, but user not found in system for attendance sync'
             });
@@ -264,7 +297,7 @@ exports.receiveLog = async (req, res) => {
                 `SELECT log_time FROM biometric_logs 
                  WHERE emp_id = $1 AND (log_time AT TIME ZONE 'Asia/Kolkata')::date = $2::date 
                  ORDER BY log_time ASC`,
-                [emp_id, dateStr]
+                [normalizedEmpId, dateStr]
             );
 
             // Get all approved leave segments
@@ -272,14 +305,14 @@ exports.receiveLog = async (req, res) => {
                 `SELECT leave_type, is_half_day, dates_detail FROM leave_requests 
                  WHERE emp_id = $1 AND status = 'Approved' 
                  AND from_date <= $2 AND to_date >= $2`,
-                [emp_id, dateStr]
+                [normalizedEmpId, dateStr]
             );
 
             // Get all approved permissions
             const { rows: approvedPerms } = await pool.query(
                 `SELECT from_time, to_time FROM permission_requests 
                  WHERE emp_id = $1 AND status = 'Approved' AND date = $2`,
-                [emp_id, dateStr]
+                [normalizedEmpId, dateStr]
             );
 
             let segments = [];
