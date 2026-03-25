@@ -182,6 +182,31 @@ const getEarnedSalary = (row) => {
     return (gross / totalDays) * normalizedPayable;
 };
 
+const BASIC_SALARY_PERCENT = 55.2;
+const PERFORMANCE_PERCENT = 36.8;
+const CONVEYANCE_PERCENT = 8;
+
+const getSalaryConceptSplit = (amount) => {
+    const safeAmount = Number(amount || 0);
+    if (!Number.isFinite(safeAmount) || safeAmount <= 0) {
+        return { basicSalary: 0, performance: 0, conveyance: 0 };
+    }
+
+    // Use paise-level math to keep split totals accurate after rounding.
+    const amountInPaise = Math.round(safeAmount * 100);
+    const basicInPaise = Math.round((amountInPaise * BASIC_SALARY_PERCENT) / 100);
+    const performanceInPaise = Math.round((amountInPaise * PERFORMANCE_PERCENT) / 100);
+    const conveyanceInPaise = amountInPaise - basicInPaise - performanceInPaise;
+
+    return {
+        basicSalary: basicInPaise / 100,
+        performance: performanceInPaise / 100,
+        conveyance: conveyanceInPaise / 100
+    };
+};
+
+const getEarnedSalaryConceptSplit = (earnedSalary) => getSalaryConceptSplit(earnedSalary);
+
 const fadeUp = {
     hidden: { opacity: 0, y: 16 },
     show: { opacity: 1, y: 0 }
@@ -459,6 +484,7 @@ const SalaryManagement = () => {
                         <input id="swal-unpaid" class="swal2-input" value="${unpaidStatuses.join(', ')}">
                     </div>
                     <p class="text-xs text-gray-500 mt-4">Enter comma-separated values. Changes will trigger a salary recalculation for the current period.</p>
+                    <p class="text-xs text-sky-600 mt-2 font-semibold">Salary Concept: Basic Salary (55.2% of Earned Salary), Performance (36.8% of Earned Salary), Conveyance (8% of Earned Salary).</p>
                 </div>
             `,
             focusConfirm: false,
@@ -527,6 +553,9 @@ const SalaryManagement = () => {
 
     const printPaymentSlip = async (row) => {
         const gross = Number(row.gross_salary || row.monthly_salary || 0);
+        const grossConcept = getSalaryConceptSplit(gross);
+        const earnedSalary = getEarnedSalary(row);
+        const salaryConcept = getEarnedSalaryConceptSplit(earnedSalary);
         const deduction = Number(row.deductions_applied || 0);
         const net = Number(row.calculated_salary || 0);
         const withPay = Number(row.total_present || row.with_pay_count || 0).toFixed(1);
@@ -643,7 +672,14 @@ const SalaryManagement = () => {
                             </thead>
                             <tbody>
                                 <tr><td>With Pay / Without Pay Days</td><td class="right">${withPay} / ${withoutPay}</td></tr>
-                                <tr><td>Gross Salary</td><td class="right">${toCurrency(gross)}</td></tr>
+                                <tr><td>Gross Salary (Basic + Performance + Conveyance)</td><td class="right">${toCurrency(gross)}</td></tr>
+                                <tr><td>Gross Basic Salary (55.2%)</td><td class="right">${toCurrency(grossConcept.basicSalary)}</td></tr>
+                                <tr><td>Gross Performance (36.8%)</td><td class="right">${toCurrency(grossConcept.performance)}</td></tr>
+                                <tr><td>Gross Conveyance (8%)</td><td class="right">${toCurrency(grossConcept.conveyance)}</td></tr>
+                                <tr><td>Earned Salary</td><td class="right">${toCurrency(earnedSalary)}</td></tr>
+                                <tr><td>Basic Salary (55.2% of Earned)</td><td class="right">${toCurrency(salaryConcept.basicSalary)}</td></tr>
+                                <tr><td>Performance (36.8% of Earned)</td><td class="right">${toCurrency(salaryConcept.performance)}</td></tr>
+                                <tr><td>Conveyance (8% of Earned)</td><td class="right">${toCurrency(salaryConcept.conveyance)}</td></tr>
                                 ${deductionRowsHtml}
                                 <tr><td>Total Deductions</td><td class="right">${toCurrency(deduction)}</td></tr>
                                 <tr><td>Net Salary</td><td class="right">${toCurrency(net)}</td></tr>
@@ -673,6 +709,8 @@ const SalaryManagement = () => {
                 const detail = getDetailedDeductionBreakdown(r.deductions);
                 const monthlyFixed = Number(r.monthly_salary || r.gross_salary || 0);
                 const grossSalary = Number(r.gross_salary || r.monthly_salary || 0);
+                const earnedSalary = getEarnedSalary(r);
+                const salaryConcept = getEarnedSalaryConceptSplit(earnedSalary);
                 const totalDeductions = Number(r.deductions_applied || 0);
                 const netSalary = Number(r.calculated_salary || 0);
                 const otherLabel = detail.otherLabel ? `Other (${detail.otherLabel})` : 'Other';
@@ -684,6 +722,10 @@ const SalaryManagement = () => {
                 <td>${escapeHtml(r.department_name || '-')}</td>
                 <td class="right">${toCurrency(monthlyFixed)}</td>
                 <td class="right">${toCurrency(grossSalary)}</td>
+                <td class="right">${toCurrency(earnedSalary)}</td>
+                <td class="right">${toCurrency(salaryConcept.basicSalary)}</td>
+                <td class="right">${toCurrency(salaryConcept.performance)}</td>
+                <td class="right">${toCurrency(salaryConcept.conveyance)}</td>
                 <td class="right">${toCurrency(detail.employPf)}</td>
                 <td class="right">${toCurrency(detail.salaryAdvance)}</td>
                 <td class="right">${toCurrency(detail.hostelFoodFees)}</td>
@@ -739,7 +781,11 @@ const SalaryManagement = () => {
                                     <th>Emp ID</th>
                                     <th>Department</th>
                                     <th class="right">Monthly Salary (Fixed)</th>
-                                    <th class="right">Gross Salary</th>
+                                    <th class="right">Gross Salary (Basic + Performance + Conveyance)</th>
+                                    <th class="right">Earned Salary</th>
+                                    <th class="right">Basic Salary (55.2%)</th>
+                                    <th class="right">Performance (36.8%)</th>
+                                    <th class="right">Conveyance (8%)</th>
                                     <th class="right">Employ PF</th>
                                     <th class="right">Salary Advance</th>
                                     <th class="right">Hostel/Food Fees</th>
@@ -779,6 +825,8 @@ const SalaryManagement = () => {
             ${(() => {
                 const detail = getDetailedDeductionBreakdown(r.deductions);
                 const otherLabel = detail.otherLabel ? `Other (${detail.otherLabel})` : 'Other';
+                const earnedSalary = getEarnedSalary(r);
+                const salaryConcept = getEarnedSalaryConceptSplit(earnedSalary);
                 return `
             <tr>
                 <td>${index + 1}</td>
@@ -787,7 +835,10 @@ const SalaryManagement = () => {
                 <td>${escapeHtml(r.department_name || '-')}</td>
                 <td class="right">${toCurrency(r.monthly_salary || r.gross_salary || 0)}</td>
                 <td class="right">${toCurrency(r.gross_salary || r.monthly_salary || 0)}</td>
-                <td class="right">${toCurrency(getEarnedSalary(r))}</td>
+                <td class="right">${toCurrency(earnedSalary)}</td>
+                <td class="right">${toCurrency(salaryConcept.basicSalary)}</td>
+                <td class="right">${toCurrency(salaryConcept.performance)}</td>
+                <td class="right">${toCurrency(salaryConcept.conveyance)}</td>
                 <td class="right">${toCurrency(detail.employPf)}</td>
                 <td class="right">${toCurrency(detail.salaryAdvance)}</td>
                 <td class="right">${toCurrency(detail.hostelFoodFees)}</td>
@@ -843,8 +894,11 @@ const SalaryManagement = () => {
                                     <th>Emp ID</th>
                                     <th>Department</th>
                                     <th class="right">Monthly Salary (Fixed)</th>
-                                    <th class="right">Gross Salary</th>
+                                    <th class="right">Gross Salary (Basic + Performance + Conveyance)</th>
                                     <th class="right">Earned Salary</th>
+                                    <th class="right">Basic Salary (55.2%)</th>
+                                    <th class="right">Performance (36.8%)</th>
+                                    <th class="right">Conveyance (8%)</th>
                                     <th class="right">Employ PF</th>
                                     <th class="right">Salary Advance</th>
                                     <th class="right">Hostel/Food Fees</th>
@@ -1223,8 +1277,11 @@ const SalaryManagement = () => {
                                     {!isPersonalView && <th className="p-6 text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-sky-50">Employee</th>}
                                     {isPersonalView && <th className="p-6 text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-sky-50">Period</th>}
                                     <th className="p-6 text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-sky-50 text-right">With/Without Pay</th>
-                                    <th className="p-6 text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-sky-50 text-right">Gross Salary</th>
+                                    <th className="p-6 text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-sky-50 text-right">Gross Salary (Basic + Performance + Conveyance)</th>
                                     <th className="p-6 text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-sky-50 text-right">Earned Salary</th>
+                                    <th className="p-6 text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-sky-50 text-right">Basic Salary (55.2%)</th>
+                                    <th className="p-6 text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-sky-50 text-right">Performance (36.8%)</th>
+                                    <th className="p-6 text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-sky-50 text-right">Conveyance (8%)</th>
                                     <th className="p-6 text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-sky-50 text-right">Deductions</th>
                                     <th className="p-6 text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-sky-50 text-right">Net Salary</th>
                                     <th className="p-6 text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-sky-50 text-center">Status</th>
@@ -1233,7 +1290,12 @@ const SalaryManagement = () => {
                             </thead>
                         <tbody>
                             <AnimatePresence mode="popLayout">
-                                {!loading && filteredRows.map((r, idx) => (
+                                {!loading && filteredRows.map((r, idx) => {
+                                const grossSalary = Number(r.gross_salary || r.monthly_salary || 0);
+                                const grossConcept = getSalaryConceptSplit(grossSalary);
+                                const earnedSalary = getEarnedSalary(r);
+                                const salaryConcept = getEarnedSalaryConceptSplit(earnedSalary);
+                                return (
                                 <motion.tr
                                     key={r.id}
                                     initial={{ opacity: 0, y: 10 }}
@@ -1291,11 +1353,21 @@ const SalaryManagement = () => {
                                     <td className="p-6 text-right">
                                         <div className="flex flex-col items-end gap-1">
                                             <span className="text-sm font-bold text-gray-700 bg-gray-50 px-3 py-1.5 rounded-lg border border-gray-100 whitespace-nowrap">Rs {toCurrency(r.gross_salary || r.monthly_salary || 0)}</span>
-                                            <span className="text-[9px] font-black text-gray-400 uppercase tracking-[0.12em]">Fixed Salary = {toCurrency(r.monthly_salary || r.gross_salary || 0)}</span>
+                                            <span className="text-[9px] font-black text-gray-400 uppercase tracking-[0.12em]">Basic + Performance + Conveyance</span>
+                                            <span className="text-[9px] font-black text-gray-400 uppercase tracking-[0.08em]">{toCurrency(grossConcept.basicSalary)} + {toCurrency(grossConcept.performance)} + {toCurrency(grossConcept.conveyance)}</span>
                                         </div>
                                     </td>
                                     <td className="p-6 text-right">
-                                        <span className="text-sm font-black text-indigo-700 bg-indigo-50 px-3 py-1.5 rounded-lg border border-indigo-100 whitespace-nowrap">Rs {toCurrency(getEarnedSalary(r))}</span>
+                                        <span className="text-sm font-black text-indigo-700 bg-indigo-50 px-3 py-1.5 rounded-lg border border-indigo-100 whitespace-nowrap">Rs {toCurrency(earnedSalary)}</span>
+                                    </td>
+                                    <td className="p-6 text-right">
+                                        <span className="text-sm font-black text-cyan-700 bg-cyan-50 px-3 py-1.5 rounded-lg border border-cyan-100 whitespace-nowrap">Rs {toCurrency(salaryConcept.basicSalary)}</span>
+                                    </td>
+                                    <td className="p-6 text-right">
+                                        <span className="text-sm font-black text-violet-700 bg-violet-50 px-3 py-1.5 rounded-lg border border-violet-100 whitespace-nowrap">Rs {toCurrency(salaryConcept.performance)}</span>
+                                    </td>
+                                    <td className="p-6 text-right">
+                                        <span className="text-sm font-black text-amber-700 bg-amber-50 px-3 py-1.5 rounded-lg border border-amber-100 whitespace-nowrap">Rs {toCurrency(salaryConcept.conveyance)}</span>
                                     </td>
                                     <td className="p-6 text-right">
                                         <div className="flex flex-col items-end gap-1">
@@ -1395,12 +1467,13 @@ const SalaryManagement = () => {
                                         </div>
                                     </td>
                                 </motion.tr>
-                            ))}
+                                );
+                            })}
                             </AnimatePresence>
 
                             {loading && (
                                         <tr>
-                                            <td colSpan={canInstitutionWide && isHistoryPage ? 10 : 9} className="p-32 text-center text-gray-500">
+                                            <td colSpan={canInstitutionWide && isHistoryPage ? 12 : 11} className="p-32 text-center text-gray-500">
                                                 <div className="flex flex-col items-center gap-4">
                                                     <div className="h-14 w-14 border-4 border-sky-100 border-t-sky-600 rounded-full animate-spin"></div>
                                                     <p className="text-[10px] font-black text-sky-500 uppercase tracking-[0.2em] mt-2">Loading payroll records...</p>
@@ -1411,7 +1484,7 @@ const SalaryManagement = () => {
 
                                     {!loading && filteredRows.length === 0 && (
                                         <tr>
-                                            <td colSpan={canInstitutionWide && isHistoryPage ? 10 : 9} className="p-32 text-center">
+                                            <td colSpan={canInstitutionWide && isHistoryPage ? 12 : 11} className="p-32 text-center">
                                                 <div className="flex flex-col items-center gap-6 opacity-20 grayscale">
                                                     <FaMoneyBillWave size={64} className="text-gray-400" />
                                                     <div>

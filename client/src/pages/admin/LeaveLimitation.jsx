@@ -38,6 +38,8 @@ const LeaveLimitation = () => {
     const socket = useSocket();
     const hasLoadedOnceRef = useRef(false);
     const autoRefreshInFlightRef = useRef(false);
+    const limitsRequestRef = useRef(null);
+    const selectedYear = new Date(fromDate).getFullYear();
 
     const mapEmployeesToDefaultLimits = (employees, year) => {
         return (employees || []).filter((e) => e?.emp_id).map((emp) => ({
@@ -69,15 +71,18 @@ const LeaveLimitation = () => {
 
     useEffect(() => {
         fetchLimits();
+    }, [selectedYear]);
+
+    useEffect(() => {
         fetchLeaveTypes();
-    }, [fromDate, toDate]);
+    }, []);
 
     useEffect(() => {
         if (!socket) return;
         const handler = () => fetchLimits({ silent: true });
         socket.on('leave_limits_updated', handler);
         return () => socket.off('leave_limits_updated', handler);
-    }, [socket, fromDate, toDate]);
+    }, [socket, selectedYear]);
 
     useEffect(() => {
         const triggerFastAutoRefresh = async () => {
@@ -107,7 +112,7 @@ const LeaveLimitation = () => {
             document.removeEventListener('visibilitychange', onVisibilityChange);
             window.removeEventListener('focus', onFocus);
         };
-    }, [fromDate, toDate]);
+    }, [selectedYear]);
 
     const fetchLeaveTypes = async () => {
         try {
@@ -140,12 +145,16 @@ const LeaveLimitation = () => {
     };
 
     const fetchLimits = async ({ silent = false } = {}) => {
+        if (limitsRequestRef.current) {
+            return limitsRequestRef.current;
+        }
+
+        const run = (async () => {
         if (!silent || !hasLoadedOnceRef.current) {
             setLoading(true);
         }
         try {
-            const year = new Date(fromDate).getFullYear();
-            const { data } = await api.get(`/leave-limits?year=${year}`);
+            const { data } = await api.get(`/leave-limits?year=${selectedYear}`);
 
             // Filter data based on month range if additional date fields exist
             // For now, we show all data for the selected year
@@ -154,14 +163,13 @@ const LeaveLimitation = () => {
                 setStaffData(data);
             } else {
                 const { data: employees } = await api.get('/employees?all=true');
-                setStaffData(mapEmployeesToDefaultLimits(employees, year));
+                setStaffData(mapEmployeesToDefaultLimits(employees, selectedYear));
             }
         } catch (error) {
             console.error('Failed to fetch limits', error);
             try {
-                const year = new Date(fromDate).getFullYear();
                 const { data: employees } = await api.get('/employees?all=true');
-                setStaffData(mapEmployeesToDefaultLimits(employees, year));
+                setStaffData(mapEmployeesToDefaultLimits(employees, selectedYear));
             } catch (fallbackError) {
                 console.error('Fallback employee fetch failed', fallbackError);
                 setStaffData([]);
@@ -169,6 +177,14 @@ const LeaveLimitation = () => {
         } finally {
             hasLoadedOnceRef.current = true;
             setLoading(false);
+        }
+        })();
+
+        limitsRequestRef.current = run;
+        try {
+            await run;
+        } finally {
+            limitsRequestRef.current = null;
         }
     };
 

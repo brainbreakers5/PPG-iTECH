@@ -56,6 +56,8 @@ const EmployeeFormPage = () => {
     const [existingCerts, setExistingCerts] = useState([]);
     const [deductionForm, setDeductionForm] = useState({
         employ_pf: '',
+        pf_duration_years: '1',
+        pf_interest_percentage: '12',
         salary_advance: '',
         hostel_and_food_fees: '',
         bus_fees: '',
@@ -116,6 +118,8 @@ const EmployeeFormPage = () => {
                 if (Array.isArray(loadedDeductions)) {
                     const normalized = {
                         employ_pf: '',
+                        pf_duration_years: '1',
+                        pf_interest_percentage: '12',
                         salary_advance: '',
                         hostel_and_food_fees: '',
                         bus_fees: '',
@@ -135,6 +139,14 @@ const EmployeeFormPage = () => {
 
                         if (lowerType.includes('pf')) {
                             normalized.employ_pf = String((Number(normalized.employ_pf) || 0) + amount);
+                            const durationMatch = type.match(/duration:\s*(\d+(?:\.\d+)?)/i);
+                            const interestMatch = type.match(/(\d+(?:\.\d+)?)\s*%/);
+                            if (durationMatch && !normalized.pf_duration_years) {
+                                normalized.pf_duration_years = durationMatch[1];
+                            }
+                            if (interestMatch && !normalized.pf_interest_percentage) {
+                                normalized.pf_interest_percentage = interestMatch[1];
+                            }
                             return;
                         }
                         if (lowerType.includes('salary advance') || lowerType.includes('advance')) {
@@ -258,9 +270,28 @@ const EmployeeFormPage = () => {
         setDeductionForm(prev => ({ ...prev, [field]: value }));
     };
 
+    const getMonthlyPfDeduction = () => {
+        const basicAmount = Number(deductionForm.employ_pf || 0) || 0;
+        const durationYears = Number(deductionForm.pf_duration_years || 0) || 0;
+        const interestRate = Number(deductionForm.pf_interest_percentage || 0) || 0;
+
+        if (basicAmount <= 0) return 0;
+        if (durationYears <= 0) return basicAmount;
+
+        const totalWithSimpleInterest = basicAmount + (basicAmount * interestRate * durationYears) / 100;
+        return totalWithSimpleInterest / (durationYears * 12);
+    };
+
     const serializeDeductions = () => {
+        const pfAmount = Number(getMonthlyPfDeduction() || 0);
+        const pfDuration = String(deductionForm.pf_duration_years || '').trim();
+        const pfInterest = String(deductionForm.pf_interest_percentage || '').trim();
+        const pfTypeLabel = pfDuration || pfInterest
+            ? `Employ PF Monthly (PF Basic, Duration: ${pfDuration || '0'} years, Interest: ${pfInterest || '0'}%)`
+            : 'PF Basic';
+
         const rows = [
-            { type: 'Employ PF', amount: Number(deductionForm.employ_pf || 0) || 0 },
+            { type: pfTypeLabel, amount: pfAmount },
             { type: 'Salary Advance', amount: Number(deductionForm.salary_advance || 0) || 0 },
             { type: 'Hostel and Food Fees', amount: Number(deductionForm.hostel_and_food_fees || 0) || 0 },
             { type: 'Bus Fees', amount: Number(deductionForm.bus_fees || 0) || 0 },
@@ -612,9 +643,44 @@ const EmployeeFormPage = () => {
 
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 <div>
-                                    <label className={labelClass}>Employ PF (Rs / month)</label>
+                                    <label className={labelClass}>PF Basic (Rs / month)</label>
                                     <input type="number" min="0" value={deductionForm.employ_pf} onChange={(e) => setDeductionValue('employ_pf', e.target.value)} className={inputClass} disabled={!isAdmin} />
                                 </div>
+                                {(Number(deductionForm.employ_pf || 0) > 0) && (
+                                    <>
+                                        <div>
+                                            <label className={labelClass}>PF Duration (Years)</label>
+                                            <input
+                                                type="number"
+                                                min="0"
+                                                step="0.5"
+                                                value={deductionForm.pf_duration_years}
+                                                onChange={(e) => setDeductionValue('pf_duration_years', e.target.value)}
+                                                className={inputClass}
+                                                placeholder="e.g. 2"
+                                                disabled={!isAdmin}
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className={labelClass}>PF Interest (%)</label>
+                                            <input
+                                                type="number"
+                                                min="0"
+                                                step="0.01"
+                                                value={deductionForm.pf_interest_percentage}
+                                                onChange={(e) => setDeductionValue('pf_interest_percentage', e.target.value)}
+                                                className={inputClass}
+                                                placeholder="e.g. 8.25"
+                                                disabled={!isAdmin}
+                                            />
+                                        </div>
+                                        <div className="md:col-span-2 bg-sky-50 border border-sky-100 rounded-2xl p-4">
+                                            <p className="text-[10px] font-black text-sky-600 uppercase tracking-widest">Auto Monthly PF Deduction</p>
+                                            <p className="text-lg font-black text-sky-700 mt-1">₹{Number(getMonthlyPfDeduction() || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })}</p>
+                                            <p className="text-[10px] font-bold text-gray-500 mt-1">Computed from PF Basic Amount + Duration + Interest</p>
+                                        </div>
+                                    </>
+                                )}
                                 <div>
                                     <label className={labelClass}>Salary Advance (Rs / month)</label>
                                     <input type="number" min="0" value={deductionForm.salary_advance} onChange={(e) => setDeductionValue('salary_advance', e.target.value)} className={inputClass} disabled={!isAdmin} />
@@ -687,7 +753,7 @@ const EmployeeFormPage = () => {
                                 <span className="text-[10px] font-black text-sky-600 uppercase tracking-widest">Total Monthly Deductions</span>
                                 <span className="text-lg font-black text-sky-700">
                                     ₹{(
-                                        (Number(deductionForm.employ_pf) || 0) +
+                                        (Number(getMonthlyPfDeduction()) || 0) +
                                         (Number(deductionForm.salary_advance) || 0) +
                                         (Number(deductionForm.hostel_and_food_fees) || 0) +
                                         (Number(deductionForm.bus_fees) || 0) +
