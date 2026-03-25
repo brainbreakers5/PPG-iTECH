@@ -465,6 +465,24 @@ const AttendanceRecord = () => {
         );
     };
 
+    const scrollToTop = () => {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        document.querySelector('main')?.scrollTo({ top: 0, behavior: 'smooth' });
+    };
+
+    const handleViewEmployee = (rec) => {
+        const empRecords = detailedRecords.filter(d => d.emp_id === rec.emp_id);
+        setSelectedEmployee({
+            emp_id: rec.emp_id,
+            name: rec.name,
+            role: rec.role,
+            profile_pic: rec.profile_pic,
+            records: empRecords
+        });
+        setModalSubView('table');
+        scrollToTop();
+    };
+
     return (
         <Layout>
             <div>
@@ -609,6 +627,109 @@ const AttendanceRecord = () => {
                     )}
                 </motion.div>
 
+                {selectedEmployee && (
+                    <motion.div
+                        initial={{ opacity: 0, y: -8 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="sticky top-3 z-40 bg-white rounded-2xl border border-sky-100 shadow-xl shadow-sky-50/60 mb-8 overflow-hidden"
+                    >
+                        <div className="px-4 md:px-6 py-4 border-b border-gray-100 bg-gradient-to-r from-sky-50 to-blue-50 flex flex-wrap items-center justify-between gap-3">
+                            <div className="flex items-center gap-3">
+                                <img
+                                    src={selectedEmployee.profile_pic || `https://ui-avatars.com/api/?name=${encodeURIComponent(selectedEmployee.name || '?')}&size=100&background=0ea5e9&color=fff&bold=true`}
+                                    alt=""
+                                    className="h-11 w-11 rounded-xl object-cover shadow"
+                                />
+                                <div>
+                                    <p className="text-base font-black text-gray-800 tracking-tight">{selectedEmployee.name}</p>
+                                    <p className="text-[10px] font-black text-sky-600 uppercase tracking-widest">
+                                        {selectedEmployee.emp_id}
+                                        {selectedEmployee.role ? ` | ${selectedEmployee.role}` : ''}
+                                    </p>
+                                </div>
+                                <span className="ml-2 bg-sky-100 text-sky-700 px-3 py-1 rounded-xl text-[10px] font-black uppercase tracking-widest">
+                                    {selectedEmployee.records.length} Records
+                                </span>
+                            </div>
+
+                            <div className="flex items-center gap-2">
+                                <div className="flex bg-gray-100 p-1 rounded-xl">
+                                    <button
+                                        onClick={() => setModalSubView('table')}
+                                        className={`px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${modalSubView === 'table' ? 'bg-white text-sky-600 shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
+                                    >
+                                        Detailed Table
+                                    </button>
+                                    <button
+                                        onClick={() => setModalSubView('history')}
+                                        className={`px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${modalSubView === 'history' ? 'bg-white text-sky-600 shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
+                                    >
+                                        Recent History
+                                    </button>
+                                </div>
+                                <button
+                                    onClick={() => {
+                                        setSelectedEmployee(null);
+                                        setModalSubView('table');
+                                    }}
+                                    className="p-2.5 rounded-xl bg-white hover:bg-rose-50 text-gray-400 hover:text-rose-500 transition-all border border-gray-200 shadow-sm"
+                                    title="Close employee details"
+                                >
+                                    <FaTimes size={14} />
+                                </button>
+                            </div>
+                        </div>
+
+                        <div className="max-h-[60vh] overflow-auto p-4 md:p-6">
+                            {modalSubView === 'history' ? (
+                                <AttendanceHistory
+                                    empId={selectedEmployee.emp_id}
+                                    recentOnly={false}
+                                    startDate={startDate}
+                                    endDate={endDate}
+                                />
+                            ) : (
+                                selectedEmployee.records.length === 0 ? (
+                                    <p className="text-gray-400 text-sm font-bold">No detailed records found for this employee in the selected date range.</p>
+                                ) : (
+                                    <table className="min-w-full text-left">
+                                        <thead className="sticky top-0 z-10 bg-white">
+                                            <tr className="bg-gray-50">
+                                                <th className="px-4 py-3 text-[10px] font-black text-gray-400 uppercase tracking-widest">#</th>
+                                                <th className="px-4 py-3 text-[10px] font-black text-gray-400 uppercase tracking-widest">Date</th>
+                                                <th className="px-4 py-3 text-[10px] font-black text-gray-400 uppercase tracking-widest">Status</th>
+                                                <th className="px-4 py-3 text-[10px] font-black text-gray-400 uppercase tracking-widest text-center">In Time</th>
+                                                <th className="px-4 py-3 text-[10px] font-black text-gray-400 uppercase tracking-widest text-center">Out Time</th>
+                                                <th className="px-4 py-3 text-[10px] font-black text-gray-400 uppercase tracking-widest text-center">Total Hours</th>
+                                                <th className="px-4 py-3 text-[10px] font-black text-gray-400 uppercase tracking-widest text-center">Remarks</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-gray-50">
+                                            {selectedEmployee.records.map((log, idx) => (
+                                                <tr key={log.id || idx} className="hover:bg-sky-50/50 transition-colors">
+                                                    <td className="px-4 py-3 text-xs font-black text-gray-400">{idx + 1}</td>
+                                                    <td className="px-4 py-3 text-xs font-bold text-gray-700">
+                                                        {new Date(String(log.date).slice(0, 10) + 'T00:00:00+05:30').toLocaleDateString('en-US', { timeZone: 'Asia/Kolkata', weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' })}
+                                                    </td>
+                                                    <td className="px-4 py-3">
+                                                        <StatusBadge status={log.status} inTime={log.in_time} outTime={log.out_time} />
+                                                    </td>
+                                                    <td className="px-4 py-3 text-xs font-black text-gray-700 text-center">{formatTo12Hr(log.in_time) || '—'}</td>
+                                                    <td className="px-4 py-3 text-xs font-black text-gray-700 text-center">{formatTo12Hr(log.out_time) || '—'}</td>
+                                                    <td className="px-4 py-3 text-xs font-black text-sky-600 text-center">{calculateHours(log.in_time, log.out_time)}</td>
+                                                    <td className="px-4 py-3 text-[10px] font-bold text-gray-500 italic text-center max-w-[220px] truncate" title={log.remarks}>
+                                                        {log.remarks || '—'}
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                )
+                            )}
+                        </div>
+                    </motion.div>
+                )}
+
                 <AnimatePresence mode="wait">
                     {viewMode === 'summary' ? (
                         <motion.div
@@ -682,10 +803,7 @@ const AttendanceRecord = () => {
                                                 <td className="p-5 text-sm font-black text-center text-orange-600">{rec.total_late || 0}</td>
                                                 <td className="p-5 text-center no-print">
                                                     <button
-                                                        onClick={() => {
-                                                            const empRecords = detailedRecords.filter(d => d.emp_id === rec.emp_id);
-                                                            setSelectedEmployee({ emp_id: rec.emp_id, name: rec.name, role: rec.role, records: empRecords });
-                                                        }}
+                                                        onClick={() => handleViewEmployee(rec)}
                                                         className="p-3 bg-gray-50 text-gray-400 hover:text-sky-600 hover:bg-sky-50 rounded-xl transition-all"
                                                         title="View Detailed Records"
                                                     >
@@ -902,149 +1020,6 @@ const AttendanceRecord = () => {
                         <p className="text-gray-400 font-bold italic">No records found for the selected date range.</p>
                     </div>
                 )}
-
-                {/* Employee Detail Full Screen - Summary View Action */}
-                <AnimatePresence>
-                    {selectedEmployee && (
-                        <motion.div
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            exit={{ opacity: 0 }}
-                            className="fixed inset-0 bg-white z-50 flex flex-col"
-                        >
-                            {/* Full Screen Header */}
-                            <div className="px-6 md:px-10 py-5 border-b border-gray-100 bg-gradient-to-r from-sky-50 to-blue-50 flex items-center justify-between flex-shrink-0">
-                                <div className="flex items-center gap-4">
-                                    <img src={selectedEmployee.profile_pic || `https://ui-avatars.com/api/?name=${encodeURIComponent(selectedEmployee.name || '?')}&size=100&background=0ea5e9&color=fff&bold=true`} alt="" className="h-12 w-12 rounded-2xl object-cover shadow-lg" />
-                                    <div>
-                                        <p className="text-xl font-black text-gray-800 tracking-tight">{selectedEmployee.name}</p>
-                                        <div className="flex items-center gap-3 mt-0.5">
-                                            <p className="text-[10px] font-black text-sky-500 uppercase tracking-widest">{selectedEmployee.emp_id}</p>
-                                            {selectedEmployee.role && (
-                                                <span className="px-2 py-0.5 bg-gray-100 rounded-full text-[9px] font-black text-gray-500 uppercase tracking-wider">{selectedEmployee.role}</span>
-                                            )}
-                                        </div>
-                                    </div>
-                                    
-                                    {/* Sub-view Toggle */}
-                                    <div className="flex bg-gray-200/50 p-1 rounded-2xl ml-6 no-print">
-                                        <button
-                                            onClick={() => setModalSubView('table')}
-                                            className={`px-5 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${modalSubView === 'table' ? 'bg-white text-sky-600 shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
-                                        >
-                                            Detailed Table
-                                        </button>
-                                        <button
-                                            onClick={() => setModalSubView('history')}
-                                            className={`px-5 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${modalSubView === 'history' ? 'bg-white text-sky-600 shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
-                                        >
-                                            Recent History
-                                        </button>
-                                    </div>
-
-                                    <span className="ml-2 bg-sky-100 text-sky-700 px-4 py-1.5 rounded-xl text-xs font-black">
-                                        {selectedEmployee.records.length} Records
-                                    </span>
-                                </div>
-                                <button
-                                    onClick={() => {
-                                        setSelectedEmployee(null);
-                                        setModalSubView('table');
-                                    }}
-                                    className="p-3 rounded-2xl bg-white hover:bg-rose-50 text-gray-400 hover:text-rose-500 transition-all border border-gray-200 shadow-sm"
-                                >
-                                    <FaTimes size={18} />
-                                </button>
-                            </div>
-                            {/* Full Screen Table */}
-                            <div className="flex-1 overflow-auto px-6 md:px-10 py-6">
-                                {modalSubView === 'history' ? (
-                                    <div className="max-w-5xl mx-auto pb-10">
-                                        <AttendanceHistory 
-                                            empId={selectedEmployee.emp_id} 
-                                            recentOnly={false} 
-                                            startDate={startDate} 
-                                            endDate={endDate} 
-                                        />
-                                    </div>
-                                ) : (
-                                    selectedEmployee.records.length === 0 ? (
-                                        <div className="flex items-center justify-center h-full">
-                                            <p className="text-gray-400 text-lg font-bold">No detailed records found for this employee in the selected date range.</p>
-                                        </div>
-                                    ) : (
-                                        <table className="min-w-full text-left">
-                                            <thead className="sticky top-0 z-10">
-                                                <tr className="bg-gray-50">
-                                                    <th className="px-5 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">#</th>
-                                                    <th className="px-5 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Date</th>
-                                                    <th className="px-5 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Status</th>
-                                                    <th className="px-5 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-center">In Time</th>
-                                                    <th className="px-5 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-center">Out Time</th>
-                                                    <th className="px-5 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-center">Total Hours</th>
-                                                    <th className="px-5 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-center">Remarks</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody className="divide-y divide-gray-50">
-                                                {selectedEmployee.records.map((log, idx) => (
-                                                    <motion.tr
-                                                        key={log.id || idx}
-                                                        initial={{ opacity: 0, y: 5 }}
-                                                        animate={{ opacity: 1, y: 0 }}
-                                                        transition={{ delay: idx * 0.02 }}
-                                                        className="hover:bg-sky-50/50 transition-colors"
-                                                    >
-                                                        <td className="px-5 py-4 text-sm font-black text-gray-400">{idx + 1}</td>
-                                                        <td className="px-5 py-4 flex items-center gap-2">
-                                                            <img
-                                                                src={log.profile_pic || `https://ui-avatars.com/api/?name=${encodeURIComponent(log.name || '?')}&size=40&background=0ea5e9&color=fff&bold=true`}
-                                                                alt=""
-                                                                className="h-7 w-7 rounded-xl object-cover flex-shrink-0 border border-gray-200"
-                                                                style={{ minWidth: 28, minHeight: 28 }}
-                                                            />
-                                                            <span className="font-bold text-gray-700">
-                                                                {new Date(String(log.date).slice(0, 10) + 'T00:00:00+05:30').toLocaleDateString('en-US', { timeZone: 'Asia/Kolkata', weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' })}
-                                                            </span>
-                                                        </td>
-                                                        <td className="px-5 py-4">
-                                                            <StatusBadge status={log.status} inTime={log.in_time} outTime={log.out_time} />
-                                                        </td>
-                                                        <td className="px-5 py-4 text-sm font-black text-gray-700 text-center">{formatTo12Hr(log.in_time) || '—'}</td>
-                                                        <td className="px-5 py-4 text-sm font-black text-gray-700 text-center">{formatTo12Hr(log.out_time) || '—'}</td>
-                                                        <td className="px-5 py-4 text-sm font-black text-sky-600 text-center">{calculateHours(log.in_time, log.out_time)}</td>
-                                                        <td className="px-5 py-4 text-[10px] font-bold text-gray-500 italic text-center max-w-[300px] truncate" title={log.remarks}>
-                                                            {log.remarks || '—'}
-                                                        </td>
-                                                    </motion.tr>
-                                                ))}
-                                             </tbody>
-                                             <tfoot className="border-t-2 border-sky-100 bg-sky-50/20">
-                                                 <tr>
-                                                     <td colSpan={7} className="px-6 py-4 bg-sky-50/30">
-                                                         <div className="flex flex-col gap-2">
-                                                             <p className="text-[10px] font-black uppercase tracking-widest text-sky-600">Employee Remarks History</p>
-                                                             <p className="text-sm font-bold text-sky-700 italic leading-relaxed">
-                                                                 {(() => {
-                                                                     const filtered = selectedEmployee.records.filter(r => r.remarks && r.remarks.trim() !== '');
-                                                                     if (filtered.length === 0) return 'No special remarks recorded for this period.';
-                                                                     const text = filtered
-                                                                         .sort((a, b) => new Date(a.date) - new Date(b.date))
-                                                                         .map(r => `${new Date(r.date + 'T00:00:00+05:30').toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit' })} - ${r.remarks}`)
-                                                                         .join(', ');
-                                                                     return `(${text})`;
-                                                                 })()}
-                                                             </p>
-                                                         </div>
-                                                     </td>
-                                                 </tr>
-                                             </tfoot>
-                                        </table>
-                                    )
-                                )}
-                            </div>
-                        </motion.div>
-                    )}
-                </AnimatePresence>
 
             </div>
         </Layout>
