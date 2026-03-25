@@ -369,7 +369,26 @@ const SalaryManagement = () => {
             autoRefreshInFlightRef.current = true;
             refreshOnReturnRef.current = false;
             try {
-                await handleRefreshRows();
+                // Fast first load: show current records immediately.
+                await refreshRows();
+
+                // Then run calculation in background for institution-wide live payroll,
+                // and refresh again once completed.
+                if (canInstitutionWide && !isHistoryPage && !isPersonalView) {
+                    try {
+                        await api.post('/salary/calculate', {
+                            month: currentCycle.month,
+                            year: currentCycle.year,
+                            fromDate: currentCycle.fromDate,
+                            toDate: currentCycle.toDate,
+                            paidStatuses,
+                            unpaidStatuses
+                        });
+                        await refreshRows();
+                    } catch (error) {
+                        console.error('Auto calculate after fast refresh failed:', error?.response?.data || error.message);
+                    }
+                }
             } finally {
                 autoRefreshInFlightRef.current = false;
             }
@@ -1161,7 +1180,7 @@ const SalaryManagement = () => {
                                     <td className="p-6 text-right">
                                         <div className="flex flex-col items-end gap-1">
                                             <span className="text-sm font-bold text-gray-700 bg-gray-50 px-3 py-1.5 rounded-lg border border-gray-100 whitespace-nowrap">Rs {toCurrency(r.gross_salary || r.monthly_salary || 0)}</span>
-                                            <span className="text-[9px] font-black text-gray-400 uppercase tracking-[0.12em]">Fixed Salary = (Each Employee Monthly Salary Example: 40000)</span>
+                                            <span className="text-[9px] font-black text-gray-400 uppercase tracking-[0.12em]">Fixed Salary = {toCurrency(r.monthly_salary || r.gross_salary || 0)}</span>
                                         </div>
                                     </td>
                                     <td className="p-6 text-right">
