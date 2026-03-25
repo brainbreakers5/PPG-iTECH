@@ -146,9 +146,14 @@ const downloadExcelFromHtml = ({ html, title }) => {
 };
 
 const openHtmlPreviewWindow = ({ html, title = 'Report Preview' }) => {
+    const rawHtml = String(html || '');
+    const previewHtml = /<body[^>]*>/i.test(rawHtml)
+        ? rawHtml.replace(/<body([^>]*)>/i, '<body$1 class="excel-preview">')
+        : rawHtml;
+
     const previewWindow = window.open('', '_blank', 'width=1200,height=800');
     if (!previewWindow) return false;
-    previewWindow.document.write(withPrintPaginationCss(html));
+    previewWindow.document.write(withPrintPaginationCss(previewHtml));
     previewWindow.document.title = `${title} - Preview`;
     previewWindow.document.close();
     previewWindow.focus();

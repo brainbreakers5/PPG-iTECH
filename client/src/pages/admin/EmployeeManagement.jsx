@@ -235,6 +235,7 @@ const EmployeeManagement = () => {
         th { background: #e2e8f0; font-weight: 700; }
         tbody tr:nth-child(even) { background: #f8fafc; }
         .excel-only { display: none; }
+        body.excel-preview .excel-only { display: table-cell; }
     </style>
 </head>
 <body>

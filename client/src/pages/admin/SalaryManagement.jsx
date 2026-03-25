@@ -776,6 +776,10 @@ const SalaryManagement = () => {
 
         const generatedAt = formatGeneratedAt();
         const bodyRows = filteredRows.map((r, index) => `
+            ${(() => {
+                const detail = getDetailedDeductionBreakdown(r.deductions);
+                const otherLabel = detail.otherLabel ? `Other (${detail.otherLabel})` : 'Other';
+                return `
             <tr>
                 <td>${index + 1}</td>
                 <td>${escapeHtml(r.name)}</td>
@@ -784,10 +788,19 @@ const SalaryManagement = () => {
                 <td class="right">${toCurrency(r.monthly_salary || r.gross_salary || 0)}</td>
                 <td class="right">${toCurrency(r.gross_salary || r.monthly_salary || 0)}</td>
                 <td class="right">${toCurrency(getEarnedSalary(r))}</td>
+                <td class="right">${toCurrency(detail.employPf)}</td>
+                <td class="right">${toCurrency(detail.salaryAdvance)}</td>
+                <td class="right">${toCurrency(detail.hostelFoodFees)}</td>
+                <td class="right">${toCurrency(detail.busFees)}</td>
+                <td class="right">${toCurrency(detail.lwf)}</td>
+                <td class="right">${toCurrency(detail.tds)}</td>
+                <td class="right" title="${escapeHtml(otherLabel)}">${toCurrency(detail.other)}</td>
                 <td class="right">${toCurrency(r.deductions_applied || 0)}</td>
                 <td class="right">${toCurrency(r.calculated_salary || 0)}</td>
                 <td>${escapeHtml(String(r.status || 'Pending'))}</td>
             </tr>
+                `;
+            })()}
         `).join('');
 
         const html = `
@@ -832,7 +845,14 @@ const SalaryManagement = () => {
                                     <th class="right">Monthly Salary (Fixed)</th>
                                     <th class="right">Gross Salary</th>
                                     <th class="right">Earned Salary</th>
-                                    <th class="right">Deductions</th>
+                                    <th class="right">Employ PF</th>
+                                    <th class="right">Salary Advance</th>
+                                    <th class="right">Hostel/Food Fees</th>
+                                    <th class="right">Bus Fees</th>
+                                    <th class="right">LWF</th>
+                                    <th class="right">TDS</th>
+                                    <th class="right">Other</th>
+                                    <th class="right">Total Deductions</th>
                                     <th class="right">Net Salary</th>
                                     <th>Status</th>
                                 </tr>

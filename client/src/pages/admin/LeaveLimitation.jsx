@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Layout from '../../components/Layout';
 import api from '../../utils/api';
 import Swal from 'sweetalert2';
@@ -36,6 +36,8 @@ const LeaveLimitation = () => {
     const [leaveTypes, setLeaveTypes] = useState([]);
     const [showAddLeaveType, setShowAddLeaveType] = useState(false);
     const socket = useSocket();
+    const hasLoadedOnceRef = useRef(false);
+    const autoRefreshInFlightRef = useRef(false);
 
     const mapEmployeesToDefaultLimits = (employees, year) => {
         return (employees || []).filter((e) => e?.emp_id).map((emp) => ({
@@ -72,10 +74,40 @@ const LeaveLimitation = () => {
 
     useEffect(() => {
         if (!socket) return;
-        const handler = () => fetchLimits();
+        const handler = () => fetchLimits({ silent: true });
         socket.on('leave_limits_updated', handler);
         return () => socket.off('leave_limits_updated', handler);
     }, [socket, fromDate, toDate]);
+
+    useEffect(() => {
+        const triggerFastAutoRefresh = async () => {
+            if (autoRefreshInFlightRef.current) return;
+            autoRefreshInFlightRef.current = true;
+            try {
+                await fetchLimits({ silent: true });
+            } finally {
+                autoRefreshInFlightRef.current = false;
+            }
+        };
+
+        const onVisibilityChange = () => {
+            if (document.visibilityState === 'visible') {
+                triggerFastAutoRefresh();
+            }
+        };
+
+        const onFocus = () => {
+            triggerFastAutoRefresh();
+        };
+
+        document.addEventListener('visibilitychange', onVisibilityChange);
+        window.addEventListener('focus', onFocus);
+
+        return () => {
+            document.removeEventListener('visibilitychange', onVisibilityChange);
+            window.removeEventListener('focus', onFocus);
+        };
+    }, [fromDate, toDate]);
 
     const fetchLeaveTypes = async () => {
         try {
@@ -107,8 +139,10 @@ const LeaveLimitation = () => {
         }
     };
 
-    const fetchLimits = async () => {
-        setLoading(true);
+    const fetchLimits = async ({ silent = false } = {}) => {
+        if (!silent || !hasLoadedOnceRef.current) {
+            setLoading(true);
+        }
         try {
             const year = new Date(fromDate).getFullYear();
             const { data } = await api.get(`/leave-limits?year=${year}`);
@@ -133,6 +167,7 @@ const LeaveLimitation = () => {
                 setStaffData([]);
             }
         } finally {
+            hasLoadedOnceRef.current = true;
             setLoading(false);
         }
     };
