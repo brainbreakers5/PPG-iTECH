@@ -97,6 +97,9 @@ const DepartmentStaffPage = () => {
                 .header { display:flex; justify-content:space-between; align-items:flex-end; margin-bottom:20px; border-bottom:3px solid #1e3a8a; padding-bottom:12px; }
                 .header h1 { margin:0; color:#1e3a8a; font-size:18pt; font-weight:900; letter-spacing:-0.5px; }
                 .meta { font-size:9pt; color:#64748b; font-weight:bold; margin-top:5px; }
+                .summary { margin: 0 0 14px 0; padding: 8px 10px; border: 1px solid #dbeafe; border-radius: 10px; background: #f8fbff; }
+                .summary p { margin: 2px 0; font-size: 9pt; color:#334155; font-weight: 700; }
+                .summary strong { color:#1e3a8a; }
                 .brand { font-weight:900; color:#1e3a8a; font-size:11pt; text-align:right; }
                 .gen-date { font-size:8pt; color:#94a3b8; text-align:right; }
                 table { width:100%; border-collapse:collapse; }
@@ -107,12 +110,16 @@ const DepartmentStaffPage = () => {
             <div class="header">
                 <div>
                     <h1>${escHtml(department?.name || 'Department')} — Staff & HOD Registry</h1>
-                    <p class="meta">Department Code: ${escHtml(department?.code || '—')} &nbsp;|&nbsp; Total Personnel: ${filteredPersonnel.length}</p>
+                    <p class="meta">Total Personnel: ${filteredPersonnel.length}</p>
                 </div>
                 <div>
                     <div class="brand">PPG EMP HUB</div>
                     <div class="gen-date">Generated: ${new Date().toLocaleString('en-GB')}</div>
                 </div>
+            </div>
+            <div class="summary">
+                <p><strong>Department Name:</strong> ${escHtml(department?.name || '—')}</p>
+                <p><strong>Department Code:</strong> ${escHtml(department?.code || '—')}</p>
             </div>
             <table>
                 <thead><tr>

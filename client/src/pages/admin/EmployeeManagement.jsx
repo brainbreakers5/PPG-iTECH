@@ -1,10 +1,10 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Layout from '../../components/Layout';
 import api from '../../utils/api';
 import Swal from 'sweetalert2';
 import { runPrintWindow } from '../../utils/printUtils';
-import { FaEdit, FaTrash, FaUserPlus, FaSearch, FaFilter, FaUsers, FaIdBadge, FaEnvelope, FaPhone, FaPrint, FaFileImport, FaHistory, FaUndo } from 'react-icons/fa';
+import { FaEdit, FaTrash, FaUserPlus, FaSearch, FaFilter, FaUsers, FaIdBadge, FaEnvelope, FaPhone, FaPrint } from 'react-icons/fa';
 import { motion, AnimatePresence } from 'framer-motion';
 
 
@@ -13,11 +13,7 @@ const EmployeeManagement = () => {
     const [employees, setEmployees] = useState([]);
     const [filteredEmployees, setFilteredEmployees] = useState([]);
     const [departments, setDepartments] = useState([]);
-    const [importHistory, setImportHistory] = useState([]);
-    const [isImporting, setIsImporting] = useState(false);
-    const [uploadProgress, setUploadProgress] = useState(0);
     const navigate = useNavigate();
-    const fileInputRef = useRef(null);
 
     // Search & Filter State
     const [searchQuery, setSearchQuery] = useState('');
@@ -27,7 +23,6 @@ const EmployeeManagement = () => {
     useEffect(() => {
         fetchEmployees();
         fetchDepartments();
-        fetchImportHistory();
     }, []);
 
     useEffect(() => {
@@ -46,15 +41,6 @@ const EmployeeManagement = () => {
             const { data } = await api.get('/departments');
             setDepartments(data);
         } catch (error) { console.error(error); }
-    };
-
-    const fetchImportHistory = async () => {
-        try {
-            const { data } = await api.get('/employees/import/history');
-            setImportHistory(Array.isArray(data) ? data : []);
-        } catch (error) {
-            console.error('Failed to fetch import history:', error);
-        }
     };
 
     const applyFilters = () => {
@@ -137,101 +123,6 @@ const EmployeeManagement = () => {
     const handleRowClick = (emp) => {
         navigate(`/admin/profile/${emp.emp_id}`);
         window.dispatchEvent(new CustomEvent('closeSidebar'));
-    };
-
-    const triggerImportPicker = () => {
-        if (isImporting) return;
-        fileInputRef.current?.click();
-    };
-
-    const handleImportFileChange = async (event) => {
-        const file = event.target.files?.[0];
-        event.target.value = '';
-        if (!file) return;
-
-        const lower = file.name.toLowerCase();
-        if (!(lower.endsWith('.xlsx') || lower.endsWith('.csv'))) {
-            Swal.fire({ title: 'Invalid File', text: 'Please select a .xlsx or .csv file.', icon: 'warning' });
-            return;
-        }
-
-        const formData = new FormData();
-        formData.append('file', file);
-
-        try {
-            setIsImporting(true);
-            setUploadProgress(0);
-
-            const { data } = await api.post('/employees/import', formData, {
-                headers: {
-                    'Content-Type': 'multipart/form-data',
-                    'X-Disable-Encrypt': '1'
-                },
-                onUploadProgress: (progressEvent) => {
-                    const total = progressEvent.total || 0;
-                    if (!total) return;
-                    const percent = Math.round((progressEvent.loaded * 100) / total);
-                    setUploadProgress(percent);
-                }
-            });
-
-            await fetchEmployees();
-            await fetchImportHistory();
-
-            Swal.fire({
-                title: 'Employee data imported successfully',
-                html: `
-                    <div style="text-align:left; font-size:13px; line-height:1.7;">
-                        <div><strong>Total Rows:</strong> ${data.totalRows ?? 0}</div>
-                        <div><strong>Created:</strong> ${data.createdCount ?? 0}</div>
-                        <div><strong>Updated:</strong> ${data.updatedCount ?? 0}</div>
-                        <div><strong>Failed:</strong> ${data.failedCount ?? 0}</div>
-                    </div>
-                `,
-                icon: (data.failedCount || 0) > 0 ? 'warning' : 'success',
-                confirmButtonColor: '#2563eb'
-            });
-        } catch (error) {
-            Swal.fire({
-                title: 'Import Failed',
-                text: error.response?.data?.message || error.response?.data?.error || error.message || 'Could not import employee data.',
-                icon: 'error'
-            });
-        } finally {
-            setUploadProgress(0);
-            setIsImporting(false);
-        }
-    };
-
-    const handleRollbackImport = async (importId) => {
-        const confirm = await Swal.fire({
-            title: 'Rollback This Import?',
-            text: 'This will undo created records and restore updated rows from this import batch.',
-            icon: 'warning',
-            showCancelButton: true,
-            confirmButtonText: 'Yes, Rollback',
-            confirmButtonColor: '#ef4444',
-            cancelButtonColor: '#64748b'
-        });
-        if (!confirm.isConfirmed) return;
-
-        try {
-            const { data } = await api.post(`/employees/import/${importId}/rollback`);
-            await fetchEmployees();
-            await fetchImportHistory();
-
-            Swal.fire({
-                title: 'Rollback Completed',
-                text: data?.message || 'Import rollback completed successfully.',
-                icon: 'success'
-            });
-        } catch (error) {
-            Swal.fire({
-                title: 'Rollback Failed',
-                text: error.response?.data?.message || error.response?.data?.error || error.message || 'Rollback could not be completed.',
-                icon: 'error'
-            });
-        }
     };
 
     const getExportRows = () => filteredEmployees.map((emp) => ({
@@ -340,22 +231,6 @@ const EmployeeManagement = () => {
 
                     </div>
                     <div className="flex items-center gap-3">
-                        <input
-                            ref={fileInputRef}
-                            type="file"
-                            accept=".xlsx,.csv"
-                            onChange={handleImportFileChange}
-                            className="hidden"
-                        />
-                        <button
-                            onClick={triggerImportPicker}
-                            disabled={isImporting}
-                            className="p-4 bg-indigo-600 text-white rounded-2xl shadow-lg shadow-indigo-100 hover:bg-indigo-700 disabled:bg-indigo-300 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2 group font-black uppercase tracking-widest text-[10px]"
-                            title="Import Employee Details"
-                        >
-                            <FaFileImport className="group-hover:scale-110 transition-transform" />
-                            <span className="hidden sm:inline">Import Employee Details</span>
-                        </button>
                         <button
                             onClick={handlePrint}
                             className="p-4 bg-sky-600 text-white rounded-2xl shadow-lg shadow-sky-100 hover:bg-sky-700 transition-all flex items-center justify-center gap-2 group font-black uppercase tracking-widest text-[10px]"
@@ -370,71 +245,6 @@ const EmployeeManagement = () => {
                         >
                             <FaUserPlus className="mr-3 group-hover:scale-110 transition-transform" /> Add New Employee
                         </button>
-                    </div>
-                </div>
-
-                {isImporting && (
-                    <div className="mb-8 bg-white border border-indigo-100 rounded-2xl p-5 shadow-lg shadow-indigo-50">
-                        <div className="flex items-center justify-between gap-4 mb-3">
-                            <p className="text-xs font-black tracking-widest uppercase text-indigo-700">Import In Progress</p>
-                            <p className="text-xs font-black text-indigo-700">{uploadProgress}%</p>
-                        </div>
-                        <div className="w-full h-3 bg-indigo-50 rounded-full overflow-hidden">
-                            <div
-                                className="h-full bg-indigo-600 transition-all duration-300"
-                                style={{ width: `${uploadProgress}%` }}
-                            />
-                        </div>
-                        <p className="text-[11px] text-indigo-700 font-semibold mt-2">Uploading and processing employee records securely...</p>
-                    </div>
-                )}
-
-                <div className="bg-white/90 backdrop-blur-xl p-6 rounded-3xl shadow-xl shadow-gray-100 border border-gray-100 mb-10">
-                    <div className="flex items-center gap-3 mb-4">
-                        <FaHistory className="text-indigo-500" />
-                        <h2 className="text-sm font-black uppercase tracking-[0.18em] text-gray-700">Import History</h2>
-                    </div>
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-left border-collapse">
-                            <thead>
-                                <tr className="bg-gray-50/70">
-                                    <th className="p-3 text-[10px] font-black text-gray-400 uppercase tracking-widest">File</th>
-                                    <th className="p-3 text-[10px] font-black text-gray-400 uppercase tracking-widest">Result</th>
-                                    <th className="p-3 text-[10px] font-black text-gray-400 uppercase tracking-widest">Imported By</th>
-                                    <th className="p-3 text-[10px] font-black text-gray-400 uppercase tracking-widest">Created At</th>
-                                    <th className="p-3 text-[10px] font-black text-gray-500 uppercase tracking-widest text-center">Action</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-gray-100">
-                                {importHistory.map((h) => (
-                                    <tr key={h.id}>
-                                        <td className="p-3 text-xs font-semibold text-gray-700">{h.file_name}</td>
-                                        <td className="p-3 text-xs text-gray-600">
-                                            <span className="font-black">T:</span> {h.total_rows} &nbsp;
-                                            <span className="font-black text-emerald-600">C:</span> {h.created_count} &nbsp;
-                                            <span className="font-black text-sky-600">U:</span> {h.updated_count} &nbsp;
-                                            <span className="font-black text-rose-600">F:</span> {h.failed_count}
-                                        </td>
-                                        <td className="p-3 text-xs font-semibold text-gray-600">{h.imported_by_name || 'System'}</td>
-                                        <td className="p-3 text-xs font-semibold text-gray-600">{new Date(h.created_at).toLocaleString()}</td>
-                                        <td className="p-3 text-center">
-                                            <button
-                                                onClick={() => handleRollbackImport(h.id)}
-                                                disabled={h.rolled_back || (!h.created_count && !h.updated_count)}
-                                                className="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-rose-50 text-rose-600 hover:bg-rose-100 disabled:opacity-40 disabled:cursor-not-allowed text-[10px] font-black uppercase tracking-widest"
-                                            >
-                                                <FaUndo /> {h.rolled_back ? 'Rolled Back' : 'Rollback'}
-                                            </button>
-                                        </td>
-                                    </tr>
-                                ))}
-                                {importHistory.length === 0 && (
-                                    <tr>
-                                        <td colSpan="5" className="p-6 text-center text-sm text-gray-400 font-semibold">No import history available.</td>
-                                    </tr>
-                                )}
-                            </tbody>
-                        </table>
                     </div>
                 </div>
 
@@ -461,7 +271,7 @@ const EmployeeManagement = () => {
                                 value={filterRole}
                                 onChange={(e) => setFilterRole(e.target.value)}
                             >
-                                <option value="">Global Roles</option>
+                                <option value="">All Roles</option>
                                 <option value="admin">Executive (Admin)</option>
                                 <option value="principal">Principal</option>
                                 <option value="hod">Supervisory (HOD)</option>
@@ -478,7 +288,7 @@ const EmployeeManagement = () => {
                                 value={filterDept}
                                 onChange={(e) => setFilterDept(e.target.value)}
                             >
-                                <option value="">All Divisions</option>
+                                <option value="">All Departments</option>
                                 {departments.map(d => (
                                     <option key={d.id} value={d.id}>
                                         {d.name} {d.code ? `(${d.code})` : ''}
