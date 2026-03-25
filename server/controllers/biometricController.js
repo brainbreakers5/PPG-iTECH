@@ -7,6 +7,38 @@ const path = require('path');
 const PENDING_DIR = path.join(__dirname, '..', 'data');
 const PENDING_FILE = path.join(PENDING_DIR, 'biometric_pending_logs.jsonl');
 
+const admsLastSeenState = {
+    heartbeat: null,
+    heartbeatMeta: null,
+    cdata: null,
+    cdataMeta: null,
+};
+
+const toIsoNow = () => new Date().toISOString();
+
+exports.markAdmsHeartbeatSeen = (meta = null) => {
+    admsLastSeenState.heartbeat = toIsoNow();
+    admsLastSeenState.heartbeatMeta = meta;
+};
+
+exports.markAdmsCdataSeen = (meta = null) => {
+    admsLastSeenState.cdata = toIsoNow();
+    admsLastSeenState.cdataMeta = meta;
+};
+
+// @desc    Get ADMS last heartbeat/cdata seen times
+// @route   GET /api/biometric/adms-last-seen
+// @access  Private (Admin)
+exports.getAdmsLastSeen = async (req, res) => {
+    return res.status(200).json({
+        heartbeat_last_seen_at: admsLastSeenState.heartbeat,
+        cdata_last_seen_at: admsLastSeenState.cdata,
+        heartbeat_meta: admsLastSeenState.heartbeatMeta,
+        cdata_meta: admsLastSeenState.cdataMeta,
+        now: toIsoNow(),
+    });
+};
+
 const isTransientDbError = (error) => {
     if (!error) return false;
     const code = String(error.code || '').toUpperCase();

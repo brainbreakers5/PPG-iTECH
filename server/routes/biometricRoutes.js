@@ -1,6 +1,14 @@
 const express = require('express');
 const router = express.Router();
-const { receiveLog, getBiometricData, getBiometricStats, backfillTodayFromAttendance } = require('../controllers/biometricController');
+const {
+	receiveLog,
+	getBiometricData,
+	getBiometricStats,
+	backfillTodayFromAttendance,
+	getAdmsLastSeen,
+	markAdmsHeartbeatSeen,
+	markAdmsCdataSeen,
+} = require('../controllers/biometricController');
 const { protect, restrictTo } = require('../middleware/authMiddleware');
 
 const admsTextParser = express.text({ type: '*/*', limit: '5mb' });
@@ -59,6 +67,10 @@ const getAdmsBodyText = (req) => {
 
 // ADMS heartbeat endpoint (device polls this URL)
 router.get('/getrequest', (req, res) => {
+	markAdmsHeartbeatSeen({
+		sn: req.query.SN || req.query.sn || null,
+		ip: req.ip,
+	});
 	console.log('ADMS device connected:', {
 		query: req.query,
 		ip: req.ip,
@@ -69,6 +81,10 @@ router.get('/getrequest', (req, res) => {
 
 // ADMS attendance payload endpoint (some devices use POST, some can hit GET)
 const handleCdata = async (req, res) => {
+	markAdmsCdataSeen({
+		sn: req.query.SN || req.query.sn || null,
+		ip: req.ip,
+	});
 	console.log('ADMS attendance data received:', {
 		query: req.query,
 		body: req.body,
@@ -147,5 +163,6 @@ router.post('/backfill-today-from-attendance', protect, restrictTo('admin', 'man
 // Endpoints for web frontend to fetch data
 router.get('/data', protect, getBiometricData);
 router.get('/stats', protect, getBiometricStats);
+router.get('/adms-last-seen', protect, restrictTo('admin'), getAdmsLastSeen);
 
 module.exports = router;
