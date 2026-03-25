@@ -273,13 +273,20 @@ const EmployeeFormPage = () => {
     const getMonthlyPfDeduction = () => {
         const basicAmount = Number(deductionForm.employ_pf || 0) || 0;
         const durationYears = Number(deductionForm.pf_duration_years || 0) || 0;
-        const interestRate = Number(deductionForm.pf_interest_percentage || 0) || 0;
+        const deductionRatePerMonth = Number(deductionForm.pf_interest_percentage || 0) || 0;
 
         if (basicAmount <= 0) return 0;
-        if (durationYears <= 0) return basicAmount;
+        if (deductionRatePerMonth <= 0) return 0;
 
-        const totalWithSimpleInterest = basicAmount + (basicAmount * interestRate * durationYears) / 100;
-        return totalWithSimpleInterest / (durationYears * 12);
+        // Concept: monthly PF deduction is a percentage of PF Basic each month.
+        return (basicAmount * deductionRatePerMonth) / 100;
+    };
+
+    const getTotalPfDeductionForDuration = () => {
+        const durationYears = Number(deductionForm.pf_duration_years || 0) || 0;
+        const monthlyDeduction = Number(getMonthlyPfDeduction() || 0);
+        if (durationYears <= 0) return monthlyDeduction;
+        return monthlyDeduction * durationYears * 12;
     };
 
     const serializeDeductions = () => {
@@ -287,7 +294,7 @@ const EmployeeFormPage = () => {
         const pfDuration = String(deductionForm.pf_duration_years || '').trim();
         const pfInterest = String(deductionForm.pf_interest_percentage || '').trim();
         const pfTypeLabel = pfDuration || pfInterest
-            ? `Employ PF Monthly (PF Basic, Duration: ${pfDuration || '0'} years, Interest: ${pfInterest || '0'}%)`
+            ? `Employ PF Monthly (PF Basic: ${deductionForm.employ_pf || '0'}, Duration: ${pfDuration || '0'} years, PF Deduction % Per Month: ${pfInterest || '0'}%)`
             : 'PF Basic';
 
         const rows = [
@@ -662,7 +669,7 @@ const EmployeeFormPage = () => {
                                             />
                                         </div>
                                         <div>
-                                            <label className={labelClass}>PF Interest (%)</label>
+                                            <label className={labelClass}>PF Deduction % Per Month</label>
                                             <input
                                                 type="number"
                                                 min="0"
@@ -670,14 +677,16 @@ const EmployeeFormPage = () => {
                                                 value={deductionForm.pf_interest_percentage}
                                                 onChange={(e) => setDeductionValue('pf_interest_percentage', e.target.value)}
                                                 className={inputClass}
-                                                placeholder="e.g. 8.25"
+                                                placeholder="e.g. 12"
                                                 disabled={!isAdmin}
                                             />
                                         </div>
                                         <div className="md:col-span-2 bg-sky-50 border border-sky-100 rounded-2xl p-4">
                                             <p className="text-[10px] font-black text-sky-600 uppercase tracking-widest">Auto Monthly PF Deduction</p>
                                             <p className="text-lg font-black text-sky-700 mt-1">₹{Number(getMonthlyPfDeduction() || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })}</p>
-                                            <p className="text-[10px] font-bold text-gray-500 mt-1">Computed from PF Basic Amount + Duration + Interest</p>
+                                            <p className="text-[10px] font-bold text-gray-500 mt-1">Formula: PF Monthly Deduction = PF Basic × (PF Deduction % Per Month / 100)</p>
+                                            <p className="text-[10px] font-bold text-gray-500 mt-1">Example: PF Basic ₹6,000, Duration 1 Year, PF Deduction % Per Month 12% → Monthly PF Deduction ₹720.00 and Total for Duration ₹8,640.00.</p>
+                                            <p className="text-[10px] font-bold text-gray-500 mt-1">Current Values: PF Basic ₹{Number(deductionForm.employ_pf || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })}, Duration {Number(deductionForm.pf_duration_years || 0) || 0} Year(s), PF Deduction % Per Month {Number(deductionForm.pf_interest_percentage || 0) || 0}% → Monthly ₹{Number(getMonthlyPfDeduction() || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })}, Duration Total ₹{Number(getTotalPfDeductionForDuration() || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })}.</p>
                                         </div>
                                     </>
                                 )}
