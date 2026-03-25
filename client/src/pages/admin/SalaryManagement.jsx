@@ -94,6 +94,36 @@ const parseDeductionItems = (raw) => {
         return [];
     }
 };
+
+const getMonthlyPfAmountFromLabel = (label, fallbackAmount) => {
+    const safeLabel = String(label || '');
+    const safeFallbackAmount = Number(fallbackAmount || 0) || 0;
+
+    // New format: PF Basic: X, PF Deduction % Per Month: Y%
+    const basicMatch = safeLabel.match(/pf\s*basic\s*:\s*(\d+(?:\.\d+)?)/i);
+    const monthlyRateMatch = safeLabel.match(/pf\s*deduction\s*%\s*per\s*month\s*:\s*(\d+(?:\.\d+)?)\s*%/i);
+    if (basicMatch && monthlyRateMatch) {
+        const basic = Number(basicMatch[1] || 0);
+        const monthlyRate = Number(monthlyRateMatch[1] || 0);
+        if (Number.isFinite(basic) && Number.isFinite(monthlyRate) && basic > 0 && monthlyRate >= 0) {
+            return (basic * monthlyRate) / 100;
+        }
+    }
+
+    // Legacy format fallback: PF Basic with percentage in label.
+    const legacyBasicMatch = safeLabel.match(/pf\s*basic\s*[:=]?\s*(\d+(?:\.\d+)?)/i);
+    const anyPercentMatch = safeLabel.match(/(\d+(?:\.\d+)?)\s*%/);
+    if (legacyBasicMatch && anyPercentMatch) {
+        const basic = Number(legacyBasicMatch[1] || 0);
+        const rate = Number(anyPercentMatch[1] || 0);
+        if (Number.isFinite(basic) && Number.isFinite(rate) && basic > 0 && rate >= 0) {
+            return (basic * rate) / 100;
+        }
+    }
+
+    return safeFallbackAmount;
+};
+
 const getDetailedDeductionBreakdown = (raw) => {
     const details = {
         employPf: 0,
@@ -113,7 +143,7 @@ const getDetailedDeductionBreakdown = (raw) => {
         if (!amount) return;
 
         if (label.includes('pf')) {
-            details.employPf += amount;
+            details.employPf += getMonthlyPfAmountFromLabel(item.label, amount);
             return;
         }
         if (label.includes('salary advance') || label.includes('advance')) {
@@ -1269,23 +1299,26 @@ const SalaryManagement = () => {
                             )}
                         </div>
                     </div>
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-left border-collapse">
+                    <div className="px-4 pb-2 md:hidden">
+                        <p className="text-[10px] font-black uppercase tracking-[0.14em] text-gray-400">Swipe left and right to view all salary columns</p>
+                    </div>
+                    <div className="overflow-x-auto -mx-2 px-2 md:mx-0 md:px-0">
+                        <table className="min-w-max w-full text-left border-collapse whitespace-nowrap">
                             <thead>
                                 <tr className="bg-sky-50/30">
-                                    {canInstitutionWide && isHistoryPage && <th className="p-6 w-12 text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-sky-50"><div className="flex justify-center">Select</div></th>}
-                                    {!isPersonalView && <th className="p-6 text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-sky-50">Employee</th>}
-                                    {isPersonalView && <th className="p-6 text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-sky-50">Period</th>}
-                                    <th className="p-6 text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-sky-50 text-right">With/Without Pay</th>
-                                    <th className="p-6 text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-sky-50 text-right">Gross Salary (Basic + Performance + Conveyance)</th>
-                                    <th className="p-6 text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-sky-50 text-right">Earned Salary</th>
-                                    <th className="p-6 text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-sky-50 text-right">Basic Salary (55.2%)</th>
-                                    <th className="p-6 text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-sky-50 text-right">Performance (36.8%)</th>
-                                    <th className="p-6 text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-sky-50 text-right">Conveyance (8%)</th>
-                                    <th className="p-6 text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-sky-50 text-right">Deductions</th>
-                                    <th className="p-6 text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-sky-50 text-right">Net Salary</th>
-                                    <th className="p-6 text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-sky-50 text-center">Status</th>
-                                    <th className="p-6 text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-sky-50 text-center">Actions</th>
+                                    {canInstitutionWide && isHistoryPage && <th className="p-3 md:p-6 w-12 text-[9px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-sky-50 whitespace-nowrap"><div className="flex justify-center">Select</div></th>}
+                                    {!isPersonalView && <th className="p-3 md:p-6 text-[9px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-sky-50 whitespace-nowrap">Employee</th>}
+                                    {isPersonalView && <th className="p-3 md:p-6 text-[9px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-sky-50 whitespace-nowrap">Period</th>}
+                                    <th className="p-3 md:p-6 text-[9px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-sky-50 text-right whitespace-nowrap">With/Without Pay</th>
+                                    <th className="p-3 md:p-6 text-[9px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-sky-50 text-right whitespace-nowrap">Gross Salary (Basic + Performance + Conveyance)</th>
+                                    <th className="p-3 md:p-6 text-[9px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-sky-50 text-right whitespace-nowrap">Earned Salary</th>
+                                    <th className="p-3 md:p-6 text-[9px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-sky-50 text-right whitespace-nowrap">Basic Salary (55.2%)</th>
+                                    <th className="p-3 md:p-6 text-[9px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-sky-50 text-right whitespace-nowrap">Performance (36.8%)</th>
+                                    <th className="p-3 md:p-6 text-[9px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-sky-50 text-right whitespace-nowrap">Conveyance (8%)</th>
+                                    <th className="p-3 md:p-6 text-[9px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-sky-50 text-right whitespace-nowrap">Deductions</th>
+                                    <th className="p-3 md:p-6 text-[9px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-sky-50 text-right whitespace-nowrap">Net Salary</th>
+                                    <th className="p-3 md:p-6 text-[9px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-sky-50 text-center whitespace-nowrap">Status</th>
+                                    <th className="p-3 md:p-6 text-[9px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-sky-50 text-center whitespace-nowrap">Actions</th>
                                 </tr>
                             </thead>
                         <tbody>
@@ -1305,7 +1338,7 @@ const SalaryManagement = () => {
                                     className="hover:bg-sky-50/20 transition-all group border-b border-sky-50/10"
                                 >
                                     {canInstitutionWide && isHistoryPage && (
-                                        <td className="p-6">
+                                        <td className="p-3 md:p-6">
                                             <div className="flex justify-center">
                                                 <input
                                                     type="checkbox"
@@ -1317,84 +1350,59 @@ const SalaryManagement = () => {
                                         </td>
                                     )}
                                     {!isPersonalView && (
-                                        <td className="p-6">
+                                        <td className="p-3 md:p-6 whitespace-nowrap">
                                             <div className="flex items-center gap-3">
                                                 <img
                                                     src={r.profile_pic || r.profile_picture_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(r.name || '?')}&background=0ea5e9&color=fff&bold=true`}
                                                     alt={r.name}
-                                                    className="h-10 w-10 rounded-xl object-cover border border-sky-100 shadow-sm"
+                                                    className="h-8 w-8 md:h-10 md:w-10 rounded-xl object-cover border border-sky-100 shadow-sm"
                                                 />
-                                                <div>
-                                                <p className="text-sm font-black text-gray-800 tracking-tight">{r.name}</p>
-                                                <div className="flex flex-wrap gap-2 items-center mt-1">
-                                                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.2em]"><span className="text-sky-500 font-black">{r.emp_id}</span></p>
-                                                    {r.department_name && (
-                                                        <>
-                                                            <span className="h-1 w-1 bg-gray-300 rounded-full"></span>
-                                                            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.2em]"><span className="text-gray-600 font-black">{r.department_name}</span></p>
-                                                        </>
-                                                    )}
-                                                </div>
-                                                </div>
+                                                <p className="text-xs md:text-sm font-black text-gray-800 tracking-tight">{r.name} <span className="text-[9px] md:text-[10px] text-sky-500 ml-2">{r.emp_id}</span>{r.department_name ? <span className="text-[9px] md:text-[10px] text-gray-500 ml-2">{r.department_name}</span> : null}</p>
                                             </div>
                                         </td>
                                     )}
                                     {isPersonalView && (
-                                        <td className="p-6">
-                                            <span className="text-sm font-bold text-gray-700 bg-gray-50 px-3 py-1.5 rounded-lg border border-gray-100 whitespace-nowrap">{r.from_date || '-'} to {r.to_date || '-'}</span>
+                                        <td className="p-3 md:p-6 whitespace-nowrap">
+                                            <span className="text-xs md:text-sm font-bold text-gray-700 bg-gray-50 px-2.5 md:px-3 py-1.5 rounded-lg border border-gray-100 whitespace-nowrap">{r.from_date || '-'} to {r.to_date || '-'}</span>
                                         </td>
                                     )}
-                                    <td className="p-6 text-right">
-                                        <div className="flex flex-col items-end gap-1">
-                                            <span className="text-sm font-black text-emerald-600">{Number(r.total_present || r.with_pay_count || 0).toFixed(1)} <span className="text-[9px] text-gray-400 uppercase">Paid</span></span>
-                                            <span className="text-sm font-black text-rose-600">{Number(r.total_lop || r.without_pay_count || 0).toFixed(1)} <span className="text-[9px] text-gray-400 uppercase">Unpaid</span></span>
-                                        </div>
+                                    <td className="p-3 md:p-6 text-right whitespace-nowrap">
+                                        <span className="text-xs md:text-sm font-black text-gray-700">{Number(r.total_present || r.with_pay_count || 0).toFixed(1)} Paid / {Number(r.total_lop || r.without_pay_count || 0).toFixed(1)} Unpaid</span>
                                     </td>
-                                    <td className="p-6 text-right">
-                                        <div className="flex flex-col items-end gap-1">
-                                            <span className="text-sm font-bold text-gray-700 bg-gray-50 px-3 py-1.5 rounded-lg border border-gray-100 whitespace-nowrap">Rs {toCurrency(r.gross_salary || r.monthly_salary || 0)}</span>
-                                            <span className="text-[9px] font-black text-gray-400 uppercase tracking-[0.12em]">Basic + Performance + Conveyance</span>
-                                            <span className="text-[9px] font-black text-gray-400 uppercase tracking-[0.08em]">{toCurrency(grossConcept.basicSalary)} + {toCurrency(grossConcept.performance)} + {toCurrency(grossConcept.conveyance)}</span>
-                                        </div>
+                                    <td className="p-3 md:p-6 text-right whitespace-nowrap" title={`Basic ${toCurrency(grossConcept.basicSalary)} + Performance ${toCurrency(grossConcept.performance)} + Conveyance ${toCurrency(grossConcept.conveyance)}`}>
+                                        <span className="text-xs md:text-sm font-bold text-gray-700 bg-gray-50 px-2.5 md:px-3 py-1.5 rounded-lg border border-gray-100 whitespace-nowrap">Rs {toCurrency(r.gross_salary || r.monthly_salary || 0)} (B+P+C)</span>
                                     </td>
-                                    <td className="p-6 text-right">
-                                        <span className="text-sm font-black text-indigo-700 bg-indigo-50 px-3 py-1.5 rounded-lg border border-indigo-100 whitespace-nowrap">Rs {toCurrency(earnedSalary)}</span>
+                                    <td className="p-3 md:p-6 text-right whitespace-nowrap">
+                                        <span className="text-xs md:text-sm font-black text-indigo-700 bg-indigo-50 px-2.5 md:px-3 py-1.5 rounded-lg border border-indigo-100 whitespace-nowrap">Rs {toCurrency(earnedSalary)}</span>
                                     </td>
-                                    <td className="p-6 text-right">
-                                        <span className="text-sm font-black text-cyan-700 bg-cyan-50 px-3 py-1.5 rounded-lg border border-cyan-100 whitespace-nowrap">Rs {toCurrency(salaryConcept.basicSalary)}</span>
+                                    <td className="p-3 md:p-6 text-right whitespace-nowrap">
+                                        <span className="text-xs md:text-sm font-black text-cyan-700 bg-cyan-50 px-2.5 md:px-3 py-1.5 rounded-lg border border-cyan-100 whitespace-nowrap">Rs {toCurrency(salaryConcept.basicSalary)}</span>
                                     </td>
-                                    <td className="p-6 text-right">
-                                        <span className="text-sm font-black text-violet-700 bg-violet-50 px-3 py-1.5 rounded-lg border border-violet-100 whitespace-nowrap">Rs {toCurrency(salaryConcept.performance)}</span>
+                                    <td className="p-3 md:p-6 text-right whitespace-nowrap">
+                                        <span className="text-xs md:text-sm font-black text-violet-700 bg-violet-50 px-2.5 md:px-3 py-1.5 rounded-lg border border-violet-100 whitespace-nowrap">Rs {toCurrency(salaryConcept.performance)}</span>
                                     </td>
-                                    <td className="p-6 text-right">
-                                        <span className="text-sm font-black text-amber-700 bg-amber-50 px-3 py-1.5 rounded-lg border border-amber-100 whitespace-nowrap">Rs {toCurrency(salaryConcept.conveyance)}</span>
+                                    <td className="p-3 md:p-6 text-right whitespace-nowrap">
+                                        <span className="text-xs md:text-sm font-black text-amber-700 bg-amber-50 px-2.5 md:px-3 py-1.5 rounded-lg border border-amber-100 whitespace-nowrap">Rs {toCurrency(salaryConcept.conveyance)}</span>
                                     </td>
-                                    <td className="p-6 text-right">
-                                        <div className="flex flex-col items-end gap-1">
-                                            <span className="text-sm font-bold text-rose-600 bg-rose-50 px-3 py-1.5 rounded-lg border border-rose-100 whitespace-nowrap">Rs {toCurrency(r.deductions_applied || 0)}</span>
-                                            {getDeductionBreakdownText(r.deductions) && (
-                                                <span className="text-[10px] font-black text-rose-500 uppercase tracking-[0.08em] max-w-[260px] text-right" title={getDeductionBreakdownText(r.deductions)}>
-                                                    {getDeductionBreakdownText(r.deductions)}
-                                                </span>
-                                            )}
-                                        </div>
+                                    <td className="p-3 md:p-6 text-right whitespace-nowrap" title={getDeductionBreakdownText(r.deductions) || ''}>
+                                        <span className="text-xs md:text-sm font-bold text-rose-600 bg-rose-50 px-2.5 md:px-3 py-1.5 rounded-lg border border-rose-100 whitespace-nowrap">Rs {toCurrency(r.deductions_applied || 0)}</span>
                                     </td>
-                                    <td className="p-6 text-right">
-                                        <span className="text-sm font-black text-emerald-700 bg-emerald-50 px-3 py-1.5 rounded-lg border border-emerald-100 whitespace-nowrap">Rs {toCurrency(r.calculated_salary || 0)}</span>
+                                    <td className="p-3 md:p-6 text-right whitespace-nowrap">
+                                        <span className="text-xs md:text-sm font-black text-emerald-700 bg-emerald-50 px-2.5 md:px-3 py-1.5 rounded-lg border border-emerald-100 whitespace-nowrap">Rs {toCurrency(r.calculated_salary || 0)}</span>
                                     </td>
-                                    <td className="p-6 text-center">
+                                    <td className="p-3 md:p-6 text-center whitespace-nowrap">
                                         {String(r.status).toLowerCase() === 'paid' ? (
-                                            <span className="inline-block text-[9px] font-black uppercase tracking-[0.1em] px-4 py-1.5 rounded-xl border-2 shadow-sm bg-emerald-600 text-white border-emerald-600">Paid</span>
+                                            <span className="inline-block text-[8px] md:text-[9px] font-black uppercase tracking-[0.1em] px-3 md:px-4 py-1.5 rounded-xl border-2 shadow-sm bg-emerald-600 text-white border-emerald-600">Paid</span>
                                         ) : (
-                                            <span className="inline-block text-[9px] font-black uppercase tracking-[0.1em] px-4 py-1.5 rounded-xl bg-amber-50 text-amber-600 border border-amber-100 animate-pulse">Pending</span>
+                                            <span className="inline-block text-[8px] md:text-[9px] font-black uppercase tracking-[0.1em] px-3 md:px-4 py-1.5 rounded-xl bg-amber-50 text-amber-600 border border-amber-100 animate-pulse">Pending</span>
                                         )}
                                     </td>
-                                    <td className="p-6">
+                                    <td className="p-3 md:p-6 whitespace-nowrap">
                                         <div className="flex justify-center gap-2">
                                             {!isPersonalView && (
                                                 <button
                                                     onClick={() => printPaymentSlip(r)}
-                                                    className="h-10 w-10 bg-sky-50 text-sky-600 rounded-xl hover:bg-sky-600 hover:text-white transition-all active:scale-95 group/btn"
+                                                    className="h-8 w-8 md:h-10 md:w-10 bg-sky-50 text-sky-600 rounded-xl hover:bg-sky-600 hover:text-white transition-all active:scale-95 group/btn"
                                                     title="Payslip"
                                                 >
                                                     <FaFileAlt className="group-hover/btn:scale-125 transition-transform" />
@@ -1403,7 +1411,7 @@ const SalaryManagement = () => {
                                             {isPersonalView && (
                                                 <button
                                                     onClick={() => printPaymentSlip(r)}
-                                                    className="h-10 w-10 bg-sky-50 text-sky-600 rounded-xl hover:bg-sky-600 hover:text-white transition-all active:scale-95 group/btn"
+                                                    className="h-8 w-8 md:h-10 md:w-10 bg-sky-50 text-sky-600 rounded-xl hover:bg-sky-600 hover:text-white transition-all active:scale-95 group/btn"
                                                     title="Payslip"
                                                 >
                                                     <FaFileAlt className="group-hover/btn:scale-125 transition-transform" />
@@ -1412,7 +1420,7 @@ const SalaryManagement = () => {
                                             {canInstitutionWide && isHistoryPage && (
                                                 <button
                                                     onClick={() => navigate(`/${user.role}/payroll/employee/${encodeURIComponent(normalizeEmpId(r.emp_id))}`)}
-                                                    className="h-10 w-10 bg-sky-50 text-sky-600 rounded-xl hover:bg-sky-600 hover:text-white transition-all active:scale-95 group/btn"
+                                                    className="h-8 w-8 md:h-10 md:w-10 bg-sky-50 text-sky-600 rounded-xl hover:bg-sky-600 hover:text-white transition-all active:scale-95 group/btn"
                                                     title="View employee salary page"
                                                 >
                                                     <FaSearch className="group-hover/btn:scale-125 transition-transform" />
@@ -1421,7 +1429,7 @@ const SalaryManagement = () => {
                                             {isPersonalView && (
                                                 <button
                                                     onClick={handleSubmitReport}
-                                                    className="bg-sky-600 text-white px-8 py-4 rounded-2xl shadow-xl shadow-sky-100 hover:bg-sky-700 transition-all active:scale-95 text-[10px] font-black uppercase tracking-[0.2em] flex items-center gap-2"
+                                                    className="bg-sky-600 text-white px-4 md:px-8 py-2.5 md:py-4 rounded-2xl shadow-xl shadow-sky-100 hover:bg-sky-700 transition-all active:scale-95 text-[9px] md:text-[10px] font-black uppercase tracking-[0.2em] flex items-center gap-2"
                                                     title="Report issue"
                                                 >
                                                     <FaPaperPlane /> Report
@@ -1441,7 +1449,7 @@ const SalaryManagement = () => {
                                                                 Swal.fire('Error', error?.response?.data?.message || 'Failed to mark paid.', 'error');
                                                             }
                                                         }}
-                                                        className="h-10 w-10 bg-sky-50 text-sky-600 rounded-xl hover:bg-sky-600 hover:text-white transition-all active:scale-95 group/btn disabled:opacity-40 disabled:cursor-not-allowed"
+                                                        className="h-8 w-8 md:h-10 md:w-10 bg-sky-50 text-sky-600 rounded-xl hover:bg-sky-600 hover:text-white transition-all active:scale-95 group/btn disabled:opacity-40 disabled:cursor-not-allowed"
                                                         title="Mark paid"
                                                     >
                                                         <FaCheckCircle className="group-hover/btn:scale-125 transition-transform" />
@@ -1457,7 +1465,7 @@ const SalaryManagement = () => {
                                                                 Swal.fire('Error', error?.response?.data?.message || 'Failed to mark unpaid.', 'error');
                                                             }
                                                         }}
-                                                        className="h-10 w-10 bg-sky-50 text-sky-600 rounded-xl hover:bg-sky-600 hover:text-white transition-all active:scale-95 group/btn"
+                                                        className="h-8 w-8 md:h-10 md:w-10 bg-sky-50 text-sky-600 rounded-xl hover:bg-sky-600 hover:text-white transition-all active:scale-95 group/btn"
                                                         title="Mark unpaid"
                                                     >
                                                         <FaTimesCircle className="group-hover/btn:scale-125 transition-transform" />
@@ -1473,7 +1481,7 @@ const SalaryManagement = () => {
 
                             {loading && (
                                         <tr>
-                                            <td colSpan={canInstitutionWide && isHistoryPage ? 12 : 11} className="p-32 text-center text-gray-500">
+                                            <td colSpan={canInstitutionWide && isHistoryPage ? 12 : 11} className="p-16 md:p-32 text-center text-gray-500">
                                                 <div className="flex flex-col items-center gap-4">
                                                     <div className="h-14 w-14 border-4 border-sky-100 border-t-sky-600 rounded-full animate-spin"></div>
                                                     <p className="text-[10px] font-black text-sky-500 uppercase tracking-[0.2em] mt-2">Loading payroll records...</p>
@@ -1484,7 +1492,7 @@ const SalaryManagement = () => {
 
                                     {!loading && filteredRows.length === 0 && (
                                         <tr>
-                                            <td colSpan={canInstitutionWide && isHistoryPage ? 12 : 11} className="p-32 text-center">
+                                            <td colSpan={canInstitutionWide && isHistoryPage ? 12 : 11} className="p-16 md:p-32 text-center">
                                                 <div className="flex flex-col items-center gap-6 opacity-20 grayscale">
                                                     <FaMoneyBillWave size={64} className="text-gray-400" />
                                                     <div>

@@ -59,6 +59,10 @@ const EmployeeFormPage = () => {
         pf_duration_years: '1',
         pf_interest_percentage: '12',
         salary_advance: '',
+        salary_advance_duration_type: 'single',
+        salary_advance_month: '',
+        salary_advance_from_month: '',
+        salary_advance_to_month: '',
         hostel_and_food_fees: '',
         bus_fees: '',
         lwf: '',
@@ -121,6 +125,10 @@ const EmployeeFormPage = () => {
                         pf_duration_years: '1',
                         pf_interest_percentage: '12',
                         salary_advance: '',
+                        salary_advance_duration_type: 'single',
+                        salary_advance_month: '',
+                        salary_advance_from_month: '',
+                        salary_advance_to_month: '',
                         hostel_and_food_fees: '',
                         bus_fees: '',
                         lwf: '',
@@ -151,6 +159,17 @@ const EmployeeFormPage = () => {
                         }
                         if (lowerType.includes('salary advance') || lowerType.includes('advance')) {
                             normalized.salary_advance = String((Number(normalized.salary_advance) || 0) + amount);
+                            const singleMonthMatch = type.match(/single month\s*:\s*(\d{4}-\d{2})/i);
+                            const rangeMatch = type.match(/from\s*:\s*(\d{4}-\d{2})\s*to\s*:\s*(\d{4}-\d{2})/i);
+                            if (singleMonthMatch) {
+                                normalized.salary_advance_duration_type = 'single';
+                                normalized.salary_advance_month = singleMonthMatch[1];
+                            }
+                            if (rangeMatch) {
+                                normalized.salary_advance_duration_type = 'range';
+                                normalized.salary_advance_from_month = rangeMatch[1];
+                                normalized.salary_advance_to_month = rangeMatch[2];
+                            }
                             return;
                         }
                         if (lowerType.includes('hostel') || lowerType.includes('food')) {
@@ -293,13 +312,21 @@ const EmployeeFormPage = () => {
         const pfAmount = Number(getMonthlyPfDeduction() || 0);
         const pfDuration = String(deductionForm.pf_duration_years || '').trim();
         const pfInterest = String(deductionForm.pf_interest_percentage || '').trim();
+        const salaryAdvanceAmount = Number(deductionForm.salary_advance || 0) || 0;
+        const salaryAdvanceDurationType = String(deductionForm.salary_advance_duration_type || 'single');
+        const salaryAdvanceSingleMonth = String(deductionForm.salary_advance_month || '').trim();
+        const salaryAdvanceFromMonth = String(deductionForm.salary_advance_from_month || '').trim();
+        const salaryAdvanceToMonth = String(deductionForm.salary_advance_to_month || '').trim();
         const pfTypeLabel = pfDuration || pfInterest
             ? `Employ PF Monthly (PF Basic: ${deductionForm.employ_pf || '0'}, Duration: ${pfDuration || '0'} years, PF Deduction % Per Month: ${pfInterest || '0'}%)`
             : 'PF Basic';
+        const salaryAdvanceTypeLabel = salaryAdvanceDurationType === 'range'
+            ? `Salary Advance (From: ${salaryAdvanceFromMonth || '-'} To: ${salaryAdvanceToMonth || '-'})`
+            : `Salary Advance (Single Month: ${salaryAdvanceSingleMonth || '-'})`;
 
         const rows = [
             { type: pfTypeLabel, amount: pfAmount },
-            { type: 'Salary Advance', amount: Number(deductionForm.salary_advance || 0) || 0 },
+            { type: salaryAdvanceTypeLabel, amount: salaryAdvanceAmount },
             { type: 'Hostel and Food Fees', amount: Number(deductionForm.hostel_and_food_fees || 0) || 0 },
             { type: 'Bus Fees', amount: Number(deductionForm.bus_fees || 0) || 0 },
             { type: 'LWF', amount: Number(deductionForm.lwf || 0) || 0 },
@@ -319,6 +346,42 @@ const EmployeeFormPage = () => {
 
     const handleSubmit = async (e) => {
         if (e) e.preventDefault();
+
+        const salaryAdvanceAmount = Number(deductionForm.salary_advance || 0) || 0;
+        if (salaryAdvanceAmount > 0) {
+            const durationType = String(deductionForm.salary_advance_duration_type || 'single');
+            const singleMonth = String(deductionForm.salary_advance_month || '').trim();
+            const fromMonth = String(deductionForm.salary_advance_from_month || '').trim();
+            const toMonth = String(deductionForm.salary_advance_to_month || '').trim();
+
+            if (durationType === 'single' && !singleMonth) {
+                return Swal.fire({
+                    title: 'Salary Advance Month Required',
+                    text: 'Please select Single Month for Salary Advance.',
+                    icon: 'warning',
+                    confirmButtonColor: '#2563eb'
+                });
+            }
+
+            if (durationType === 'range') {
+                if (!fromMonth || !toMonth) {
+                    return Swal.fire({
+                        title: 'Salary Advance Range Required',
+                        text: 'Please select both From Month and To Month for Salary Advance.',
+                        icon: 'warning',
+                        confirmButtonColor: '#2563eb'
+                    });
+                }
+                if (fromMonth > toMonth) {
+                    return Swal.fire({
+                        title: 'Invalid Salary Advance Range',
+                        text: 'From Month should be before or equal to To Month.',
+                        icon: 'warning',
+                        confirmButtonColor: '#2563eb'
+                    });
+                }
+            }
+        }
 
         if (!id && formData.pin !== formData.confirm_pin) {
             return Swal.fire({
@@ -694,6 +757,57 @@ const EmployeeFormPage = () => {
                                     <label className={labelClass}>Salary Advance (Rs / month)</label>
                                     <input type="number" min="0" value={deductionForm.salary_advance} onChange={(e) => setDeductionValue('salary_advance', e.target.value)} className={inputClass} disabled={!isAdmin} />
                                 </div>
+                                {(Number(deductionForm.salary_advance || 0) > 0) && (
+                                    <>
+                                        <div>
+                                            <label className={labelClass}>Salary Advance Duration Type</label>
+                                            <select
+                                                value={deductionForm.salary_advance_duration_type}
+                                                onChange={(e) => setDeductionValue('salary_advance_duration_type', e.target.value)}
+                                                className={inputClass}
+                                                disabled={!isAdmin}
+                                            >
+                                                <option value="single">Single Month</option>
+                                                <option value="range">From - To Month</option>
+                                            </select>
+                                        </div>
+                                        {deductionForm.salary_advance_duration_type === 'single' ? (
+                                            <div>
+                                                <label className={labelClass}>Salary Advance Month</label>
+                                                <input
+                                                    type="month"
+                                                    value={deductionForm.salary_advance_month}
+                                                    onChange={(e) => setDeductionValue('salary_advance_month', e.target.value)}
+                                                    className={inputClass}
+                                                    disabled={!isAdmin}
+                                                />
+                                            </div>
+                                        ) : (
+                                            <>
+                                                <div>
+                                                    <label className={labelClass}>Salary Advance From Month</label>
+                                                    <input
+                                                        type="month"
+                                                        value={deductionForm.salary_advance_from_month}
+                                                        onChange={(e) => setDeductionValue('salary_advance_from_month', e.target.value)}
+                                                        className={inputClass}
+                                                        disabled={!isAdmin}
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className={labelClass}>Salary Advance To Month</label>
+                                                    <input
+                                                        type="month"
+                                                        value={deductionForm.salary_advance_to_month}
+                                                        onChange={(e) => setDeductionValue('salary_advance_to_month', e.target.value)}
+                                                        className={inputClass}
+                                                        disabled={!isAdmin}
+                                                    />
+                                                </div>
+                                            </>
+                                        )}
+                                    </>
+                                )}
                                 <div>
                                     <label className={labelClass}>Hostel and Food Fees (Rs / month)</label>
                                     <input type="number" min="0" value={deductionForm.hostel_and_food_fees} onChange={(e) => setDeductionValue('hostel_and_food_fees', e.target.value)} className={inputClass} disabled={!isAdmin} />
