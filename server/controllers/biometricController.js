@@ -514,3 +514,88 @@ exports.getBiometricStats = async (req, res) => {
         res.status(500).json({ message: 'Server Error' });
     }
 };
+
+// @desc    Backfill today's manual attendance times into biometric live tables
+// @route   POST /api/biometric/backfill-today-from-attendance
+// @access  Private (Admin/Management)
+exports.backfillTodayFromAttendance = async (req, res) => {
+    const client = await pool.connect();
+    try {
+        await client.query('BEGIN');
+
+        const insertLogsResult = await client.query(`
+            WITH source_rows AS (
+                SELECT
+                    ar.emp_id,
+                    ar.date::date AS att_date,
+                    NULLIF(TRIM(ar.in_time::text), '')::time AS in_time_val,
+                    NULLIF(TRIM(ar.out_time::text), '')::time AS out_time_val
+                FROM attendance_records ar
+                WHERE ar.date::date = (NOW() AT TIME ZONE 'Asia/Kolkata')::date
+                  AND (ar.in_time IS NOT NULL OR ar.out_time IS NOT NULL)
+            ), candidate_logs AS (
+                SELECT emp_id, (att_date::timestamp + in_time_val) AS log_time, 'IN'::text AS log_type
+                FROM source_rows
+                WHERE in_time_val IS NOT NULL
+                UNION ALL
+                SELECT emp_id, (att_date::timestamp + out_time_val) AS log_time, 'OUT'::text AS log_type
+                FROM source_rows
+                WHERE out_time_val IS NOT NULL
+            )
+            INSERT INTO biometric_logs (device_id, emp_id, log_time, type)
+            SELECT
+                'MANUAL_ATTENDANCE_SYNC',
+                cl.emp_id,
+                cl.log_time,
+                cl.log_type::biometric_log_type
+            FROM candidate_logs cl
+            WHERE NOT EXISTS (
+                SELECT 1
+                FROM biometric_logs b
+                WHERE b.emp_id = cl.emp_id
+                  AND b.log_time = cl.log_time
+                  AND COALESCE(b.type::text, '') = cl.log_type
+            )
+            RETURNING emp_id
+        `);
+
+        const upsertBiometricAttendanceResult = await client.query(`
+            WITH today_rollup AS (
+                SELECT
+                    b.emp_id AS user_id,
+                    (b.log_time AT TIME ZONE 'Asia/Kolkata')::date AS punch_date,
+                    MIN((b.log_time AT TIME ZONE 'Asia/Kolkata')::time) AS first_punch,
+                    MAX((b.log_time AT TIME ZONE 'Asia/Kolkata')::time) AS last_punch
+                FROM biometric_logs b
+                WHERE (b.log_time AT TIME ZONE 'Asia/Kolkata')::date = (NOW() AT TIME ZONE 'Asia/Kolkata')::date
+                GROUP BY b.emp_id, (b.log_time AT TIME ZONE 'Asia/Kolkata')::date
+            )
+            INSERT INTO biometric_attendance (user_id, date, intime, outtime)
+            SELECT user_id, punch_date, first_punch, last_punch
+            FROM today_rollup
+            ON CONFLICT (user_id, date)
+            DO UPDATE SET
+                intime = EXCLUDED.intime,
+                outtime = EXCLUDED.outtime
+            RETURNING user_id
+        `);
+
+        await client.query('COMMIT');
+
+        return res.status(200).json({
+            message: 'Today attendance backfill to biometric live data completed',
+            insertedBiometricLogs: insertLogsResult.rowCount,
+            upsertedBiometricAttendanceRows: upsertBiometricAttendanceResult.rowCount,
+            date: new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' }),
+        });
+    } catch (error) {
+        await client.query('ROLLBACK');
+        console.error('Error backfilling today attendance to biometric data:', error);
+        return res.status(500).json({
+            message: 'Failed to backfill today attendance into biometric live data',
+            error: error.message,
+        });
+    } finally {
+        client.release();
+    }
+};

@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
-const { receiveLog, getBiometricData, getBiometricStats } = require('../controllers/biometricController');
-const { protect } = require('../middleware/authMiddleware');
+const { receiveLog, getBiometricData, getBiometricStats, backfillTodayFromAttendance } = require('../controllers/biometricController');
+const { protect, restrictTo } = require('../middleware/authMiddleware');
 
 // ADMS heartbeat endpoint (device polls this URL)
 router.get('/getrequest', (req, res) => {
@@ -29,6 +29,9 @@ router.post('/cdata', handleCdata);
 
 // Endpoint for biometric device to push data (No auth for device, but can add secret key check inside controller)
 router.post('/log', receiveLog);
+
+// Backfill today's manually entered attendance times into biometric live data
+router.post('/backfill-today-from-attendance', protect, restrictTo('admin', 'management'), backfillTodayFromAttendance);
 
 // Endpoints for web frontend to fetch data
 router.get('/data', protect, getBiometricData);
