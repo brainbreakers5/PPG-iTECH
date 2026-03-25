@@ -424,26 +424,8 @@ const SalaryManagement = () => {
             autoRefreshInFlightRef.current = true;
             refreshOnReturnRef.current = false;
             try {
-                // Fast first load: show current records immediately.
+                // One-time fast refresh when user lands/returns to this page.
                 await refreshRows();
-
-                // Then run calculation in background for institution-wide live payroll,
-                // and refresh again once completed.
-                if (canInstitutionWide && !isHistoryPage && !isPersonalView) {
-                    try {
-                        await api.post('/salary/calculate', {
-                            month: currentCycle.month,
-                            year: currentCycle.year,
-                            fromDate: currentCycle.fromDate,
-                            toDate: currentCycle.toDate,
-                            paidStatuses,
-                            unpaidStatuses
-                        });
-                        await refreshRows();
-                    } catch (error) {
-                        console.error('Auto calculate after fast refresh failed:', error?.response?.data || error.message);
-                    }
-                }
             } finally {
                 autoRefreshInFlightRef.current = false;
             }
@@ -461,27 +443,15 @@ const SalaryManagement = () => {
             triggerAutoRefreshOnce();
         };
 
-        const onWindowBlur = () => {
-            markRefreshNeeded();
-        };
-
-        const onWindowFocus = () => {
-            triggerAutoRefreshOnce();
-        };
-
         // Route switch to any payroll page should refresh once automatically.
         markRefreshNeeded();
         triggerAutoRefreshOnce();
 
         document.addEventListener('visibilitychange', onVisibilityChange);
-        window.addEventListener('blur', onWindowBlur);
-        window.addEventListener('focus', onWindowFocus);
 
         return () => {
             mounted = false;
             document.removeEventListener('visibilitychange', onVisibilityChange);
-            window.removeEventListener('blur', onWindowBlur);
-            window.removeEventListener('focus', onWindowFocus);
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [location.pathname]);
