@@ -128,13 +128,40 @@ const EmployeeManagement = () => {
 
     const getExportRows = () => filteredEmployees.map((emp) => ({
         emp_id: emp.emp_id || '',
+        emp_code: emp.emp_code || '',
         employee_name: emp.name || '',
         role: emp.role || '',
+        category: emp.community || '',
+        caste: emp.caste || '',
         department: emp.department_name || '',
         designation: emp.designation || '',
         email: emp.email || '',
         phone: emp.mobile || '',
-        status: emp.employment_status || 'active'
+        whatsapp: emp.whatsapp || '',
+        dob: emp.dob || '',
+        doj: emp.doj || '',
+        gender: emp.gender || '',
+        blood_group: emp.blood_group || '',
+        religion: emp.religion || '',
+        nationality: emp.nationality || '',
+        aadhar: emp.aadhar || '',
+        pan: emp.pan || '',
+        account_no: emp.account_no || '',
+        bank_name: emp.bank_name || '',
+        branch: emp.branch || '',
+        ifsc: emp.ifsc || '',
+        pin_code: emp.pin_code || '',
+        pf_number: emp.pf_number || '',
+        uan_number: emp.uan_number || '',
+        permanent_address: emp.permanent_address || '',
+        communication_address: emp.communication_address || '',
+        father_name: emp.father_name || '',
+        mother_name: emp.mother_name || '',
+        marital_status: emp.marital_status || '',
+        monthly_salary: emp.monthly_salary || '',
+        experience: emp.experience || '',
+        status: emp.employment_status || 'active',
+        profile_link: `${window.location.origin}/admin/profile/${encodeURIComponent(emp.emp_id || '')}`
     }));
 
     const handlePrint = async () => {
@@ -162,6 +189,33 @@ const EmployeeManagement = () => {
                 <td>${escapeHtml(r.email)}</td>
                 <td>${escapeHtml(r.phone)}</td>
                 <td>${escapeHtml(r.status)}</td>
+                <td class="excel-only">${escapeHtml(r.emp_code)}</td>
+                <td class="excel-only">${escapeHtml(r.category)}</td>
+                <td class="excel-only">${escapeHtml(r.caste)}</td>
+                <td class="excel-only">${escapeHtml(r.whatsapp)}</td>
+                <td class="excel-only">${escapeHtml(r.dob)}</td>
+                <td class="excel-only">${escapeHtml(r.doj)}</td>
+                <td class="excel-only">${escapeHtml(r.gender)}</td>
+                <td class="excel-only">${escapeHtml(r.blood_group)}</td>
+                <td class="excel-only">${escapeHtml(r.religion)}</td>
+                <td class="excel-only">${escapeHtml(r.nationality)}</td>
+                <td class="excel-only">${escapeHtml(r.aadhar)}</td>
+                <td class="excel-only">${escapeHtml(r.pan)}</td>
+                <td class="excel-only">${escapeHtml(r.account_no)}</td>
+                <td class="excel-only">${escapeHtml(r.bank_name)}</td>
+                <td class="excel-only">${escapeHtml(r.branch)}</td>
+                <td class="excel-only">${escapeHtml(r.ifsc)}</td>
+                <td class="excel-only">${escapeHtml(r.pin_code)}</td>
+                <td class="excel-only">${escapeHtml(r.pf_number)}</td>
+                <td class="excel-only">${escapeHtml(r.uan_number)}</td>
+                <td class="excel-only">${escapeHtml(r.permanent_address)}</td>
+                <td class="excel-only">${escapeHtml(r.communication_address)}</td>
+                <td class="excel-only">${escapeHtml(r.father_name)}</td>
+                <td class="excel-only">${escapeHtml(r.mother_name)}</td>
+                <td class="excel-only">${escapeHtml(r.marital_status)}</td>
+                <td class="excel-only">${escapeHtml(r.monthly_salary)}</td>
+                <td class="excel-only">${escapeHtml(r.experience)}</td>
+                <td class="excel-only">${escapeHtml(r.profile_link)}</td>
             </tr>
         `).join('');
 
@@ -180,6 +234,7 @@ const EmployeeManagement = () => {
         th, td { border: 1px solid #cbd5e1; padding: 6px 8px; text-align: left; white-space: nowrap; }
         th { background: #e2e8f0; font-weight: 700; }
         tbody tr:nth-child(even) { background: #f8fafc; }
+        .excel-only { display: none; }
     </style>
 </head>
 <body>
@@ -202,6 +257,33 @@ const EmployeeManagement = () => {
                 <th>Email</th>
                 <th>Phone</th>
                 <th>Status</th>
+                <th class="excel-only">Emp Code</th>
+                <th class="excel-only">Category</th>
+                <th class="excel-only">Caste</th>
+                <th class="excel-only">WhatsApp</th>
+                <th class="excel-only">DOB</th>
+                <th class="excel-only">DOJ</th>
+                <th class="excel-only">Gender</th>
+                <th class="excel-only">Blood Group</th>
+                <th class="excel-only">Religion</th>
+                <th class="excel-only">Nationality</th>
+                <th class="excel-only">Aadhar</th>
+                <th class="excel-only">PAN</th>
+                <th class="excel-only">Account No</th>
+                <th class="excel-only">Bank Name</th>
+                <th class="excel-only">Branch</th>
+                <th class="excel-only">IFSC</th>
+                <th class="excel-only">PIN Code</th>
+                <th class="excel-only">PF Number</th>
+                <th class="excel-only">UAN Number</th>
+                <th class="excel-only">Permanent Address</th>
+                <th class="excel-only">Communication Address</th>
+                <th class="excel-only">Father Name</th>
+                <th class="excel-only">Mother Name</th>
+                <th class="excel-only">Marital Status</th>
+                <th class="excel-only">Monthly Salary</th>
+                <th class="excel-only">Experience</th>
+                <th class="excel-only">Profile Link</th>
             </tr>
         </thead>
         <tbody>

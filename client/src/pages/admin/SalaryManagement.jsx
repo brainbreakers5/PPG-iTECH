@@ -768,6 +768,91 @@ const SalaryManagement = () => {
         });
     };
 
+    const reportCurrentSalaryRows = async () => {
+        if (!filteredRows.length) {
+            Swal.fire('No Data', 'No salary records available for this report.', 'info');
+            return;
+        }
+
+        const generatedAt = formatGeneratedAt();
+        const bodyRows = filteredRows.map((r, index) => `
+            <tr>
+                <td>${index + 1}</td>
+                <td>${escapeHtml(r.name)}</td>
+                <td>${escapeHtml(r.emp_id)}</td>
+                <td>${escapeHtml(r.department_name || '-')}</td>
+                <td class="right">${toCurrency(r.monthly_salary || r.gross_salary || 0)}</td>
+                <td class="right">${toCurrency(r.gross_salary || r.monthly_salary || 0)}</td>
+                <td class="right">${toCurrency(getEarnedSalary(r))}</td>
+                <td class="right">${toCurrency(r.deductions_applied || 0)}</td>
+                <td class="right">${toCurrency(r.calculated_salary || 0)}</td>
+                <td>${escapeHtml(String(r.status || 'Pending'))}</td>
+            </tr>
+        `).join('');
+
+        const html = `
+            <html>
+                <head>
+                    <title>Salary Records Report</title>
+                    <style>
+                        @page { size: A4 landscape; margin: 8mm; }
+                        * { box-sizing: border-box; }
+                        body { font-family: Arial, sans-serif; margin: 0; color: #111827; }
+                        .wrap { width: 100%; }
+                        .head { margin-bottom: 10px; }
+                        .title { margin: 0; font-size: 20px; font-weight: 900; letter-spacing: 0.03em; }
+                        .sub { margin-top: 4px; font-size: 11px; color: #4b5563; }
+                        .brand-right { text-align: right; font-size: 10px; font-weight: 700; color: #334155; line-height: 1.4; margin-bottom: 8px; }
+                        table { width: 100%; border-collapse: collapse; }
+                        thead { display: table-header-group; }
+                        tr { page-break-inside: avoid; }
+                        th, td { border: 1px solid #dbeafe; padding: 7px; font-size: 10px; vertical-align: top; }
+                        th { background: #eff6ff; text-transform: uppercase; letter-spacing: 0.08em; font-weight: 800; }
+                        .right { text-align: right; }
+                    </style>
+                </head>
+                <body>
+                    <div class="wrap">
+                        <div class="brand-right">
+                            <div>PPG EMP HUB</div>
+                            <div>Generated: ${escapeHtml(generatedAt)}</div>
+                            <div>Salary Records</div>
+                        </div>
+                        <div class="head">
+                            <p class="title">Salary Records Report</p>
+                            <p class="sub">Cycle: ${escapeHtml(selectedCycle.fromDate)} to ${escapeHtml(selectedCycle.toDate)} | Total Employees: ${filteredRows.length}</p>
+                        </div>
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>#</th>
+                                    <th>Employee</th>
+                                    <th>Emp ID</th>
+                                    <th>Department</th>
+                                    <th class="right">Monthly Salary (Fixed)</th>
+                                    <th class="right">Gross Salary</th>
+                                    <th class="right">Earned Salary</th>
+                                    <th class="right">Deductions</th>
+                                    <th class="right">Net Salary</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>${bodyRows}</tbody>
+                        </table>
+                    </div>
+                </body>
+            </html>
+        `;
+
+        await runPrintWindow({
+            title: 'Salary Records Report',
+            html,
+            windowFeatures: 'width=1200,height=900',
+            delay: 250,
+            modeLabel: 'the salary records report'
+        });
+    };
+
     const handleBulkMark = async (status) => {
         const chosen = filteredRows.filter((r) => selectedIds.includes(r.id));
         if (!chosen.length) {
@@ -949,6 +1034,12 @@ const SalaryManagement = () => {
                             <>
                                 {!isHistoryPage && (
                                     <>
+                                        <button
+                                            onClick={reportCurrentSalaryRows}
+                                            className="bg-sky-600 text-white px-8 py-4 rounded-2xl shadow-xl shadow-sky-100 hover:bg-sky-700 transition-all active:scale-95 flex items-center font-black uppercase tracking-[0.2em] text-[10px]"
+                                        >
+                                            <FaFileAlt className="mr-3 group-hover:scale-110 transition-transform" /> Report
+                                        </button>
                                         <button
                                             onClick={() => navigate(`/${user.role}/payroll/history`)}
                                             className="bg-sky-600 text-white px-8 py-4 rounded-2xl shadow-xl shadow-sky-100 hover:bg-sky-700 transition-all active:scale-95 flex items-center font-black uppercase tracking-[0.2em] text-[10px]"
