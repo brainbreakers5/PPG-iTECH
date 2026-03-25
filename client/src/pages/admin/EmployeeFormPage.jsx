@@ -10,6 +10,14 @@ import { useAuth } from '../../context/AuthContext';
 const inputClass = "w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl outline-none focus:ring-4 focus:ring-sky-100 focus:border-sky-500 transition-all font-bold text-gray-700 text-sm disabled:opacity-70 disabled:bg-gray-100/60 disabled:cursor-not-allowed disabled:text-gray-500 disabled:border-gray-50";
 const labelClass = "block text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-3 ml-1";
 
+const normalizeEmployeeCategory = (value) => {
+    const v = String(value || '').trim().toLowerCase();
+    if (v === 'teaching') return 'Teaching';
+    if (v === 'non-teaching' || v === 'non teaching' || v === 'nonteaching') return 'Non-Teaching';
+    if (v === 'workers' || v === 'worker') return 'Workers';
+    return '';
+};
+
 const FormSection = ({ title, icon, children }) => (
     <div className="mb-12 border-b border-gray-50 pb-12 last:border-0 last:pb-0">
         <div className="flex items-center gap-4 mb-8">
@@ -46,7 +54,20 @@ const EmployeeFormPage = () => {
     const [formData, setFormData] = useState(defaultData);
     const [certificates, setCertificates] = useState([]);
     const [existingCerts, setExistingCerts] = useState([]);
-    const [deductions, setDeductions] = useState([]); // [{ type, amount }]
+    const [deductionForm, setDeductionForm] = useState({
+        employ_pf: '',
+        salary_advance: '',
+        hostel_and_food_fees: '',
+        bus_fees: '',
+        lwf: '',
+        tds: '',
+        other_enabled: false,
+        other_name: '',
+        other_amount: ''
+    });
+    const selectedCategory = normalizeEmployeeCategory(formData.community);
+    const isTeachingCategory = selectedCategory === 'Teaching';
+    const isWorkersCategory = selectedCategory === 'Workers';
 
     useEffect(() => {
         fetchDepartments();
@@ -75,13 +96,68 @@ const EmployeeFormPage = () => {
     const fetchEmployee = async () => {
         try {
             const { data } = await api.get(`/employees/${id}?lookup=id`);
-            setFormData({ ...data, confirm_pin: data.pin });
+            setFormData({
+                ...data,
+                community: normalizeEmployeeCategory(data.community),
+                confirm_pin: data.pin
+            });
             // Load existing deductions if stored
             if (data.deductions) {
                 const loadedDeductions = typeof data.deductions === 'string' 
                     ? JSON.parse(data.deductions) 
                     : data.deductions;
-                setDeductions(Array.isArray(loadedDeductions) ? loadedDeductions : []);
+                if (Array.isArray(loadedDeductions)) {
+                    const normalized = {
+                        employ_pf: '',
+                        salary_advance: '',
+                        hostel_and_food_fees: '',
+                        bus_fees: '',
+                        lwf: '',
+                        tds: '',
+                        other_enabled: false,
+                        other_name: '',
+                        other_amount: ''
+                    };
+
+                    loadedDeductions.forEach((d) => {
+                        const type = String(d?.type || d?.name || d?.label || '').trim();
+                        const amount = Number(d?.amount || 0) || 0;
+                        const lowerType = type.toLowerCase();
+
+                        if (!amount) return;
+
+                        if (lowerType.includes('pf')) {
+                            normalized.employ_pf = String((Number(normalized.employ_pf) || 0) + amount);
+                            return;
+                        }
+                        if (lowerType.includes('salary advance') || lowerType.includes('advance')) {
+                            normalized.salary_advance = String((Number(normalized.salary_advance) || 0) + amount);
+                            return;
+                        }
+                        if (lowerType.includes('hostel') || lowerType.includes('food')) {
+                            normalized.hostel_and_food_fees = String((Number(normalized.hostel_and_food_fees) || 0) + amount);
+                            return;
+                        }
+                        if (lowerType.includes('bus')) {
+                            normalized.bus_fees = String((Number(normalized.bus_fees) || 0) + amount);
+                            return;
+                        }
+                        if (lowerType.includes('lwf')) {
+                            normalized.lwf = String((Number(normalized.lwf) || 0) + amount);
+                            return;
+                        }
+                        if (lowerType.includes('tds') || lowerType.includes('income tax')) {
+                            normalized.tds = String((Number(normalized.tds) || 0) + amount);
+                            return;
+                        }
+
+                        normalized.other_enabled = true;
+                        normalized.other_name = normalized.other_name || type || 'Other';
+                        normalized.other_amount = String((Number(normalized.other_amount) || 0) + amount);
+                    });
+
+                    setDeductionForm(normalized);
+                }
             }
             setLoading(false);
         } catch (error) {
@@ -92,7 +168,19 @@ const EmployeeFormPage = () => {
     };
 
     const handleChange = (e) => {
-        setFormData({ ...formData, [e.target.name]: e.target.value });
+        const { name, value } = e.target;
+
+        if (name === 'community') {
+            const category = normalizeEmployeeCategory(value);
+            setFormData(prev => ({
+                ...prev,
+                community: category,
+                department_id: category === 'Teaching' ? prev.department_id : ''
+            }));
+            return;
+        }
+
+        setFormData({ ...formData, [name]: value });
     };
 
     const handleFileChange = (e) => {
@@ -157,16 +245,30 @@ const EmployeeFormPage = () => {
         }
     };
 
-
     // ─── Deduction Handlers ─────────────────────────────────────────────
-    const DEDUCTION_PRESETS = ['PF (Provident Fund)', 'ESI', 'Income Tax (TDS)', 'Professional Tax', 'Loan Recovery', 'Other'];
-
-    const addDeduction = () => {
-        setDeductions(prev => [...prev, { type: '', amount: '' }]);
+    const setDeductionValue = (field, value) => {
+        setDeductionForm(prev => ({ ...prev, [field]: value }));
     };
-    const removeDeduction = (i) => setDeductions(prev => prev.filter((_, idx) => idx !== i));
-    const updateDeduction = (i, field, val) => {
-        setDeductions(prev => prev.map((d, idx) => idx === i ? { ...d, [field]: val } : d));
+
+    const serializeDeductions = () => {
+        const rows = [
+            { type: 'Employ PF', amount: Number(deductionForm.employ_pf || 0) || 0 },
+            { type: 'Salary Advance', amount: Number(deductionForm.salary_advance || 0) || 0 },
+            { type: 'Hostel and Food Fees', amount: Number(deductionForm.hostel_and_food_fees || 0) || 0 },
+            { type: 'Bus Fees', amount: Number(deductionForm.bus_fees || 0) || 0 },
+            { type: 'LWF', amount: Number(deductionForm.lwf || 0) || 0 },
+            { type: 'TDS', amount: Number(deductionForm.tds || 0) || 0 }
+        ].filter(row => row.amount > 0);
+
+        if (deductionForm.other_enabled) {
+            const otherName = String(deductionForm.other_name || '').trim();
+            const otherAmount = Number(deductionForm.other_amount || 0) || 0;
+            if (otherName && otherAmount > 0) {
+                rows.push({ type: otherName, amount: otherAmount });
+            }
+        }
+
+        return JSON.stringify(rows);
     };
 
     const handleSubmit = async (e) => {
@@ -185,7 +287,9 @@ const EmployeeFormPage = () => {
             let userId = formData.id;
             const payload = {
                 ...formData,
-                deductions: JSON.stringify(deductions.filter(d => d.type && Number(d.amount) > 0))
+                community: normalizeEmployeeCategory(formData.community),
+                department_id: normalizeEmployeeCategory(formData.community) === 'Teaching' ? formData.department_id : '',
+                deductions: serializeDeductions()
             };
 
             if (id) {
@@ -231,7 +335,7 @@ const EmployeeFormPage = () => {
 
 
             // Upload new certificates
-            if (userId && certificates.length > 0) {
+            if (userId && isWorkersCategory && certificates.length > 0) {
                 const validCerts = certificates.filter(c => c.certificate_name && c.file_data);
                 for (const cert of validCerts) {
                     try {
@@ -337,17 +441,19 @@ const EmployeeFormPage = () => {
                                         <option value="admin">Admin</option>
                                     </select>
                                 </div>
-                                <div>
-                                    <label className={labelClass}>Department</label>
-                                    <select name="department_id" value={formData.department_id || ''} onChange={handleChange} className={inputClass} disabled={!isAdmin}>
-                                        <option value="">Select Department</option>
-                                        {departments.map(d => (
-                                            <option key={d.id} value={d.id}>
-                                                {d.name} {d.code ? `(${d.code})` : ''}
-                                            </option>
-                                        ))}
-                                    </select>
-                                </div>
+                                {isTeachingCategory && (
+                                    <div>
+                                        <label className={labelClass}>Department</label>
+                                        <select name="department_id" value={formData.department_id || ''} onChange={handleChange} className={inputClass} disabled={!isAdmin}>
+                                            <option value="">Select Department</option>
+                                            {departments.map(d => (
+                                                <option key={d.id} value={d.id}>
+                                                    {d.name} {d.code ? `(${d.code})` : ''}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                )}
                                 <div>
                                     <label className={labelClass}>Designation</label>
                                     <input name="designation" value={formData.designation || ''} onChange={handleChange} className={inputClass} disabled={!isAdmin} />
@@ -384,13 +490,34 @@ const EmployeeFormPage = () => {
                                     <label className={labelClass}>Religion</label>
                                     <input name="religion" value={formData.religion || ''} onChange={handleChange} className={inputClass} disabled={!isAdmin} />
                                 </div>
+                            </div>
+                        </FormSection>
+                        <FormSection title="Category Details" icon={<FaUsers />}>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                                 <div>
-                                    <label className={labelClass}>Caste</label>
-                                    <input name="caste" value={formData.caste || ''} onChange={handleChange} className={inputClass} disabled={!isAdmin} />
+                                    <label className={labelClass}>Employee Category</label>
+                                    <select
+                                        name="community"
+                                        value={formData.community || ''}
+                                        onChange={handleChange}
+                                        className={inputClass}
+                                        disabled={!isAdmin}
+                                    >
+                                        <option value="">Select Category</option>
+                                        <option value="Teaching">Teaching</option>
+                                        <option value="Non-Teaching">Non-Teaching</option>
+                                        <option value="Workers">Workers</option>
+                                    </select>
                                 </div>
                                 <div>
-                                    <label className={labelClass}>Community</label>
-                                    <input name="community" value={formData.community || ''} onChange={handleChange} className={inputClass} disabled={!isAdmin} />
+                                    <label className={labelClass}>Caste</label>
+                                    <input
+                                        name="caste"
+                                        value={formData.caste || ''}
+                                        onChange={handleChange}
+                                        className={inputClass}
+                                        disabled={!isAdmin}
+                                    />
                                 </div>
                             </div>
                         </FormSection>
@@ -470,80 +597,97 @@ const EmployeeFormPage = () => {
                         <FormSection title="Salary Deductions" icon={<FaMinusCircle />}>
                             <div className="mb-4 bg-amber-50 border border-amber-100 rounded-2xl p-4">
                                 <p className="text-xs text-amber-700 font-bold leading-relaxed">
-                                    ⚠️ Deductions entered here are fixed monthly deductions (e.g. PF, ESI, Loan). They will be automatically subtracted from the employee's net salary during payroll calculation.
+                                    Fixed monthly deductions are automatically subtracted during payroll.
                                 </p>
                             </div>
 
-                            <div className="space-y-4">
-                                {deductions.map((d, i) => (
-                                    <div key={i} className="flex items-center gap-4 bg-gray-50 p-4 rounded-2xl border border-gray-100 relative">
-                                        {/* Type */}
-                                        <div className="flex-1">
-                                            <label className={labelClass}>Deduction Type</label>
-                                            <select
-                                                value={DEDUCTION_PRESETS.includes(d.type) ? d.type : 'Other'}
-                                                onChange={(e) => updateDeduction(i, 'type', e.target.value === 'Other' ? '' : e.target.value)}
-                                                className={inputClass}
-                                                disabled={!isAdmin}
-                                            >
-                                                <option value="">Select type...</option>
-                                                {DEDUCTION_PRESETS.map(p => <option key={p} value={p}>{p}</option>)}
-                                            </select>
-                                            {(!DEDUCTION_PRESETS.includes(d.type) || d.type === '') && (
-                                                <input
-                                                    className={inputClass + " mt-2"}
-                                                    placeholder="Or type custom deduction name..."
-                                                    value={d.type}
-                                                    onChange={(e) => updateDeduction(i, 'type', e.target.value)}
-                                                    disabled={!isAdmin}
-                                                />
-                                            )}
-                                        </div>
-                                        {/* Amount */}
-                                        <div className="w-40">
-                                            <label className={labelClass}>Amount (₹/month)</label>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div>
+                                    <label className={labelClass}>Employ PF (Rs / month)</label>
+                                    <input type="number" min="0" value={deductionForm.employ_pf} onChange={(e) => setDeductionValue('employ_pf', e.target.value)} className={inputClass} disabled={!isAdmin} />
+                                </div>
+                                <div>
+                                    <label className={labelClass}>Salary Advance (Rs / month)</label>
+                                    <input type="number" min="0" value={deductionForm.salary_advance} onChange={(e) => setDeductionValue('salary_advance', e.target.value)} className={inputClass} disabled={!isAdmin} />
+                                </div>
+                                <div>
+                                    <label className={labelClass}>Hostel and Food Fees (Rs / month)</label>
+                                    <input type="number" min="0" value={deductionForm.hostel_and_food_fees} onChange={(e) => setDeductionValue('hostel_and_food_fees', e.target.value)} className={inputClass} disabled={!isAdmin} />
+                                </div>
+                                <div>
+                                    <label className={labelClass}>Bus Fees (Rs / month)</label>
+                                    <input type="number" min="0" value={deductionForm.bus_fees} onChange={(e) => setDeductionValue('bus_fees', e.target.value)} className={inputClass} disabled={!isAdmin} />
+                                </div>
+                                <div>
+                                    <label className={labelClass}>LWF (Rs / month)</label>
+                                    <input type="number" min="0" value={deductionForm.lwf} onChange={(e) => setDeductionValue('lwf', e.target.value)} className={inputClass} disabled={!isAdmin} />
+                                </div>
+                                <div>
+                                    <label className={labelClass}>TDS (Rs / month)</label>
+                                    <input type="number" min="0" value={deductionForm.tds} onChange={(e) => setDeductionValue('tds', e.target.value)} className={inputClass} disabled={!isAdmin} />
+                                </div>
+                            </div>
+
+                            <div className="mt-6 p-5 rounded-2xl border border-gray-100 bg-gray-50">
+                                <label className="flex items-center gap-3 text-sm font-bold text-gray-700 cursor-pointer">
+                                    <input
+                                        type="checkbox"
+                                        checked={deductionForm.other_enabled}
+                                        onChange={(e) => {
+                                            const checked = e.target.checked;
+                                            setDeductionForm(prev => ({
+                                                ...prev,
+                                                other_enabled: checked,
+                                                other_name: checked ? prev.other_name : '',
+                                                other_amount: checked ? prev.other_amount : ''
+                                            }));
+                                        }}
+                                        disabled={!isAdmin}
+                                    />
+                                    Other deduction
+                                </label>
+
+                                {deductionForm.other_enabled && (
+                                    <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-6">
+                                        <div>
+                                            <label className={labelClass}>Other Deduction Name</label>
                                             <input
-                                                type="number"
-                                                min="0"
-                                                value={d.amount}
-                                                onChange={(e) => updateDeduction(i, 'amount', e.target.value)}
+                                                value={deductionForm.other_name}
+                                                onChange={(e) => setDeductionValue('other_name', e.target.value)}
                                                 className={inputClass}
-                                                placeholder="e.g. 1800"
+                                                placeholder="Type deduction name"
                                                 disabled={!isAdmin}
                                             />
                                         </div>
-                                        {/* Remove */}
-                                        {isAdmin && (
-                                            <button
-                                                type="button"
-                                                onClick={() => removeDeduction(i)}
-                                                className="mt-5 h-10 w-10 rounded-xl bg-rose-50 text-rose-500 flex items-center justify-center hover:bg-rose-100 transition-colors shrink-0"
-                                            >
-                                                <FaTrash size={12} />
-                                            </button>
-                                        )}
+                                        <div>
+                                            <label className={labelClass}>Other Amount (Rs / month)</label>
+                                            <input
+                                                type="number"
+                                                min="0"
+                                                value={deductionForm.other_amount}
+                                                onChange={(e) => setDeductionValue('other_amount', e.target.value)}
+                                                className={inputClass}
+                                                disabled={!isAdmin}
+                                            />
+                                        </div>
                                     </div>
-                                ))}
+                                )}
                             </div>
 
-                            {isAdmin && (
-                                <button
-                                    type="button"
-                                    onClick={addDeduction}
-                                    className="mt-6 px-6 py-3 bg-rose-50 text-rose-600 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-rose-100 transition-colors flex items-center gap-2"
-                                >
-                                    <FaPlus size={10} /> Add Deduction
-                                </button>
-                            )}
-
-                            {deductions.length > 0 && (
-                                <div className="mt-6 bg-sky-50 border border-sky-100 rounded-2xl p-4 flex items-center justify-between">
-                                    <span className="text-[10px] font-black text-sky-600 uppercase tracking-widest">Total Monthly Deductions</span>
-                                    <span className="text-lg font-black text-sky-700">
-                                        ₹{deductions.reduce((acc, d) => acc + (Number(d.amount) || 0), 0).toLocaleString()}
-                                    </span>
-                                </div>
-                            )}
+                            <div className="mt-6 bg-sky-50 border border-sky-100 rounded-2xl p-4 flex items-center justify-between">
+                                <span className="text-[10px] font-black text-sky-600 uppercase tracking-widest">Total Monthly Deductions</span>
+                                <span className="text-lg font-black text-sky-700">
+                                    ₹{(
+                                        (Number(deductionForm.employ_pf) || 0) +
+                                        (Number(deductionForm.salary_advance) || 0) +
+                                        (Number(deductionForm.hostel_and_food_fees) || 0) +
+                                        (Number(deductionForm.bus_fees) || 0) +
+                                        (Number(deductionForm.lwf) || 0) +
+                                        (Number(deductionForm.tds) || 0) +
+                                        (deductionForm.other_enabled ? (Number(deductionForm.other_amount) || 0) : 0)
+                                    ).toLocaleString()}
+                                </span>
+                            </div>
                         </FormSection>
 
                         <FormSection title="Family Relations" icon={<FaUsers />}>
@@ -567,7 +711,13 @@ const EmployeeFormPage = () => {
                             </div>
                         </FormSection>
 
+                        {(isWorkersCategory || existingCerts.length > 0) && (
                         <FormSection title="Certificates" icon={<FaCertificate />}>
+                            {isWorkersCategory && (
+                                <div className="mb-6 bg-sky-50 border border-sky-100 rounded-2xl p-4">
+                                    <p className="text-xs font-bold text-sky-700">Certificate section is enabled for Workers category.</p>
+                                </div>
+                            )}
                             {/* Existing Certificates (edit mode) */}
                             {existingCerts.length > 0 && (
                                 <div className="mb-8">
@@ -633,14 +783,17 @@ const EmployeeFormPage = () => {
                                 ))}
                             </div>
 
-                            <button
-                                type="button"
-                                onClick={addCertRow}
-                                className="mt-6 px-6 py-3 bg-sky-50 text-sky-600 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-sky-100 transition-colors flex items-center gap-2"
-                            >
-                                <FaPlus size={10} /> Add Certificate
-                            </button>
+                            {isWorkersCategory && (
+                                <button
+                                    type="button"
+                                    onClick={addCertRow}
+                                    className="mt-6 px-6 py-3 bg-sky-50 text-sky-600 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-sky-100 transition-colors flex items-center gap-2"
+                                >
+                                    <FaPlus size={10} /> Add Certificate
+                                </button>
+                            )}
                         </FormSection>
+                        )}
 
                         <FormSection title="Account Security" icon={<FaLock />}>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">

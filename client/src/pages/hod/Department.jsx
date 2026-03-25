@@ -122,10 +122,10 @@ const Department = () => {
                 <button
                     onClick={handlePrint}
                     className="p-4 bg-sky-600 text-white rounded-2xl shadow-lg shadow-sky-100 hover:bg-sky-700 transition-all flex items-center justify-center gap-2 group font-black uppercase tracking-widest text-[10px]"
-                    title="Print Department Report"
+                    title="Department Report"
                 >
                     <FaPrint className="group-hover:scale-110 transition-transform" />
-                    <span className="hidden sm:inline">Print</span>
+                    <span className="hidden sm:inline">Report</span>
                 </button>
             </div>
 

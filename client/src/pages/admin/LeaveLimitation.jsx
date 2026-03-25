@@ -355,7 +355,7 @@ const LeaveLimitation = () => {
         const defaultYear = new Date(fromDate || new Date().toISOString().slice(0, 10)).getFullYear();
         const defaultMonth = (fromDate || new Date().toISOString().slice(0, 10)).slice(0, 7);
         const { value: formValues } = await Swal.fire({
-            title: 'Set CL Yearly & PL Monthly',
+            title: 'Set CL Yearly & PL Monthly Auto',
             html: `
                 <div style="display:grid; gap:16px; text-align:left; padding:10px 0;">
                     <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px; padding:12px; background:#f8fafc; border-radius:12px; margin-bottom:8px;">
@@ -365,7 +365,7 @@ const LeaveLimitation = () => {
                                 style="width:100%; padding:8px 12px; border:2px solid #e5e7eb; border-radius:10px; font-weight:600; font-size:13px; outline:none;">
                         </div>
                         <div>
-                            <label style="font-size:11px; font-weight:900; color:#64748b; text-transform:uppercase; letter-spacing:0.1em; display:block; margin-bottom:6px;">PL Month</label>
+                            <label style="font-size:11px; font-weight:900; color:#64748b; text-transform:uppercase; letter-spacing:0.1em; display:block; margin-bottom:6px;">PL Start Month</label>
                             <input id="bulk_permission_month" type="month" value="${defaultMonth}" 
                                 style="width:100%; padding:8px 12px; border:2px solid #e5e7eb; border-radius:10px; font-weight:600; font-size:13px; outline:none;">
                         </div>
@@ -386,7 +386,7 @@ const LeaveLimitation = () => {
                                 style="width:80px; padding:8px 12px; border:2px solid #e5e7eb; border-radius:12px; font-weight:700; font-size:14px; text-align:center; outline:none;">
                         </div>
                         <div style="margin-top:8px; padding:8px 12px; background:#f0fdf4; border-radius:10px; font-size:11px; color:#16a34a; font-weight:700;">
-                            CL will be saved as yearly value for selected employees. PL will be saved and reset month-wise for the selected PL month.
+                            CL will be saved as yearly value. PL monthly limit starts from selected month and continues every month until you change it again.
                         </div>
                     </div>
                 </div>
@@ -480,7 +480,7 @@ const LeaveLimitation = () => {
                     title: failCount > 0 ? 'Bulk Set Partial' : 'Bulk Set Complete!',
                     text: failCount > 0
                         ? `${successCount} updated, ${failCount} failed.${firstFailure ? ` ${firstFailure.empId}: ${firstFailure.message}` : ''}`
-                        : `Synchronized limits for ${successCount} personnel.`,
+                        : `Synchronized limits for ${successCount} personnel. PL will auto-apply month-to-month until changed.`,
                     icon: failCount > 0 ? 'warning' : 'success',
                     confirmButtonColor: '#2563eb'
                 });

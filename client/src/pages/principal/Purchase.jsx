@@ -132,7 +132,7 @@ const Purchase = () => {
     const handlePrintRequests = async (items, title) => {
         if (!items || items.length === 0) {
             Swal.fire({
-                title: 'Nothing to print',
+                title: 'Nothing to report',
                 text: 'No purchased requests selected.',
                 icon: 'info',
                 confirmButtonColor: '#2563eb'
@@ -144,7 +144,7 @@ const Purchase = () => {
         if (!printWindow) {
             Swal.fire({
                 title: 'Popup blocked',
-                text: 'Please allow popups to print purchased requests.',
+                text: 'Please allow popups to generate purchased reports.',
                 icon: 'warning',
                 confirmButtonColor: '#2563eb'
             });
@@ -482,7 +482,7 @@ const Purchase = () => {
                             onClick={handlePrintAllPurchased}
                             className="bg-white text-gray-700 px-6 py-3 rounded-xl shadow-xl shadow-gray-200/50 hover:bg-gray-50 transition-all font-black uppercase tracking-widest text-[10px] flex items-center gap-2 border border-gray-100 no-print"
                         >
-                            <FaPrint className="text-sky-500" size={12} /> Print All Purchased
+                            <FaPrint className="text-sky-500" size={12} /> Report All Purchased
                         </button>
                     )}
                 </div>
@@ -506,7 +506,7 @@ const Purchase = () => {
                                         onClick={handlePrintSelectedPurchased}
                                         className="px-6 py-2 bg-sky-50 text-sky-600 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-sky-600 hover:text-white transition-all active:scale-95 flex items-center gap-2"
                                     >
-                                        <FaPrint size={10} /> Print Selected ({selectedIds.length})
+                                        <FaPrint size={10} /> Report Selected ({selectedIds.length})
                                     </button>
                                 ) : (
                                     <>
@@ -630,7 +630,7 @@ const Purchase = () => {
                                                                     <button
                                                                         onClick={() => handlePrintSingle(req)}
                                                                         className="h-10 w-10 bg-sky-50 text-sky-600 rounded-xl hover:bg-sky-600 hover:text-white transition-all shadow-sm flex items-center justify-center active:scale-90 group/btn"
-                                                                        title="Print Purchased Request"
+                                                                        title="Purchased Request Report"
                                                                     >
                                                                         <FaPrint className="group-hover/btn:scale-125 transition-transform" />
                                                                     </button>

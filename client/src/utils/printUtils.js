@@ -1,3 +1,6 @@
+import Swal from 'sweetalert2';
+import * as XLSX from 'xlsx';
+
 const DEFAULT_PRINT_PAGINATION_CSS = `
 <style id="global-print-pagination-fix">
     html, body {
@@ -108,8 +111,132 @@ const printWithHiddenIframe = ({ html, title, delay = 250, closeAfterPrint = tru
     });
 };
 
+const sanitizeFileName = (value, fallback = 'report') => {
+    const base = String(value || fallback)
+        .trim()
+        .replace(/[\\/:*?"<>|]+/g, '-')
+        .replace(/\s+/g, ' ')
+        .slice(0, 80);
+    return (base || fallback).replace(/\s+/g, '_');
+};
+
+const parseTableFromHtml = (html) => {
+    const doc = new DOMParser().parseFromString(String(html || ''), 'text/html');
+    const table = doc.querySelector('table');
+    if (!table) return [];
+
+    const rows = [];
+    table.querySelectorAll('tr').forEach((tr) => {
+        const cells = Array.from(tr.querySelectorAll('th, td')).map((cell) => String(cell.textContent || '').trim());
+        if (cells.length) rows.push(cells);
+    });
+    return rows;
+};
+
+const downloadExcelFromHtml = ({ html, title }) => {
+    const rows = parseTableFromHtml(html);
+    if (!rows.length) {
+        throw new Error('No tabular data available for Excel export.');
+    }
+
+    const ws = XLSX.utils.aoa_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Report');
+    XLSX.writeFile(wb, `${sanitizeFileName(title)}.xlsx`);
+};
+
+const downloadPdfFromHtml = async ({ html, title }) => {
+    const { jsPDF } = await import('jspdf');
+
+    const doc = new DOMParser().parseFromString(String(html || ''), 'text/html');
+    const host = document.createElement('div');
+    host.style.position = 'fixed';
+    host.style.left = '-10000px';
+    host.style.top = '0';
+    host.style.width = '1000px';
+    host.style.background = '#fff';
+    host.innerHTML = doc.body?.innerHTML || String(html || '');
+    document.body.appendChild(host);
+
+    try {
+        const pdf = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'a4' });
+        await pdf.html(host, {
+            margin: [30, 20, 30, 20],
+            autoPaging: 'text',
+            html2canvas: { scale: 0.7, useCORS: true, backgroundColor: '#ffffff' }
+        });
+        pdf.save(`${sanitizeFileName(title)}.pdf`);
+    } finally {
+        document.body.removeChild(host);
+    }
+};
+
+const shareReport = async ({ html, title }) => {
+    const reportTitle = String(title || 'Report');
+    const reportText = `${reportTitle} - shared from PPG EMP HUB`;
+    const reportUrl = window.location.href;
+
+    const htmlBlob = new Blob([String(html || '')], { type: 'text/html' });
+    const htmlFile = new File([htmlBlob], `${sanitizeFileName(reportTitle)}.html`, { type: 'text/html' });
+
+    if (navigator.share) {
+        try {
+            if (navigator.canShare && navigator.canShare({ files: [htmlFile] })) {
+                await navigator.share({ title: reportTitle, text: reportText, files: [htmlFile] });
+                return;
+            }
+            await navigator.share({ title: reportTitle, text: reportText, url: reportUrl });
+            return;
+        } catch {
+            // User cancellation and API errors fall through to manual choices.
+        }
+    }
+
+    const encodedText = encodeURIComponent(`${reportText}\n${reportUrl}`);
+    const encodedSubject = encodeURIComponent(reportTitle);
+
+    const { isConfirmed, isDenied } = await Swal.fire({
+        title: 'Share Report',
+        text: 'Choose where you want to share this report.',
+        icon: 'info',
+        showCancelButton: true,
+        confirmButtonText: 'WhatsApp',
+        denyButtonText: 'Email',
+        showDenyButton: true,
+        cancelButtonText: 'Copy Link'
+    });
+
+    if (isConfirmed) {
+        window.open(`https://wa.me/?text=${encodedText}`, '_blank', 'noopener,noreferrer');
+        return;
+    }
+    if (isDenied) {
+        window.location.href = `mailto:?subject=${encodedSubject}&body=${encodedText}`;
+        return;
+    }
+
+    await navigator.clipboard?.writeText(`${reportText}\n${reportUrl}`);
+    await Swal.fire({ icon: 'success', title: 'Copied', text: 'Report link copied to clipboard.', timer: 1500, showConfirmButton: false });
+};
+
 export const choosePrintMode = async (documentLabel = 'this report') => {
-    return 'print';
+    const { isConfirmed, value } = await Swal.fire({
+        title: 'Generate Report',
+        text: `How do you want to generate ${documentLabel}?`,
+        input: 'radio',
+        inputOptions: {
+            print: 'Print Page',
+            excel: 'Excel (.xlsx)',
+            pdf: 'PDF (.pdf)',
+            share: 'Share'
+        },
+        inputValue: 'print',
+        showCancelButton: true,
+        confirmButtonText: 'Continue'
+    });
+
+    if (!isConfirmed) return null;
+    return value || 'print';
 };
 
 export const runPrintWindow = async ({
@@ -120,7 +247,28 @@ export const runPrintWindow = async ({
     modeLabel = 'this report',
     closeAfterPrint = false
 }) => {
-    const mode = 'print';
+    const mode = await choosePrintMode(modeLabel);
+    if (!mode) return false;
+
+    if (mode === 'excel' || mode === 'pdf' || mode === 'share') {
+        try {
+            if (mode === 'excel') {
+                downloadExcelFromHtml({ html, title });
+            } else if (mode === 'pdf') {
+                await downloadPdfFromHtml({ html, title });
+            } else {
+                await shareReport({ html, title });
+            }
+            return true;
+        } catch (error) {
+            await Swal.fire({
+                icon: 'error',
+                title: 'Report action failed',
+                text: error?.message || 'Unable to complete this report action right now.'
+            });
+            return false;
+        }
+    }
 
     const printWindow = window.open('', '_blank', windowFeatures);
     if (!printWindow) {
@@ -166,7 +314,28 @@ export const finalizePrintWindow = async ({
 
     if (!preparedHtml) return false;
 
-    const mode = 'print';
+    const mode = await choosePrintMode(modeLabel);
+    if (!mode) return false;
+
+    if (mode === 'excel' || mode === 'pdf' || mode === 'share') {
+        try {
+            if (mode === 'excel') {
+                downloadExcelFromHtml({ html: preparedHtml, title });
+            } else if (mode === 'pdf') {
+                await downloadPdfFromHtml({ html: preparedHtml, title });
+            } else {
+                await shareReport({ html: preparedHtml, title });
+            }
+            return true;
+        } catch (error) {
+            await Swal.fire({
+                icon: 'error',
+                title: 'Report action failed',
+                text: error?.message || 'Unable to complete this report action right now.'
+            });
+            return false;
+        }
+    }
 
     const targetWindow = window.open('', '_blank', windowFeatures || inferredFeatures);
     if (!targetWindow) {

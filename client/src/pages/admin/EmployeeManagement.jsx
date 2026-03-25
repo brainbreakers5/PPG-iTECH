@@ -4,7 +4,7 @@ import Layout from '../../components/Layout';
 import api from '../../utils/api';
 import Swal from 'sweetalert2';
 import { runPrintWindow } from '../../utils/printUtils';
-import { FaEdit, FaTrash, FaUserPlus, FaSearch, FaFilter, FaUsers, FaIdBadge, FaEnvelope, FaPhone, FaPrint } from 'react-icons/fa';
+import { FaEdit, FaTrash, FaUserPlus, FaSearch, FaFilter, FaUsers, FaIdBadge, FaEnvelope, FaPhone, FaPrint, FaSearchPlus } from 'react-icons/fa';
 import { motion, AnimatePresence } from 'framer-motion';
 
 
@@ -120,7 +120,8 @@ const EmployeeManagement = () => {
         window.dispatchEvent(new CustomEvent('closeSidebar'));
     };
 
-    const handleRowClick = (emp) => {
+    const handleView = (e, emp) => {
+        e.stopPropagation();
         navigate(`/admin/profile/${emp.emp_id}`);
         window.dispatchEvent(new CustomEvent('closeSidebar'));
     };
@@ -138,7 +139,7 @@ const EmployeeManagement = () => {
 
     const handlePrint = async () => {
         if (!filteredEmployees || filteredEmployees.length === 0) {
-            Swal.fire({ icon: 'warning', title: 'No Data', text: 'No employees to print.' });
+            Swal.fire({ icon: 'warning', title: 'No Data', text: 'No employees available for this report.' });
             return;
         }
 
@@ -234,10 +235,10 @@ const EmployeeManagement = () => {
                         <button
                             onClick={handlePrint}
                             className="p-4 bg-sky-600 text-white rounded-2xl shadow-lg shadow-sky-100 hover:bg-sky-700 transition-all flex items-center justify-center gap-2 group font-black uppercase tracking-widest text-[10px]"
-                            title="Print Employee Report"
+                            title="Employee Report"
                         >
                             <FaPrint className="group-hover:scale-110 transition-transform" />
-                            <span className="hidden sm:inline">Print</span>
+                            <span className="hidden sm:inline">Report</span>
                         </button>
                         <button
                             onClick={handleAdd}
@@ -372,6 +373,13 @@ const EmployeeManagement = () => {
                                             </td>
                                             <td className="p-6">
                                                 <div className="flex justify-center gap-3">
+                                                    <button
+                                                        onClick={(e) => handleView(e, emp)}
+                                                        className="h-10 w-10 bg-indigo-50 text-indigo-600 rounded-xl hover:bg-indigo-600 hover:text-white transition-all shadow-sm flex items-center justify-center active:scale-90 group/btn"
+                                                        title="View Profile"
+                                                    >
+                                                        <FaSearchPlus className="group-hover/btn:scale-110 transition-transform" />
+                                                    </button>
                                                     <button
                                                         onClick={(e) => handleEdit(e, emp)}
                                                         className="h-10 w-10 bg-sky-50 text-sky-600 rounded-xl hover:bg-sky-600 hover:text-white transition-all shadow-sm flex items-center justify-center active:scale-90 group/btn"

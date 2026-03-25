@@ -448,7 +448,7 @@ const ManagementSalary = () => {
                                                     <button
                                                         onClick={() => handlePrintSlip(s)}
                                                         className="h-10 w-10 bg-purple-50 text-purple-600 rounded-xl flex items-center justify-center hover:bg-purple-600 hover:text-white transition-all active:scale-95 shadow-sm border border-purple-100 mx-auto lg:ml-auto lg:mr-0 group/btn"
-                                                        title="Print Slip"
+                                                        title="Slip Report"
                                                     >
                                                         <FaFileAlt className="group-hover/btn:scale-110 transition-transform" />
                                                     </button>

@@ -92,15 +92,16 @@ const Layout = ({ children }) => {
             console.log('Auto-printing triggered via AI Assistant...');
             const timer = setTimeout(() => {
                 // Try to find the page's native custom Print button
-                const printBtn = Array.from(document.querySelectorAll('button')).find(btn => 
-                    (btn.title && btn.title.toLowerCase().includes('print')) || 
-                    (btn.textContent && btn.textContent.toLowerCase().includes('print'))
-                );
+                const printBtn = Array.from(document.querySelectorAll('button')).find(btn => {
+                    const titleText = String(btn.title || '').toLowerCase();
+                    const bodyText = String(btn.textContent || '').toLowerCase();
+                    return titleText.includes('print') || titleText.includes('report') || bodyText.includes('print') || bodyText.includes('report');
+                });
                 
                 if (printBtn) {
                     printBtn.click();
                 } else {
-                    console.log('No custom print button found, falling back to window.print()...');
+                    console.log('No custom report button found, falling back to window.print()...');
                     window.print();
                 }
 

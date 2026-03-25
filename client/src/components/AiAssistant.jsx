@@ -306,10 +306,11 @@ const AiAssistant = ({ isSidebar, onClose, userRole, isAiMinimized }) => {
 
             // 1. Check if user just wants to print the CURRENT page
             if (wantsPrint && (!cleanText || cleanText.length < 3)) {
-                const printBtn = Array.from(document.querySelectorAll('button')).find(btn => 
-                    (btn.title && btn.title.toLowerCase().includes('print')) || 
-                    (btn.textContent && btn.textContent.toLowerCase().includes('print'))
-                );
+                const printBtn = Array.from(document.querySelectorAll('button')).find(btn => {
+                    const titleText = String(btn.title || '').toLowerCase();
+                    const bodyText = String(btn.textContent || '').toLowerCase();
+                    return titleText.includes('print') || titleText.includes('report') || bodyText.includes('print') || bodyText.includes('report');
+                });
                 
                 if (printBtn) {
                     setMessages(prev => [...prev, { type: 'ai', text: "Report found. Opening print directly...", time: new Date() }]);
@@ -361,10 +362,11 @@ const AiAssistant = ({ isSidebar, onClose, userRole, isAiMinimized }) => {
                         window.dispatchEvent(new Event('hashchange'));
                         if (wantsPrint && exactMatch.p) {
                             setTimeout(() => {
-                                const printBtn = Array.from(document.querySelectorAll('button')).find(btn => 
-                                    (btn.title && btn.title.toLowerCase().includes('print')) || 
-                                    (btn.textContent && btn.textContent.toLowerCase().includes('print'))
-                                );
+                                const printBtn = Array.from(document.querySelectorAll('button')).find(btn => {
+                                    const titleText = String(btn.title || '').toLowerCase();
+                                    const bodyText = String(btn.textContent || '').toLowerCase();
+                                    return titleText.includes('print') || titleText.includes('report') || bodyText.includes('print') || bodyText.includes('report');
+                                });
                                 if (printBtn) {
                                     printBtn.click();
                                 } else {
@@ -388,8 +390,8 @@ const AiAssistant = ({ isSidebar, onClose, userRole, isAiMinimized }) => {
             );
 
             if (filtered.length > 0) {
-                const reply = wantsPrint 
-                    ? `Which report would you like to print?`
+                    const reply = wantsPrint 
+                        ? `Which report would you like to generate?`
                     : `I found ${filtered.length} relevant options based on your keyword:`;
                 setMessages(prev => [...prev, { 
                     type: 'ai', 

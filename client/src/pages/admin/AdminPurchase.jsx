@@ -45,7 +45,7 @@ const AdminPurchase = () => {
     const handlePrintRequests = async (items, title) => {
         if (!items || items.length === 0) {
             Swal.fire({
-                title: 'Nothing to print',
+                title: 'Nothing to report',
                 text: 'No purchased requests selected.',
                 icon: 'info',
                 confirmButtonColor: '#2563eb'
@@ -57,7 +57,7 @@ const AdminPurchase = () => {
         if (!printWindow) {
             Swal.fire({
                 title: 'Popup blocked',
-                text: 'Please allow popups to print purchased requests.',
+                text: 'Please allow popups to generate purchased reports.',
                 icon: 'warning',
                 confirmButtonColor: '#2563eb'
             });
@@ -387,7 +387,7 @@ const AdminPurchase = () => {
                                 onClick={handlePrintAllPurchased}
                                 className="bg-white text-gray-700 px-6 py-3 rounded-xl shadow-xl shadow-gray-200/50 hover:bg-gray-50 transition-all font-black uppercase tracking-widest text-[10px] flex items-center gap-2 border border-gray-100 no-print animate-fade-in"
                             >
-                                <FaPrint className="text-sky-500" size={12} /> {selectedIds.length > 0 ? `Print Selected (${selectedIds.length})` : 'Print All Purchased'}
+                                <FaPrint className="text-sky-500" size={12} /> {selectedIds.length > 0 ? `Report Selected (${selectedIds.length})` : 'Report All Purchased'}
                             </button>
                         )}
                     </div>
@@ -424,7 +424,7 @@ const AdminPurchase = () => {
                                 onClick={handlePrintSelectedPurchased}
                                 className="px-6 py-2 bg-white text-sky-600 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-sky-600 hover:text-white transition-all active:scale-95 flex items-center gap-2 border border-sky-100"
                             >
-                                <FaPrint size={10} /> Print Selected ({selectedIds.length})
+                                <FaPrint size={10} /> Report Selected ({selectedIds.length})
                             </button>
                         )}
                     </div>

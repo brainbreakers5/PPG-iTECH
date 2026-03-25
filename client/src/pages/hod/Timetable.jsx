@@ -370,7 +370,7 @@ const Timetable = ({ showToggle = true }) => {
                             onClick={handlePrint}
                             className="no-print flex items-center gap-2 px-6 py-2.5 bg-sky-600 text-white rounded-xl font-bold hover:bg-sky-700 transition-all shadow-lg shadow-sky-200 active:scale-95"
                         >
-                            <FaFileAlt /> Print Timetable
+                            <FaFileAlt /> Report Timetable
                         </button>
                     </div>
                 </div>

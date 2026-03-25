@@ -94,7 +94,7 @@ const ManagementDepartment = () => {
                     </tbody>
                 </table>
             `
-            : '<p style="text-align:center; color:#64748b; font-style:italic; margin-top: 40px;">No personnel data available to print.</p>';
+            : '<p style="text-align:center; color:#64748b; font-style:italic; margin-top: 40px;">No personnel data available for this report.</p>';
 
         printWindow.document.write(`
             <!doctype html><html><head><meta charset="UTF-8">
@@ -148,10 +148,10 @@ const ManagementDepartment = () => {
                     <button
                         onClick={handlePrint}
                         className="p-4 bg-violet-600 text-white rounded-2xl shadow-lg shadow-violet-100 hover:bg-violet-700 transition-all flex items-center justify-center gap-2 group font-black uppercase tracking-widest text-[10px] shrink-0"
-                        title="Print Department Report"
+                        title="Department Report"
                     >
                         <FaPrint className="group-hover:scale-110 transition-transform" />
-                        <span className="hidden sm:inline">Print</span>
+                        <span className="hidden sm:inline">Report</span>
                     </button>
                 </div>
 

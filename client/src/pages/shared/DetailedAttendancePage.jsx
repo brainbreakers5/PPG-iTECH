@@ -124,7 +124,7 @@ const DetailedAttendancePage = () => {
                     onClick={handlePrint}
                     className="bg-white text-gray-500 px-6 py-4 rounded-2xl shadow-xl shadow-sky-50/50 hover:bg-sky-50 hover:text-sky-600 transition-all font-black uppercase tracking-[0.2em] text-[10px] flex items-center border border-sky-50 active:scale-95"
                 >
-                    <FaPrint className="mr-3 text-sky-400" /> Print Report
+                    <FaPrint className="mr-3 text-sky-400" /> Report
                 </button>
             </div>
 

@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import Swal from 'sweetalert2';
 import { FaTrash, FaPlus, FaLayerGroup, FaBuilding, FaProjectDiagram, FaArrowRight, FaPen, FaPrint } from 'react-icons/fa';
 import { motion, AnimatePresence } from 'framer-motion';
+import { finalizePrintWindow } from '../../utils/printUtils';
 
 const DepartmentManagement = () => {
     const [departments, setDepartments] = useState([]);
@@ -145,7 +146,7 @@ const DepartmentManagement = () => {
                     </tbody>
                 </table>
             `
-            : '<p style="text-align:center; color:#64748b; font-style:italic; margin-top: 40px;">No personnel data available to print.</p>';
+            : '<p style="text-align:center; color:#64748b; font-style:italic; margin-top: 40px;">No personnel data available for this report.</p>';
 
         printWindow.document.write(`
             <!doctype html><html><head><meta charset="UTF-8">
@@ -174,10 +175,13 @@ const DepartmentManagement = () => {
             </body></html>
         `);
         printWindow.document.close();
-        setTimeout(() => {
-            printWindow.focus();
-            printWindow.print();
-        }, 350);
+        await finalizePrintWindow({
+            printWindow,
+            title: 'Department Management Report',
+            modeLabel: 'the department management report',
+            closeAfterPrint: true,
+            delay: 350
+        });
     };
 
     return (
@@ -200,10 +204,10 @@ const DepartmentManagement = () => {
                         <button
                             onClick={handlePrint}
                             className="p-4 bg-sky-600 text-white rounded-2xl shadow-lg shadow-sky-100 hover:bg-sky-700 transition-all flex items-center justify-center gap-2 group font-black uppercase tracking-widest text-[10px]"
-                            title="Print Department Report"
+                            title="Department Report"
                         >
                             <FaPrint className="group-hover:scale-110 transition-transform" />
-                            <span className="hidden sm:inline">Print</span>
+                            <span className="hidden sm:inline">Report</span>
                         </button>
                         <button
                             onClick={() => handleAction()}

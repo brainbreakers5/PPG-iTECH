@@ -65,7 +65,7 @@ const BiometricHistory = () => {
 
     const handlePrint = async () => {
         if (filteredLogs.length === 0) {
-            Swal.fire({ icon: 'warning', title: 'No Data', text: 'No records to print.' });
+            Swal.fire({ icon: 'warning', title: 'No Data', text: 'No records available for this report.' });
             return;
         }
 

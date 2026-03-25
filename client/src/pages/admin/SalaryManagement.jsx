@@ -5,7 +5,6 @@ import api from '../../utils/api';
 import Swal from 'sweetalert2';
 import { runPrintWindow } from '../../utils/printUtils';
 import { useAuth } from '../../context/AuthContext';
-import { useSocket } from '../../context/SocketContext';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
     FaCheckCircle,
@@ -17,6 +16,7 @@ import {
     FaHistory,
     FaMoneyBillWave,
     FaPaperPlane,
+    FaRedoAlt,
     FaSearch,
     FaTimesCircle,
     FaWallet
@@ -94,10 +94,72 @@ const parseDeductionItems = (raw) => {
         return [];
     }
 };
-const getDeductionBreakdownText = (raw) => {
+const getDetailedDeductionBreakdown = (raw) => {
+    const details = {
+        employPf: 0,
+        salaryAdvance: 0,
+        hostelFoodFees: 0,
+        busFees: 0,
+        lwf: 0,
+        tds: 0,
+        other: 0,
+        otherLabel: ''
+    };
+
     const items = parseDeductionItems(raw);
-    if (!items.length) return '';
-    return items.map((item) => `${item.label}=${toCurrency(item.amount)}`).join(', ');
+    items.forEach((item) => {
+        const label = String(item.label || '').toLowerCase();
+        const amount = Number(item.amount || 0);
+        if (!amount) return;
+
+        if (label.includes('pf')) {
+            details.employPf += amount;
+            return;
+        }
+        if (label.includes('salary advance') || label.includes('advance')) {
+            details.salaryAdvance += amount;
+            return;
+        }
+        if (label.includes('hostel') || label.includes('food')) {
+            details.hostelFoodFees += amount;
+            return;
+        }
+        if (label.includes('bus')) {
+            details.busFees += amount;
+            return;
+        }
+        if (label.includes('lwf')) {
+            details.lwf += amount;
+            return;
+        }
+        if (label.includes('tds')) {
+            details.tds += amount;
+            return;
+        }
+
+        details.other += amount;
+        if (!details.otherLabel) {
+            const parsedOtherName = String(item.label || '').split(':').slice(1).join(':').trim();
+            details.otherLabel = parsedOtherName;
+        }
+    });
+
+    return details;
+};
+const getDeductionBreakdownText = (raw) => {
+    const details = getDetailedDeductionBreakdown(raw);
+    const lines = [];
+    if (details.employPf > 0) lines.push(`Employ PF=${toCurrency(details.employPf)}`);
+    if (details.salaryAdvance > 0) lines.push(`Salary Advance=${toCurrency(details.salaryAdvance)}`);
+    if (details.hostelFoodFees > 0) lines.push(`Hostel/Food=${toCurrency(details.hostelFoodFees)}`);
+    if (details.busFees > 0) lines.push(`Bus Fees=${toCurrency(details.busFees)}`);
+    if (details.lwf > 0) lines.push(`LWF=${toCurrency(details.lwf)}`);
+    if (details.tds > 0) lines.push(`TDS=${toCurrency(details.tds)}`);
+    if (details.other > 0) {
+        const otherLabel = details.otherLabel ? `Other (${details.otherLabel})` : 'Other';
+        lines.push(`${otherLabel}=${toCurrency(details.other)}`);
+    }
+    return lines.join(', ');
 };
 const formatGeneratedAt = () => {
     const now = new Date();
@@ -125,7 +187,6 @@ const staggerWrap = {
 
 const SalaryManagement = () => {
     const { user } = useAuth();
-    const socket = useSocket();
     const navigate = useNavigate();
     const location = useLocation();
 
@@ -145,7 +206,8 @@ const SalaryManagement = () => {
 
     const [rows, setRows] = useState([]);
     const [liveDaily, setLiveDaily] = useState(null);
-    const [loading, setLoading] = useState(true);
+    const [loading, setLoading] = useState(false);
+    const [hasLoaded, setHasLoaded] = useState(false);
     const [selectedIds, setSelectedIds] = useState([]);
     const [activeRole, setActiveRole] = useState('all');
     const [activeDepartment, setActiveDepartment] = useState('all');
@@ -243,6 +305,7 @@ const SalaryManagement = () => {
                 const myCurrent = currentRows.find((r) => normalizeEmpId(r.emp_id) === normalizeEmpId(user?.emp_id));
                 setRows(myCurrent ? [myCurrent] : []);
                 setLiveDaily(dailyRes?.data || null);
+                setHasLoaded(true);
                 setLoading(false);
                 return;
             }
@@ -258,6 +321,7 @@ const SalaryManagement = () => {
             const { data } = await api.get(`/salary?${params.toString()}`);
             setRows(Array.isArray(data) ? data : []);
             setLiveDaily(null);
+            setHasLoaded(true);
         } catch (error) {
             console.error('Failed to fetch salaries:', error);
             setRows([]);
@@ -267,9 +331,8 @@ const SalaryManagement = () => {
         }
     };
 
-    useEffect(() => {
-        const autoCalculateCurrent = async () => {
-            if (!canInstitutionWide || isHistoryPage) return;
+    const handleRefreshRows = async () => {
+        if (canInstitutionWide && !isHistoryPage && !isPersonalView) {
             try {
                 await api.post('/salary/calculate', {
                     month: currentCycle.month,
@@ -280,43 +343,11 @@ const SalaryManagement = () => {
                     unpaidStatuses
                 });
             } catch (error) {
-                console.error('Auto-calculate failed:', error?.response?.data || error.message);
+                console.error('Manual calculate failed:', error?.response?.data || error.message);
             }
-        };
-
-        autoCalculateCurrent().finally(refreshRows);
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [isHistoryPage, canInstitutionWide]);
-
-    useEffect(() => {
-        refreshRows();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [selectedMonth, selectedYear, isHistoryPage, isPersonalView, user?.emp_id, selectedCycle.fromDate, selectedCycle.toDate]);
-
-    useEffect(() => {
-        const intervalId = setInterval(() => {
-            refreshRows();
-        }, 10000);
-        return () => clearInterval(intervalId);
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [isPersonalView, canInstitutionWide, isHistoryPage, user?.emp_id, selectedCycle.fromDate, selectedCycle.toDate]);
-
-    useEffect(() => {
-        if (!socket) return undefined;
-
-        const handleSalaryRealtime = () => {
-            refreshRows();
-        };
-
-        socket.on('salary_calculated', handleSalaryRealtime);
-        socket.on('salary_published', handleSalaryRealtime);
-
-        return () => {
-            socket.off('salary_calculated', handleSalaryRealtime);
-            socket.off('salary_published', handleSalaryRealtime);
-        };
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [socket, selectedCycle.fromDate, selectedCycle.toDate, isHistoryPage, isPersonalView]);
+        }
+        await refreshRows();
+    };
 
     useEffect(() => {
         const fetchDepartments = async () => {
@@ -375,7 +406,7 @@ const SalaryManagement = () => {
                             unpaidStatuses: unpaid
                         });
                     }
-                    await refreshRows();
+                    await handleRefreshRows();
                     Swal.fire('Saved!', 'Attendance rules updated and salaries recalculated.', 'success');
                 } catch (error) {
                     console.error('Failed to save config:', error);
@@ -418,10 +449,22 @@ const SalaryManagement = () => {
         const net = Number(row.calculated_salary || 0);
         const withPay = Number(row.total_present || row.with_pay_count || 0).toFixed(1);
         const withoutPay = Number(row.total_lop || row.without_pay_count || 0).toFixed(1);
-        const deductionBreakdown = getDeductionBreakdownText(row.deductions);
-        const deductionLabel = deductionBreakdown
-            ? `Deductions (${escapeHtml(deductionBreakdown)})`
-            : 'Deductions';
+        const breakdown = getDetailedDeductionBreakdown(row.deductions);
+        const deductionRows = [
+            { label: 'Employ PF', amount: breakdown.employPf },
+            { label: 'Salary Advance', amount: breakdown.salaryAdvance },
+            { label: 'Hostel and Food Fees', amount: breakdown.hostelFoodFees },
+            { label: 'Bus Fees', amount: breakdown.busFees },
+            { label: 'LWF', amount: breakdown.lwf },
+            { label: 'TDS', amount: breakdown.tds },
+            {
+                label: breakdown.otherLabel ? `Other (${breakdown.otherLabel})` : 'Other',
+                amount: breakdown.other
+            }
+        ].filter((item) => Number(item.amount || 0) > 0);
+        const deductionRowsHtml = deductionRows.length
+            ? deductionRows.map((item) => `<tr><td>${escapeHtml(item.label)}</td><td class="right">${toCurrency(item.amount)}</td></tr>`).join('')
+            : '<tr><td>Deductions</td><td class="right">0</td></tr>';
         const generatedAt = formatGeneratedAt();
 
         const html = `
@@ -519,7 +562,8 @@ const SalaryManagement = () => {
                             <tbody>
                                 <tr><td>With Pay / Without Pay Days</td><td class="right">${withPay} / ${withoutPay}</td></tr>
                                 <tr><td>Gross Salary</td><td class="right">${toCurrency(gross)}</td></tr>
-                                <tr><td>${deductionLabel}</td><td class="right">${toCurrency(deduction)}</td></tr>
+                                ${deductionRowsHtml}
+                                <tr><td>Total Deductions</td><td class="right">${toCurrency(deduction)}</td></tr>
                                 <tr><td>Net Salary</td><td class="right">${toCurrency(net)}</td></tr>
                             </tbody>
                         </table>
@@ -543,16 +587,34 @@ const SalaryManagement = () => {
         const generatedAt = formatGeneratedAt();
 
         const bodyRows = filteredRows.map((r, index) => `
+            ${(() => {
+                const detail = getDetailedDeductionBreakdown(r.deductions);
+                const monthlyFixed = Number(r.monthly_salary || r.gross_salary || 0);
+                const grossSalary = Number(r.gross_salary || r.monthly_salary || 0);
+                const totalDeductions = Number(r.deductions_applied || 0);
+                const netSalary = Number(r.calculated_salary || 0);
+                const otherLabel = detail.otherLabel ? `Other (${detail.otherLabel})` : 'Other';
+                return `
             <tr>
                 <td>${index + 1}</td>
                 <td>${escapeHtml(r.name)}</td>
                 <td>${escapeHtml(r.emp_id)}</td>
                 <td>${escapeHtml(r.department_name || '-')}</td>
-                <td class="right">${toCurrency(r.gross_salary || r.monthly_salary || 0)}</td>
-                <td class="right">${toCurrency(r.deductions_applied || 0)}</td>
-                <td class="right">${toCurrency(r.calculated_salary || 0)}</td>
+                <td class="right">${toCurrency(monthlyFixed)}</td>
+                <td class="right">${toCurrency(grossSalary)}</td>
+                <td class="right">${toCurrency(detail.employPf)}</td>
+                <td class="right">${toCurrency(detail.salaryAdvance)}</td>
+                <td class="right">${toCurrency(detail.hostelFoodFees)}</td>
+                <td class="right">${toCurrency(detail.busFees)}</td>
+                <td class="right">${toCurrency(detail.lwf)}</td>
+                <td class="right">${toCurrency(detail.tds)}</td>
+                <td class="right" title="${escapeHtml(otherLabel)}">${toCurrency(detail.other)}</td>
+                <td class="right">${toCurrency(totalDeductions)}</td>
+                <td class="right">${toCurrency(netSalary)}</td>
                 <td>${escapeHtml(String(r.status || 'Pending'))}</td>
             </tr>
+                `;
+            })()}
         `).join('');
 
         const html = `
@@ -594,8 +656,16 @@ const SalaryManagement = () => {
                                     <th>Employee</th>
                                     <th>Emp ID</th>
                                     <th>Department</th>
+                                    <th class="right">Monthly Salary (Fixed)</th>
                                     <th class="right">Gross Salary</th>
-                                    <th class="right">Deduction</th>
+                                    <th class="right">Employ PF</th>
+                                    <th class="right">Salary Advance</th>
+                                    <th class="right">Hostel/Food Fees</th>
+                                    <th class="right">Bus Fees</th>
+                                    <th class="right">LWF</th>
+                                    <th class="right">TDS</th>
+                                    <th class="right">Other</th>
+                                    <th class="right">Total Deductions</th>
                                     <th class="right">Net Salary</th>
                                     <th>Status</th>
                                 </tr>
@@ -640,7 +710,7 @@ const SalaryManagement = () => {
 
         const failed = settled.filter((s) => s.status === 'rejected').length;
         setSelectedIds([]);
-        await refreshRows();
+        await handleRefreshRows();
 
         if (failed > 0) {
             Swal.fire('Partial Success', `${chosen.length - failed} updated, ${failed} failed.`, 'warning');
@@ -778,6 +848,13 @@ const SalaryManagement = () => {
                     </div>
 
                     <div className="flex flex-wrap gap-4">
+                        <button
+                            onClick={handleRefreshRows}
+                            className="bg-white text-sky-600 border border-sky-200 px-8 py-4 rounded-2xl shadow-xl shadow-sky-50 hover:bg-sky-50 transition-all active:scale-95 flex items-center font-black uppercase tracking-[0.2em] text-[10px]"
+                            title="Refresh salary records"
+                        >
+                            <FaRedoAlt className={`mr-3 transition-transform ${loading ? 'animate-spin' : ''}`} /> Refresh
+                        </button>
                         {isAdmin && !isHistoryPage && (
                             <button
                                 onClick={openAttendanceConfig}
@@ -939,7 +1016,7 @@ const SalaryManagement = () => {
                                         onClick={printAllHistoryRows}
                                         className="bg-sky-600 text-white px-4 py-2 rounded-xl shadow-lg shadow-sky-100 hover:bg-sky-700 transition-all active:scale-95 flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em]"
                                     >
-                                        <FaFileAlt /> Print All
+                                        <FaFileAlt /> Report All
                                     </button>
                                 </>
                             )}
@@ -1018,7 +1095,10 @@ const SalaryManagement = () => {
                                         </div>
                                     </td>
                                     <td className="p-6 text-right">
-                                        <span className="text-sm font-bold text-gray-700 bg-gray-50 px-3 py-1.5 rounded-lg border border-gray-100 whitespace-nowrap">Rs {toCurrency(r.gross_salary || r.monthly_salary || 0)}</span>
+                                        <div className="flex flex-col items-end gap-1">
+                                            <span className="text-sm font-bold text-gray-700 bg-gray-50 px-3 py-1.5 rounded-lg border border-gray-100 whitespace-nowrap">Rs {toCurrency(r.gross_salary || r.monthly_salary || 0)}</span>
+                                            <span className="text-[9px] font-black text-gray-400 uppercase tracking-[0.12em]">Fixed Salary</span>
+                                        </div>
                                     </td>
                                     <td className="p-6 text-right">
                                         <div className="flex flex-col items-end gap-1">
@@ -1085,7 +1165,7 @@ const SalaryManagement = () => {
                                                         onClick={async () => {
                                                             try {
                                                                 await updateStatus(r, 'Paid');
-                                                                await refreshRows();
+                                                                await handleRefreshRows();
                                                                 Swal.fire('Success', 'Marked as paid.', 'success');
                                                             } catch (error) {
                                                                 console.error(error);
@@ -1101,7 +1181,7 @@ const SalaryManagement = () => {
                                                         onClick={async () => {
                                                             try {
                                                                 await updateStatus(r, 'Pending');
-                                                                await refreshRows();
+                                                                await handleRefreshRows();
                                                                 Swal.fire('Success', 'Marked as unpaid.', 'success');
                                                             } catch (error) {
                                                                 console.error(error);
@@ -1139,7 +1219,7 @@ const SalaryManagement = () => {
                                                     <FaMoneyBillWave size={64} className="text-gray-400" />
                                                     <div>
                                                         <p className="text-xl font-black text-gray-800 tracking-tight">No Records</p>
-                                                        <p className="text-sm font-bold uppercase tracking-[0.2em] text-gray-400 mt-1">No salary records found for this view.</p>
+                                                        <p className="text-sm font-bold uppercase tracking-[0.2em] text-gray-400 mt-1">{hasLoaded ? 'No salary records found for this view.' : 'Click refresh to load salary records.'}</p>
                                                     </div>
                                                 </div>
                                             </td>

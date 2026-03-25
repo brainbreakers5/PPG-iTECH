@@ -274,7 +274,7 @@ const AttendanceRecord = () => {
 
     const handlePrint = async () => {
         if (!detailedRecords || detailedRecords.length === 0) {
-            Swal.fire({ icon: 'warning', title: 'No Data', text: 'No matching records available to print.' });
+            Swal.fire({ icon: 'warning', title: 'No Data', text: 'No matching records available for this report.' });
             return;
         }
 
@@ -545,7 +545,7 @@ const AttendanceRecord = () => {
                                 <button
                                     onClick={handlePrint}
                                     className="p-4 bg-sky-600 text-white rounded-2xl shadow-lg shadow-sky-100 hover:bg-sky-700 transition-all flex items-center justify-center group"
-                                    title="Print Report"
+                                    title="Report"
                                 >
                                     <FaFileDownload className="group-hover:scale-110 transition-transform" />
                                 </button>
@@ -603,7 +603,7 @@ const AttendanceRecord = () => {
                                 <button
                                     onClick={handlePrint}
                                     className="p-4 bg-sky-600 text-white rounded-2xl shadow-lg shadow-sky-100 hover:bg-sky-700 transition-all flex items-center justify-center group"
-                                    title="Print Report"
+                                    title="Report"
                                 >
                                     <FaFileDownload className="group-hover:scale-110 transition-transform" />
                                 </button>

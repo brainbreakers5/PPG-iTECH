@@ -4,6 +4,7 @@ import { FaTimes, FaCheckCircle, FaIdBadge, FaBuilding, FaPhone, FaEnvelope, FaU
 import api from '../utils/api';
 import Swal from 'sweetalert2';
 import { useAuth } from '../context/AuthContext';
+import { runPrintWindow } from '../utils/printUtils';
 
 const inputClass = "w-full p-3 bg-gray-50 border border-gray-200 rounded-2xl outline-none focus:ring-4 focus:ring-sky-100 focus:border-sky-500 transition-all font-bold text-gray-700 text-sm";
 
@@ -390,49 +391,14 @@ const ProfileViewer = ({ user, onClose }) => {
             </html>
         `;
 
-        // Use a hidden iframe for mobile compatibility (window.open is blocked by mobile browsers)
-        const existingFrame = document.getElementById('profile-print-frame');
-        if (existingFrame) existingFrame.remove();
-
-        const iframe = document.createElement('iframe');
-        iframe.id = 'profile-print-frame';
-        iframe.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:1px;height:1px;border:none;';
-        document.body.appendChild(iframe);
-
-        const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
-        if (!iframeDoc) return;
-
-        iframeDoc.open();
-        iframeDoc.write(htmlContent);
-        iframeDoc.close();
-
-        // Wait for content + images to load, then print
-        const tryPrint = () => {
-            iframe.contentWindow?.focus();
-            iframe.contentWindow?.print();
-            // Clean up after a short delay
-            setTimeout(() => {
-                if (iframe.parentNode) iframe.parentNode.removeChild(iframe);
-            }, 2000);
-        };
-
-        const images = iframeDoc.getElementsByTagName('img');
-        const totalImages = images.length;
-
-        if (totalImages === 0) {
-            setTimeout(tryPrint, 300);
-        } else {
-            let loadedImages = 0;
-            const checkDone = () => {
-                loadedImages++;
-                if (loadedImages >= totalImages) setTimeout(tryPrint, 300);
-            };
-            Array.from(images).forEach(img => {
-                if (img.complete) checkDone();
-                else { img.onload = checkDone; img.onerror = checkDone; }
-            });
-            setTimeout(tryPrint, 3000); // fallback
-        }
+        await runPrintWindow({
+            title,
+            html: htmlContent,
+            modeLabel: 'the profile report',
+            closeAfterPrint: true,
+            delay: 450,
+            windowFeatures: 'width=1100,height=850'
+        });
     };
 
     return (
@@ -535,9 +501,9 @@ const ProfileViewer = ({ user, onClose }) => {
                                 <button
                                     onClick={handlePrintProfile}
                                     className="flex items-center gap-2 px-5 py-2.5 bg-white border border-gray-200 text-gray-600 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-gray-50 transition-all shadow-sm group"
-                                    title="Print Profile & Certificates"
+                                    title="Profile & Certificates Report"
                                 >
-                                    <FaPrint size={12} className="group-hover:scale-110 transition-transform" /> Print
+                                    <FaPrint size={12} className="group-hover:scale-110 transition-transform" /> Report
                                 </button>
                             )}
                             {isOwnProfile && !isEditingProfile && (
