@@ -272,10 +272,10 @@ const EmployeeManagement = () => {
                                 onChange={(e) => setFilterRole(e.target.value)}
                             >
                                 <option value="">All Roles</option>
-                                <option value="admin">Executive (Admin)</option>
-                                <option value="principal">Principal</option>
-                                <option value="hod">Supervisory (HOD)</option>
-                                <option value="staff">Operations (Staff)</option>
+                                <option value="admin">admin</option>
+                                <option value="principal">principal</option>
+                                <option value="hod">hod</option>
+                                <option value="staff">staff</option>
                             </select>
                             <FaFilter className="absolute right-5 top-1/2 -translate-y-1/2 text-gray-300 pointer-events-none" />
                         </div>
@@ -345,7 +345,7 @@ const EmployeeManagement = () => {
                                             </td>
                                             <td className="p-6">
                                                 <p className="text-sm text-gray-800 font-black tracking-tight">{emp.department_name}</p>
-                                                <div className="flex items-center gap-2 mt-1">
+                                                <div className="flex flex-col items-start gap-1 mt-1">
                                                      <span className={`text-[8px] font-black uppercase px-2 py-0.5 rounded-md tracking-[0.1em] ${emp.role === 'admin' ? 'bg-violet-100 text-violet-600' :
                                                         emp.role === 'principal' ? 'bg-indigo-100 text-indigo-600' :
                                                             emp.role === 'hod' ? 'bg-sky-100 text-sky-600' : 'bg-gray-100 text-gray-500'
@@ -355,7 +355,7 @@ const EmployeeManagement = () => {
                                                          emp.role === 'hod' ? 'HOD' :
                                                          emp.role === 'staff' ? 'Staff' : emp.role}
                                                      </span>
-                                                    <span className="text-[9px] text-gray-400 font-bold uppercase tracking-widest">• {emp.designation}</span>
+                                                    <span className="text-[9px] text-gray-400 font-bold uppercase tracking-widest">{emp.designation || 'N/A'}</span>
                                                 </div>
                                             </td>
                                             <td className="p-6">

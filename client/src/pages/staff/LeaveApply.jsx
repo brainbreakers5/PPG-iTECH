@@ -1504,6 +1504,8 @@ const LeaveApply = () => {
                                                         <div className="min-w-0">
                                                             <p className="text-sm font-black text-gray-800 tracking-tight whitespace-nowrap overflow-hidden text-ellipsis max-w-[170px]">{leave.applicant_name}</p>
                                                             <p className="text-[9px] font-black text-sky-500 uppercase tracking-widest mt-0.5 whitespace-nowrap overflow-hidden text-ellipsis max-w-[170px]">{leave.department_name}</p>
+                                                            <p className="text-[9px] font-black text-gray-500 uppercase tracking-widest mt-0.5 whitespace-nowrap overflow-hidden text-ellipsis max-w-[170px]">{leave.applicant_role || 'staff'}</p>
+                                                            <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mt-0.5 whitespace-nowrap overflow-hidden text-ellipsis max-w-[170px]">{leave.applicant_designation || 'N/A'}</p>
                                                         </div>
                                                     </div>
                                                 </td>
@@ -1615,6 +1617,8 @@ const LeaveApply = () => {
                                                                 <div className="min-w-0">
                                                                     <p className="text-sm font-black text-gray-800 tracking-tight whitespace-nowrap overflow-hidden text-ellipsis max-w-[170px]">{leave.applicant_name}</p>
                                                                     <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mt-0.5 whitespace-nowrap overflow-hidden text-ellipsis max-w-[170px]">{leave.department_name}</p>
+                                                                    <p className="text-[9px] font-black text-gray-500 uppercase tracking-widest mt-0.5 whitespace-nowrap overflow-hidden text-ellipsis max-w-[170px]">{leave.applicant_role || 'staff'}</p>
+                                                                    <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mt-0.5 whitespace-nowrap overflow-hidden text-ellipsis max-w-[170px]">{leave.applicant_designation || 'N/A'}</p>
                                                                 </div>
                                                             </div>
                                                         </td>

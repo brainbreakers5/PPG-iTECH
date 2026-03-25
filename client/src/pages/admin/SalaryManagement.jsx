@@ -1046,7 +1046,16 @@ const SalaryManagement = () => {
                                                 <button
                                                     onClick={() => printPaymentSlip(r)}
                                                     className="h-10 w-10 bg-sky-50 text-sky-600 rounded-xl hover:bg-sky-600 hover:text-white transition-all active:scale-95 group/btn"
-                                                    title="Print"
+                                                    title="Payslip"
+                                                >
+                                                    <FaFileAlt className="group-hover/btn:scale-125 transition-transform" />
+                                                </button>
+                                            )}
+                                            {isPersonalView && (
+                                                <button
+                                                    onClick={() => printPaymentSlip(r)}
+                                                    className="h-10 w-10 bg-sky-50 text-sky-600 rounded-xl hover:bg-sky-600 hover:text-white transition-all active:scale-95 group/btn"
+                                                    title="Payslip"
                                                 >
                                                     <FaFileAlt className="group-hover/btn:scale-125 transition-transform" />
                                                 </button>

@@ -167,7 +167,7 @@ exports.getLeaveRequests = async (req, res) => {
         // 1. The applicant
         // 2. An approver (pending or already acted on)
         const query = `
-            SELECT l.*, u.name as applicant_name, u.role as applicant_role, u.profile_pic as applicant_pic, d.name as department_name, 
+                 SELECT l.*, u.name as applicant_name, u.role as applicant_role, u.designation as applicant_designation, u.profile_pic as applicant_pic, d.name as department_name, 
                    ap.status as my_approval_status, ap.approver_type as my_approver_type, ap.comments as approval_notes,
                    ap.updated_at as approval_acted_at
             FROM leave_requests l
@@ -241,6 +241,7 @@ exports.approveLeaveStep = async (req, res) => {
 
             // Revert leave balance (only for regular leave requests, not comp_credit)
             const { rows: reqDetails } = await client.query('SELECT emp_id, leave_type, from_date, days_count, request_type FROM leave_requests WHERE id = $1', [requestId]);
+            const requestMeta = reqDetails[0] || null;
             if (reqDetails.length > 0) {
                 const { emp_id, leave_type, from_date, days_count, request_type } = reqDetails[0];
                 if (request_type !== 'comp_credit') {
@@ -261,7 +262,7 @@ exports.approveLeaveStep = async (req, res) => {
 
             // Notify applicant
             const { rows: applicantRows } = await client.query('SELECT emp_id FROM leave_requests WHERE id = $1', [requestId]);
-            const notifyMsg = reqDetails[0]?.request_type === 'comp_credit'
+            const notifyMsg = requestMeta?.request_type === 'comp_credit'
                 ? `Your comp off request has been REJECTED by ${req.user.name}.`
                 : `Your leave request has been REJECTED by ${req.user.name}.`;
             await createNotification(applicantRows[0].emp_id, notifyMsg, 'leave', null, client);
@@ -356,12 +357,15 @@ exports.approveLeaveStep = async (req, res) => {
                     }
                 } else {
                     // Regular leave — update attendance records for each date in the range
-                    const start = new Date(from_date);
-                    const end = new Date(to_date);
+                    const startIso = String(from_date || '').slice(0, 10);
+                    const endIso = String(to_date || '').slice(0, 10);
+                    const start = new Date(`${startIso}T00:00:00Z`);
+                    const end = new Date(`${endIso}T00:00:00Z`);
                     const datesDetail = Array.isArray(dates_detail) ? dates_detail : (typeof dates_detail === 'string' ? JSON.parse(dates_detail || '[]') : []);
+                    const attendanceStatus = leave_type === 'OD' ? 'OD' : 'Leave';
 
-                    for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-                        const dateStr = d.toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
+                    for (let d = new Date(start); d <= end; d.setUTCDate(d.getUTCDate() + 1)) {
+                        const dateStr = d.toISOString().slice(0, 10);
 
                         // Find matching date in datesDetail
                         const detail = datesDetail.find(dd => dd.date === dateStr);
@@ -407,7 +411,7 @@ exports.approveLeaveStep = async (req, res) => {
                                         -- Otherwise keep existing
                                         ELSE attendance_records.remarks
                                     END
-                        `, [emp_id, dateStr, leave_type, null, null, remarks]);
+                        `, [emp_id, dateStr, attendanceStatus, null, null, remarks]);
                     }
 
                     await createNotification(emp_id, `Congratulations! Your leave request${(reqDetails[0].is_half_day && reqDetails[0].hours) ? ` (${reqDetails[0].hours} Hours)` : ''} has been FINALLY APPROVED.`, 'leave', null, client);
@@ -512,7 +516,7 @@ exports.getLeaveConflicts = async (req, res) => {
 exports.getAllLeaveHistory = async (req, res) => {
     try {
         const query = `
-            SELECT l.*, u.name as applicant_name, u.role as applicant_role, u.profile_pic as applicant_pic, d.name as department_name
+            SELECT l.*, u.name as applicant_name, u.role as applicant_role, u.designation as applicant_designation, u.profile_pic as applicant_pic, d.name as department_name
             FROM leave_requests l
             JOIN users u ON l.emp_id = u.emp_id
             LEFT JOIN departments d ON u.department_id = d.id

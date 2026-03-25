@@ -236,6 +236,7 @@ const DepartmentStaffPage = () => {
                                                     }`}>
                                                         <FaIdBadge /> {member.role}
                                                     </span>
+                                                    <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest">{member.designation || 'N/A'}</span>
                                                 </div>
                                             </td>
                                             <td className="py-4 px-6">

@@ -107,7 +107,8 @@ const PersonnelListPage = () => {
                                                     />
                                                     <div>
                                                         <h3 className="text-sm font-black text-gray-800 tracking-tight group-hover/row:text-sky-600 transition-colors uppercase">{member.name}</h3>
-                                                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mt-0.5">{member.designation || member.role}</p>
+                                                        <p className="text-[10px] font-black text-sky-500 uppercase tracking-[0.2em] mt-0.5">{member.role || 'staff'}</p>
+                                                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mt-0.5">{member.designation || 'N/A'}</p>
                                                     </div>
                                                 </div>
                                             </td>

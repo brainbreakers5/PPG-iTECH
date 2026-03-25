@@ -489,6 +489,8 @@ const LeaveRequests = () => {
                                                         <div>
                                                             <p className="text-sm font-black text-gray-800 tracking-tight group-hover/profile:text-sky-600 transition-colors break-words whitespace-normal">{leave.applicant_name}</p>
                                                             <p className="text-[10px] font-black text-sky-500 uppercase tracking-widest mt-0.5">{leave.department_name}</p>
+                                                            <p className="text-[9px] font-black text-gray-500 uppercase tracking-widest mt-0.5">{leave.applicant_role || 'staff'}</p>
+                                                            <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mt-0.5">{leave.applicant_designation || 'N/A'}</p>
                                                         </div>
                                                     </div>
                                                 </td>
@@ -652,6 +654,8 @@ const LeaveRequests = () => {
                                                         <div>
                                                             <p className="text-sm font-black text-gray-800 tracking-tight group-hover/profile:text-sky-600 transition-colors break-words whitespace-normal">{leave.applicant_name}</p>
                                                             <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mt-0.5">{leave.department_name}</p>
+                                                            <p className="text-[9px] font-black text-gray-500 uppercase tracking-widest mt-0.5">{leave.applicant_role || 'staff'}</p>
+                                                            <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mt-0.5">{leave.applicant_designation || 'N/A'}</p>
                                                         </div>
                                                     </div>
                                                 </td>
