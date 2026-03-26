@@ -4,7 +4,7 @@ import Layout from '../../components/Layout';
 import api from '../../utils/api';
 import Swal from 'sweetalert2';
 import { runPrintWindow } from '../../utils/printUtils';
-import { FaEdit, FaTrash, FaUserPlus, FaSearch, FaFilter, FaUsers, FaIdBadge, FaEnvelope, FaPhone, FaPrint, FaSearchPlus } from 'react-icons/fa';
+import { FaEdit, FaTrash, FaUserPlus, FaSearch, FaFilter, FaUsers, FaIdBadge, FaEnvelope, FaPhone, FaPrint, FaEye } from 'react-icons/fa';
 import { motion, AnimatePresence } from 'framer-motion';
 
 
@@ -461,7 +461,7 @@ const EmployeeManagement = () => {
                                                         className="h-10 w-10 bg-indigo-50 text-indigo-600 rounded-xl hover:bg-indigo-600 hover:text-white transition-all shadow-sm flex items-center justify-center active:scale-90 group/btn"
                                                         title="View Profile"
                                                     >
-                                                        <FaSearchPlus className="group-hover/btn:scale-110 transition-transform" />
+                                                        <FaEye className="group-hover/btn:scale-110 transition-transform" />
                                                     </button>
                                                     <button
                                                         onClick={(e) => handleEdit(e, emp)}

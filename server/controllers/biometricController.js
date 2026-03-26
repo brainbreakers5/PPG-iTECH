@@ -102,6 +102,8 @@ const drainPendingBiometricLogs = async (limit = 25) => {
                 [payload.device_id || 'PENDING_QUEUE', queuedEmpId, queuedLogDate, payload.type || (queuedLogDate.getHours() < 12 ? 'IN' : 'OUT')],
                 'biometric_logs'
             );
+            const queuedDateStr = queuedLogDate.toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
+            await rebuildAttendanceFromBiometricTimeline(queuedEmpId, queuedDateStr);
             replayed += 1;
         } catch (err) {
             keep.push(line);
@@ -130,6 +132,170 @@ const ensureBiometricUser = async (empId) => {
          ON CONFLICT (emp_id) DO NOTHING`,
         [safeEmpId, passwordHash, `Biometric User ${safeEmpId}`]
     );
+};
+
+const rebuildAttendanceFromBiometricTimeline = async (normalizedEmpId, dateStr) => {
+    const toMins = (t) => {
+        if (!t) return 0;
+        const [h, m] = t.split(':').map(Number);
+        return (h || 0) * 60 + (m || 0);
+    };
+
+    const { rows: allPunches } = await pool.query(
+        `SELECT log_time FROM biometric_logs
+         WHERE emp_id = $1 AND (log_time AT TIME ZONE 'Asia/Kolkata')::date = $2::date
+         ORDER BY log_time ASC`,
+        [normalizedEmpId, dateStr]
+    );
+
+    const { rows: approvedLeaves } = await pool.query(
+        `SELECT leave_type, is_half_day, dates_detail FROM leave_requests
+         WHERE emp_id = $1 AND status = 'Approved'
+         AND from_date <= $2 AND to_date >= $2`,
+        [normalizedEmpId, dateStr]
+    );
+
+    const { rows: approvedPerms } = await pool.query(
+        `SELECT from_time, to_time FROM permission_requests
+         WHERE emp_id = $1 AND status = 'Approved' AND date = $2`,
+        [normalizedEmpId, dateStr]
+    );
+
+    let segments = [];
+    let physIn = null;
+    let physOut = null;
+
+    if (allPunches.length > 0) {
+        physIn = new Date(allPunches[0].log_time).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Kolkata' });
+        if (allPunches.length > 1) {
+            physOut = new Date(allPunches[allPunches.length - 1].log_time).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Kolkata' });
+        }
+        segments.push({ type: 'Present', from: physIn, to: physOut || physIn, fromMins: toMins(physIn), toMins: toMins(physOut || physIn) });
+    }
+
+    approvedLeaves.forEach((leave) => {
+        let details = [];
+        try {
+            details = Array.isArray(leave.dates_detail) ? leave.dates_detail : (typeof leave.dates_detail === 'string' ? JSON.parse(leave.dates_detail) : []);
+        } catch (e) { details = []; }
+
+        const dayDetail = details.find((d) => d.date === dateStr);
+        if (dayDetail && (dayDetail.day_type || !dayDetail.is_full_day)) {
+            let f;
+            let t;
+            if (dayDetail.day_type === 'Half Day AM') { f = '09:00'; t = '13:00'; }
+            else if (dayDetail.day_type === 'Half Day PM') { f = '13:30'; t = '16:45'; }
+            else { f = dayDetail.from_time || '09:00'; t = dayDetail.to_time || '16:45'; }
+            segments.push({ type: leave.leave_type, from: f, to: t, fromMins: toMins(f), toMins: toMins(t), day_type: dayDetail.day_type });
+        } else if (!leave.is_half_day) {
+            segments.push({ type: leave.leave_type, from: '09:00', to: '16:45', fromMins: toMins('09:00'), toMins: toMins('16:45'), isFull: true });
+        }
+    });
+
+    approvedPerms.forEach((perm) => {
+        segments.push({ type: 'Permission', from: perm.from_time, to: perm.to_time, fromMins: toMins(perm.from_time), toMins: toMins(perm.to_time) });
+    });
+
+    const STD_IN_MINS = 540;
+    const STD_OUT_MINS = 1005;
+    const MORNING_HALF_DAY_END_MINS = 755;
+    const EVENING_HALF_DAY_START_MINS = 810;
+
+    let flags = [];
+    let workingHoursStr = '0h 0m';
+    let dbStatus = 'Present';
+
+    if (physIn) {
+        const inMins = toMins(physIn);
+        const outMins = physOut ? toMins(physOut) : inMins;
+        const diff = outMins - inMins;
+        workingHoursStr = `${Math.floor(diff / 60)}h ${diff % 60}m`;
+
+        let isLateCovered = true;
+        let isEarlyCovered = true;
+        let lateLopUnits = 0;
+        let earlyLopUnits = 0;
+
+        if (inMins > STD_IN_MINS) {
+            isLateCovered = segments.some((s) => s.type !== 'Present');
+            flags.push(`Late Entry (${physIn})`);
+            if (!isLateCovered) {
+                lateLopUnits = inMins <= MORNING_HALF_DAY_END_MINS ? 0.5 : 1;
+                if (lateLopUnits === 0.5) flags.push('Morning Session LOP (09:00-12:35)');
+            }
+        }
+
+        if (physOut && outMins < STD_OUT_MINS) {
+            isEarlyCovered = segments.some((s) => s.type !== 'Present');
+            flags.push(`Early Exit (${physOut})`);
+            if (!isEarlyCovered) {
+                earlyLopUnits = outMins >= EVENING_HALF_DAY_START_MINS ? 0.5 : 1;
+                if (earlyLopUnits === 0.5) flags.push('Evening Session LOP (13:30-16:45)');
+            }
+        }
+
+        const leaveSegments = segments.filter((s) => s.type !== 'Present' && s.type !== 'Permission');
+        const leaveInfo = leaveSegments.length > 0 ? leaveSegments.map((s) => `${s.type} (${s.from}-${s.to})`).join(' + ') : null;
+        const lopUnits = Math.min(1, lateLopUnits + earlyLopUnits);
+
+        if (lopUnits >= 1) {
+            dbStatus = leaveInfo ? `LOP + ${leaveInfo}` : 'LOP';
+        } else if (lopUnits === 0.5) {
+            dbStatus = 'LOP + Present';
+        } else {
+            dbStatus = leaveInfo ? `Present + ${leaveInfo}` : 'Present';
+        }
+    } else {
+        const fullDay = segments.find((s) => s.isFull);
+        const otherSegments = segments.filter((s) => s.type !== 'Present' && s.type !== 'Permission' && !s.isFull);
+        const leaveInfo = otherSegments.length > 0 ? otherSegments.map((s) => `${s.type} (${s.from}-${s.to})`).join(' + ') : null;
+        if (fullDay) dbStatus = fullDay.type;
+        else if (leaveInfo) dbStatus = `Absent + ${leaveInfo}`;
+        else dbStatus = 'Absent';
+    }
+
+    const approvedInfoList = segments
+        .filter((s) => s.type !== 'Present')
+        .map((s) => {
+            const fromTimeStr = new Date(`2000-01-01T${s.from}`).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+            const toTimeStr = new Date(`2000-01-01T${s.to}`).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+            const durationInMins = s.toMins - s.fromMins;
+            const h = Math.floor(durationInMins / 60);
+            const m = durationInMins % 60;
+            return `${s.type}${s.day_type ? ' (' + s.day_type + ')' : ''}: ${fromTimeStr}-${toTimeStr} (${h}h ${m}m)`;
+        });
+
+    const finalRemarks = [
+        `Working Hours: ${workingHoursStr}`,
+        flags.length > 0 ? `Alerts: ${flags.join(', ')}` : null,
+        approvedInfoList.length > 0 ? `Approved Segments: ${approvedInfoList.join(' | ')}` : null
+    ].filter(Boolean).join(' | ');
+
+    await runWithSequenceFix(
+        `INSERT INTO biometric_attendance (user_id, date, intime, outtime)
+         VALUES ($1, $2, $3, $4)
+         ON CONFLICT (user_id, date)
+         DO UPDATE SET
+            intime = EXCLUDED.intime,
+            outtime = EXCLUDED.outtime`,
+        [normalizedEmpId, dateStr, physIn || null, physOut || null],
+        'biometric_attendance'
+    );
+
+    await runWithSequenceFix(
+        `INSERT INTO attendance_records (emp_id, date, in_time, out_time, status, remarks)
+         VALUES ($1, $2, $3, $4, $5, $6)
+         ON CONFLICT (emp_id, date)
+         DO UPDATE SET
+            in_time = EXCLUDED.in_time,
+            out_time = EXCLUDED.out_time,
+            status = EXCLUDED.status,
+            remarks = EXCLUDED.remarks`,
+        [normalizedEmpId, dateStr, physIn || null, physOut || null, dbStatus, finalRemarks || null],
+        'attendance_records'
+    );
+
+    return { dbStatus, physIn, physOut };
 };
 
 // Helper: run a query, and on unique-violation (23505) attempt to reset sequence for given table and retry once
@@ -355,6 +521,8 @@ exports.receiveLog = async (req, res) => {
             // 4. Detailed Calculation for Late Entry / Early Exit / Working Hours
             const STD_IN_MINS = 540;   // 09:00
             const STD_OUT_MINS = 1005; // 16:45
+            const MORNING_HALF_DAY_END_MINS = 755; // 12:35
+            const EVENING_HALF_DAY_START_MINS = 810; // 13:30
 
             let flags = [];
             let workingHoursStr = '0h 0m';
@@ -373,12 +541,22 @@ exports.receiveLog = async (req, res) => {
                 let isEarlyExit = false;
                 let isLateCovered = true;
                 let isEarlyCovered = true;
+                let lateLopUnits = 0;
+                let earlyLopUnits = 0;
 
                 if (inMins > STD_IN_MINS) {
                     isLateEntry = true;
                     // Any approved leave or permission cancels the automatic LOP for being late
                     isLateCovered = segments.some(s => s.type !== 'Present'); 
                     flags.push(`Late Entry (${physIn})`);
+
+                    if (!isLateCovered) {
+                        // Morning-only LOP window: 09:00 to 12:35 counts as half-day LOP.
+                        lateLopUnits = inMins <= MORNING_HALF_DAY_END_MINS ? 0.5 : 1;
+                        if (lateLopUnits === 0.5) {
+                            flags.push('Morning Session LOP (09:00-12:35)');
+                        }
+                    }
                 }
 
                 // Check Early Exit: if punch-out is before standard 16:45
@@ -388,17 +566,28 @@ exports.receiveLog = async (req, res) => {
                     // Any approved leave or permission cancels the automatic LOP for early exit
                     isEarlyCovered = segments.some(s => s.type !== 'Present');
                     flags.push(`Early Exit (${physOut})`);
+
+                    if (!isEarlyCovered) {
+                        // Evening-only LOP window: 13:30 to 16:45 counts as half-day LOP.
+                        earlyLopUnits = outMins >= EVENING_HALF_DAY_START_MINS ? 0.5 : 1;
+                        if (earlyLopUnits === 0.5) {
+                            flags.push('Evening Session LOP (13:30-16:45)');
+                        }
+                    }
                 }
 
                 // Status Logic: 
                 const leaveSegments = segments.filter(s => s.type !== 'Present' && s.type !== 'Permission');
                 const leaveInfo = leaveSegments.length > 0 ? leaveSegments.map(s => `${s.type} (${s.from}-${s.to})`).join(' + ') : null;
 
-                const hasUncovered = (isLateEntry && !isLateCovered) || (isEarlyExit && !isEarlyCovered);
+                const lopUnits = Math.min(1, lateLopUnits + earlyLopUnits);
 
-                // 1. Uncovered late/early -> LOP (+ Leaves if any)
-                if (hasUncovered) {
+                // 1. Uncovered late/early -> LOP
+                //    Half-day LOP is represented as "LOP + Present" so salary aggregation counts 0.5 unpaid.
+                if (lopUnits >= 1) {
                     dbStatus = leaveInfo ? `LOP + ${leaveInfo}` : 'LOP';
+                } else if (lopUnits === 0.5) {
+                    dbStatus = 'LOP + Present';
                 } else {
                     // 2. Covered -> Present (+ Leaves if any)
                     dbStatus = leaveInfo ? `Present + ${leaveInfo}` : 'Present';
@@ -515,8 +704,11 @@ exports.receiveLog = async (req, res) => {
                 error: error.message,
             });
         }
-        res.status(500).json({
-            message: 'Server Error during biometric processing',
+
+        // Reliability fallback: keep punch payload for replay even on non-transient failures.
+        queuePendingBiometricLog(req.body, error);
+        res.status(202).json({
+            message: 'Biometric punch queued for retry due to processing error',
             error: error.message
         });
     }

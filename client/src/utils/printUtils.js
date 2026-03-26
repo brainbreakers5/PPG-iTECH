@@ -241,6 +241,7 @@ const downloadPdfFromHtml = async ({ html, title }) => {
 const openPdfPreviewModal = async ({ blobUrl, title }) => {
     await Swal.fire({
         title: `${String(title || 'Report')} - PDF Preview`,
+        backdrop: false,
         html: `
             <div style="height:72vh; max-height:780px; border:1px solid #e2e8f0; border-radius:12px; overflow:hidden; background:#fff;">
                 <iframe
@@ -422,15 +423,14 @@ const shareReport = async ({ html, title }) => {
     await Swal.fire({ icon: 'success', title: 'Copied', text: 'Report link copied to clipboard.', timer: 1500, showConfirmButton: false });
 };
 
-export const choosePrintMode = async (documentLabel = 'this report') => {
+export const choosePrintMode = async () => {
     const { isConfirmed, value } = await Swal.fire({
         title: 'Generate Report',
-        text: `How do you want to generate ${documentLabel}?`,
         input: 'radio',
         inputOptions: {
-            print: 'Print Page',
-            excel: 'Excel (.xlsx)',
-            pdf: 'PDF (.pdf)',
+            print: 'Print',
+            pdf: 'PDF',
+            excel: 'Excel',
             share: 'Share'
         },
         inputValue: 'print',

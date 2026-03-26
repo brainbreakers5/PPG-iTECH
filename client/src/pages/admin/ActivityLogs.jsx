@@ -169,12 +169,17 @@ const ActivityLogs = () => {
                     )}
 
                     <div className="overflow-x-auto">
-                        <table className="w-full text-left border-collapse">
+                        <table className="w-full min-w-[860px] text-left border-collapse table-fixed">
+                            <colgroup>
+                                <col className="w-[30%]" />
+                                <col className="w-[42%]" />
+                                <col className="w-[28%]" />
+                            </colgroup>
                             <thead>
                                 <tr className="bg-slate-50 border-b border-slate-100">
-                                    <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Timestamp</th>
-                                    <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">User</th>
-                                    <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Action</th>
+                                    <th className="px-6 lg:px-8 py-4 lg:py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] whitespace-nowrap align-middle">Timestamp</th>
+                                    <th className="px-6 lg:px-8 py-4 lg:py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] whitespace-nowrap align-middle">User</th>
+                                    <th className="px-6 lg:px-8 py-4 lg:py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] whitespace-nowrap align-middle text-center">Action</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-50">
@@ -233,32 +238,32 @@ const ActivityLogs = () => {
                                                         });
                                                     }
                                                 }}
-                                                className="hover:bg-slate-50/50 transition-colors group cursor-pointer"
+                                                className="hover:bg-slate-50/50 transition-colors group cursor-pointer align-middle"
                                             >
-                                                <td className="px-8 py-5">
+                                                <td className="px-6 lg:px-8 py-4 lg:py-5 align-middle">
                                                     <div className="flex flex-col">
-                                                        <span className="text-slate-700 font-bold text-sm whitespace-nowrap">
+                                                        <span className="text-slate-700 font-bold text-sm whitespace-nowrap leading-tight">
                                                             {new Date(log.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
                                                         </span>
-                                                        <span className="text-slate-400 font-medium text-[11px] flex items-center gap-1">
+                                                        <span className="text-slate-400 font-medium text-[11px] flex items-center gap-1 whitespace-nowrap mt-1">
                                                             <Clock size={10} />
                                                             {formatTimestamp(log.created_at)}
                                                         </span>
                                                     </div>
                                                 </td>
-                                                <td className="px-8 py-5">
+                                                <td className="px-6 lg:px-8 py-4 lg:py-5 align-middle">
                                                     <div className="flex items-center gap-3">
                                                         <div className="w-9 h-9 bg-slate-100 rounded-xl flex items-center justify-center text-slate-500 font-black text-xs border border-slate-100 group-hover:bg-blue-50 group-hover:text-blue-600 group-hover:border-blue-100 transition-colors">
                                                             {log.user_name?.charAt(0)}
                                                         </div>
-                                                        <div className="flex flex-col">
-                                                            <span className="text-slate-700 font-bold text-sm group-hover:text-blue-600 transition-colors">{log.user_name}</span>
-                                                            <span className="text-slate-400 font-medium text-[11px] uppercase tracking-tighter">{log.emp_id}</span>
+                                                        <div className="flex flex-col min-w-0">
+                                                            <span className="text-slate-700 font-bold text-sm group-hover:text-blue-600 transition-colors truncate">{log.user_name}</span>
+                                                            <span className="text-slate-400 font-medium text-[11px] uppercase tracking-tighter truncate">{log.emp_id}</span>
                                                         </div>
                                                     </div>
                                                 </td>
-                                                <td className="px-8 py-5">
-                                                    <span className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider border ${getActionColor(log.action)}`}>
+                                                <td className="px-6 lg:px-8 py-4 lg:py-5 text-center align-middle">
+                                                    <span className={`inline-flex items-center justify-center px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider border whitespace-nowrap ${getActionColor(log.action)}`}>
                                                         {log.action?.replace(/_/g, ' ')}
                                                     </span>
                                                 </td>

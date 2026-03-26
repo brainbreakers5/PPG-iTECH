@@ -11,6 +11,7 @@ import {
     FaClock,
     FaCog,
     FaEnvelope,
+    FaEye,
     FaFileAlt,
     FaFilter,
     FaHistory,
@@ -259,6 +260,12 @@ const SalaryManagement = () => {
     const isHistoryPage = /\/payroll\/history$/.test(location.pathname);
     const isPersonalView = !canInstitutionWide;
     const isAdmin = user?.role === 'admin';
+    const showStatusColumn = isHistoryPage;
+
+    const tableColumnCount = (canInstitutionWide && isHistoryPage ? 1 : 0)
+        + (isPersonalView ? 1 : 6)
+        + (showStatusColumn ? 1 : 0)
+        + 1;
 
     const currentCycle = useMemo(() => getCurrentPayrollCycle(), []);
     const [selectedMonth, setSelectedMonth] = useState(currentCycle.month);
@@ -470,7 +477,6 @@ const SalaryManagement = () => {
                         <input id="swal-unpaid" class="swal2-input" value="${unpaidStatuses.join(', ')}">
                     </div>
                     <p class="text-xs text-gray-500 mt-4">Enter comma-separated values. Changes will trigger a salary recalculation for the current period.</p>
-                    <p class="text-xs text-sky-600 mt-2 font-semibold">Salary Concept: Basic Salary (55.2% of Earned Salary), Performance (36.8% of Earned Salary), Conveyance (8% of Earned Salary).</p>
                 </div>
             `,
             focusConfirm: false,
@@ -1201,7 +1207,7 @@ const SalaryManagement = () => {
                                     {!isPersonalView && <th className="p-3 md:p-6 text-[9px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-sky-50 text-right whitespace-nowrap">Gross Salary</th>}
                                     {!isPersonalView && <th className="p-3 md:p-6 text-[9px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-sky-50 text-right whitespace-nowrap">Deductions</th>}
                                     {!isPersonalView && <th className="p-3 md:p-6 text-[9px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-sky-50 text-right whitespace-nowrap">Net Salary</th>}
-                                    <th className="p-3 md:p-6 text-[9px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-sky-50 text-center whitespace-nowrap">Status</th>
+                                    {showStatusColumn && <th className="p-3 md:p-6 text-[9px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-sky-50 text-center whitespace-nowrap">Status</th>}
                                     <th className="p-3 md:p-6 text-[9px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-sky-50 text-center whitespace-nowrap">Actions</th>
                                 </tr>
                             </thead>
@@ -1275,13 +1281,15 @@ const SalaryManagement = () => {
                                             <span className="text-xs md:text-sm font-black text-emerald-700 bg-emerald-50 px-2.5 md:px-3 py-1.5 rounded-lg border border-emerald-100 whitespace-nowrap">Rs {toCurrency(r.calculated_salary || 0)}</span>
                                         </td>
                                     )}
-                                    <td className="p-3 md:p-6 text-center whitespace-nowrap">
-                                        {String(r.status).toLowerCase() === 'paid' ? (
-                                            <span className="inline-block text-[8px] md:text-[9px] font-black uppercase tracking-[0.1em] px-3 md:px-4 py-1.5 rounded-xl border-2 shadow-sm bg-emerald-600 text-white border-emerald-600">Paid</span>
-                                        ) : (
-                                            <span className="inline-block text-[8px] md:text-[9px] font-black uppercase tracking-[0.1em] px-3 md:px-4 py-1.5 rounded-xl bg-amber-50 text-amber-600 border border-amber-100 animate-pulse">Pending</span>
-                                        )}
-                                    </td>
+                                    {showStatusColumn && (
+                                        <td className="p-3 md:p-6 text-center whitespace-nowrap">
+                                            {String(r.status).toLowerCase() === 'paid' ? (
+                                                <span className="inline-block text-[8px] md:text-[9px] font-black uppercase tracking-[0.1em] px-3 md:px-4 py-1.5 rounded-xl border-2 shadow-sm bg-emerald-600 text-white border-emerald-600">Paid</span>
+                                            ) : (
+                                                <span className="inline-block text-[8px] md:text-[9px] font-black uppercase tracking-[0.1em] px-3 md:px-4 py-1.5 rounded-xl bg-amber-50 text-amber-600 border border-amber-100 animate-pulse">Pending</span>
+                                            )}
+                                        </td>
+                                    )}
                                     <td className="p-3 md:p-6 whitespace-nowrap">
                                         <div className="flex justify-center gap-2">
                                             {!isPersonalView && (
@@ -1308,7 +1316,7 @@ const SalaryManagement = () => {
                                                     className="h-8 w-8 md:h-10 md:w-10 bg-sky-50 text-sky-600 rounded-xl hover:bg-sky-600 hover:text-white transition-all active:scale-95 group/btn"
                                                     title="View employee salary page"
                                                 >
-                                                    <FaSearch className="group-hover/btn:scale-125 transition-transform" />
+                                                    <FaEye className="group-hover/btn:scale-125 transition-transform" />
                                                 </button>
                                             )}
                                             {isPersonalView && (
@@ -1366,7 +1374,7 @@ const SalaryManagement = () => {
 
                             {loading && (
                                         <tr>
-                                            <td colSpan={canInstitutionWide && isHistoryPage ? 9 : 8} className="p-16 md:p-32 text-center text-gray-500">
+                                            <td colSpan={tableColumnCount} className="p-16 md:p-32 text-center text-gray-500">
                                                 <div className="flex flex-col items-center gap-4">
                                                     <div className="h-14 w-14 border-4 border-sky-100 border-t-sky-600 rounded-full animate-spin"></div>
                                                     <p className="text-[10px] font-black text-sky-500 uppercase tracking-[0.2em] mt-2">Loading payroll records...</p>
@@ -1377,7 +1385,7 @@ const SalaryManagement = () => {
 
                                     {!loading && filteredRows.length === 0 && (
                                         <tr>
-                                            <td colSpan={canInstitutionWide && isHistoryPage ? 9 : 8} className="p-16 md:p-32 text-center">
+                                            <td colSpan={tableColumnCount} className="p-16 md:p-32 text-center">
                                                 <div className="flex flex-col items-center gap-6 opacity-20 grayscale">
                                                     <FaMoneyBillWave size={64} className="text-gray-400" />
                                                     <div>
