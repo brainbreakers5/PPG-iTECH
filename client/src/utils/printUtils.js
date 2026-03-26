@@ -284,7 +284,19 @@ const viewPdfFromHtml = async ({ html, title }) => {
     const pdf = await buildPdfFromHtml({ html });
     const blob = pdf.output('blob');
     const blobUrl = URL.createObjectURL(blob);
-    await openPdfPreviewModal({ blobUrl, title });
+    const viewerUrl = `${blobUrl}#toolbar=1&navpanes=1&scrollbar=1&view=FitH`;
+
+    const opened = window.open(viewerUrl, '_blank', 'noopener,noreferrer');
+    if (!opened) {
+        // Fallback to modal when popups are blocked.
+        await openPdfPreviewModal({ blobUrl, title });
+        return true;
+    }
+
+    setTimeout(() => {
+        URL.revokeObjectURL(blobUrl);
+    }, 60000);
+
     return true;
 };
 
