@@ -191,11 +191,95 @@ const downloadPdfFromHtml = async ({ html, title }) => {
     pdf.save(`${sanitizeFileName(title)}.pdf`);
 };
 
+const openPdfPreviewModal = async ({ blobUrl, title }) => {
+    let keepUrl = false;
+
+    await Swal.fire({
+        title: `${String(title || 'Report')} - PDF Preview`,
+        html: `
+            <div style="height:min(72vh,780px); border:1px solid #e2e8f0; border-radius:12px; overflow:hidden; background:#fff;">
+                <iframe
+                    src="${blobUrl}"
+                    title="PDF Preview"
+                    style="width:100%; height:100%; border:0;"
+                ></iframe>
+            </div>
+        `,
+        width: '92vw',
+        showCancelButton: true,
+        confirmButtonText: 'Download PDF',
+        cancelButtonText: 'Close',
+        didOpen: () => {
+            keepUrl = true;
+        },
+        willClose: () => {
+            keepUrl = false;
+        }
+    }).then((result) => {
+        if (result.isConfirmed) {
+            const anchor = document.createElement('a');
+            anchor.href = blobUrl;
+            anchor.download = `${sanitizeFileName(title)}.pdf`;
+            document.body.appendChild(anchor);
+            anchor.click();
+            document.body.removeChild(anchor);
+        }
+    });
+
+    if (!keepUrl) {
+        URL.revokeObjectURL(blobUrl);
+    }
+};
+
 const viewPdfFromHtml = async ({ html, title }) => {
     const pdf = await buildPdfFromHtml({ html });
-    const blobUrl = pdf.output('bloburl');
-    window.open(blobUrl, '_blank', 'noopener,noreferrer');
+    const blob = pdf.output('blob');
+    const blobUrl = URL.createObjectURL(blob);
+    await openPdfPreviewModal({ blobUrl, title });
     return true;
+};
+
+const escapeHtml = (value) => String(value || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+
+const openExcelPreviewModal = async ({ html, title }) => {
+    const rows = parseTableFromHtml(html);
+    if (!rows.length) {
+        throw new Error('No tabular data available for Excel preview.');
+    }
+
+    const previewTable = rows
+        .map((row, rowIndex) => {
+            const tag = rowIndex === 0 ? 'th' : 'td';
+            const cells = row
+                .map((cell) => `<${tag} style="padding:10px 12px; border:1px solid #e2e8f0; font-size:12px; text-align:left; white-space:nowrap;">${escapeHtml(cell)}</${tag}>`)
+                .join('');
+            return `<tr>${cells}</tr>`;
+        })
+        .join('');
+
+    await Swal.fire({
+        title: `${String(title || 'Report')} - Excel Preview`,
+        html: `
+            <div style="max-height:min(72vh,780px); overflow:auto; border:1px solid #e2e8f0; border-radius:12px;">
+                <table style="width:100%; border-collapse:collapse; background:#fff;">
+                    ${previewTable}
+                </table>
+            </div>
+        `,
+        width: '92vw',
+        showCancelButton: true,
+        confirmButtonText: 'Download Excel',
+        cancelButtonText: 'Close'
+    }).then((result) => {
+        if (result.isConfirmed) {
+            downloadExcelFromHtml({ html, title });
+        }
+    });
 };
 
 const chooseFileAction = async (formatLabel = 'file') => {
@@ -227,21 +311,7 @@ const handleFileReportAction = async ({ mode, html, title }) => {
             return true;
         }
 
-        const opened = openHtmlPreviewWindow({ html, title: String(title || 'Excel Report') });
-        if (!opened) throw new Error('Popup blocked while opening Excel preview.');
-
-        const followup = await Swal.fire({
-            title: 'Excel Preview Opened',
-            text: 'Do you want to download the Excel file now?',
-            icon: 'info',
-            showCancelButton: true,
-            confirmButtonText: 'Download Excel',
-            cancelButtonText: 'Keep Preview Only'
-        });
-
-        if (followup.isConfirmed) {
-            downloadExcelFromHtml({ html, title });
-        }
+        await openExcelPreviewModal({ html, title: String(title || 'Excel Report') });
         return true;
     }
 
@@ -251,18 +321,6 @@ const handleFileReportAction = async ({ mode, html, title }) => {
     }
 
     await viewPdfFromHtml({ html, title });
-    const followup = await Swal.fire({
-        title: 'PDF Preview Opened',
-        text: 'Do you want to download the PDF file now?',
-        icon: 'info',
-        showCancelButton: true,
-        confirmButtonText: 'Download PDF',
-        cancelButtonText: 'Keep Preview Only'
-    });
-
-    if (followup.isConfirmed) {
-        await downloadPdfFromHtml({ html, title });
-    }
     return true;
 };
 
@@ -271,13 +329,14 @@ const shareReport = async ({ html, title }) => {
     const reportText = `${reportTitle} - shared from PPG EMP HUB`;
     const reportUrl = window.location.href;
 
-    const htmlBlob = new Blob([String(html || '')], { type: 'text/html' });
-    const htmlFile = new File([htmlBlob], `${sanitizeFileName(reportTitle)}.html`, { type: 'text/html' });
+    const pdf = await buildPdfFromHtml({ html });
+    const pdfBlob = pdf.output('blob');
+    const pdfFile = new File([pdfBlob], `${sanitizeFileName(reportTitle)}.pdf`, { type: 'application/pdf' });
 
     if (navigator.share) {
         try {
-            if (navigator.canShare && navigator.canShare({ files: [htmlFile] })) {
-                await navigator.share({ title: reportTitle, text: reportText, files: [htmlFile] });
+            if (navigator.canShare && navigator.canShare({ files: [pdfFile] })) {
+                await navigator.share({ title: reportTitle, text: reportText, files: [pdfFile] });
                 return;
             }
             await navigator.share({ title: reportTitle, text: reportText, url: reportUrl });
@@ -287,12 +346,14 @@ const shareReport = async ({ html, title }) => {
         }
     }
 
+    await downloadPdfFromHtml({ html, title: reportTitle });
+
     const encodedText = encodeURIComponent(`${reportText}\n${reportUrl}`);
     const encodedSubject = encodeURIComponent(reportTitle);
 
     const { isConfirmed, isDenied } = await Swal.fire({
         title: 'Share Report',
-        text: 'Choose where you want to share this report.',
+        text: 'PDF downloaded. Choose where you want to share this report.',
         icon: 'info',
         showCancelButton: true,
         confirmButtonText: 'WhatsApp',
