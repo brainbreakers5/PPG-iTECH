@@ -203,13 +203,13 @@ const escapeHtml = (value) => String(value ?? '')
     .replaceAll("'", '&#039;');
 
 const getEarnedSalary = (row) => {
-    const gross = Number(row?.gross_salary || row?.monthly_salary || 0);
+    const fixedSalary = Number(row?.monthly_salary || row?.gross_salary || 0);
     const totalDays = Number(row?.total_days_in_period || 0);
     const payableDays = Number(row?.with_pay_count ?? row?.total_present ?? 0);
-    if (!Number.isFinite(gross) || gross <= 0) return 0;
-    if (!Number.isFinite(totalDays) || totalDays <= 0) return gross;
+    if (!Number.isFinite(fixedSalary) || fixedSalary <= 0) return 0;
+    if (!Number.isFinite(totalDays) || totalDays <= 0) return fixedSalary;
     const normalizedPayable = Math.max(0, Math.min(totalDays, payableDays));
-    return (gross / totalDays) * normalizedPayable;
+    return (fixedSalary / totalDays) * normalizedPayable;
 };
 
 const BASIC_SALARY_PERCENT = 55.2;
@@ -270,7 +270,7 @@ const SalaryManagement = () => {
     }, [isHistoryPage, selectedMonth, selectedYear, currentCycle]);
 
     const [rows, setRows] = useState([]);
-    const [liveDaily, setLiveDaily] = useState(null);
+    const [, setLiveDaily] = useState(null);
     const [loading, setLoading] = useState(false);
     const [hasLoaded, setHasLoaded] = useState(false);
     const [selectedIds, setSelectedIds] = useState([]);
@@ -329,6 +329,7 @@ const SalaryManagement = () => {
         if (!liveRow) return null;
 
         return {
+            monthlySalary: Number(liveRow.monthly_salary || 0),
             gross: Number(liveRow.gross_salary || liveRow.monthly_salary || 0),
             deductions: Number(liveRow.deductions_applied || 0),
             net: Number(liveRow.calculated_salary || 0),
@@ -340,21 +341,6 @@ const SalaryManagement = () => {
             deductionBreakdown: getDeductionBreakdownText(liveRow.deductions)
         };
     }, [isPersonalView, rows, selectedCycle, cycleWorkingDays]);
-
-    const liveDailyOverview = useMemo(() => {
-        if (!isPersonalView || !liveDaily) return null;
-        const todayIso = getTodayIso();
-        const todayRow = Array.isArray(liveDaily.breakdown)
-            ? liveDaily.breakdown.find((d) => normalizeDateOnly(d?.date) === todayIso)
-            : null;
-
-        return {
-            dailyRate: Number(liveDaily.daily_rate || 0),
-            earnedToDate: Number(liveDaily.total_gross || 0),
-            todayEarned: Number(todayRow?.net_earned || todayRow?.gross_earned || 0),
-            todayStatus: String(todayRow?.status || 'N/A')
-        };
-    }, [isPersonalView, liveDaily]);
 
     const refreshRows = async () => {
         setLoading(true);
@@ -683,7 +669,7 @@ const SalaryManagement = () => {
             ${(() => {
                 const detail = getDetailedDeductionBreakdown(r.deductions);
                 const monthlyFixed = Number(r.monthly_salary ?? 0);
-                const grossSalary = Math.max(0, Number(r.calculated_salary || 0) + Number(r.deductions_applied || 0));
+                const grossSalary = Number(r.gross_salary ?? getEarnedSalary(r) ?? 0);
                 const totalDeductions = Number(r.deductions_applied || 0);
                 const netSalary = Number(r.calculated_salary || 0);
                 const otherLabel = detail.otherLabel ? `Other (${detail.otherLabel})` : 'Other';
@@ -791,7 +777,7 @@ const SalaryManagement = () => {
                 const detail = getDetailedDeductionBreakdown(r.deductions);
                 const otherLabel = detail.otherLabel ? `Other (${detail.otherLabel})` : 'Other';
                 const fixedSalary = Number(r.monthly_salary ?? 0);
-                const grossSalary = Math.max(0, Number(r.calculated_salary || 0) + Number(r.deductions_applied || 0));
+                const grossSalary = Number(r.gross_salary ?? getEarnedSalary(r) ?? 0);
                 return `
             <tr>
                 <td>${index + 1}</td>
@@ -1113,45 +1099,19 @@ const SalaryManagement = () => {
                 {renderFilterControls}
 
                 {isPersonalView && livePersonalOverview && (
-                    <motion.div variants={staggerWrap} className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
+                    <motion.div variants={staggerWrap} className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
                         <motion.div variants={fadeUp} transition={{ duration: 0.35 }} className="modern-card p-5 border-sky-50">
-                            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">Live Gross</p>
-                            <p className="mt-2 text-xl font-black text-gray-800 tracking-tighter">Rs {toCurrency(livePersonalOverview.gross)}</p>
+                            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">Monthly Salary</p>
+                            <p className="mt-2 text-xl font-black text-gray-800 tracking-tighter">Rs {toCurrency(livePersonalOverview.monthlySalary)}</p>
                             <p className="text-[10px] font-bold text-gray-400 mt-2">{livePersonalOverview.fromDate} to {livePersonalOverview.toDate}</p>
                         </motion.div>
                         <motion.div variants={fadeUp} transition={{ duration: 0.35 }} className="modern-card p-5 border-rose-50">
-                            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">Live Deductions</p>
+                            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">Total Deductions</p>
                             <p className="mt-2 text-xl font-black text-rose-700 tracking-tighter">Rs {toCurrency(livePersonalOverview.deductions)}</p>
                             {livePersonalOverview.deductionBreakdown && (
                                 <p className="text-[10px] font-bold text-rose-500 mt-2 uppercase tracking-[0.08em]">{livePersonalOverview.deductionBreakdown}</p>
                             )}
                         </motion.div>
-                        <motion.div variants={fadeUp} transition={{ duration: 0.35 }} className="modern-card p-5 border-emerald-50">
-                            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">Live Net Salary</p>
-                            <p className="mt-2 text-xl font-black text-emerald-700 tracking-tighter">Rs {toCurrency(livePersonalOverview.net)}</p>
-                            <p className="text-[10px] font-bold text-gray-400 mt-2">Paid {livePersonalOverview.paidDays.toFixed(1)} | Unpaid {livePersonalOverview.unpaidDays.toFixed(1)}</p>
-                        </motion.div>
-                        <motion.div variants={fadeUp} transition={{ duration: 0.35 }} className="modern-card p-5 border-indigo-50">
-                            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">Total Working Days</p>
-                            <p className="mt-2 text-xl font-black text-indigo-700 tracking-tighter">{livePersonalOverview.workingDays}</p>
-                            <p className="text-[10px] font-bold text-gray-400 mt-2">Selected calendar period</p>
-                        </motion.div>
-                        <motion.div variants={fadeUp} transition={{ duration: 0.35 }} className="modern-card p-5 border-amber-50">
-                            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">Live Daily Salary</p>
-                            <p className="mt-2 text-xl font-black text-amber-700 tracking-tighter">Rs {toCurrency(liveDailyOverview?.dailyRate || 0)}</p>
-                            <p className="text-[10px] font-bold text-gray-400 mt-2">Today's earned: Rs {toCurrency(liveDailyOverview?.todayEarned || 0)} ({liveDailyOverview?.todayStatus || 'N/A'})</p>
-                        </motion.div>
-                    </motion.div>
-                )}
-
-                {isPersonalView && liveDailyOverview && (
-                    <motion.div
-                        variants={fadeUp}
-                        transition={{ duration: 0.35 }}
-                        className="modern-card p-4 border-amber-100 mb-6"
-                    >
-                        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">Live Earned So Far In Current Cycle</p>
-                        <p className="mt-1 text-lg font-black text-amber-700 tracking-tight">Rs {toCurrency(liveDailyOverview.earnedToDate)}</p>
                     </motion.div>
                 )}
 
@@ -1236,11 +1196,11 @@ const SalaryManagement = () => {
                                     {canInstitutionWide && isHistoryPage && <th className="p-3 md:p-6 w-12 text-[9px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-sky-50 whitespace-nowrap"><div className="flex justify-center">Select</div></th>}
                                     {!isPersonalView && <th className="p-3 md:p-6 text-[9px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-sky-50 whitespace-nowrap">Employee</th>}
                                     {isPersonalView && <th className="p-3 md:p-6 text-[9px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-sky-50 whitespace-nowrap">Period</th>}
-                                    <th className="p-3 md:p-6 text-[9px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-sky-50 text-right whitespace-nowrap">With/Without Pay</th>
-                                    <th className="p-3 md:p-6 text-[9px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-sky-50 text-right whitespace-nowrap">Fixed Salary</th>
-                                    <th className="p-3 md:p-6 text-[9px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-sky-50 text-right whitespace-nowrap">Gross Salary</th>
-                                    <th className="p-3 md:p-6 text-[9px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-sky-50 text-right whitespace-nowrap">Deductions</th>
-                                    <th className="p-3 md:p-6 text-[9px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-sky-50 text-right whitespace-nowrap">Net Salary</th>
+                                    {!isPersonalView && <th className="p-3 md:p-6 text-[9px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-sky-50 text-right whitespace-nowrap">With/Without Pay</th>}
+                                    {!isPersonalView && <th className="p-3 md:p-6 text-[9px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-sky-50 text-right whitespace-nowrap">Fixed Salary</th>}
+                                    {!isPersonalView && <th className="p-3 md:p-6 text-[9px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-sky-50 text-right whitespace-nowrap">Gross Salary</th>}
+                                    {!isPersonalView && <th className="p-3 md:p-6 text-[9px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-sky-50 text-right whitespace-nowrap">Deductions</th>}
+                                    {!isPersonalView && <th className="p-3 md:p-6 text-[9px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-sky-50 text-right whitespace-nowrap">Net Salary</th>}
                                     <th className="p-3 md:p-6 text-[9px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-sky-50 text-center whitespace-nowrap">Status</th>
                                     <th className="p-3 md:p-6 text-[9px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-sky-50 text-center whitespace-nowrap">Actions</th>
                                 </tr>
@@ -1249,7 +1209,7 @@ const SalaryManagement = () => {
                             <AnimatePresence mode="popLayout">
                                 {!loading && filteredRows.map((r, idx) => {
                                 const fixedSalary = Number(r.monthly_salary ?? 0);
-                                const grossSalary = Math.max(0, Number(r.calculated_salary || 0) + Number(r.deductions_applied || 0));
+                                const grossSalary = Number(r.gross_salary ?? getEarnedSalary(r) ?? 0);
                                 return (
                                 <motion.tr
                                     key={r.id}
@@ -1288,23 +1248,33 @@ const SalaryManagement = () => {
                                             <span className="text-xs md:text-sm font-bold text-gray-700 bg-gray-50 px-2.5 md:px-3 py-1.5 rounded-lg border border-gray-100 whitespace-nowrap">{r.from_date || '-'} to {r.to_date || '-'}</span>
                                         </td>
                                     )}
-                                    <td className="p-3 md:p-6 text-right whitespace-nowrap">
-                                        <span className="text-xs md:text-sm font-black text-gray-700">{Number(r.total_present || r.with_pay_count || 0).toFixed(1)} Paid / {Number(r.total_lop || r.without_pay_count || 0).toFixed(1)} Unpaid</span>
-                                    </td>
-                                    <td className="p-3 md:p-6 text-right whitespace-nowrap" title="Employee monthly fixed salary">
-                                        <span className="text-xs md:text-sm font-bold text-gray-700 bg-gray-50 px-2.5 md:px-3 py-1.5 rounded-lg border border-gray-100 whitespace-nowrap">Rs {toCurrency(fixedSalary)}</span>
-                                    </td>
-                                    <td className="p-3 md:p-6 text-right whitespace-nowrap" title="Gross salary before deductions">
-                                        <div className="inline-flex flex-col items-end gap-1 bg-gray-50 px-2.5 md:px-3 py-1.5 rounded-lg border border-gray-100">
-                                            <span className="text-xs md:text-sm font-bold text-gray-800 whitespace-nowrap">Rs {toCurrency(grossSalary)}</span>
-                                        </div>
-                                    </td>
-                                    <td className="p-3 md:p-6 text-right whitespace-nowrap" title={getDeductionBreakdownText(r.deductions) || ''}>
-                                        <span className="text-xs md:text-sm font-bold text-rose-600 bg-rose-50 px-2.5 md:px-3 py-1.5 rounded-lg border border-rose-100 whitespace-nowrap">Rs {toCurrency(r.deductions_applied || 0)}</span>
-                                    </td>
-                                    <td className="p-3 md:p-6 text-right whitespace-nowrap">
-                                        <span className="text-xs md:text-sm font-black text-emerald-700 bg-emerald-50 px-2.5 md:px-3 py-1.5 rounded-lg border border-emerald-100 whitespace-nowrap">Rs {toCurrency(r.calculated_salary || 0)}</span>
-                                    </td>
+                                    {!isPersonalView && (
+                                        <td className="p-3 md:p-6 text-right whitespace-nowrap">
+                                            <span className="text-xs md:text-sm font-black text-gray-700">{Number(r.total_present || r.with_pay_count || 0).toFixed(1)} Paid / {Number(r.total_lop || r.without_pay_count || 0).toFixed(1)} Unpaid</span>
+                                        </td>
+                                    )}
+                                    {!isPersonalView && (
+                                        <td className="p-3 md:p-6 text-right whitespace-nowrap" title="Employee monthly fixed salary">
+                                            <span className="text-xs md:text-sm font-bold text-gray-700 bg-gray-50 px-2.5 md:px-3 py-1.5 rounded-lg border border-gray-100 whitespace-nowrap">Rs {toCurrency(fixedSalary)}</span>
+                                        </td>
+                                    )}
+                                    {!isPersonalView && (
+                                        <td className="p-3 md:p-6 text-right whitespace-nowrap" title="Gross salary before deductions">
+                                            <div className="inline-flex flex-col items-end gap-1 bg-gray-50 px-2.5 md:px-3 py-1.5 rounded-lg border border-gray-100">
+                                                <span className="text-xs md:text-sm font-bold text-gray-800 whitespace-nowrap">Rs {toCurrency(grossSalary)}</span>
+                                            </div>
+                                        </td>
+                                    )}
+                                    {!isPersonalView && (
+                                        <td className="p-3 md:p-6 text-right whitespace-nowrap" title={getDeductionBreakdownText(r.deductions) || ''}>
+                                            <span className="text-xs md:text-sm font-bold text-rose-600 bg-rose-50 px-2.5 md:px-3 py-1.5 rounded-lg border border-rose-100 whitespace-nowrap">Rs {toCurrency(r.deductions_applied || 0)}</span>
+                                        </td>
+                                    )}
+                                    {!isPersonalView && (
+                                        <td className="p-3 md:p-6 text-right whitespace-nowrap">
+                                            <span className="text-xs md:text-sm font-black text-emerald-700 bg-emerald-50 px-2.5 md:px-3 py-1.5 rounded-lg border border-emerald-100 whitespace-nowrap">Rs {toCurrency(r.calculated_salary || 0)}</span>
+                                        </td>
+                                    )}
                                     <td className="p-3 md:p-6 text-center whitespace-nowrap">
                                         {String(r.status).toLowerCase() === 'paid' ? (
                                             <span className="inline-block text-[8px] md:text-[9px] font-black uppercase tracking-[0.1em] px-3 md:px-4 py-1.5 rounded-xl border-2 shadow-sm bg-emerald-600 text-white border-emerald-600">Paid</span>

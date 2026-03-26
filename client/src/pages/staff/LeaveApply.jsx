@@ -10,7 +10,7 @@ import {
     FaPaperPlane, FaUserFriends, FaHistory, FaCalendarCheck,
     FaClock, FaInfoCircle, FaCheckCircle, FaTimesCircle,
     FaHourglassHalf, FaPlusCircle, FaInbox, FaCheck,
-    FaTimes, FaUserTag, FaCalendarAlt, FaSearch, FaGift, FaFileAlt, FaCalendarDay, FaChevronRight, FaExchangeAlt
+    FaTimes, FaUserTag, FaCalendarAlt, FaSearch, FaGift, FaFileAlt, FaCalendarDay, FaChevronRight, FaExchangeAlt, FaUpload
 } from 'react-icons/fa';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -57,6 +57,7 @@ const LeaveApply = () => {
         day_type: 'Full Day', // 'Full Day', 'Half Day AM', 'Half Day PM'
         replacements: [{ staff_id: '', periods: '' }]
     });
+    const [odProof, setOdProof] = useState({ file_name: '', file_type: '', file_data: '' });
     const [staffList, setStaffList] = useState([]);
     const [staffSearch, setStaffSearch] = useState('');
     const [conflicts, setConflicts] = useState([]);
@@ -326,6 +327,13 @@ const LeaveApply = () => {
     const handleAction = async (id, status) => {
         // Allow approvers (HOD / Principal) to optionally edit per-day time ranges before approving
         const reqObj = pendingApprovals.find(p => p.id === id) || pastApprovals.find(p => p.id === id) || history.find(p => p.id === id);
+        const isMedicalLeave = String(reqObj?.leave_type || '').toUpperCase() === 'ML';
+
+        const approvalTitle = status === 'Approved'
+            ? (isMedicalLeave
+                ? (user.role === 'hod' ? 'Verify ML Docs and Move to Principal?' : user.role === 'principal' ? 'Final Verify ML Docs and Approve?' : 'Approve Medical Leave?')
+                : 'Approve Leave?')
+            : 'Reject Leave?';
 
         // Ask whether to edit times first (only Principal may edit times)
         let wantsEdit = false;
@@ -374,7 +382,7 @@ const LeaveApply = () => {
         }
 
         const { value: comments } = await Swal.fire({
-            title: `${status === 'Approved' ? 'Approve' : 'Reject'} Leave?`,
+            title: approvalTitle,
             input: 'textarea',
             inputLabel: 'Comments (Optional)',
             inputPlaceholder: 'Enter your message to the employee...',
@@ -569,6 +577,95 @@ const LeaveApply = () => {
         setFormData({ ...formData, replacements: newReplacements });
     };
 
+    const fileToDataUrl = (file) => new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+    });
+
+    const handleOdProofUpload = async (e) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        try {
+            const dataUrl = await fileToDataUrl(file);
+            setOdProof({
+                file_name: file.name,
+                file_type: file.type || 'application/octet-stream',
+                file_data: dataUrl
+            });
+        } catch {
+            Swal.fire({
+                title: 'Upload Error',
+                text: 'Failed to read selected file.',
+                icon: 'error',
+                confirmButtonColor: '#2563eb'
+            });
+        }
+    };
+
+    const handleUploadMedicalDocuments = async (leave) => {
+        if (!leave || String(leave.leave_type || '').toUpperCase() !== 'ML') return;
+
+        const { value: file } = await Swal.fire({
+            title: 'Upload Medical Documents',
+            input: 'file',
+            inputAttributes: {
+                accept: '.pdf,.png,.jpg,.jpeg,.webp,.doc,.docx',
+                'aria-label': 'Upload medical documents'
+            },
+            showCancelButton: true,
+            confirmButtonText: 'Upload & Submit',
+            confirmButtonColor: '#2563eb'
+        });
+
+        if (!file) return;
+
+        try {
+            const fileData = await fileToDataUrl(file);
+            await api.post(`/leaves/${leave.id}/medical-documents`, {
+                file_name: file.name,
+                file_type: file.type || 'application/octet-stream',
+                file_data: fileData
+            });
+
+            Swal.fire({
+                title: 'Submitted',
+                text: 'Medical documents sent to HOD for verification.',
+                icon: 'success',
+                confirmButtonColor: '#2563eb'
+            });
+            fetchLeaves();
+        } catch (error) {
+            Swal.fire({
+                title: 'Upload Failed',
+                text: error.response?.data?.message || 'Failed to upload medical documents.',
+                icon: 'error',
+                confirmButtonColor: '#2563eb'
+            });
+        }
+    };
+
+    const handleViewMedicalDocuments = (leave) => {
+        const data = leave?.ml_doc_file_data;
+        if (!data) {
+            Swal.fire({ title: 'No Document', text: 'Medical documents are not uploaded yet.', icon: 'info', confirmButtonColor: '#2563eb' });
+            return;
+        }
+        const win = window.open('', '_blank', 'noopener,noreferrer,width=1000,height=800');
+        if (!win) return;
+        const safeName = leave?.ml_doc_file_name || 'medical-document';
+        win.document.write(`
+            <html>
+                <head><title>${safeName}</title></head>
+                <body style="margin:0;">
+                    <iframe src="${data}" style="width:100%;height:100vh;border:none;"></iframe>
+                </body>
+            </html>
+        `);
+        win.document.close();
+    };
+
     const handleSubmit = async (e) => {
         e.preventDefault();
         if (formData.dates.length === 0) {
@@ -613,6 +710,12 @@ const LeaveApply = () => {
             dates_detail: formData.dates // Include full date breakdown
         };
 
+        if (String(formData.leave_type || '').toUpperCase() === 'OD' && odProof.file_data) {
+            payload.proof_file_name = odProof.file_name;
+            payload.proof_file_type = odProof.file_type;
+            payload.proof_file_data = odProof.file_data;
+        }
+
         try {
             await api.post('/leaves', payload);
             Swal.fire({
@@ -628,6 +731,7 @@ const LeaveApply = () => {
                 reason: '',
                 dates: []
             });
+            setOdProof({ file_name: '', file_type: '', file_data: '' });
         } catch (error) {
             Swal.fire({
                 title: 'Error',
@@ -931,6 +1035,26 @@ const LeaveApply = () => {
                                         ))}
                                     </select>
                                 </motion.div>
+
+                                {String(formData.leave_type || '').toUpperCase() === 'OD' && (
+                                    <motion.div
+                                        initial={{ opacity: 0, y: 10 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                    >
+                                        <label className={labelClass}>Upload Proof (Optional)</label>
+                                        <input
+                                            type="file"
+                                            accept=".pdf,.png,.jpg,.jpeg,.webp,.doc,.docx"
+                                            onChange={handleOdProofUpload}
+                                            className={inputClass}
+                                        />
+                                        {odProof.file_name && (
+                                            <p className="text-[10px] font-black text-sky-600 uppercase tracking-widest mt-2">
+                                                Proof attached: {odProof.file_name}
+                                            </p>
+                                        )}
+                                    </motion.div>
+                                )}
 
                                 <div>
                                     <label className={labelClass}>Subject</label>
@@ -1546,6 +1670,16 @@ const LeaveApply = () => {
                                                                 return '';
                                                             })()}
                                                         </div>
+                                                        {String(leave.leave_type || '').toUpperCase() === 'ML' && (
+                                                            <div className="flex flex-wrap gap-1 mt-2">
+                                                                <span className={`px-2 py-0.5 rounded-md text-[8px] font-black uppercase tracking-widest border ${leave.ml_document_submitted ? 'bg-sky-50 text-sky-600 border-sky-100' : 'bg-gray-50 text-gray-500 border-gray-100'}`}>
+                                                                    {leave.ml_document_submitted ? 'Docs Submitted' : 'Docs Pending'}
+                                                                </span>
+                                                                <span className={`px-2 py-0.5 rounded-md text-[8px] font-black uppercase tracking-widest border ${leave.ml_hod_verified ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-amber-50 text-amber-600 border-amber-100'}`}>
+                                                                    {leave.ml_hod_verified ? 'HOD Verified' : 'HOD Verify Pending'}
+                                                                </span>
+                                                            </div>
+                                                        )}
                                                     </div>
                                                 </td>
                                                 <td className="p-4 md:p-6 max-w-xs align-top">
@@ -1559,7 +1693,22 @@ const LeaveApply = () => {
                                                 </td>
                                                 <td className="p-4 md:p-6 align-top">
                                                     <div className="flex justify-center gap-3">
-                                                        <button onClick={() => handleAction(leave.id, 'Approved')} className="h-10 w-10 bg-emerald-50 text-emerald-600 rounded-xl hover:bg-emerald-600 hover:text-white transition-all flex items-center justify-center group/btn active:scale-90 shadow-sm" title="Approve">
+                                                        {String(leave.leave_type || '').toUpperCase() === 'ML' && leave.ml_document_submitted && (
+                                                            <button
+                                                                onClick={() => handleViewMedicalDocuments(leave)}
+                                                                className="h-10 w-10 bg-sky-50 text-sky-600 rounded-xl hover:bg-sky-600 hover:text-white transition-all flex items-center justify-center group/btn active:scale-90 shadow-sm"
+                                                                title="View ML documents"
+                                                            >
+                                                                <FaFileAlt />
+                                                            </button>
+                                                        )}
+                                                        <button
+                                                            onClick={() => handleAction(leave.id, 'Approved')}
+                                                            className="h-10 w-10 bg-emerald-50 text-emerald-600 rounded-xl hover:bg-emerald-600 hover:text-white transition-all flex items-center justify-center group/btn active:scale-90 shadow-sm"
+                                                            title={String(leave.leave_type || '').toUpperCase() === 'ML'
+                                                                ? (user.role === 'hod' ? 'Verify ML Docs and Next' : user.role === 'principal' ? 'Final Verify ML Docs' : 'Approve ML')
+                                                                : 'Approve'}
+                                                        >
                                                             <FaCheck />
                                                         </button>
                                                         <button onClick={() => handleAction(leave.id, 'Rejected')} className="h-10 w-10 bg-rose-50 text-rose-600 rounded-xl hover:bg-rose-600 hover:text-white transition-all flex items-center justify-center group/btn active:scale-90 shadow-sm" title="Reject">
@@ -1731,6 +1880,32 @@ const LeaveApply = () => {
                                             )}
                                         </div>
 
+                                        {String(leave.leave_type || '').toUpperCase() === 'ML' && (
+                                            <div className="mb-4 flex flex-wrap gap-2">
+                                                <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest border ${leave.ml_document_submitted
+                                                    ? 'bg-sky-50 text-sky-600 border-sky-100'
+                                                    : 'bg-gray-50 text-gray-500 border-gray-100'
+                                                    }`}>
+                                                    <FaFileAlt size={10} />
+                                                    {leave.ml_document_submitted ? 'Medical Docs Submitted' : 'Medical Docs Pending'}
+                                                </span>
+                                                <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest border ${leave.ml_hod_verified
+                                                    ? 'bg-emerald-50 text-emerald-600 border-emerald-100'
+                                                    : 'bg-amber-50 text-amber-600 border-amber-100'
+                                                    }`}>
+                                                    <FaCheckCircle size={10} />
+                                                    {leave.ml_hod_verified ? 'HOD Verified' : 'Waiting HOD Verify'}
+                                                </span>
+                                                <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest border ${leave.ml_principal_verified
+                                                    ? 'bg-emerald-50 text-emerald-600 border-emerald-100'
+                                                    : 'bg-amber-50 text-amber-600 border-amber-100'
+                                                    }`}>
+                                                    <FaCheckCircle size={10} />
+                                                    {leave.ml_principal_verified ? 'Principal Verified' : 'Waiting Principal Verify'}
+                                                </span>
+                                            </div>
+                                        )}
+
                                         <h4 className="text-lg font-black text-gray-800 tracking-tight group-hover:text-sky-600 transition-colors">{leave.subject || 'Leave Request'}</h4>
                                         <p className="text-xs text-gray-400 font-medium mt-2 line-clamp-2 leading-relaxed">{leave.reason}</p>
 
@@ -1752,6 +1927,16 @@ const LeaveApply = () => {
                                                 })()}
                                             </div>
                                         </div>
+
+                                        {String(leave.leave_type || '').toUpperCase() === 'ML' && String(leave.status || '').toLowerCase() === 'pending' && (
+                                            <button
+                                                type="button"
+                                                onClick={() => handleUploadMedicalDocuments(leave)}
+                                                className="mt-4 w-full bg-sky-50 text-sky-600 font-black py-2.5 rounded-xl hover:bg-sky-600 hover:text-white transition-all flex items-center justify-center gap-2 uppercase tracking-widest text-[9px]"
+                                            >
+                                                <FaUpload size={10} /> Upload Medical Documents & Submit
+                                            </button>
+                                        )}
                                     </motion.div>
                                 )) : (
                                     <div className="col-span-full py-20 text-center opacity-20">

@@ -57,6 +57,10 @@ const parseDeductions = (raw) => {
     }
 };
 
+const BASIC_PERCENT = 55.2;
+const ALLOWANCE_PERCENT = 36.8;
+const CONVEYANCE_PERCENT = 8;
+
 const ensureSalarySchema = async () => {
     await pool.query(`
         ALTER TABLE salary_records
@@ -174,19 +178,34 @@ const getAttendanceAggregateMap = async ({ fromDate, toDate, paidStatuses, unpai
 };
 
 const computeSalaryMetrics = ({ monthlySalary, deductions, workingDaysInPeriod, payableDays }) => {
-    const grossSalary = parseFloat(String(monthlySalary || 0).replace(/,/g, '')) || 0;
-    const fixedDeductions = Number(deductions || 0);
-    const divisor = workingDaysInPeriod > 0 ? workingDaysInPeriod : 1;
-    const dailySalary = grossSalary / divisor;
-    const normalizedPayable = Math.max(0, Math.min(workingDaysInPeriod, Number(payableDays || 0)));
-    const lopDays = Math.max(0, workingDaysInPeriod - normalizedPayable);
-    const lopAmount = lopDays * dailySalary;
-    const deductionsApplied = lopAmount + fixedDeductions;
+    const fixedSalary = parseFloat(String(monthlySalary || 0).replace(/,/g, '')) || 0;
+    const totalDays = Number(workingDaysInPeriod || 0);
+    const divisor = totalDays > 0 ? totalDays : 1;
+    const normalizedPayable = Math.max(0, Math.min(divisor, Number(payableDays || 0)));
+
+    // Step 1: Earned Salary = (Fixed Salary / Total Days) * Pay Days
+    const dailySalary = fixedSalary / divisor;
+    const earnedSalary = dailySalary * normalizedPayable;
+
+    // Step 2: Gross Salary split from earned salary.
+    const basicSalary = earnedSalary * (BASIC_PERCENT / 100);
+    const allowance = earnedSalary * (ALLOWANCE_PERCENT / 100);
+    const conveyance = earnedSalary * (CONVEYANCE_PERCENT / 100);
+    const grossSalary = basicSalary + allowance + conveyance;
+
+    // Step 3 and 4: Net Salary = Gross Salary - Total Deduction
+    const deductionsApplied = Math.max(0, Number(deductions || 0));
     const netSalary = Math.max(0, grossSalary - deductionsApplied);
+    const lopDays = Math.max(0, divisor - normalizedPayable);
 
     return {
-        grossSalary,
+        fixedSalary,
         dailySalary,
+        earnedSalary,
+        basicSalary,
+        allowance,
+        conveyance,
+        grossSalary,
         payableDays: normalizedPayable,
         lopDays,
         deductionsApplied,
@@ -361,7 +380,7 @@ exports.calculateSalary = async (req, res) => {
                 emp_id: userEmpId,
                 name: user.name,
                 role: user.role,
-                monthly_salary: metrics.grossSalary,
+                monthly_salary: metrics.fixedSalary,
                 calculated_salary: metrics.netSalary.toFixed(2),
                 payable_days: metrics.payableDays,
                 total_lop: metrics.lopDays,

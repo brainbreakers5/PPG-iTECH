@@ -1,18 +1,40 @@
 const { pool } = require('../config/db');
 const { createNotification } = require('./notificationController');
 
+const ensureLeaveRequestDocumentSchema = async (client) => {
+    await client.query(`
+        ALTER TABLE leave_requests
+        ADD COLUMN IF NOT EXISTS proof_file_name TEXT,
+        ADD COLUMN IF NOT EXISTS proof_file_type TEXT,
+        ADD COLUMN IF NOT EXISTS proof_file_data TEXT,
+        ADD COLUMN IF NOT EXISTS ml_doc_file_name TEXT,
+        ADD COLUMN IF NOT EXISTS ml_doc_file_type TEXT,
+        ADD COLUMN IF NOT EXISTS ml_doc_file_data TEXT,
+        ADD COLUMN IF NOT EXISTS ml_document_submitted BOOLEAN DEFAULT FALSE,
+        ADD COLUMN IF NOT EXISTS ml_document_submitted_at TIMESTAMP,
+        ADD COLUMN IF NOT EXISTS ml_hod_verified BOOLEAN DEFAULT FALSE,
+        ADD COLUMN IF NOT EXISTS ml_hod_verified_by VARCHAR(50),
+        ADD COLUMN IF NOT EXISTS ml_hod_verified_at TIMESTAMP,
+        ADD COLUMN IF NOT EXISTS ml_principal_verified BOOLEAN DEFAULT FALSE,
+        ADD COLUMN IF NOT EXISTS ml_principal_verified_by VARCHAR(50),
+        ADD COLUMN IF NOT EXISTS ml_principal_verified_at TIMESTAMP
+    `);
+};
+
 // @desc    Apply for leave
 // @route   POST /api/leaves
 // @access  Private
 exports.applyLeave = async (req, res) => {
     const {
         leave_type, from_date, to_date, days_count,
-        reason, subject, replacements, is_half_day, hours, dates_detail
+        reason, subject, replacements, is_half_day, hours, dates_detail,
+        proof_file_name, proof_file_type, proof_file_data
     } = req.body;
 
     const client = await pool.connect();
     try {
         await client.query('BEGIN');
+        await ensureLeaveRequestDocumentSchema(client);
 
         // 0. Check Leave Limits — per-employee first, fall back to global settings
         // Use the requested from_date's year for limits instead of system year
@@ -82,11 +104,27 @@ exports.applyLeave = async (req, res) => {
         const firstReplacementId = validReplacements.length > 0 ? validReplacements[0].staff_id : null;
 
         const sanitizedHours = hours ? parseFloat(hours) : null;
+        const hasOdProof = String(leave_type || '').toUpperCase() === 'OD' && proof_file_name && proof_file_type && proof_file_data;
         const { rows: resultRows } = await client.query(
-            `INSERT INTO leave_requests (emp_id, leave_type, from_date, to_date, days_count, reason, subject, alternative_staff_id, status, is_half_day, hours, dates_detail)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'Pending', $9, $10, $11)
+            `INSERT INTO leave_requests (emp_id, leave_type, from_date, to_date, days_count, reason, subject, alternative_staff_id, status, is_half_day, hours, dates_detail, proof_file_name, proof_file_type, proof_file_data)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'Pending', $9, $10, $11, $12, $13, $14)
              RETURNING id`,
-            [req.user.emp_id, leave_type, from_date, to_date, totalDays, reason, subject || 'Leave Request', firstReplacementId, is_half_day || false, sanitizedHours, JSON.stringify(dates_detail || [])]
+            [
+                req.user.emp_id,
+                leave_type,
+                from_date,
+                to_date,
+                totalDays,
+                reason,
+                subject || 'Leave Request',
+                firstReplacementId,
+                is_half_day || false,
+                sanitizedHours,
+                JSON.stringify(dates_detail || []),
+                hasOdProof ? proof_file_name : null,
+                hasOdProof ? proof_file_type : null,
+                hasOdProof ? proof_file_data : null
+            ]
         );
 
         const requestId = resultRows[0].id;
@@ -163,6 +201,7 @@ exports.applyLeave = async (req, res) => {
 // @access  Private
 exports.getLeaveRequests = async (req, res) => {
     try {
+        await ensureLeaveRequestDocumentSchema(pool);
         // Complex query to get requests where the user is either:
         // 1. The applicant
         // 2. An approver (pending or already acted on)
@@ -212,6 +251,7 @@ exports.approveLeaveStep = async (req, res) => {
     const client = await pool.connect(); // Changed from connection to client, and getConnection() to connect()
     try {
         await client.query('BEGIN'); // Changed from connection.beginTransaction() to client.query('BEGIN')
+        await ensureLeaveRequestDocumentSchema(client);
 
         // Optional: if approver supplied updated per-day time details, persist them
         if (dates_detail && Array.isArray(dates_detail)) {
@@ -230,6 +270,51 @@ exports.approveLeaveStep = async (req, res) => {
         }
 
         const currentStep = approval[0];
+        const { rows: reqRows } = await client.query(
+            `SELECT id, emp_id, leave_type, status, ml_document_submitted, ml_hod_verified, ml_principal_verified
+             FROM leave_requests WHERE id = $1`,
+            [requestId]
+        );
+        if (reqRows.length === 0) {
+            await client.query('ROLLBACK');
+            return res.status(404).json({ message: 'Leave request not found' });
+        }
+        const leaveReq = reqRows[0];
+        const isMedicalLeave = String(leaveReq.leave_type || '').toUpperCase() === 'ML';
+
+        if (status === 'Approved' && isMedicalLeave) {
+            if (!leaveReq.ml_document_submitted) {
+                await client.query('ROLLBACK');
+                return res.status(400).json({ message: 'Medical documents are required before approval. Ask employee to upload and submit documents.' });
+            }
+
+            if (currentStep.approver_type === 'hod' && !leaveReq.ml_hod_verified) {
+                await client.query(
+                    `UPDATE leave_requests
+                     SET ml_hod_verified = TRUE,
+                         ml_hod_verified_by = $2,
+                         ml_hod_verified_at = NOW()
+                     WHERE id = $1`,
+                    [requestId, userId]
+                );
+            }
+
+            if ((currentStep.approver_type === 'principal' || currentStep.approver_type === 'admin')) {
+                if (!leaveReq.ml_hod_verified && req.user.role !== 'admin') {
+                    await client.query('ROLLBACK');
+                    return res.status(400).json({ message: 'HOD must verify medical documents before principal final verification.' });
+                }
+                await client.query(
+                    `UPDATE leave_requests
+                     SET ml_principal_verified = TRUE,
+                         ml_principal_verified_by = $2,
+                         ml_principal_verified_at = NOW()
+                     WHERE id = $1`,
+                    [requestId, userId]
+                );
+            }
+        }
+
         await client.query(
             'UPDATE leave_approvals SET status = $1, comments = $2 WHERE id = $3',
             [status, comments, currentStep.id]
@@ -515,6 +600,7 @@ exports.getLeaveConflicts = async (req, res) => {
 // @access  Private (principal, admin)
 exports.getAllLeaveHistory = async (req, res) => {
     try {
+        await ensureLeaveRequestDocumentSchema(pool);
         const query = `
             SELECT l.*, u.name as applicant_name, u.role as applicant_role, u.designation as applicant_designation, u.profile_pic as applicant_pic, d.name as department_name
             FROM leave_requests l
@@ -541,6 +627,109 @@ exports.getAllLeaveHistory = async (req, res) => {
     } catch (error) {
         console.error(error);
         res.status(500).json({ message: 'Server Error' });
+    }
+};
+
+// @desc    Upload medical documents for a medical leave request
+// @route   POST /api/leaves/:id/medical-documents
+// @access  Private (applicant only)
+exports.uploadMedicalDocuments = async (req, res) => {
+    const requestId = req.params.id;
+    const { file_name, file_type, file_data } = req.body;
+
+    if (!file_name || !file_type || !file_data) {
+        return res.status(400).json({ message: 'file_name, file_type and file_data are required.' });
+    }
+
+    const client = await pool.connect();
+    try {
+        await client.query('BEGIN');
+        await ensureLeaveRequestDocumentSchema(client);
+
+        const { rows: reqRows } = await client.query(
+            `SELECT l.id, l.emp_id, l.leave_type, l.status, u.name AS applicant_name, u.department_id, u.role
+             FROM leave_requests l
+             JOIN users u ON u.emp_id = l.emp_id
+             WHERE l.id = $1`,
+            [requestId]
+        );
+
+        if (reqRows.length === 0) {
+            await client.query('ROLLBACK');
+            return res.status(404).json({ message: 'Leave request not found.' });
+        }
+
+        const reqInfo = reqRows[0];
+        if (String(reqInfo.emp_id || '') !== String(req.user.emp_id || '')) {
+            await client.query('ROLLBACK');
+            return res.status(403).json({ message: 'Only the applicant can upload medical documents.' });
+        }
+        if (String(reqInfo.leave_type || '').toUpperCase() !== 'ML') {
+            await client.query('ROLLBACK');
+            return res.status(400).json({ message: 'Medical documents can only be uploaded for Medical Leave (ML).' });
+        }
+        if (String(reqInfo.status || '').toLowerCase() !== 'pending') {
+            await client.query('ROLLBACK');
+            return res.status(400).json({ message: 'Documents can only be uploaded while the request is pending.' });
+        }
+
+        await client.query(
+            `UPDATE leave_requests
+             SET ml_doc_file_name = $2,
+                 ml_doc_file_type = $3,
+                 ml_doc_file_data = $4,
+                 ml_document_submitted = TRUE,
+                 ml_document_submitted_at = NOW(),
+                 ml_hod_verified = FALSE,
+                 ml_hod_verified_by = NULL,
+                 ml_hod_verified_at = NULL,
+                 ml_principal_verified = FALSE,
+                 ml_principal_verified_by = NULL,
+                 ml_principal_verified_at = NULL
+             WHERE id = $1`,
+            [requestId, file_name, file_type, file_data]
+        );
+
+        // Notify HOD first for document verification, else fallback to principal.
+        let notified = false;
+        if (String(reqInfo.role || '').toLowerCase() !== 'hod') {
+            const { rows: hodRows } = await client.query(
+                `SELECT emp_id FROM users WHERE department_id = $1 AND role = 'hod' LIMIT 1`,
+                [reqInfo.department_id]
+            );
+            if (hodRows.length > 0) {
+                await createNotification(
+                    hodRows[0].emp_id,
+                    `Medical documents uploaded by ${reqInfo.applicant_name}. Please verify ML documents and forward to principal.`,
+                    'leave',
+                    { requestId: reqInfo.id, flow: 'ml_doc_verification' },
+                    client
+                );
+                notified = true;
+            }
+        }
+
+        if (!notified) {
+            const { rows: principalRows } = await client.query(`SELECT emp_id FROM users WHERE role = 'principal' LIMIT 1`);
+            if (principalRows.length > 0) {
+                await createNotification(
+                    principalRows[0].emp_id,
+                    `Medical documents uploaded by ${reqInfo.applicant_name}. Final ML document verification required.`,
+                    'leave',
+                    { requestId: reqInfo.id, flow: 'ml_doc_verification' },
+                    client
+                );
+            }
+        }
+
+        await client.query('COMMIT');
+        res.json({ message: 'Medical documents uploaded and submitted for verification.' });
+    } catch (error) {
+        await client.query('ROLLBACK');
+        console.error('UPLOAD MEDICAL DOCUMENTS ERROR:', error);
+        res.status(500).json({ message: 'Server Error: ' + error.message });
+    } finally {
+        client.release();
     }
 };
 

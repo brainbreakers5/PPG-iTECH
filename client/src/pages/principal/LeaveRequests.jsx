@@ -80,8 +80,12 @@ const LeaveRequests = () => {
     };
 
     const handleAction = async (id, status) => {
+        const reqObj = leaves.find((l) => l.id === id);
+        const isMedicalLeave = String(reqObj?.leave_type || '').toUpperCase() === 'ML';
         const { value: comments } = await Swal.fire({
-            title: `${status === 'Approved' ? 'Approve' : 'Reject'} Leave?`,
+            title: status === 'Approved'
+                ? (isMedicalLeave ? 'Final Verify ML Docs and Approve?' : 'Approve Leave?')
+                : 'Reject Leave?',
             input: 'textarea',
             inputLabel: 'Comments (Optional)',
             inputPlaceholder: 'Enter your message to the employee...',
@@ -155,6 +159,26 @@ const LeaveRequests = () => {
                 });
             }
         }
+    };
+
+    const handleViewMedicalDocuments = (leave) => {
+        const data = leave?.ml_doc_file_data;
+        if (!data) {
+            Swal.fire({ title: 'No Document', text: 'Medical documents are not uploaded yet.', icon: 'info', confirmButtonColor: '#2563eb' });
+            return;
+        }
+        const win = window.open('', '_blank', 'noopener,noreferrer,width=1000,height=800');
+        if (!win) return;
+        const safeName = leave?.ml_doc_file_name || 'medical-document';
+        win.document.write(`
+            <html>
+                <head><title>${safeName}</title></head>
+                <body style="margin:0;">
+                    <iframe src="${data}" style="width:100%;height:100vh;border:none;"></iframe>
+                </body>
+            </html>
+        `);
+        win.document.close();
     };
 
     const toggleSelect = (id) => {
@@ -540,6 +564,16 @@ const LeaveRequests = () => {
                                                                 )
                                                             }
                                                         </div>
+                                                        {String(leave.leave_type || '').toUpperCase() === 'ML' && (
+                                                            <div className="flex flex-wrap gap-1 mt-2">
+                                                                <span className={`px-2 py-0.5 rounded-md text-[8px] font-black uppercase tracking-widest border ${leave.ml_document_submitted ? 'bg-sky-50 text-sky-600 border-sky-100' : 'bg-gray-50 text-gray-500 border-gray-100'}`}>
+                                                                    {leave.ml_document_submitted ? 'Docs Submitted' : 'Docs Pending'}
+                                                                </span>
+                                                                <span className={`px-2 py-0.5 rounded-md text-[8px] font-black uppercase tracking-widest border ${leave.ml_hod_verified ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-amber-50 text-amber-600 border-amber-100'}`}>
+                                                                    {leave.ml_hod_verified ? 'HOD Verified' : 'HOD Verify Pending'}
+                                                                </span>
+                                                            </div>
+                                                        )}
                                                     </div>
                                                 </td>
                                                 <td className="p-3 md:p-5 max-w-xs align-top">
@@ -565,10 +599,19 @@ const LeaveRequests = () => {
                                                 </td>
                                                 <td className="p-3 md:p-5 align-top">
                                                     <div className="flex justify-center gap-3">
+                                                        {String(leave.leave_type || '').toUpperCase() === 'ML' && leave.ml_document_submitted && (
+                                                            <button
+                                                                onClick={() => handleViewMedicalDocuments(leave)}
+                                                                className="h-10 w-10 bg-sky-50 text-sky-600 rounded-xl hover:bg-sky-600 hover:text-white transition-all shadow-sm flex items-center justify-center group/btn active:scale-90"
+                                                                title="View ML documents"
+                                                            >
+                                                                <FaFileAlt className="group-hover/btn:scale-125 transition-transform" />
+                                                            </button>
+                                                        )}
                                                         <button
                                                             onClick={() => handleAction(leave.id, 'Approved')}
                                                             className="h-10 w-10 bg-emerald-50 text-emerald-600 rounded-xl hover:bg-emerald-600 hover:text-white transition-all shadow-sm flex items-center justify-center group/btn active:scale-90"
-                                                            title="Authorize"
+                                                            title={String(leave.leave_type || '').toUpperCase() === 'ML' ? 'Final Verify ML Docs' : 'Authorize'}
                                                         >
                                                             <FaCheck className="group-hover/btn:scale-125 transition-transform" />
                                                         </button>
