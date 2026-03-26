@@ -49,6 +49,30 @@ const ActivityLogs = () => {
         fetchLogs();
     }, []);
 
+    const normalizeLog = (log = {}) => {
+        const rawDetails = log.details;
+        let parsedDetails = null;
+
+        if (rawDetails && typeof rawDetails === 'object' && !Array.isArray(rawDetails)) {
+            parsedDetails = rawDetails;
+        } else if (typeof rawDetails === 'string' && rawDetails.trim().startsWith('{')) {
+            try {
+                parsedDetails = JSON.parse(rawDetails);
+            } catch {
+                parsedDetails = null;
+            }
+        }
+
+        return {
+            ...log,
+            created_at: log.created_at || null,
+            user_name: String(log.user_name || 'NA'),
+            emp_id: String(log.emp_id || 'NA'),
+            action: String(log.action || 'UNKNOWN'),
+            details_normalized: parsedDetails
+        };
+    };
+
     const filteredLogs = logs.filter(log => {
         const matchesSearch = 
             log.user_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -58,7 +82,7 @@ const ActivityLogs = () => {
         const matchesAction = filterAction === 'ALL' || log.action === filterAction;
         
         return matchesSearch && matchesAction;
-    });
+    }).map(normalizeLog);
 
     const failedLogins = logs.filter(l => l.action === 'FAILED_LOGIN');
 
@@ -299,11 +323,7 @@ const ActivityLogs = () => {
                                                 animate={{ opacity: 1, y: 0 }}
                                                 transition={{ delay: index * 0.02 }}
                                                 onClick={() => {
-                                                    let detailsObj = log.details;
-                                                    // Auto-parse if it's a string (Postgres TEXT vs JSONB)
-                                                    if (typeof detailsObj === 'string' && detailsObj.trim().startsWith('{')) {
-                                                        try { detailsObj = JSON.parse(detailsObj); } catch(e) { console.error("Parse Error:", e); }
-                                                    }
+                                                    let detailsObj = log.details_normalized;
 
                                                     if (detailsObj && typeof detailsObj === 'object' && Object.keys(detailsObj).length > 0) {
                                                         // Sort details: Target ID first, then Emp ID, then others
@@ -332,6 +352,34 @@ const ActivityLogs = () => {
                                                             html: `
                                                                 <div style="text-align: left; background: #f8fafc; border-radius: 12px; padding: 15px; margin-top: 10px; border: 1px solid #e2e8f0;">
                                                                     ${detailsList}
+                                                                </div>
+                                                            `,
+                                                            showConfirmButton: false,
+                                                            showCloseButton: true,
+                                                            width: '450px',
+                                                            background: '#ffffff',
+                                                            customClass: {
+                                                                popup: 'rounded-[30px] border-4 border-blue-50/50 shadow-2xl',
+                                                                title: 'text-2xl font-black text-slate-800 tracking-tight pt-5'
+                                                            }
+                                                        });
+                                                    } else {
+                                                        Swal.fire({
+                                                            title: `${log.action?.replace(/_/g, ' ')} Details`,
+                                                            html: `
+                                                                <div style="text-align: left; background: #f8fafc; border-radius: 12px; padding: 15px; margin-top: 10px; border: 1px solid #e2e8f0;">
+                                                                    <div style="display: flex; justify-content: space-between; border-bottom: 2px solid #f1f5f9; padding: 12px 10px; gap: 20px;">
+                                                                        <span style="font-weight: 800; text-transform: uppercase; font-size: 10px; color: #64748b; white-space: nowrap;">Employee ID:</span>
+                                                                        <span style="font-weight: 800; font-size: 13px; color: #334155; text-align: right; word-break: break-all;">${log.emp_id || 'NA'}</span>
+                                                                    </div>
+                                                                    <div style="display: flex; justify-content: space-between; border-bottom: 2px solid #f1f5f9; padding: 12px 10px; gap: 20px;">
+                                                                        <span style="font-weight: 800; text-transform: uppercase; font-size: 10px; color: #64748b; white-space: nowrap;">User:</span>
+                                                                        <span style="font-weight: 800; font-size: 13px; color: #334155; text-align: right; word-break: break-all;">${log.user_name || 'NA'}</span>
+                                                                    </div>
+                                                                    <div style="display: flex; justify-content: space-between; padding: 12px 10px; gap: 20px;">
+                                                                        <span style="font-weight: 800; text-transform: uppercase; font-size: 10px; color: #64748b; white-space: nowrap;">Info:</span>
+                                                                        <span style="font-weight: 800; font-size: 13px; color: #334155; text-align: right; word-break: break-all;">No extra detail fields available</span>
+                                                                    </div>
                                                                 </div>
                                                             `,
                                                             showConfirmButton: false,
