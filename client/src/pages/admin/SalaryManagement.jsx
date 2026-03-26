@@ -682,8 +682,8 @@ const SalaryManagement = () => {
         const bodyRows = filteredRows.map((r, index) => `
             ${(() => {
                 const detail = getDetailedDeductionBreakdown(r.deductions);
-                const monthlyFixed = Number(r.monthly_salary ?? r.gross_salary ?? 0);
-                const grossSalary = getEarnedSalary(r);
+                const monthlyFixed = Number(r.monthly_salary ?? 0);
+                const grossSalary = Math.max(0, Number(r.calculated_salary || 0) + Number(r.deductions_applied || 0));
                 const totalDeductions = Number(r.deductions_applied || 0);
                 const netSalary = Number(r.calculated_salary || 0);
                 const otherLabel = detail.otherLabel ? `Other (${detail.otherLabel})` : 'Other';
@@ -693,8 +693,8 @@ const SalaryManagement = () => {
                 <td>${escapeHtml(r.name)}</td>
                 <td>${escapeHtml(r.emp_id)}</td>
                 <td>${escapeHtml(r.department_name || '-')}</td>
-                <td class="right">${toCurrency(monthlyFixed)}</td>
                 <td class="right">${toCurrency(grossSalary)}</td>
+                <td class="right">${toCurrency(monthlyFixed)}</td>
                 <td class="right">${toCurrency(detail.employPf)}</td>
                 <td class="right">${toCurrency(detail.salaryAdvance)}</td>
                 <td class="right">${toCurrency(detail.hostelFoodFees)}</td>
@@ -749,8 +749,8 @@ const SalaryManagement = () => {
                                     <th>Employee</th>
                                     <th>Emp ID</th>
                                     <th>Department</th>
-                                    <th class="right">Monthly Salary (Fixed)</th>
                                     <th class="right">Gross Salary</th>
+                                    <th class="right">Fixed Salary</th>
                                     <th class="right">Employ PF</th>
                                     <th class="right">Salary Advance</th>
                                     <th class="right">Hostel/Food Fees</th>
@@ -790,16 +790,16 @@ const SalaryManagement = () => {
             ${(() => {
                 const detail = getDetailedDeductionBreakdown(r.deductions);
                 const otherLabel = detail.otherLabel ? `Other (${detail.otherLabel})` : 'Other';
-                const fixedSalary = Number(r.monthly_salary ?? r.gross_salary ?? 0);
-                const grossSalary = getEarnedSalary(r);
+                const fixedSalary = Number(r.monthly_salary ?? 0);
+                const grossSalary = Math.max(0, Number(r.calculated_salary || 0) + Number(r.deductions_applied || 0));
                 return `
             <tr>
                 <td>${index + 1}</td>
                 <td>${escapeHtml(r.name)}</td>
                 <td>${escapeHtml(r.emp_id)}</td>
                 <td>${escapeHtml(r.department_name || '-')}</td>
+                <td class="right">${toCurrency(grossSalary)}</td>
                 <td class="right">${toCurrency(fixedSalary)}</td>
-                <td class="right">${toCurrency(grossSalary)}<br><span style="font-size:10px;color:#64748b;">Fixed Salary: ${toCurrency(fixedSalary)}</span></td>
                 <td class="right">${toCurrency(detail.employPf)}</td>
                 <td class="right">${toCurrency(detail.salaryAdvance)}</td>
                 <td class="right">${toCurrency(detail.hostelFoodFees)}</td>
@@ -854,8 +854,8 @@ const SalaryManagement = () => {
                                     <th>Employee</th>
                                     <th>Emp ID</th>
                                     <th>Department</th>
-                                    <th class="right">Monthly Salary (Fixed)</th>
                                     <th class="right">Gross Salary</th>
+                                    <th class="right">Fixed Salary</th>
                                     <th class="right">Employ PF</th>
                                     <th class="right">Salary Advance</th>
                                     <th class="right">Hostel/Food Fees</th>
@@ -1046,13 +1046,6 @@ const SalaryManagement = () => {
                     </div>
 
                     <div className="flex flex-wrap gap-4">
-                        <button
-                            onClick={handleRefreshRows}
-                            className="bg-white text-sky-600 border border-sky-200 px-8 py-4 rounded-2xl shadow-xl shadow-sky-50 hover:bg-sky-50 transition-all active:scale-95 flex items-center font-black uppercase tracking-[0.2em] text-[10px]"
-                            title="Refresh salary records"
-                        >
-                            <FaRedoAlt className={`mr-3 transition-transform ${loading ? 'animate-spin' : ''}`} /> Refresh
-                        </button>
                         {isAdmin && !isHistoryPage && (
                             <button
                                 onClick={openAttendanceConfig}
@@ -1188,6 +1181,13 @@ const SalaryManagement = () => {
                             <h2 className="text-lg font-black text-gray-800 uppercase tracking-widest">Salary Records</h2>
                         </div>
                         <div className="flex flex-wrap items-center justify-end gap-3">
+                            <button
+                                onClick={handleRefreshRows}
+                                className="bg-white text-sky-600 border border-sky-200 px-4 py-2 rounded-xl shadow-lg shadow-sky-50 hover:bg-sky-50 transition-all active:scale-95 flex items-center font-black uppercase tracking-[0.2em] text-[10px]"
+                                title="Refresh salary records"
+                            >
+                                <FaRedoAlt className={`mr-2 transition-transform ${loading ? 'animate-spin' : ''}`} /> Refresh
+                            </button>
                             {!isPersonalView && !isHistoryPage && (
                                 <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">
                                     <span>Payroll Period</span>
@@ -1238,6 +1238,7 @@ const SalaryManagement = () => {
                                     {isPersonalView && <th className="p-3 md:p-6 text-[9px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-sky-50 whitespace-nowrap">Period</th>}
                                     <th className="p-3 md:p-6 text-[9px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-sky-50 text-right whitespace-nowrap">With/Without Pay</th>
                                     <th className="p-3 md:p-6 text-[9px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-sky-50 text-right whitespace-nowrap">Gross Salary</th>
+                                    <th className="p-3 md:p-6 text-[9px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-sky-50 text-right whitespace-nowrap">Fixed Salary</th>
                                     <th className="p-3 md:p-6 text-[9px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-sky-50 text-right whitespace-nowrap">Deductions</th>
                                     <th className="p-3 md:p-6 text-[9px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-sky-50 text-right whitespace-nowrap">Net Salary</th>
                                     <th className="p-3 md:p-6 text-[9px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-sky-50 text-center whitespace-nowrap">Status</th>
@@ -1247,8 +1248,8 @@ const SalaryManagement = () => {
                         <tbody>
                             <AnimatePresence mode="popLayout">
                                 {!loading && filteredRows.map((r, idx) => {
-                                const fixedSalary = Number(r.monthly_salary ?? r.gross_salary ?? 0);
-                                const grossSalary = getEarnedSalary(r);
+                                const fixedSalary = Number(r.monthly_salary ?? 0);
+                                const grossSalary = Math.max(0, Number(r.calculated_salary || 0) + Number(r.deductions_applied || 0));
                                 return (
                                 <motion.tr
                                     key={r.id}
@@ -1290,11 +1291,13 @@ const SalaryManagement = () => {
                                     <td className="p-3 md:p-6 text-right whitespace-nowrap">
                                         <span className="text-xs md:text-sm font-black text-gray-700">{Number(r.total_present || r.with_pay_count || 0).toFixed(1)} Paid / {Number(r.total_lop || r.without_pay_count || 0).toFixed(1)} Unpaid</span>
                                     </td>
-                                    <td className="p-3 md:p-6 text-right whitespace-nowrap" title="Gross salary and fixed monthly salary">
+                                    <td className="p-3 md:p-6 text-right whitespace-nowrap" title="Gross salary before deductions">
                                         <div className="inline-flex flex-col items-end gap-1 bg-gray-50 px-2.5 md:px-3 py-1.5 rounded-lg border border-gray-100">
                                             <span className="text-xs md:text-sm font-bold text-gray-800 whitespace-nowrap">Gross Salary: Rs {toCurrency(grossSalary)}</span>
-                                            <span className="text-[10px] md:text-xs font-bold text-gray-500 whitespace-nowrap">Fixed Salary: Rs {toCurrency(fixedSalary)}</span>
                                         </div>
+                                    </td>
+                                    <td className="p-3 md:p-6 text-right whitespace-nowrap" title="Employee monthly fixed salary">
+                                        <span className="text-xs md:text-sm font-bold text-gray-700 bg-gray-50 px-2.5 md:px-3 py-1.5 rounded-lg border border-gray-100 whitespace-nowrap">Rs {toCurrency(fixedSalary)}</span>
                                     </td>
                                     <td className="p-3 md:p-6 text-right whitespace-nowrap" title={getDeductionBreakdownText(r.deductions) || ''}>
                                         <span className="text-xs md:text-sm font-bold text-rose-600 bg-rose-50 px-2.5 md:px-3 py-1.5 rounded-lg border border-rose-100 whitespace-nowrap">Rs {toCurrency(r.deductions_applied || 0)}</span>
@@ -1393,7 +1396,7 @@ const SalaryManagement = () => {
 
                             {loading && (
                                         <tr>
-                                            <td colSpan={canInstitutionWide && isHistoryPage ? 8 : 7} className="p-16 md:p-32 text-center text-gray-500">
+                                            <td colSpan={canInstitutionWide && isHistoryPage ? 9 : 8} className="p-16 md:p-32 text-center text-gray-500">
                                                 <div className="flex flex-col items-center gap-4">
                                                     <div className="h-14 w-14 border-4 border-sky-100 border-t-sky-600 rounded-full animate-spin"></div>
                                                     <p className="text-[10px] font-black text-sky-500 uppercase tracking-[0.2em] mt-2">Loading payroll records...</p>
@@ -1404,7 +1407,7 @@ const SalaryManagement = () => {
 
                                     {!loading && filteredRows.length === 0 && (
                                         <tr>
-                                            <td colSpan={canInstitutionWide && isHistoryPage ? 8 : 7} className="p-16 md:p-32 text-center">
+                                            <td colSpan={canInstitutionWide && isHistoryPage ? 9 : 8} className="p-16 md:p-32 text-center">
                                                 <div className="flex flex-col items-center gap-6 opacity-20 grayscale">
                                                     <FaMoneyBillWave size={64} className="text-gray-400" />
                                                     <div>

@@ -64,7 +64,9 @@ import ManagementDepartment from './pages/management/ManagementDepartment';
 
 // Protected Route Wrapper
 const ProtectedRoute = ({ children, allowedRoles }) => {
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
+
+  if (loading) return null;
 
   if (!user) return <Navigate to="/login" />;
 
@@ -86,7 +88,9 @@ const ManagementRoute = ({ children }) => {
 
 // A wrapper for /login that redirects to dashboard if already authenticated
 const LoginRoute = () => {
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
+
+  if (loading) return null;
   const isManagement =
     localStorage.getItem('managementAccess') === 'true' ||
     sessionStorage.getItem('managementAccess') === 'true';
@@ -100,12 +104,17 @@ const LoginRoute = () => {
 };
 
 const AppContent = () => {
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
   const [showSplash, setShowSplash] = useState(true);
 
   const handleSplashFinish = () => {
     setShowSplash(false);
   };
+
+  useEffect(() => {
+    const bootSplash = document.getElementById('boot-splash');
+    if (bootSplash) bootSplash.remove();
+  }, []);
 
   const isAlreadyLogged = !!localStorage.getItem('token') || !!localStorage.getItem('managementAccess');
   const forceFullSplash = localStorage.getItem('force_full_splash') === 'true';
@@ -190,6 +199,14 @@ const AppContent = () => {
       localStorage.removeItem('force_full_splash');
     }
     return <Splash onFinish={handleSplashFinish} isFast={isAlreadyLogged && !forceFullSplash} />;
+  }
+
+  if (loading) {
+    return (
+      <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-[#0f2744]">
+        <div className="h-9 w-9 border-4 border-sky-200/30 border-t-sky-300 rounded-full animate-spin" />
+      </div>
+    );
   }
 
   return (

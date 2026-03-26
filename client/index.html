@@ -36,9 +36,28 @@
     <meta name="format-detection" content="telephone=no">
 
     <title>PPG EMP HUB</title>
+    <style>
+      #boot-splash {
+        position: fixed;
+        inset: 0;
+        z-index: 10000;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: linear-gradient(135deg, #0c1929 0%, #0f2744 30%, #0a1628 70%, #060d18 100%);
+      }
+      #boot-splash img {
+        width: 112px;
+        height: 112px;
+        object-fit: contain;
+      }
+    </style>
   </head>
 
   <body>
+    <div id="boot-splash" aria-hidden="true">
+      <img src="/ppg-logo.png" alt="PPG EMP HUB" />
+    </div>
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
   </body>
