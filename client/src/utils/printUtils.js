@@ -192,29 +192,24 @@ const downloadPdfFromHtml = async ({ html, title }) => {
 };
 
 const openPdfPreviewModal = async ({ blobUrl, title }) => {
-    let keepUrl = false;
-
     await Swal.fire({
         title: `${String(title || 'Report')} - PDF Preview`,
         html: `
-            <div style="height:min(72vh,780px); border:1px solid #e2e8f0; border-radius:12px; overflow:hidden; background:#fff;">
+            <div style="height:72vh; max-height:780px; border:1px solid #e2e8f0; border-radius:12px; overflow:hidden; background:#fff;">
                 <iframe
                     src="${blobUrl}"
                     title="PDF Preview"
                     style="width:100%; height:100%; border:0;"
                 ></iframe>
             </div>
+            <p style="margin-top:10px; font-size:12px; color:#64748b;">If preview looks blank, use Open in New Tab.</p>
         `,
         width: '92vw',
+        showDenyButton: true,
         showCancelButton: true,
         confirmButtonText: 'Download PDF',
+        denyButtonText: 'Open in New Tab',
         cancelButtonText: 'Close',
-        didOpen: () => {
-            keepUrl = true;
-        },
-        willClose: () => {
-            keepUrl = false;
-        }
     }).then((result) => {
         if (result.isConfirmed) {
             const anchor = document.createElement('a');
@@ -223,12 +218,18 @@ const openPdfPreviewModal = async ({ blobUrl, title }) => {
             document.body.appendChild(anchor);
             anchor.click();
             document.body.removeChild(anchor);
+            return;
+        }
+
+        if (result.isDenied) {
+            window.open(blobUrl, '_blank', 'noopener,noreferrer');
         }
     });
 
-    if (!keepUrl) {
+    // Keep the URL alive briefly so embedded and new-tab viewers can load it.
+    setTimeout(() => {
         URL.revokeObjectURL(blobUrl);
-    }
+    }, 60000);
 };
 
 const viewPdfFromHtml = async ({ html, title }) => {
@@ -339,8 +340,7 @@ const shareReport = async ({ html, title }) => {
                 await navigator.share({ title: reportTitle, text: reportText, files: [pdfFile] });
                 return;
             }
-            await navigator.share({ title: reportTitle, text: reportText, url: reportUrl });
-            return;
+            // System share is available but file sharing is not. Continue to fallback with document download.
         } catch {
             // User cancellation and API errors fall through to manual choices.
         }
