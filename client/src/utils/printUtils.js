@@ -111,6 +111,34 @@ const printWithHiddenIframe = ({ html, title, delay = 250, closeAfterPrint = tru
     });
 };
 
+const waitForDocumentReady = async (doc, timeoutMs = 2000) => {
+    const start = Date.now();
+    while (doc.readyState !== 'complete' && Date.now() - start < timeoutMs) {
+        await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+
+    const images = Array.from(doc.images || []);
+    await Promise.all(images.map((img) => {
+        if (img.complete) return Promise.resolve();
+        return new Promise((resolve) => {
+            img.addEventListener('load', resolve, { once: true });
+            img.addEventListener('error', resolve, { once: true });
+            setTimeout(resolve, 1000);
+        });
+    }));
+
+    if (doc.fonts && doc.fonts.ready) {
+        try {
+            await Promise.race([
+                doc.fonts.ready,
+                new Promise((resolve) => setTimeout(resolve, 1000))
+            ]);
+        } catch {
+            // Ignore font readiness failures.
+        }
+    }
+};
+
 const sanitizeFileName = (value, fallback = 'report') => {
     const base = String(value || fallback)
         .trim()
@@ -163,26 +191,45 @@ const openHtmlPreviewWindow = ({ html, title = 'Report Preview' }) => {
 const buildPdfFromHtml = async ({ html }) => {
     const { jsPDF } = await import('jspdf');
 
-    const doc = new DOMParser().parseFromString(String(html || ''), 'text/html');
-    const host = document.createElement('div');
-    host.style.position = 'fixed';
-    host.style.left = '-10000px';
-    host.style.top = '0';
-    host.style.width = '1000px';
-    host.style.background = '#fff';
-    host.innerHTML = doc.body?.innerHTML || String(html || '');
-    document.body.appendChild(host);
+    const sourceHtml = withPrintPaginationCss(String(html || ''));
+    const iframe = document.createElement('iframe');
+    iframe.style.position = 'fixed';
+    iframe.style.left = '0';
+    iframe.style.top = '0';
+    iframe.style.width = '1024px';
+    iframe.style.height = '1400px';
+    iframe.style.opacity = '0';
+    iframe.style.pointerEvents = 'none';
+    iframe.style.zIndex = '-1';
+    document.body.appendChild(iframe);
 
     try {
+        const frameDoc = iframe.contentDocument || iframe.contentWindow?.document;
+        if (!frameDoc) throw new Error('Unable to initialize PDF render frame.');
+
+        frameDoc.open();
+        frameDoc.write(sourceHtml);
+        frameDoc.close();
+
+        await waitForDocumentReady(frameDoc);
+
+        const renderRoot = frameDoc.body;
+        if (!renderRoot || !String(renderRoot.textContent || '').trim()) {
+            throw new Error('Report content is empty for PDF rendering.');
+        }
+
         const pdf = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'a4' });
-        await pdf.html(host, {
+        await pdf.html(renderRoot, {
             margin: [30, 20, 30, 20],
             autoPaging: 'text',
-            html2canvas: { scale: 0.7, useCORS: true, backgroundColor: '#ffffff' }
+            html2canvas: { scale: 0.7, useCORS: true, backgroundColor: '#ffffff' },
+            windowWidth: Math.max(frameDoc.documentElement?.scrollWidth || 1024, 1024)
         });
         return pdf;
     } finally {
-        document.body.removeChild(host);
+        if (document.body.contains(iframe)) {
+            document.body.removeChild(iframe);
+        }
     }
 };
 
@@ -433,6 +480,7 @@ export const runPrintWindow = async ({
     printWindow.document.close();
     printWindow.focus();
 
+    await waitForDocumentReady(printWindow.document);
     setTimeout(() => {
         printWindow.print();
         if (closeAfterPrint) {
@@ -498,6 +546,7 @@ export const finalizePrintWindow = async ({
     targetWindow.document.close();
     targetWindow.focus();
 
+    await waitForDocumentReady(targetWindow.document);
     setTimeout(() => {
         targetWindow.print();
         if (closeAfterPrint) {
