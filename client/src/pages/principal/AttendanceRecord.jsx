@@ -801,7 +801,7 @@ const AttendanceRecord = () => {
 
                                     {/* Attendance Sheet Table */}
                                     <div className="overflow-x-auto attendance-sheet-scroll pb-1">
-                                        <table className="w-full border-collapse table-fixed" style={{ minWidth: `${attendanceTableMinWidth}px` }}>
+                                        <table className="w-full table-fixed border-separate border-spacing-0" style={{ minWidth: `${attendanceTableMinWidth}px` }}>
                                             <colgroup>
                                                 <col style={{ width: `${firstColumnWidth}px`, minWidth: `${firstColumnWidth}px` }} />
                                                 {uniqueDates.map(date => (
@@ -810,7 +810,7 @@ const AttendanceRecord = () => {
                                             </colgroup>
                                             <thead>
                                                 <tr>
-                                                    <th className="sticky left-0 top-0 z-20 bg-gray-100 border border-dotted border-gray-300 px-3 py-3 text-[10px] font-black uppercase tracking-wider text-gray-500 text-left">
+                                                    <th className="sticky left-0 top-0 z-20 bg-gray-100 border border-gray-200 px-3 py-3 h-11 text-[10px] font-black uppercase tracking-wider text-gray-500 text-left">
                                                         Day &rarr;
                                                     </th>
                                                     {uniqueDates.map(date => {
@@ -819,7 +819,7 @@ const AttendanceRecord = () => {
                                                         const dayName = d.toLocaleDateString('en-US', { timeZone: 'Asia/Kolkata', weekday: 'short' });
                                                         const isSunday = d.getDay() === 0;
                                                         return (
-                                                            <th key={date} className={`sticky top-0 z-10 border border-dotted border-gray-300 px-1.5 py-2.5 text-center ${isSunday ? 'bg-rose-50' : 'bg-gray-50'}`}>
+                                                            <th key={date} className={`sticky top-0 z-10 border border-gray-200 px-1.5 py-2.5 h-11 text-center ${isSunday ? 'bg-rose-50' : 'bg-gray-50'}`}>
                                                                 <div className={`text-[11px] font-black ${isSunday ? 'text-rose-500' : 'text-gray-700'}`}>{dayNum}</div>
                                                                 <div className={`text-[8px] font-bold uppercase ${isSunday ? 'text-rose-400' : 'text-gray-400'}`}>{dayName}</div>
                                                             </th>
@@ -830,13 +830,13 @@ const AttendanceRecord = () => {
                                             <tbody>
                                                 {/* Status Row */}
                                                 <tr>
-                                                    <td className="sticky left-0 z-10 bg-white border border-dotted border-gray-300 px-3 py-2.5 text-[10px] font-black uppercase tracking-wider text-gray-600 align-middle">
+                                                    <td className="sticky left-0 z-10 bg-white border border-gray-200 px-3 py-2.5 h-11 text-[10px] font-black uppercase tracking-wider text-gray-600 align-middle">
                                                         Status
                                                     </td>
                                                     {uniqueDates.map(date => {
                                                         const rec = emp.records[date];
                                                         return (
-                                                            <td key={date} className="border border-dotted border-gray-300 px-1 py-2 text-center align-middle">
+                                                            <td key={date} className="border border-gray-200 px-1 py-2 h-11 text-center align-middle">
                                                                 {rec ? (
                                                                     <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-black leading-none ${getStatusCellColor(rec)}`}>
                                                                         {abbreviateStatus(rec)}
@@ -850,13 +850,13 @@ const AttendanceRecord = () => {
                                                 </tr>
                                                 {/* InTime Row */}
                                                 <tr className="bg-gray-50/40">
-                                                    <td className="sticky left-0 z-10 bg-gray-50 border border-dotted border-gray-300 px-3 py-2.5 text-[10px] font-black uppercase tracking-wider text-gray-600 align-middle">
+                                                    <td className="sticky left-0 z-10 bg-gray-50 border border-gray-200 px-3 py-2.5 h-11 text-[10px] font-black uppercase tracking-wider text-gray-600 align-middle">
                                                         InTime
                                                     </td>
                                                     {uniqueDates.map(date => {
                                                         const rec = emp.records[date];
                                                         return (
-                                                            <td key={date} className="border border-dotted border-gray-300 px-1 py-2 text-center text-[10px] font-semibold text-gray-600 align-middle whitespace-nowrap">
+                                                            <td key={date} className="border border-gray-200 px-1 py-2 h-11 text-center text-[10px] font-semibold text-gray-600 align-middle whitespace-nowrap">
                                                                 {rec?.in_time ? formatSheetTime(rec.in_time) : <span className="text-gray-300">&mdash;</span>}
                                                             </td>
                                                         );
@@ -864,13 +864,13 @@ const AttendanceRecord = () => {
                                                 </tr>
                                                 {/* OutTime Row */}
                                                 <tr>
-                                                    <td className="sticky left-0 z-10 bg-white border border-dotted border-gray-300 px-3 py-2.5 text-[10px] font-black uppercase tracking-wider text-gray-600 align-middle">
+                                                    <td className="sticky left-0 z-10 bg-white border border-gray-200 px-3 py-2.5 h-11 text-[10px] font-black uppercase tracking-wider text-gray-600 align-middle">
                                                         OutTime
                                                     </td>
                                                     {uniqueDates.map(date => {
                                                         const rec = emp.records[date];
                                                         return (
-                                                            <td key={date} className="border border-dotted border-gray-300 px-1 py-2 text-center text-[10px] font-semibold text-gray-600 align-middle whitespace-nowrap">
+                                                            <td key={date} className="border border-gray-200 px-1 py-2 h-11 text-center text-[10px] font-semibold text-gray-600 align-middle whitespace-nowrap">
                                                                 {rec?.out_time ? formatSheetTime(rec.out_time) : <span className="text-gray-300">&mdash;</span>}
                                                             </td>
                                                         );
@@ -878,43 +878,41 @@ const AttendanceRecord = () => {
                                                 </tr>
                                                 {/* Total Row */}
                                                 <tr className="bg-sky-50/30">
-                                                    <td className="sticky left-0 z-10 bg-sky-50 border border-dotted border-gray-300 px-3 py-2.5 text-[10px] font-black uppercase tracking-wider text-sky-700 align-middle">
+                                                    <td className="sticky left-0 z-10 bg-sky-50 border border-gray-200 px-3 py-2.5 h-11 text-[10px] font-black uppercase tracking-wider text-sky-700 align-middle">
                                                         Total
                                                     </td>
                                                     {uniqueDates.map(date => {
                                                         const rec = emp.records[date];
                                                         return (
-                                                            <td key={date} className="border border-dotted border-gray-300 px-1 py-2 text-center text-[10px] font-black text-sky-600 align-middle">
+                                                            <td key={date} className="border border-gray-200 px-1 py-2 h-11 text-center text-[10px] font-black text-sky-600 align-middle whitespace-nowrap">
                                                                 {rec ? calculateHours(rec.in_time, rec.out_time) : <span className="text-gray-300">&mdash;</span>}
                                                             </td>
                                                         );
                                                     })}
                                                 </tr>
-                                                {/* Remarks Row - Aggregated */}
-                                                <tr>
-                                                    <td className="sticky left-0 z-10 bg-white border border-dotted border-gray-300 px-3 py-3 text-[10px] font-black uppercase tracking-wider text-gray-600 align-top">
-                                                        Remarks History
-                                                    </td>
-                                                    <td colSpan={uniqueDates.length} className="border border-dotted border-gray-300 px-4 py-3 text-[10px] font-bold text-sky-600 italic leading-relaxed text-left bg-sky-50/10 align-top">
-                                                        {(() => {
-                                                            const filtered = Object.values(emp.records).filter(r => r.remarks && r.remarks.trim() !== '');
-                                                            if (filtered.length === 0) return <span className="text-gray-200">No remarks found for this employee in the selected period.</span>;
-                                                            return (
-                                                                <span className="inline leading-6">
-                                                                    (
-                                                                    {filtered.sort((a, b) => new Date(a.date) - new Date(b.date)).map((r, i) => (
-                                                                        <span key={r.date}>
-                                                                            <strong>{new Date(r.date + 'T00:00:00+05:30').toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit' })}</strong>-{r.remarks}{i < filtered.length - 1 ? ', ' : ''}
-                                                                        </span>
-                                                                    ))}
-                                                                    )
-                                                                </span>
-                                                            );
-                                                        })()}
-                                                    </td>
-                                                </tr>
                                             </tbody>
                                         </table>
+                                    </div>
+
+                                    <div className="border-t border-gray-200 bg-slate-50/70 px-4 py-3 grid gap-3" style={{ gridTemplateColumns: `${firstColumnWidth}px minmax(0, 1fr)` }}>
+                                        <div className="text-[10px] font-black uppercase tracking-wider text-gray-600">Remarks History</div>
+                                        <div className="text-[10px] font-bold text-sky-700 italic leading-relaxed text-left">
+                                            {(() => {
+                                                const filtered = Object.values(emp.records).filter(r => r.remarks && r.remarks.trim() !== '');
+                                                if (filtered.length === 0) return <span className="text-gray-300">No remarks found for this employee in the selected period.</span>;
+                                                return (
+                                                    <span className="inline leading-6">
+                                                        (
+                                                        {filtered.sort((a, b) => new Date(a.date) - new Date(b.date)).map((r, i) => (
+                                                            <span key={r.date}>
+                                                                <strong>{new Date(r.date + 'T00:00:00+05:30').toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit' })}</strong>-{r.remarks}{i < filtered.length - 1 ? ', ' : ''}
+                                                            </span>
+                                                        ))}
+                                                        )
+                                                    </span>
+                                                );
+                                            })()}
+                                        </div>
                                     </div>
                                 </motion.div>
                             ))}
