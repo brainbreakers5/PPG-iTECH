@@ -521,6 +521,26 @@ exports.getSalaryRecords = async (req, res) => {
         const merged = users.map((u) => {
             const key = String(u.emp_id || '').trim();
             const existing = recMap[key];
+
+            // Staff/HOD/Principal should only see their own published salary details.
+            if (!scopeWide) {
+                if (!existing || existing.status !== 'Paid') {
+                    return null;
+                }
+
+                return {
+                    ...existing,
+                    name: u.name,
+                    role: u.role,
+                    profile_pic: u.profile_pic,
+                    monthly_salary: parseFloat(u.monthly_salary) || parseFloat(u.base_salary) || 0,
+                    department_name: u.department_name,
+                    deductions: u.deductions,
+                    from_date: toIsoDate(existing.from_date) || period.fromDate,
+                    to_date: toIsoDate(existing.to_date) || period.toDate
+                };
+            }
+
             if (existing) {
                 if (existing.status !== 'Paid') {
                     const metrics = computeSalaryMetrics({
@@ -607,7 +627,7 @@ exports.getSalaryRecords = async (req, res) => {
                 year: period.year,
                 is_preview: true
             };
-        });
+        }).filter(Boolean);
 
         res.json(merged);
     } catch (error) {

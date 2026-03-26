@@ -1149,7 +1149,7 @@ const SalaryManagement = () => {
                         className="modern-card p-6 border-sky-100 mb-6 flex flex-wrap gap-3 items-center"
                     >
                         <button onClick={toggleSelectAll} className="bg-gray-100 text-gray-600 px-6 py-3 rounded-2xl hover:bg-gray-200 transition-all font-black uppercase tracking-[0.2em] text-[10px] active:scale-95">{selectedIds.length === filteredRows.length ? 'Clear Selection' : 'Select All'}</button>
-                        <button onClick={() => handleBulkMark('Paid')} className="bg-sky-600 text-white px-6 py-3 rounded-2xl shadow-lg shadow-sky-100 hover:bg-sky-700 transition-all font-black uppercase tracking-[0.2em] text-[10px] active:scale-95 flex items-center gap-2"><FaCheckCircle /> Mark All Paid</button>
+                        <button onClick={() => handleBulkMark('Paid')} className="bg-sky-600 text-white px-6 py-3 rounded-2xl shadow-lg shadow-sky-100 hover:bg-sky-700 transition-all font-black uppercase tracking-[0.2em] text-[10px] active:scale-95 flex items-center gap-2"><FaCheckCircle /> Publish All</button>
                         <button onClick={() => handleBulkMark('Pending')} className="bg-sky-600 text-white px-6 py-3 rounded-2xl shadow-lg shadow-sky-100 hover:bg-sky-700 transition-all font-black uppercase tracking-[0.2em] text-[10px] active:scale-95 flex items-center gap-2"><FaClock /> Mark All Unpaid</button>
                         <span className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400 ml-auto bg-gray-50 px-4 py-2 rounded-xl">Selected: {selectedIds.length}</span>
                     </motion.div>
@@ -1364,7 +1364,7 @@ const SalaryManagement = () => {
                                                             }
                                                         }}
                                                         className="h-8 w-8 md:h-10 md:w-10 bg-sky-50 text-sky-600 rounded-xl hover:bg-sky-600 hover:text-white transition-all active:scale-95 group/btn disabled:opacity-40 disabled:cursor-not-allowed"
-                                                        title="Mark paid"
+                                                        title="Publish salary"
                                                     >
                                                         <FaCheckCircle className="group-hover/btn:scale-125 transition-transform" />
                                                     </button>
