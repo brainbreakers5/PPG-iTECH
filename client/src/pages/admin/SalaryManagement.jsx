@@ -784,6 +784,11 @@ const SalaryManagement = () => {
                 const otherLabel = detail.otherLabel ? `Other (${detail.otherLabel})` : 'Other';
                 const fixedSalary = Number(r.monthly_salary ?? 0);
                 const grossSalary = Number(r.gross_salary ?? getEarnedSalary(r) ?? 0);
+                const earnedSalary = Number(getEarnedSalary(r) || 0);
+                const earnedSplit = getEarnedSalaryConceptSplit(earnedSalary);
+                const workingDays = Number(r.total_days_in_period || cycleWorkingDays || 0);
+                const paidDays = Number(r.with_pay_count ?? r.total_present ?? 0);
+                const unpaidDays = Number(r.without_pay_count ?? r.total_lop ?? 0);
                 return `
             <tr>
                 <td>${index + 1}</td>
@@ -792,6 +797,13 @@ const SalaryManagement = () => {
                 <td>${escapeHtml(r.department_name || '-')}</td>
                 <td class="right">${toCurrency(grossSalary)}</td>
                 <td class="right">${toCurrency(fixedSalary)}</td>
+                <td class="right excel-only">${workingDays.toFixed(1)}</td>
+                <td class="right excel-only">${paidDays.toFixed(1)}</td>
+                <td class="right excel-only">${unpaidDays.toFixed(1)}</td>
+                <td class="right excel-only">${toCurrency(earnedSalary)}</td>
+                <td class="right excel-only">${toCurrency(earnedSplit.basicSalary)}</td>
+                <td class="right excel-only">${toCurrency(earnedSplit.performance)}</td>
+                <td class="right excel-only">${toCurrency(earnedSplit.conveyance)}</td>
                 <td class="right">${toCurrency(detail.employPf)}</td>
                 <td class="right">${toCurrency(detail.salaryAdvance)}</td>
                 <td class="right">${toCurrency(detail.hostelFoodFees)}</td>
@@ -826,6 +838,8 @@ const SalaryManagement = () => {
                         th, td { border: 1px solid #dbeafe; padding: 7px; font-size: 10px; vertical-align: top; }
                         th { background: #eff6ff; text-transform: uppercase; letter-spacing: 0.08em; font-weight: 800; }
                         .right { text-align: right; }
+                        .excel-only { display: none; }
+                        body.excel-preview .excel-only { display: table-cell; }
                     </style>
                 </head>
                 <body>
@@ -848,6 +862,13 @@ const SalaryManagement = () => {
                                     <th>Department</th>
                                     <th class="right">Gross Salary</th>
                                     <th class="right">Fixed Salary</th>
+                                    <th class="right excel-only">Total Working Days</th>
+                                    <th class="right excel-only">Total Paid Days</th>
+                                    <th class="right excel-only">Total Unpaid Days</th>
+                                    <th class="right excel-only">Earned Salary</th>
+                                    <th class="right excel-only">Basic Salary</th>
+                                    <th class="right excel-only">Performance</th>
+                                    <th class="right excel-only">Conveyance</th>
                                     <th class="right">Employ PF</th>
                                     <th class="right">Salary Advance</th>
                                     <th class="right">Hostel/Food Fees</th>

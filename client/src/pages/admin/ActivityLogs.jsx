@@ -5,6 +5,7 @@ import {
     Search, 
     Filter, 
     RefreshCcw, 
+    Printer,
     User, 
     Clock, 
     Shield, 
@@ -75,6 +76,98 @@ const ActivityLogs = () => {
         }
     };
 
+    const handlePrintLogs = () => {
+        const safeRows = filteredLogs || [];
+        if (!safeRows.length) {
+            Swal.fire({
+                icon: 'info',
+                title: 'No Data',
+                text: 'No logs available for print preview.'
+            });
+            return;
+        }
+
+        const escapeHtml = (value) => String(value ?? '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+
+        const rowsHtml = safeRows.map((log, index) => `
+            <tr>
+                <td>${index + 1}</td>
+                <td>${escapeHtml(log.created_at ? new Date(log.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : 'NA')} ${escapeHtml(log.created_at ? formatTimestamp(log.created_at) : 'NA')}</td>
+                <td>${escapeHtml(log.user_name || 'NA')}</td>
+                <td>${escapeHtml(log.emp_id || 'NA')}</td>
+                <td>${escapeHtml((log.action || 'UNKNOWN').replace(/_/g, ' '))}</td>
+            </tr>
+        `).join('');
+
+        const printWindow = window.open('', '_blank', 'width=1200,height=800');
+        if (!printWindow) {
+            Swal.fire({
+                icon: 'warning',
+                title: 'Popup Blocked',
+                text: 'Allow popups to open print preview.'
+            });
+            return;
+        }
+
+        printWindow.document.write(`
+            <!doctype html>
+            <html>
+                <head>
+                    <meta charset="UTF-8" />
+                    <title>Detail Logs Print Preview</title>
+                    <style>
+                        @page { size: A4 landscape; margin: 10mm; }
+                        body { font-family: Arial, sans-serif; color: #0f172a; margin: 0; padding: 0; }
+                        .wrap { padding: 16px; }
+                        .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px; }
+                        .title { margin: 0; font-size: 20px; font-weight: 800; }
+                        .meta { margin-top: 4px; font-size: 11px; color: #475569; }
+                        table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+                        th, td { border: 1px solid #cbd5e1; padding: 8px; font-size: 11px; text-align: left; word-break: break-word; }
+                        th { background: #f1f5f9; font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; }
+                        tbody tr:nth-child(even) { background: #f8fafc; }
+                        .center { text-align: center; }
+                    </style>
+                </head>
+                <body>
+                    <div class="wrap">
+                        <div class="header">
+                            <div>
+                                <h1 class="title">Detail Logs</h1>
+                                <p class="meta">Total Events: ${safeRows.length}</p>
+                            </div>
+                            <p class="meta">Generated: ${new Date().toLocaleString('en-GB')}</p>
+                        </div>
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th class="center" style="width:70px;">S.No</th>
+                                    <th style="width:260px;">Timestamp</th>
+                                    <th>User</th>
+                                    <th style="width:130px;">Employee ID</th>
+                                    <th style="width:220px;">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${rowsHtml}
+                            </tbody>
+                        </table>
+                    </div>
+                </body>
+            </html>
+        `);
+        printWindow.document.close();
+        printWindow.focus();
+        setTimeout(() => {
+            printWindow.print();
+        }, 200);
+    };
+
     return (
         <Layout userRole="admin">
             <div className="p-6 lg:p-10 space-y-8 bg-slate-50/50 min-h-screen">
@@ -92,16 +185,28 @@ const ActivityLogs = () => {
                         </div>
                     </div>
 
-                    <motion.button
-                        whileHover={{ scale: 1.02 }}
-                        whileTap={{ scale: 0.98 }}
-                        onClick={fetchLogs}
-                        disabled={loading}
-                        className="flex items-center gap-2 px-6 py-3 bg-white border border-slate-200 rounded-2xl text-slate-700 font-bold text-sm shadow-sm hover:shadow-md transition-all disabled:opacity-50"
-                    >
-                        <RefreshCcw size={16} className={`${loading ? 'animate-spin' : ''}`} />
-                        Refresh Logs
-                    </motion.button>
+                    <div className="flex items-center gap-3">
+                        <motion.button
+                            whileHover={{ scale: 1.02 }}
+                            whileTap={{ scale: 0.98 }}
+                            onClick={handlePrintLogs}
+                            className="flex items-center gap-2 px-6 py-3 bg-white border border-slate-200 rounded-2xl text-slate-700 font-bold text-sm shadow-sm hover:shadow-md transition-all"
+                        >
+                            <Printer size={16} />
+                            Print Preview
+                        </motion.button>
+
+                        <motion.button
+                            whileHover={{ scale: 1.02 }}
+                            whileTap={{ scale: 0.98 }}
+                            onClick={fetchLogs}
+                            disabled={loading}
+                            className="flex items-center gap-2 px-6 py-3 bg-white border border-slate-200 rounded-2xl text-slate-700 font-bold text-sm shadow-sm hover:shadow-md transition-all disabled:opacity-50"
+                        >
+                            <RefreshCcw size={16} className={`${loading ? 'animate-spin' : ''}`} />
+                            Refresh Logs
+                        </motion.button>
+                    </div>
                 </div>
 
                 {failedLogins.length > 0 && (

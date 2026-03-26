@@ -286,12 +286,45 @@ const viewPdfFromHtml = async ({ html, title }) => {
     const blobUrl = URL.createObjectURL(blob);
     const viewerUrl = `${blobUrl}#toolbar=1&navpanes=1&scrollbar=1&view=FitH`;
 
-    const opened = window.open(viewerUrl, '_blank', 'noopener,noreferrer');
+    const opened = window.open('', '_blank', 'noopener,noreferrer');
     if (!opened) {
         // Fallback to modal when popups are blocked.
         await openPdfPreviewModal({ blobUrl, title });
         return true;
     }
+
+    opened.document.write(`
+        <!doctype html>
+        <html>
+            <head>
+                <meta charset="utf-8" />
+                <meta name="color-scheme" content="only light" />
+                <title>${escapeHtml(String(title || 'PDF Preview'))}</title>
+                <style>
+                    html, body {
+                        margin: 0;
+                        padding: 0;
+                        width: 100%;
+                        height: 100%;
+                        background: #ffffff;
+                        color-scheme: light;
+                        forced-color-adjust: none;
+                    }
+                    iframe {
+                        display: block;
+                        width: 100%;
+                        height: 100%;
+                        border: 0;
+                        background: #ffffff;
+                    }
+                </style>
+            </head>
+            <body>
+                <iframe src="${viewerUrl}" title="PDF Preview"></iframe>
+            </body>
+        </html>
+    `);
+    opened.document.close();
 
     setTimeout(() => {
         URL.revokeObjectURL(blobUrl);
