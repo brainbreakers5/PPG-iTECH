@@ -91,6 +91,9 @@ const BiometricMonitor = ({ empId, onDataChange }) => {
                             </div>
                             <div>
                                 <h2 className="text-lg font-black text-gray-800 tracking-tight">Biometric Activity</h2>
+                                <p className="text-[11px] text-gray-500 tracking-wide">
+                                    total today users: {Number(stats?.total_users ?? logs.length)}
+                                </p>
                                 <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Real-time device synchronization</p>
                             </div>
                         </div>
