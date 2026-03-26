@@ -159,6 +159,10 @@ const AttendanceRecord = () => {
         return Array.from(dates).sort();
     }, [detailedRecords]);
 
+    const firstColumnWidth = 118;
+    const dayColumnWidth = uniqueDates.length >= 26 ? 64 : uniqueDates.length >= 18 ? 72 : 82;
+    const attendanceTableMinWidth = firstColumnWidth + (uniqueDates.length * dayColumnWidth);
+
     useEffect(() => {
         const fetchDepts = async () => {
             try {
@@ -257,6 +261,14 @@ const AttendanceRecord = () => {
         const hours = Math.floor(worked / 60);
         const minutes = worked % 60;
         return `${hours}h ${String(minutes).padStart(2, '0')}m`;
+    };
+
+    const formatSheetTime = (timeValue) => {
+        if (!timeValue) return '—';
+        const parsed = String(timeValue).trim().match(/^(\d{1,2}):(\d{2})/);
+        if (!parsed) return '—';
+        const hh = String(Number(parsed[1])).padStart(2, '0');
+        return `${hh}:${parsed[2]}`;
     };
 
     const formatDayCount = (value) => {
@@ -788,17 +800,17 @@ const AttendanceRecord = () => {
                                     </div>
 
                                     {/* Attendance Sheet Table */}
-                                    <div className="overflow-x-auto attendance-sheet-scroll">
-                                        <table className="w-full border-collapse table-fixed" style={{ minWidth: `${110 + uniqueDates.length * 72}px` }}>
+                                    <div className="overflow-x-auto attendance-sheet-scroll pb-1">
+                                        <table className="w-full border-collapse table-fixed" style={{ minWidth: `${attendanceTableMinWidth}px` }}>
                                             <colgroup>
-                                                <col style={{ width: '110px', minWidth: '110px' }} />
+                                                <col style={{ width: `${firstColumnWidth}px`, minWidth: `${firstColumnWidth}px` }} />
                                                 {uniqueDates.map(date => (
-                                                    <col key={`col-${date}`} style={{ width: '72px', minWidth: '72px' }} />
+                                                    <col key={`col-${date}`} style={{ width: `${dayColumnWidth}px`, minWidth: `${dayColumnWidth}px` }} />
                                                 ))}
                                             </colgroup>
                                             <thead>
                                                 <tr>
-                                                    <th className="sticky left-0 top-0 z-20 bg-gray-100 border border-dotted border-gray-300 px-3 py-3 text-[10px] font-black uppercase tracking-wider text-gray-500 text-left w-[110px] min-w-[110px]">
+                                                    <th className="sticky left-0 top-0 z-20 bg-gray-100 border border-dotted border-gray-300 px-3 py-3 text-[10px] font-black uppercase tracking-wider text-gray-500 text-left">
                                                         Day &rarr;
                                                     </th>
                                                     {uniqueDates.map(date => {
@@ -807,7 +819,7 @@ const AttendanceRecord = () => {
                                                         const dayName = d.toLocaleDateString('en-US', { timeZone: 'Asia/Kolkata', weekday: 'short' });
                                                         const isSunday = d.getDay() === 0;
                                                         return (
-                                                            <th key={date} className={`sticky top-0 z-10 border border-dotted border-gray-300 px-1.5 py-2.5 text-center min-w-[72px] w-[72px] ${isSunday ? 'bg-rose-50' : 'bg-gray-50'}`}>
+                                                            <th key={date} className={`sticky top-0 z-10 border border-dotted border-gray-300 px-1.5 py-2.5 text-center ${isSunday ? 'bg-rose-50' : 'bg-gray-50'}`}>
                                                                 <div className={`text-[11px] font-black ${isSunday ? 'text-rose-500' : 'text-gray-700'}`}>{dayNum}</div>
                                                                 <div className={`text-[8px] font-bold uppercase ${isSunday ? 'text-rose-400' : 'text-gray-400'}`}>{dayName}</div>
                                                             </th>
@@ -845,7 +857,7 @@ const AttendanceRecord = () => {
                                                         const rec = emp.records[date];
                                                         return (
                                                             <td key={date} className="border border-dotted border-gray-300 px-1 py-2 text-center text-[10px] font-semibold text-gray-600 align-middle whitespace-nowrap">
-                                                                {rec?.in_time ? formatTo12Hr(rec.in_time) : <span className="text-gray-300">&mdash;</span>}
+                                                                {rec?.in_time ? formatSheetTime(rec.in_time) : <span className="text-gray-300">&mdash;</span>}
                                                             </td>
                                                         );
                                                     })}
@@ -859,7 +871,7 @@ const AttendanceRecord = () => {
                                                         const rec = emp.records[date];
                                                         return (
                                                             <td key={date} className="border border-dotted border-gray-300 px-1 py-2 text-center text-[10px] font-semibold text-gray-600 align-middle whitespace-nowrap">
-                                                                {rec?.out_time ? formatTo12Hr(rec.out_time) : <span className="text-gray-300">&mdash;</span>}
+                                                                {rec?.out_time ? formatSheetTime(rec.out_time) : <span className="text-gray-300">&mdash;</span>}
                                                             </td>
                                                         );
                                                     })}
