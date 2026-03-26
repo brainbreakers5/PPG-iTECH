@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FaTimes, FaCheckCircle, FaIdBadge, FaBuilding, FaPhone, FaEnvelope, FaUser, FaCalendarAlt, FaVenusMars, FaTint, FaGlobe, FaHandsHelping, FaWhatsapp, FaMapMarkerAlt, FaUsers, FaHeart, FaBriefcase, FaMoneyBillWave, FaUniversity, FaCreditCard, FaLock, FaUserCircle, FaSuitcase, FaCamera, FaEdit, FaSave, FaCertificate, FaDownload, FaEye, FaPlus, FaTrash, FaKey, FaPrint, FaMinusCircle } from 'react-icons/fa';
+import { FaTimes, FaCheckCircle, FaIdBadge, FaBuilding, FaPhone, FaEnvelope, FaUser, FaCalendarAlt, FaVenusMars, FaTint, FaGlobe, FaHandsHelping, FaWhatsapp, FaMapMarkerAlt, FaUsers, FaHeart, FaBriefcase, FaMoneyBillWave, FaUniversity, FaCreditCard, FaLock, FaUserCircle, FaSuitcase, FaCamera, FaSave, FaCertificate, FaDownload, FaEye, FaPlus, FaTrash, FaKey, FaPrint, FaMinusCircle } from 'react-icons/fa';
 import api from '../utils/api';
 import Swal from 'sweetalert2';
 import { useAuth } from '../context/AuthContext';
@@ -50,6 +50,9 @@ const ProfileViewer = ({ user, onClose }) => {
     const [certFile, setCertFile] = useState(null);
     const [uploadingCert, setUploadingCert] = useState(false);
     const [showCertForm, setShowCertForm] = useState(false);
+    const [isEditingName, setIsEditingName] = useState(false);
+    const [editableName, setEditableName] = useState('');
+    const [updatingName, setUpdatingName] = useState(false);
     const certFileRef = useRef(null);
 
     const isOwnProfile = authUser && user && (
@@ -76,6 +79,7 @@ const ProfileViewer = ({ user, onClose }) => {
 
     useEffect(() => {
         setPicUrl(user?.profile_pic || '');
+        setEditableName(user?.name || '');
         if (user) {
             setFormData({
                 mobile: user.mobile || '',
@@ -401,6 +405,25 @@ const ProfileViewer = ({ user, onClose }) => {
         });
     };
 
+    const handleSaveName = async () => {
+        const nextName = String(editableName || '').trim();
+        if (!nextName) {
+            return Swal.fire('Invalid Name', 'Name cannot be empty.', 'warning');
+        }
+
+        setUpdatingName(true);
+        try {
+            await api.put('/auth/profile-name', { name: nextName });
+            Swal.fire({ icon: 'success', title: 'Updated!', text: 'Name has been changed.', timer: 1400, showConfirmButton: false });
+            setIsEditingName(false);
+            window.location.reload();
+        } catch (error) {
+            Swal.fire('Error', error.response?.data?.message || 'Failed to update name.', 'error');
+        } finally {
+            setUpdatingName(false);
+        }
+    };
+
     return (
         <div className="w-full max-w-7xl mx-auto">
             <motion.div
@@ -470,9 +493,50 @@ const ProfileViewer = ({ user, onClose }) => {
                         </motion.div>
                     )}
 
-                    <h2 className="text-3xl font-black text-gray-800 tracking-tighter leading-tight break-words px-4">
-                        {user.name}
-                    </h2>
+                    {!isEditingName ? (
+                        <button
+                            type="button"
+                            onClick={() => {
+                                if (!isOwnProfile) return;
+                                setEditableName(user.name || '');
+                                setIsEditingName(true);
+                            }}
+                            className={`text-3xl font-black text-gray-800 tracking-tighter leading-tight break-words px-4 text-center ${isOwnProfile ? 'hover:text-sky-600 transition-colors cursor-pointer' : 'cursor-default'}`}
+                            title={isOwnProfile ? 'Click to edit name' : ''}
+                        >
+                            {user.name}
+                        </button>
+                    ) : (
+                        <div className="w-full px-4 mt-1">
+                            <input
+                                type="text"
+                                value={editableName}
+                                onChange={(e) => setEditableName(e.target.value)}
+                                className="w-full p-3 bg-gray-50 border border-gray-200 rounded-2xl outline-none focus:ring-4 focus:ring-sky-100 focus:border-sky-500 transition-all font-bold text-gray-700 text-sm text-center"
+                                placeholder="Enter your name"
+                            />
+                            <div className="flex gap-2 mt-2">
+                                <button
+                                    type="button"
+                                    onClick={handleSaveName}
+                                    disabled={updatingName}
+                                    className="flex-1 py-2 bg-sky-600 text-white rounded-lg text-[9px] font-black uppercase tracking-widest hover:bg-sky-700 disabled:opacity-50"
+                                >
+                                    {updatingName ? 'Saving...' : 'Save'}
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setIsEditingName(false);
+                                        setEditableName(user.name || '');
+                                    }}
+                                    className="flex-1 py-2 bg-gray-100 text-gray-500 rounded-lg text-[9px] font-black uppercase tracking-widest hover:bg-gray-200"
+                                >
+                                    Cancel
+                                </button>
+                            </div>
+                        </div>
+                    )}
                     <div className="mt-4 px-6 py-2 rounded-full bg-sky-50 border border-sky-100 text-sky-600 text-[10px] font-black uppercase tracking-widest inline-flex items-center gap-2">
                         <FaIdBadge /> {user.emp_id}
                     </div>
@@ -504,14 +568,6 @@ const ProfileViewer = ({ user, onClose }) => {
                                     title="Profile & Certificates Report"
                                 >
                                     <FaPrint size={12} className="group-hover:scale-110 transition-transform" /> Report
-                                </button>
-                            )}
-                            {isOwnProfile && !isEditingProfile && (
-                                <button
-                                    onClick={() => setIsEditingProfile(true)}
-                                    className="flex items-center gap-2 px-5 py-2.5 bg-sky-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-sky-700 transition-all shadow-lg shadow-sky-200"
-                                >
-                                    <FaEdit size={12} /> Edit Profile
                                 </button>
                             )}
                         </div>

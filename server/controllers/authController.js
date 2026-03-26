@@ -257,6 +257,40 @@ exports.updateProfile = async (req, res) => {
     }
 };
 
+// @desc    Update own display name only
+// @route   PUT /api/auth/profile-name
+// @access  Private
+exports.updateProfileName = async (req, res) => {
+    const { name } = req.body;
+
+    const cleanName = String(name || '').trim();
+    if (!cleanName) {
+        return res.status(400).json({ message: 'Name is required' });
+    }
+    if (cleanName.length < 2) {
+        return res.status(400).json({ message: 'Name must be at least 2 characters' });
+    }
+
+    try {
+        const { rows } = await pool.query(
+            `UPDATE users
+             SET name = $1
+             WHERE id = $2
+             RETURNING id, emp_id, name, role, profile_pic, department_id`,
+            [cleanName, req.user.id]
+        );
+
+        if (rows.length === 0) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+
+        res.json({ message: 'Name updated successfully', user: rows[0] });
+    } catch (error) {
+        console.error('Update Profile Name Error:', error);
+        res.status(500).json({ message: 'Server Error' });
+    }
+};
+
 // @desc    Check if Employee ID exists
 // @route   POST /api/auth/check-id
 // @access  Public
