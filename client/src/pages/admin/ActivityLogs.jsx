@@ -298,12 +298,12 @@ const ActivityLogs = () => {
                     )}
 
                     <div className="overflow-x-auto">
-                        <table className="w-full min-w-[920px] text-left border-collapse table-fixed">
+                        <table className="w-full min-w-[980px] text-left border-collapse table-fixed">
                             <colgroup>
-                                <col className="w-[10%]" />
-                                <col className="w-[26%]" />
-                                <col className="w-[30%]" />
-                                <col className="w-[34%]" />
+                                <col className="w-[92px]" />
+                                <col className="w-[260px]" />
+                                <col className="w-[360px]" />
+                                <col className="w-[260px]" />
                             </colgroup>
                             <thead>
                                 <tr className="bg-slate-50 border-b border-slate-100">
@@ -340,9 +340,9 @@ const ActivityLogs = () => {
                                                             const isHighlight = ['target_id', 'emp_id'].includes(key);
                                                             const label = key === 'target_id' ? 'System Target ID' : key === 'emp_id' ? 'Employee ID' : key.replace(/_/g, ' ');
                                                             return `
-                                                                <div style="display: flex; justify-content: space-between; border-bottom: 2px solid #f8fafc; padding: 12px 10px; gap: 20px; ${isHighlight ? 'background: #eff6ff; border-radius: 8px; margin: 2px 0;' : ''}">
-                                                                    <span style="font-weight: 800; text-transform: uppercase; font-size: 10px; color: ${isHighlight ? '#1e40af' : '#64748b'}; white-space: nowrap;">${label}:</span>
-                                                                    <span style="font-weight: 800; font-size: 13px; color: ${isHighlight ? '#1e293b' : '#334155'}; text-align: right; word-break: break-all;">${value || '—'}</span>
+                                                                <div style="display: grid; grid-template-columns: 160px minmax(0, 1fr); align-items: start; border-bottom: 1px solid #e2e8f0; padding: 12px 10px; gap: 12px; ${isHighlight ? 'background: #eff6ff; border-radius: 8px; margin: 2px 0;' : ''}">
+                                                                    <span style="font-weight: 800; text-transform: uppercase; font-size: 10px; color: ${isHighlight ? '#1e40af' : '#64748b'}; white-space: nowrap; letter-spacing: 0.05em;">${label}</span>
+                                                                    <span style="font-weight: 800; font-size: 13px; color: ${isHighlight ? '#1e293b' : '#334155'}; text-align: left; word-break: break-word;">${value || '—'}</span>
                                                                 </div>
                                                             `;
                                                         }).join('');
@@ -368,17 +368,17 @@ const ActivityLogs = () => {
                                                             title: `${log.action?.replace(/_/g, ' ')} Details`,
                                                             html: `
                                                                 <div style="text-align: left; background: #f8fafc; border-radius: 12px; padding: 15px; margin-top: 10px; border: 1px solid #e2e8f0;">
-                                                                    <div style="display: flex; justify-content: space-between; border-bottom: 2px solid #f1f5f9; padding: 12px 10px; gap: 20px;">
-                                                                        <span style="font-weight: 800; text-transform: uppercase; font-size: 10px; color: #64748b; white-space: nowrap;">Employee ID:</span>
-                                                                        <span style="font-weight: 800; font-size: 13px; color: #334155; text-align: right; word-break: break-all;">${log.emp_id || 'NA'}</span>
+                                                                    <div style="display: grid; grid-template-columns: 160px minmax(0, 1fr); align-items: start; border-bottom: 1px solid #e2e8f0; padding: 12px 10px; gap: 12px;">
+                                                                        <span style="font-weight: 800; text-transform: uppercase; font-size: 10px; color: #64748b; white-space: nowrap; letter-spacing: 0.05em;">Employee ID</span>
+                                                                        <span style="font-weight: 800; font-size: 13px; color: #334155; text-align: left; word-break: break-word;">${log.emp_id || 'NA'}</span>
                                                                     </div>
-                                                                    <div style="display: flex; justify-content: space-between; border-bottom: 2px solid #f1f5f9; padding: 12px 10px; gap: 20px;">
-                                                                        <span style="font-weight: 800; text-transform: uppercase; font-size: 10px; color: #64748b; white-space: nowrap;">User:</span>
-                                                                        <span style="font-weight: 800; font-size: 13px; color: #334155; text-align: right; word-break: break-all;">${log.user_name || 'NA'}</span>
+                                                                    <div style="display: grid; grid-template-columns: 160px minmax(0, 1fr); align-items: start; border-bottom: 1px solid #e2e8f0; padding: 12px 10px; gap: 12px;">
+                                                                        <span style="font-weight: 800; text-transform: uppercase; font-size: 10px; color: #64748b; white-space: nowrap; letter-spacing: 0.05em;">User</span>
+                                                                        <span style="font-weight: 800; font-size: 13px; color: #334155; text-align: left; word-break: break-word;">${log.user_name || 'NA'}</span>
                                                                     </div>
-                                                                    <div style="display: flex; justify-content: space-between; padding: 12px 10px; gap: 20px;">
-                                                                        <span style="font-weight: 800; text-transform: uppercase; font-size: 10px; color: #64748b; white-space: nowrap;">Info:</span>
-                                                                        <span style="font-weight: 800; font-size: 13px; color: #334155; text-align: right; word-break: break-all;">No extra detail fields available</span>
+                                                                    <div style="display: grid; grid-template-columns: 160px minmax(0, 1fr); align-items: start; padding: 12px 10px; gap: 12px;">
+                                                                        <span style="font-weight: 800; text-transform: uppercase; font-size: 10px; color: #64748b; white-space: nowrap; letter-spacing: 0.05em;">Info</span>
+                                                                        <span style="font-weight: 800; font-size: 13px; color: #334155; text-align: left; word-break: break-word;">No extra detail fields available</span>
                                                                     </div>
                                                                 </div>
                                                             `,

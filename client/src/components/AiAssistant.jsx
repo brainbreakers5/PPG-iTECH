@@ -137,6 +137,24 @@ const AiAssistant = ({ isSidebar, onClose, userRole, isAiMinimized }) => {
     const role = (userRole || user?.role || 'staff').toLowerCase();
     const allowedKIs = AI_KNOWLEDGE_BASE[role] || [];
 
+    // App-specific guidance rules: prioritize feature help, use current page context,
+    // keep responses simple, and redirect unrelated queries back to app workflows.
+    const getCurrentPageContext = () => {
+        const currentPath = location.pathname || '';
+        const directMatch = allowedKIs.find(k => k.link === currentPath);
+        if (directMatch) return directMatch;
+        return allowedKIs.find(k => currentPath.startsWith(k.link));
+    };
+
+    const isUnrelatedQuery = (query) => {
+        const q = String(query || '').toLowerCase();
+        const unrelatedKeywords = [
+            'movie', 'song', 'music', 'cricket score', 'football score', 'weather',
+            'stock price', 'bitcoin', 'recipe', 'joke', 'poem', 'news', 'politics'
+        ];
+        return unrelatedKeywords.some(k => q.includes(k));
+    };
+
     // Splash timer - 1 second
     useEffect(() => {
         const timer = setTimeout(() => setShowSplash(false), 1000);
@@ -401,7 +419,19 @@ const AiAssistant = ({ isSidebar, onClose, userRole, isAiMinimized }) => {
                 }]);
                 speak(reply);
             } else {
-                const reply = "I couldn't find matches for that. Try a specific keyword like 'attendance' or 'profile'.";
+                const pageContext = getCurrentPageContext();
+                let reply = "I could not find an exact match in this app yet.";
+
+                if (isUnrelatedQuery(lowerText)) {
+                    reply = "I can best help with this application. Please ask about features here, such as attendance, leave, salary, profile, logs, or reports.";
+                } else if (!cleanText || cleanText.length < 2) {
+                    reply = "Please tell me what you want to do in this app. For example: open attendance records, apply leave, view salary details, or print report.";
+                } else if (pageContext?.q) {
+                    reply = `You are on ${pageContext.q}. Do you want help with this page or should I open a related module like Attendance Records, Leave Management, Profile, or Security Log?`;
+                } else {
+                    reply = "Try a feature keyword like attendance, leave, payroll, profile, timetable, purchase, calendar, or notifications.";
+                }
+
                 setMessages(prev => [...prev, { 
                     type: 'ai', 
                     text: reply, 
