@@ -207,8 +207,8 @@ const AdminDashboard = () => {
             if (statusLabel === 'Casual Leave') return s === 'CL' || s === 'Leave';
             if (statusLabel === 'Medical Leave') return s === 'ML';
             if (statusLabel === 'Comp Leave') return s === 'Comp Leave';
-            if (statusLabel === 'Loss Of Pay') return String(s).toUpperCase().includes('LOP');
-            if (statusLabel === 'Late Entry') return (r?.remarks || '').includes('Late Entry');
+            if (statusLabel === 'Loss Of Pay') return s.toUpperCase().includes('LOP');
+            if (statusLabel === 'Late Entry') return (r?.remarks || '').includes('Late Entry') || (r?.status || '').includes('Late');
             return false;
         });
     };
@@ -571,11 +571,11 @@ const AdminDashboard = () => {
                                                                     attendanceMap[emp.emp_id]?.status?.startsWith('Present') ? 'bg-emerald-50 text-emerald-600 border-emerald-100' :
                                                                         'bg-sky-50 text-sky-600 border-sky-100'
                                                                 }`}>
-                                                                {(attendanceMap[emp.emp_id]?.remarks || '').includes('Late Entry') ? (
+                                                                {(attendanceMap[emp.emp_id]?.remarks || '').includes('Late Entry') || (attendanceMap[emp.emp_id]?.status || '').includes('Late Entry') ? (
                                                                     <span>{attendanceMap[emp.emp_id]?.status === 'Present' ? 'LE' : `${attendanceMap[emp.emp_id]?.status} (LE)`}</span>
                                                                 ) : attendanceMap[emp.emp_id]?.status?.startsWith('Present +')
                                                                     ? `P / ${attendanceMap[emp.emp_id].status.replace('Present +', '').trim()}`
-                                                                    : (attendanceMap[emp.emp_id]?.status || 'N/A')}
+                                                                    : (attendanceMap[emp.emp_id]?.status || (isNonWorkingDay ? 'N/A' : 'ABSENT'))}
                                                                 {attendanceMap[emp.emp_id]?.status?.startsWith('Present') === false && attendanceMap[emp.emp_id]?.status !== 'Absent' && attendanceMap[emp.emp_id]?.in_time && attendanceMap[emp.emp_id]?.out_time && (
                                                                     <> ({formatTo12Hr(attendanceMap[emp.emp_id].in_time)} - {formatTo12Hr(attendanceMap[emp.emp_id].out_time)})</>
                                                                 )}

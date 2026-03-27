@@ -217,20 +217,25 @@ const rebuildAttendanceFromBiometricTimeline = async (normalizedEmpId, dateStr) 
         let earlyLopUnits = 0;
 
         if (inMins > STD_IN_MINS) {
-            isLateCovered = segments.some((s) => s.type !== 'Present');
+            isLateEntry = true;
+            isLateCovered = segments.filter(s => s.type !== 'Present' && s.type !== 'Permission').some(s => s.fromMins <= STD_IN_MINS && s.toMins >= inMins);
             flags.push(`Late Entry (${physIn})`);
             if (!isLateCovered) {
+                // If late after 9:00 and not covered by leave, mark as LOP
                 lateLopUnits = inMins <= MORNING_HALF_DAY_END_MINS ? 0.5 : 1;
-                if (lateLopUnits === 0.5) flags.push('Morning Session LOP (09:00-12:35)');
+                if (lateLopUnits === 0.5) flags.push('Late LOP (Morning)');
+                else flags.push('Late LOP (Full Day)');
             }
         }
 
         if (physOut && outMins < STD_OUT_MINS) {
-            isEarlyCovered = segments.some((s) => s.type !== 'Present');
+            isEarlyExit = true;
+            isEarlyCovered = segments.filter(s => s.type !== 'Present' && s.type !== 'Permission').some(s => s.fromMins <= outMins && s.toMins >= STD_OUT_MINS);
             flags.push(`Early Exit (${physOut})`);
             if (!isEarlyCovered) {
                 earlyLopUnits = outMins >= EVENING_HALF_DAY_START_MINS ? 0.5 : 1;
-                if (earlyLopUnits === 0.5) flags.push('Evening Session LOP (13:30-16:45)');
+                if (earlyLopUnits === 0.5) flags.push('Early Exit LOP (Evening)');
+                else flags.push('Early Exit LOP (Full Day)');
             }
         }
 
@@ -241,9 +246,16 @@ const rebuildAttendanceFromBiometricTimeline = async (normalizedEmpId, dateStr) 
         if (lopUnits >= 1) {
             dbStatus = leaveInfo ? `LOP + ${leaveInfo}` : 'LOP';
         } else if (lopUnits === 0.5) {
-            dbStatus = 'LOP + Present';
+            // Check if it was Late Entry specifically
+            if (isLateEntry && !isLateCovered) {
+                dbStatus = leaveInfo ? `LOP (Late) + ${leaveInfo}` : 'LOP (Late Entry) + Present';
+            } else if (isEarlyExit && !isEarlyCovered) {
+                dbStatus = leaveInfo ? `LOP (Early) + ${leaveInfo}` : 'LOP (Early Exit) + Present';
+            } else {
+                dbStatus = 'LOP + Present';
+            }
         } else {
-            dbStatus = leaveInfo ? `Present + ${leaveInfo}` : 'Present';
+            dbStatus = leaveInfo ? (isLateEntry ? `Present (Late) + ${leaveInfo}` : `Present + ${leaveInfo}`) : (isLateEntry ? 'Present (Late Entry)' : 'Present');
         }
     } else {
         const fullDay = segments.find((s) => s.isFull);
@@ -547,14 +559,16 @@ exports.receiveLog = async (req, res) => {
                 if (inMins > STD_IN_MINS) {
                     isLateEntry = true;
                     // Any approved leave or permission cancels the automatic LOP for being late
-                    isLateCovered = segments.some(s => s.type !== 'Present'); 
+                    isLateCovered = segments.filter(s => s.type !== 'Present' && s.type !== 'Permission').some(s => s.fromMins <= STD_IN_MINS && s.toMins >= inMins);
                     flags.push(`Late Entry (${physIn})`);
 
                     if (!isLateCovered) {
                         // Morning-only LOP window: 09:00 to 12:35 counts as half-day LOP.
                         lateLopUnits = inMins <= MORNING_HALF_DAY_END_MINS ? 0.5 : 1;
                         if (lateLopUnits === 0.5) {
-                            flags.push('Morning Session LOP (09:00-12:35)');
+                            flags.push('Late LOP (Morning)');
+                        } else {
+                            flags.push('Late LOP (Full Day)');
                         }
                     }
                 }
@@ -564,14 +578,16 @@ exports.receiveLog = async (req, res) => {
                 if (physOut && outMins < STD_OUT_MINS) {
                     isEarlyExit = true;
                     // Any approved leave or permission cancels the automatic LOP for early exit
-                    isEarlyCovered = segments.some(s => s.type !== 'Present');
+                    isEarlyCovered = segments.filter(s => s.type !== 'Present' && s.type !== 'Permission').some(s => s.fromMins <= outMins && s.toMins >= STD_OUT_MINS);
                     flags.push(`Early Exit (${physOut})`);
 
                     if (!isEarlyCovered) {
                         // Evening-only LOP window: 13:30 to 16:45 counts as half-day LOP.
                         earlyLopUnits = outMins >= EVENING_HALF_DAY_START_MINS ? 0.5 : 1;
                         if (earlyLopUnits === 0.5) {
-                            flags.push('Evening Session LOP (13:30-16:45)');
+                            flags.push('Early Exit LOP (Evening)');
+                        } else {
+                            flags.push('Early Exit LOP (Full Day)');
                         }
                     }
                 }
@@ -587,10 +603,15 @@ exports.receiveLog = async (req, res) => {
                 if (lopUnits >= 1) {
                     dbStatus = leaveInfo ? `LOP + ${leaveInfo}` : 'LOP';
                 } else if (lopUnits === 0.5) {
-                    dbStatus = 'LOP + Present';
+                    if (isLateEntry && !isLateCovered) {
+                        dbStatus = leaveInfo ? `LOP (Late) + ${leaveInfo}` : 'LOP (Late Entry) + Present';
+                    } else if (isEarlyExit && !isEarlyCovered) {
+                        dbStatus = leaveInfo ? `LOP (Early) + ${leaveInfo}` : 'LOP (Early Exit) + Present';
+                    } else {
+                        dbStatus = 'LOP + Present';
+                    }
                 } else {
-                    // 2. Covered -> Present (+ Leaves if any)
-                    dbStatus = leaveInfo ? `Present + ${leaveInfo}` : 'Present';
+                    dbStatus = leaveInfo ? (isLateEntry ? `Present (Late) + ${leaveInfo}` : `Present + ${leaveInfo}`) : (isLateEntry ? 'Present (Late Entry)' : 'Present');
                 }
             } else {
                 const fullDay = segments.find(s => s.isFull);
@@ -720,10 +741,12 @@ exports.getBiometricData = async (req, res) => {
     try {
         const { emp_id, date, month, startDate, endDate } = req.query;
         let query = `
-            SELECT b.*, u.name, u.role, d.name as department_name
+            SELECT b.*, u.name, u.role, d.name as department_name, 
+                   ar.status as att_status, ar.remarks as att_remarks
             FROM biometric_attendance b
             JOIN users u ON b.user_id = u.emp_id
             LEFT JOIN departments d ON u.department_id = d.id
+            LEFT JOIN attendance_records ar ON b.user_id = ar.emp_id AND b.date = ar.date
             WHERE 1=1
         `;
         const params = [];

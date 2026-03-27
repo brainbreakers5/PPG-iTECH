@@ -249,8 +249,8 @@ const HODDashboard = () => {
             if (statusLabel === 'Casual Leave') return s === 'CL' || s === 'LEAVE' || remarks.includes('CL') || remarks.includes('CASUAL');
             if (statusLabel === 'Medical Leave') return s === 'ML' || remarks.includes('ML') || remarks.includes('MEDICAL');
             if (statusLabel === 'Comp Leave') return s.includes('COMP LEAVE') || remarks.includes('COMP LEAVE');
-            if (statusLabel === 'Loss Of Pay') return s === 'LOP' || remarks.includes('LOP') || remarks.includes('LOSS OF PAY');
-            if (statusLabel === 'Late Entry') return remarks.includes('LATE ENTRY');
+            if (statusLabel === 'Loss Of Pay') return s.includes('LOP');
+            if (statusLabel === 'Late Entry') return remarks.includes('LATE ENTRY') || s.includes('LATE ENTRY') || s.includes('LATE');
             return false;
         });
     };
@@ -649,19 +649,19 @@ const HODDashboard = () => {
                                                                 attendanceMap[emp.emp_id]?.status?.startsWith('Present') ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 
                                                                 'bg-sky-50 text-sky-600 border-sky-100'
                                                             }`}>
-                                                                {(attendanceMap[emp.emp_id]?.remarks || '').includes('Late Entry') ? (
+                                                                {(attendanceMap[emp.emp_id]?.remarks || '').includes('Late Entry') || (attendanceMap[emp.emp_id]?.status || '').includes('Late Entry') ? (
                                                                     <span>{attendanceMap[emp.emp_id]?.status === 'Present' ? 'LE' : `${attendanceMap[emp.emp_id]?.status} (LE)`}</span>
                                                                 ) : attendanceMap[emp.emp_id]?.status?.startsWith('Present +') 
                                                                     ? `P / ${attendanceMap[emp.emp_id].status.replace('Present +', '').trim()}` 
-                                                                    : (attendanceMap[emp.emp_id]?.status || 'N/A')}
+                                                                    : (attendanceMap[emp.emp_id]?.status || (isNonWorkingDay ? 'N/A' : 'ABSENT'))}
                                                                 {(attendanceMap[emp.emp_id]?.in_time && attendanceMap[emp.emp_id]?.out_time && 
-                                                                  !['Present', 'Absent', 'Holiday', 'Weekend', 'LOP'].includes(attendanceMap[emp.emp_id]?.status) &&
-                                                                  !String(attendanceMap[emp.emp_id]?.status).startsWith('Present')
-                                                                ) && (
-                                                                    <span className="ml-1 opacity-70">
-                                                                        ({formatTo12Hr(attendanceMap[emp.emp_id].in_time)} - {formatTo12Hr(attendanceMap[emp.emp_id].out_time)})
-                                                                    </span>
-                                                                )}
+                                                                   !['Present', 'Absent', 'Holiday', 'Weekend', 'LOP'].includes(attendanceMap[emp.emp_id]?.status) &&
+                                                                   !String(attendanceMap[emp.emp_id]?.status).startsWith('Present')
+                                                                 ) && (
+                                                                     <span className="ml-1 opacity-70">
+                                                                         ({formatTo12Hr(attendanceMap[emp.emp_id].in_time)} - {formatTo12Hr(attendanceMap[emp.emp_id].out_time)})
+                                                                     </span>
+                                                                 )}
                                                             </span>
                                                         </td>
                                                         <td className="px-5 py-4 text-right">
@@ -751,10 +751,10 @@ const HODDashboard = () => {
                                                         <td className="px-5 py-4 whitespace-nowrap">
                                                             <span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest border ${
                                                                 attendanceMap[emp.emp_id]?.status?.startsWith('Present') ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 
-                                                                attendanceMap[emp.emp_id]?.status === 'Absent' ? 'bg-rose-50 text-rose-600 border-rose-100' :
+                                                                (attendanceMap[emp.emp_id]?.status === 'Absent' || (!attendanceMap[emp.emp_id]?.status && !isNonWorkingDay)) ? 'bg-rose-50 text-rose-600 border-rose-100' :
                                                                 'bg-amber-50 text-amber-600 border-amber-100'
                                                             }`}>
-                                                                {attendanceMap[emp.emp_id]?.status || 'N/A'}
+                                                                {attendanceMap[emp.emp_id]?.status || (isNonWorkingDay ? 'N/A' : 'ABSENT')}
                                                             </span>
                                                         </td>
                                                         <td className="px-5 py-4 text-right">

@@ -144,8 +144,8 @@ const ManagementDashboard = () => {
             if (statusLabel === 'Casual Leave') return s === 'CL' || s === 'Leave';
             if (statusLabel === 'Medical Leave') return s === 'ML';
             if (statusLabel === 'Comp Leave') return s === 'Comp Leave';
-            if (statusLabel === 'Loss Of Pay') return String(s).toUpperCase().includes('LOP');
-            if (statusLabel === 'Late Entry') return (r?.remarks || '').includes('Late Entry');
+            if (statusLabel === 'Loss Of Pay') return s.toUpperCase().includes('LOP');
+            if (statusLabel === 'Late Entry') return (r?.remarks || '').toUpperCase().includes('LATE ENTRY') || s.toUpperCase().includes('LATE');
             return false;
         });
     };
@@ -419,15 +419,15 @@ const ManagementDashboard = () => {
                                                         <td className="px-5 py-4 text-sm font-medium text-gray-600 whitespace-nowrap">{emp.department_name || '—'}</td>
                                                         <td className="px-5 py-4 text-right whitespace-nowrap">
                                                             <span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest border ${
-                                                                (attendanceMap[emp.emp_id]?.remarks || '').includes('Late Entry') ? 'bg-orange-50 text-orange-600 border-orange-100' :
+                                                                (attendanceMap[emp.emp_id]?.remarks || '').includes('Late Entry') || (attendanceMap[emp.emp_id]?.status || '').includes('Late Entry') ? 'bg-orange-50 text-orange-600 border-orange-100' :
                                                                 attendanceMap[emp.emp_id]?.status?.startsWith('Present') ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 
                                                                 'bg-purple-50 text-purple-600 border-purple-100'
                                                             }`}>
-                                                                {(attendanceMap[emp.emp_id]?.remarks || '').includes('Late Entry') ? (
+                                                                {(attendanceMap[emp.emp_id]?.remarks || '').includes('Late Entry') || (attendanceMap[emp.emp_id]?.status || '').includes('Late Entry') ? (
                                                                     <span>{attendanceMap[emp.emp_id]?.status === 'Present' ? 'LE' : `${attendanceMap[emp.emp_id]?.status} (LE)`}</span>
                                                                 ) : attendanceMap[emp.emp_id]?.status?.startsWith('Present +') 
                                                                     ? `P / ${attendanceMap[emp.emp_id].status.replace('Present +', '').trim()}` 
-                                                                    : (attendanceMap[emp.emp_id]?.status || 'N/A')}
+                                                                    : (attendanceMap[emp.emp_id]?.status || (isNonWorkingDay ? 'N/A' : 'ABSENT'))}
                                                             </span>
                                                         </td>
                                                     </motion.tr>

@@ -257,13 +257,9 @@ exports.getAttendanceSummary = async (req, res) => {
             SELECT 
                 u.emp_id, u.name, u.role, u.department_id,
                 COALESCE(SUM(
-                    CASE
-                        WHEN au.status_text ILIKE '%+%' THEN
-                            (CASE WHEN TRIM(split_part(au.status_text, '+', 1)) ILIKE 'Present' THEN au.split_unit ELSE 0 END)
-                            +
-                            (CASE WHEN TRIM(split_part(au.status_text, '+', 2)) ILIKE 'Present' THEN au.split_unit ELSE 0 END)
-                        WHEN au.status_text ILIKE '%Present%' THEN au.unit_value
-                        ELSE 0
+                    CASE 
+                        WHEN au.status_text ILIKE '%Present%' THEN 1 
+                        ELSE 0 
                     END
                 ), 0) as total_present,
                 COALESCE(SUM(

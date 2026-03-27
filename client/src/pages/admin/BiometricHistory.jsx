@@ -82,7 +82,8 @@ const BiometricHistory = () => {
                 <td>${formatTo12Hr(log.intime)}</td>
                 <td>${formatTo12Hr(log.outtime)}</td>
                 <td>${calculateHours(log.intime, log.outtime)}</td>
-                <td>${log.outtime ? 'Completed' : 'Active'}</td>
+                <td>${log.att_status || (log.outtime ? 'Completed' : 'Active')}</td>
+                <td>${log.att_remarks || '-'}</td>
             </tr>
         `).join('');
 
@@ -125,6 +126,7 @@ const BiometricHistory = () => {
                                 <th>Out Time</th>
                                 <th>Duration</th>
                                 <th>Status</th>
+                                <th>Alerts/Remarks</th>
                             </tr>
                         </thead>
                         <tbody>${rowsHtml}</tbody>
@@ -227,7 +229,8 @@ const BiometricHistory = () => {
                                     <th className="px-8 py-6 text-[9px] font-black text-gray-400 uppercase tracking-widest text-center">Date</th>
                                     <th className="px-8 py-6 text-[9px] font-black text-gray-400 uppercase tracking-widest text-center">Punches</th>
                                     <th className="px-8 py-6 text-[9px] font-black text-gray-400 uppercase tracking-widest text-center">Duration</th>
-                                    <th className="px-8 py-6 text-[9px] font-black text-gray-400 uppercase tracking-widest text-right">Status</th>
+                                    <th className="px-8 py-6 text-[9px] font-black text-gray-400 uppercase tracking-widest text-right">Att. Status</th>
+                                    <th className="px-8 py-6 text-[9px] font-black text-gray-400 uppercase tracking-widest text-right">Sync Status</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-50">
@@ -283,6 +286,23 @@ const BiometricHistory = () => {
                                                 <div className="inline-flex items-center gap-2 bg-sky-50 text-sky-700 px-3 py-1.5 rounded-xl border border-sky-100">
                                                     <FaClock size={10} className="text-sky-400" />
                                                     <span className="text-[11px] font-black">{calculateHours(log.intime, log.outtime)}</span>
+                                                </div>
+                                            </td>
+                                            <td className="px-8 py-5 text-right">
+                                                <div className="flex flex-col items-end gap-1">
+                                                    <span className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest border ${
+                                                        (log.att_status || '').includes('LOP') ? 'bg-rose-50 text-rose-600 border-rose-100' :
+                                                        (log.att_status || '').includes('Late') ? 'bg-orange-50 text-orange-600 border-orange-100' :
+                                                        (log.att_status || '').startsWith('Present') ? 'bg-emerald-50 text-emerald-600 border-emerald-100' :
+                                                        'bg-gray-50 text-gray-600 border-gray-100'
+                                                    }`}>
+                                                        {log.att_status || 'Pending Sync'}
+                                                    </span>
+                                                    {log.att_remarks && (
+                                                        <span className="text-[8px] font-bold text-gray-400 italic max-w-[120px] truncate" title={log.att_remarks}>
+                                                            {log.att_remarks}
+                                                        </span>
+                                                    )}
                                                 </div>
                                             </td>
                                             <td className="px-8 py-5 text-right">
