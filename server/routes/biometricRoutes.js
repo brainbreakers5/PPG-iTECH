@@ -5,6 +5,7 @@ const {
 	getBiometricData,
 	getBiometricStats,
 	backfillTodayFromAttendance,
+	rebuildTodayPunches,
 	getAdmsLastSeen,
 	markAdmsHeartbeatSeen,
 	markAdmsCdataSeen,
@@ -159,6 +160,8 @@ router.post('/log', receiveLog);
 
 // Backfill today's manually entered attendance times into biometric live data
 router.post('/backfill-today-from-attendance', protect, restrictTo('admin', 'management'), backfillTodayFromAttendance);
+// Retroactively rebuild today's attendance from biometric logs (apply 9AM LOP rule)
+router.post('/rebuild-today', protect, restrictTo('admin', 'management'), rebuildTodayPunches);
 
 // Endpoints for web frontend to fetch data
 router.get('/data', protect, getBiometricData);

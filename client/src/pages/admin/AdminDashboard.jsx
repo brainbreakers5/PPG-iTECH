@@ -5,7 +5,7 @@ import { useSocket } from '../../context/SocketContext';
 import { useAuth } from '../../context/AuthContext';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
-import { FaBirthdayCake, FaUserCheck, FaUserTimes, FaCalendarDay, FaFileAlt, FaTimes, FaCalendarAlt, FaStar, FaBriefcase, FaEye, FaClock, FaHistory, FaFilter } from 'react-icons/fa';
+import { FaBirthdayCake, FaUserCheck, FaUserTimes, FaCalendarDay, FaFileAlt, FaTimes, FaCalendarAlt, FaStar, FaBriefcase, FaEye, FaClock, FaHistory, FaFilter, FaSync } from 'react-icons/fa';
 import AttendanceHistory from '../../components/AttendanceHistory';
 import { formatTo12Hr } from '../../utils/timeFormatter';
 import { getCurrentDayStatus } from '../../utils/currentDayStatus';
@@ -57,6 +57,22 @@ const AdminDashboard = () => {
         heartbeat_last_seen_at: null,
         cdata_last_seen_at: null,
     });
+    const [rebuildingToday, setRebuildingToday] = useState(false);
+    const [rebuildResult, setRebuildResult] = useState(null);
+
+    const handleRebuildToday = async () => {
+        setRebuildingToday(true);
+        setRebuildResult(null);
+        try {
+            const { data } = await api.post('/biometric/rebuild-today');
+            setRebuildResult({ success: true, message: data.message, results: data.results || [] });
+            fetchDashboardData(); // Refresh dashboard after rebuild
+        } catch (err) {
+            setRebuildResult({ success: false, message: err?.response?.data?.message || 'Rebuild failed' });
+        } finally {
+            setRebuildingToday(false);
+        }
+    };
 
     const formatLastSeen = (isoTs) => {
         if (!isoTs) return 'Never';
@@ -195,20 +211,26 @@ const AdminDashboard = () => {
         if (statusLabel === 'Total') return roleEmps;
         
         return roleEmps.filter(emp => {
-            const r = attendanceMap[emp.emp_id]; // Get the full attendance record
-            const s = r?.status || '';
-            if (statusLabel === 'Present') return s === 'Present';
+            const r = attendanceMap[emp.emp_id]; // Full attendance record or undefined
+            const s = String(r?.status || '').toUpperCase();
+            const rem = String(r?.remarks || '').toUpperCase();
+
+            if (statusLabel === 'Present') {
+                // Present = has a record AND status contains Present but NOT LOP
+                return r && s.includes('PRESENT') && !s.includes('LOP');
+            }
             if (statusLabel === 'Absent') {
                 if (isNonWorkingDay) return false;
-                const normalizedStatus = String(s).toUpperCase();
-                return !normalizedStatus || (normalizedStatus.includes('ABSENT') && !normalizedStatus.includes('LOP'));
+                // Absent = no record at all, OR status is explicitly Absent (no LOP, no leave)
+                if (!r || !s) return true;
+                return s.includes('ABSENT') && !s.includes('LOP');
             }
-            if (statusLabel === 'On Duty') return s === 'OD';
-            if (statusLabel === 'Casual Leave') return s === 'CL' || s === 'Leave';
-            if (statusLabel === 'Medical Leave') return s === 'ML';
-            if (statusLabel === 'Comp Leave') return s === 'Comp Leave';
-            if (statusLabel === 'Loss Of Pay') return s.toUpperCase().includes('LOP');
-            if (statusLabel === 'Late Entry') return (r?.remarks || '').includes('Late Entry') || (r?.status || '').includes('Late');
+            if (statusLabel === 'On Duty') return s.includes('OD') || rem.includes('OD') || rem.includes('ON DUTY');
+            if (statusLabel === 'Casual Leave') return (s.includes('CL') || s.includes('LEAVE') || rem.includes('CL') || rem.includes('CASUAL')) && !s.includes('COMP') && !rem.includes('COMP');
+            if (statusLabel === 'Medical Leave') return s.includes('ML') || rem.includes('ML') || rem.includes('MEDICAL');
+            if (statusLabel === 'Comp Leave') return s.includes('COMP LEAVE') || rem.includes('COMP LEAVE') || rem.includes('COMPENSATORY');
+            if (statusLabel === 'Loss Of Pay') return s.includes('LOP');
+            if (statusLabel === 'Late Entry') return s.includes('LATE') || rem.includes('LATE ENTRY');
             return false;
         });
     };
@@ -306,6 +328,28 @@ const AdminDashboard = () => {
                                 <p className="text-[9px] font-black text-emerald-500 uppercase tracking-widest">Data Push (/cdata)</p>
                                 <p className="text-xs font-black text-gray-700">{formatLastSeen(admsLastSeen.cdata_last_seen_at)}</p>
                             </div>
+                        </div>
+                    </div>
+                    {/* Rebuild Today's LOP Button */}
+                    <div className="mt-4 pt-4 border-t border-gray-50 flex items-center justify-between gap-4 flex-wrap">
+                        <div>
+                            <p className="text-[9px] font-black text-rose-500 uppercase tracking-widest">Biometric LOP Enforcement</p>
+                            <p className="text-[10px] font-bold text-gray-500">Re-calculate LOP for all employees who punched in after 9:00 AM today</p>
+                        </div>
+                        <div className="flex items-center gap-3">
+                            {rebuildResult && (
+                                <span className={`text-[9px] font-black uppercase tracking-widest px-3 py-1.5 rounded-xl border ${rebuildResult.success ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-rose-50 text-rose-600 border-rose-100'}`}>
+                                    {rebuildResult.message}
+                                </span>
+                            )}
+                            <button
+                                onClick={handleRebuildToday}
+                                disabled={rebuildingToday}
+                                className="flex items-center gap-2 px-5 py-2.5 bg-rose-600 text-white rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-rose-700 transition-all shadow-md shadow-rose-100 disabled:opacity-60 disabled:cursor-not-allowed"
+                            >
+                                <FaSync className={rebuildingToday ? 'animate-spin' : ''} size={10} />
+                                {rebuildingToday ? 'Rebuilding...' : "Rebuild Today's LOP"}
+                            </button>
                         </div>
                     </div>
                 </div>

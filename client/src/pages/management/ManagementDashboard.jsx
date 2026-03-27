@@ -133,19 +133,20 @@ const ManagementDashboard = () => {
         if (statusLabel === 'All') return roleEmps;
         return roleEmps.filter(emp => {
             const r = attendanceMap[emp.emp_id];
-            const s = r?.status || '';
-            if (statusLabel === 'Present') return s === 'Present';
+            const s = String(r?.status || '').toUpperCase();
+            const rem = String(r?.remarks || '').toUpperCase();
+            if (statusLabel === 'Present') return r && s.includes('PRESENT') && !s.includes('LOP');
             if (statusLabel === 'Absent') {
                 if (isNonWorkingDay) return false;
-                const normalizedStatus = String(s).toUpperCase();
-                return !normalizedStatus || (normalizedStatus.includes('ABSENT') && !normalizedStatus.includes('LOP'));
+                if (!r || !s) return true;
+                return s.includes('ABSENT') && !s.includes('LOP');
             }
-            if (statusLabel === 'On Duty') return s === 'OD';
-            if (statusLabel === 'Casual Leave') return s === 'CL' || s === 'Leave';
-            if (statusLabel === 'Medical Leave') return s === 'ML';
-            if (statusLabel === 'Comp Leave') return s === 'Comp Leave';
-            if (statusLabel === 'Loss Of Pay') return s.toUpperCase().includes('LOP');
-            if (statusLabel === 'Late Entry') return (r?.remarks || '').toUpperCase().includes('LATE ENTRY') || s.toUpperCase().includes('LATE');
+            if (statusLabel === 'On Duty') return s.includes('OD') || rem.includes('OD');
+            if (statusLabel === 'Casual Leave') return (s.includes('CL') || s.includes('LEAVE') || rem.includes('CL') || rem.includes('CASUAL')) && !s.includes('COMP') && !rem.includes('COMP');
+            if (statusLabel === 'Medical Leave') return s.includes('ML') || rem.includes('ML') || rem.includes('MEDICAL');
+            if (statusLabel === 'Comp Leave') return s.includes('COMP LEAVE') || rem.includes('COMP LEAVE');
+            if (statusLabel === 'Loss Of Pay') return s.includes('LOP');
+            if (statusLabel === 'Late Entry') return s.includes('LATE') || rem.includes('LATE ENTRY');
             return false;
         });
     };
