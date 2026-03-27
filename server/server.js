@@ -195,6 +195,11 @@ app.set('trust proxy', 1);
 
 // Socket handlers are now in utils/socket.js
 
+// Root Route for basic server status
+app.get('/', (req, res) => {
+    res.send('Server is running 🚀');
+});
+
 // Routes Registration
 // Compatibility aliases for biometric devices that ping these paths directly.
 // These are now handled by biometricRoutes mounted at /iclock and as a fallback below.
