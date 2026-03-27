@@ -64,36 +64,33 @@ const ManagementDashboard = () => {
                 const role = (r.role || '').toLowerCase();
                 const bucket = agg[role] || agg.staff;
                 const p = Number(r.total_present) || 0;
-                const l = Number(r.total_leave) || 0;
                 const o = Number(r.total_od) || 0;
                 const lp = Number(r.total_lop) || 0;
                 const late = Number(r.total_late) || 0;
+                const abs = Number(r.total_actual_absent || (r.total_absent > 0 ? r.total_absent : 0)) || 0;
                 
                 bucket.present += p;
                 bucket.od += o;
                 bucket.lop += lp;
                 bucket.late_entry += late;
-                
-                // Only count as absent if it's a working day
-                if (!isTodayNonWorking && p === 0 && l === 0 && o === 0 && lp === 0) {
-                    bucket.absent += 1;
-                    agg.absent += 1;
-                }
+                bucket.absent += abs;
                 
                 agg.present += p;
                 agg.od += o;
                 agg.lop += lp;
                 agg.late_entry += late;
+                agg.absent += abs;
             });
             // Count individual leave types from attendance map
             (emps || []).forEach(emp => {
-                const r = map[emp.emp_id];
-                const s = r?.status || '';
+                const r = attendanceMap[emp.emp_id] || {};
+                const s = (r.status || '').toUpperCase();
+                const rem = (r.remarks || '').toUpperCase();
                 const role = (emp.role || '').toLowerCase();
                 const bucket = agg[role] || agg.staff;
-                if (s === 'CL' || s === 'Leave') { bucket.cl++; agg.cl++; }
-                else if (s === 'ML') { bucket.ml++; agg.ml++; }
-                else if (s === 'Comp Leave') { bucket.comp_leave++; agg.comp_leave++; }
+                if ((s.includes('CL') || rem.includes('CL') || rem.includes('CASUAL')) && !s.includes('COMP') && !rem.includes('COMP')) { bucket.cl++; agg.cl++; }
+                else if (s.includes('ML') || rem.includes('ML') || rem.includes('MEDICAL')) { bucket.ml++; agg.ml++; }
+                else if (s.includes('COMP LEAVE') || rem.includes('COMP LEAVE') || rem.includes('COMPENSATORY')) { bucket.comp_leave++; agg.comp_leave++; }
             });
             setStats(agg);
             const daysInMonth = new Date(curYear, curMonth, 0).getDate();

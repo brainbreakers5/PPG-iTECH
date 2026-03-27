@@ -115,12 +115,12 @@ const HODDashboard = () => {
 
                 if (s.includes('PRESENT')) counts.present++;
                 if (s.includes('ABSENT') && !isNonWorking) counts.absent++;
-                if (s.includes('OD') || rem.includes('OD')) counts.od++;
+                if (s.includes('OD') || rem.includes('OD') || rem.includes('ON DUTY')) counts.od++;
                 if ((s.includes('CL') || rem.includes('CL') || rem.includes('CASUAL')) && !s.includes('COMP') && !rem.includes('COMP')) counts.cl++;
                 if (s.includes('ML') || rem.includes('ML') || rem.includes('MEDICAL')) counts.ml++;
-                if (s.includes('COMP LEAVE') || rem.includes('COMP LEAVE')) counts.comp_leave++;
-                if (s.includes('LOP') || rem.includes('LOP')) counts.lop++;
-                if (rem.includes('LATE ENTRY')) counts.late_entry++;
+                if (s.includes('COMP LEAVE') || rem.includes('COMP LEAVE') || rem.includes('COMPENSATORY')) counts.comp_leave++;
+                if (s.includes('LOP') || rem.includes('LOP') || rem.includes('LOSS OF PAY')) counts.lop++;
+                if (rem.includes('LATE ENTRY') || s.includes('LATE ENTRY')) counts.late_entry++;
             });
             setMyStats(counts);
 
@@ -135,32 +135,26 @@ const HODDashboard = () => {
                 const role = (r.role || '').toLowerCase();
                 const isHod = role === 'hod';
                 const isInDept = currentDeptId !== null && String(r.department_id) === String(currentDeptId);
-                // HOD core should show all HODs institution-wide like principal.
-                // Staff core remains scoped to current HOD's department.
                 if (!isHod && !isInDept) return;
 
                 const bucket = isHod ? agg.hod : agg.staff;
                 const p = Number(r.total_present) || 0;
-                const l = Number(r.total_leave) || 0;
                 const o = Number(r.total_od) || 0;
                 const lp = Number(r.total_lop) || 0;
                 const late = Number(r.total_late) || 0;
+                const abs = Number(r.total_actual_absent || (r.total_absent > 0 ? r.total_absent : 0)) || 0;
 
                 bucket.present += p;
                 bucket.od += o;
                 bucket.lop += lp;
                 bucket.late_entry += late;
-                
-                // Only count as absent if it's a working day
-                if (!isTodayNonWorking && p === 0 && l === 0 && o === 0 && lp === 0) {
-                    bucket.absent += 1;
-                    agg.absent += 1;
-                }
+                bucket.absent += abs;
                 
                 agg.present += p;
                 agg.od += o;
                 agg.lop += lp;
                 agg.late_entry += late;
+                agg.absent += abs;
             });
             // Count individual leave types from attendance map for the same subset
             (emps || []).forEach(emp => {
@@ -176,7 +170,7 @@ const HODDashboard = () => {
                 
                 if ((s.includes('CL') || rem.includes('CL') || rem.includes('CASUAL')) && !s.includes('COMP') && !rem.includes('COMP')) { bucket.cl++; agg.cl++; }
                 if (s.includes('ML') || rem.includes('ML') || rem.includes('MEDICAL')) { bucket.ml++; agg.ml++; }
-                if (s.includes('COMP LEAVE') || rem.includes('COMP LEAVE')) { bucket.comp_leave++; agg.comp_leave++; }
+                if (s.includes('COMP LEAVE') || rem.includes('COMP LEAVE') || rem.includes('COMPENSATORY')) { bucket.comp_leave++; agg.comp_leave++; }
             });
             setStats(agg);
             

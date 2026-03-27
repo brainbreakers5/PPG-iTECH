@@ -50,7 +50,10 @@ const AttendanceHistory = ({ empId, month: propMonth, startDate, endDate, recent
             if (onLoadSummary && data) {
                  const workingDays = data.filter(r => r.status && !['Weekend', 'Holiday'].includes(r.status)).length;
                  const holidays = data.filter(r => r.status === 'Holiday').length;
-                 onLoadSummary({ workingDays, holidays });
+                 const absent = data.filter(r => String(r.status).includes('Absent')).length;
+                 const lop = data.filter(r => String(r.status).includes('LOP') || String(r.remarks).includes('LOP') || String(r.remarks).includes('Loss of Pay')).length;
+                 const lateEntry = data.filter(r => String(r.remarks).includes('Late Entry') || String(r.status).includes('Late Entry')).length;
+                 onLoadSummary({ workingDays, holidays, absent, lop, lateEntry });
             }
         }
     }, [empId, propMonth, startDate, endDate, recentOnly, statusFilter, onLoadSummary]);

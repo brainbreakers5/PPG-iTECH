@@ -389,7 +389,7 @@ const AttendanceRecord = () => {
                     rec.name,
                     rec.role,
                     formatDayCount(rec.total_present),
-                    formatDayCount((rec.total_computed_absent != null && Number(rec.total_computed_absent) > 0) ? rec.total_computed_absent : rec.total_absent),
+                    formatDayCount(rec.total_actual_absent ?? (Number(rec.total_absent || 0) + (rec.total_computed_absent || 0))),
                     formatDayCount(rec.total_lop),
                     formatDayCount(rec.total_cl),
                     formatDayCount(rec.total_ml),
@@ -707,7 +707,7 @@ const AttendanceRecord = () => {
                                                     <span className="px-3 py-1 bg-gray-100 rounded-full">{rec.role}</span>
                                                 </td>
                                                 <td className="p-5 text-sm font-black text-center text-sky-600">{formatDayCount(rec.total_present)}</td>
-                                                <td className="p-5 text-sm font-black text-center text-rose-500">{formatDayCount((rec.total_computed_absent != null && Number(rec.total_computed_absent) > 0) ? rec.total_computed_absent : rec.total_absent)}</td>
+                                                <td className="p-5 text-sm font-black text-center text-rose-500">{formatDayCount(rec.total_actual_absent ?? (Number(rec.total_absent || 0) + (rec.total_computed_absent || 0)))}</td>
                                                 <td className="p-5 text-sm font-black text-center text-rose-800">{formatDayCount(rec.total_lop)}</td>
                                                 <td className="p-5 text-sm font-black text-center text-amber-500">{formatDayCount(rec.total_cl)}</td>
                                                 <td className="p-5 text-sm font-black text-center text-orange-500">{formatDayCount(rec.total_ml)}</td>

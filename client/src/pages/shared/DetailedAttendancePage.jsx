@@ -10,7 +10,7 @@ const DetailedAttendancePage = () => {
     const { empId, month, startDate: paramStart, endDate: paramEnd } = useParams();
     const navigate = useNavigate();
     const printRef = useRef(null);
-    const [summary, setSummary] = React.useState({ workingDays: 0, holidays: 0 });
+    const [summary, setSummary] = React.useState({ workingDays: 0, holidays: 0, absent: 0, lop: 0, lateEntry: 0 });
 
     // Support both month-based and range-based navigation
     const start = paramStart || (month ? `${month}-01` : null);
@@ -76,7 +76,10 @@ const DetailedAttendancePage = () => {
                 Employee: <b>${empId}</b> &nbsp;|&nbsp; 
                 Period: ${periodLabel} &nbsp;|&nbsp; 
                 Working Days: <b>${summary.workingDays}</b> &nbsp;|&nbsp; 
-                Holidays: <b>${summary.holidays}</b>
+                Holidays: <b>${summary.holidays}</b> &nbsp;|&nbsp;
+                Absent: <b>${summary.absent}</b> &nbsp;|&nbsp;
+                LOP: <b>${summary.lop}</b> &nbsp;|&nbsp;
+                Late Entry: <b>${summary.lateEntry}</b>
             </div>
             <table>
                 <thead><tr><th>Date</th><th>Status</th><th>In Time</th><th>Out Time</th><th>Work Hours</th><th>Remarks</th></tr></thead>
@@ -117,6 +120,12 @@ const DetailedAttendancePage = () => {
                             <span className="flex items-center gap-1">W.Days: <b className="text-emerald-600 ml-1">{summary.workingDays}</b></span>
                             <span className="h-1 w-1 bg-gray-300 rounded-full"></span>
                             <span className="flex items-center gap-1">Holidays: <b className="text-rose-500 ml-1">{summary.holidays}</b></span>
+                            <span className="h-1 w-1 bg-gray-300 rounded-full"></span>
+                            <span className="flex items-center gap-1">Absent: <b className="text-rose-600 ml-1">{summary.absent}</b></span>
+                            <span className="h-1 w-1 bg-gray-300 rounded-full"></span>
+                            <span className="flex items-center gap-1">LOP: <b className="text-rose-900 ml-1">{summary.lop}</b></span>
+                            <span className="h-1 w-1 bg-gray-300 rounded-full"></span>
+                            <span className="flex items-center gap-1">Late: <b className="text-orange-600 ml-1">{summary.lateEntry}</b></span>
                         </p>
                     </div>
                 </div>

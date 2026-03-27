@@ -60,12 +60,12 @@ const StaffDashboard = () => {
                 if (s.includes('PRESENT')) counts.present++;
                 // Skip absent on holidays/weekends
                 if (s.includes('ABSENT') && !isNonWorking) counts.absent++;
-                if (s.includes('OD') || rem.includes('OD')) counts.od++;
+                if (s.includes('OD') || rem.includes('OD') || rem.includes('ON DUTY')) counts.od++;
                 if ((s.includes('CL') || rem.includes('CL') || rem.includes('CASUAL')) && !s.includes('COMP') && !rem.includes('COMP')) counts.cl++;
                 if (s.includes('ML') || rem.includes('ML') || rem.includes('MEDICAL')) counts.ml++;
-                if (s.includes('COMP LEAVE') || rem.includes('COMP LEAVE')) counts.comp_leave++;
-                if (s.includes('LOP') || rem.includes('LOP')) counts.lop++;
-                if (rem.includes('LATE ENTRY')) counts.late_entry++;
+                if (s.includes('COMP LEAVE') || rem.includes('COMP LEAVE') || rem.includes('COMPENSATORY')) counts.comp_leave++;
+                if (s.includes('LOP') || rem.includes('LOP') || rem.includes('LOSS OF PAY')) counts.lop++;
+                if (rem.includes('LATE ENTRY') || s.includes('LATE ENTRY')) counts.late_entry++;
             });
             setMyStats(counts);
 

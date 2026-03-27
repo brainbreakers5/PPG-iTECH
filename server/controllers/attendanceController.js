@@ -333,7 +333,7 @@ exports.getAttendanceSummary = async (req, res) => {
                         ELSE 0
                     END
                 ), 0) as total_lop,
-                COALESCE(SUM(CASE WHEN au.remarks_text ILIKE '%Late Entry%' THEN 1 ELSE 0 END), 0) as total_late,
+                COALESCE(SUM(CASE WHEN au.status_text ILIKE '%Late Entry%' OR au.remarks_text ILIKE '%Late Entry%' THEN 1 ELSE 0 END), 0) as total_late,
                 COALESCE(
                     SUM(
                         CASE
@@ -375,6 +375,16 @@ exports.getAttendanceSummary = async (req, res) => {
                 ct.total_working_days,
                 ct.total_holidays
                 , GREATEST(0, ct.total_working_days - COALESCE(COUNT(au.attendance_id), 0)) as total_computed_absent
+                , COALESCE(SUM(
+                    CASE
+                        WHEN au.status_text ILIKE '%+%' THEN
+                            (CASE WHEN TRIM(split_part(au.status_text, '+', 1)) ILIKE 'Absent' THEN au.split_unit ELSE 0 END)
+                            +
+                            (CASE WHEN TRIM(split_part(au.status_text, '+', 2)) ILIKE 'Absent' THEN au.split_unit ELSE 0 END)
+                        WHEN au.status_text ILIKE '%Absent%' THEN au.unit_value
+                        ELSE 0
+                    END
+                ), 0) + GREATEST(0, ct.total_working_days - COALESCE(COUNT(au.attendance_id), 0)) as total_actual_absent
 
             FROM public.users u
             CROSS JOIN calendar_totals ct
