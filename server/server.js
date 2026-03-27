@@ -201,12 +201,18 @@ app.get('/', (req, res) => {
 });
 
 // Routes Registration
-// Compatibility aliases for biometric devices that ping these paths directly.
-// These are now handled by biometricRoutes mounted at /iclock and as a fallback below.
+// ✅ FINAL FIX for ADMS Biometric Connection
+app.get('/iclock/getrequest', (req, res) => {
+    console.log("📡 Device polling /iclock/getrequest...");
+    res.set('Content-Type', 'text/plain');
+    res.send(''); // Crucial: Empty response switches device to "Push Mode"
+});
+
+// Fallback for root-level pollers
 app.get('/getrequest', (req, res) => {
     console.log('📡 Device polling /getrequest fallback...');
     res.set('Content-Type', 'text/plain');
-    res.send(''); // Matches requirement for push-mode switch
+    res.send(''); 
 });
 
 app.use('/api/auth', authRoutes);
