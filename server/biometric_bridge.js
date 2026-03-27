@@ -10,7 +10,7 @@ require('dotenv').config();
  */
 
 const DEVICE_IP = '172.16.100.81';
-const DEVICE_PORT = 443;
+const DEVICE_PORT = 4370;
 const SERVER_API_URL = process.env.SERVER_API_BIOMETRIC_URL || `http://localhost:${process.env.PORT || 5000}/api/biometric/log`; // Adjust if server is remote
 
 async function startBridge() {
