@@ -195,6 +195,14 @@ app.set('trust proxy', 1);
 // Socket handlers are now in utils/socket.js
 
 // Routes Registration
+// Compatibility aliases for biometric devices that ping these paths directly.
+app.get('/getrequest', (req, res) => {
+    res.type('text/plain').status(200).send('OK');
+});
+app.get('/iclock/getrequest', (req, res) => {
+    res.type('text/plain').status(200).send('OK');
+});
+
 app.use('/api/auth', authRoutes);
 app.use('/api/employees', employeeRoutes);
 app.use('/api/departments', departmentRoutes);
