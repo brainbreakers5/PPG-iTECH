@@ -204,6 +204,8 @@ app.get('/', (req, res) => {
 // ✅ FINAL FIX for ADMS Biometric Connection
 app.get('/iclock/getrequest', (req, res) => {
     console.log("📡 Device polling /iclock/getrequest...");
+    const { markAdmsHeartbeatSeen } = require('./controllers/biometricController');
+    markAdmsHeartbeatSeen({ sn: req.query.SN || null, ip: req.ip });
     res.set('Content-Type', 'text/plain');
     res.send(''); // Crucial: Empty response switches device to "Push Mode"
 });
@@ -211,6 +213,8 @@ app.get('/iclock/getrequest', (req, res) => {
 // Fallback for root-level pollers
 app.get('/getrequest', (req, res) => {
     console.log('📡 Device polling /getrequest fallback...');
+    const { markAdmsHeartbeatSeen } = require('./controllers/biometricController');
+    markAdmsHeartbeatSeen({ sn: req.query.SN || null, ip: req.ip });
     res.set('Content-Type', 'text/plain');
     res.send(''); 
 });
