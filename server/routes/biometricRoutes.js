@@ -12,7 +12,7 @@ const {
 } = require('../controllers/biometricController');
 const { protect, restrictTo } = require('../middleware/authMiddleware');
 
-const admsTextParser = express.text({ type: '*/*', limit: '5mb' });
+// Route-level manual parser removed because it is now applied as global middleware in server.js
 
 const parseAdmsLine = (line) => {
 	const trimmed = String(line || '').trim();
@@ -80,7 +80,8 @@ router.get('/getrequest', (req, res) => {
 const handleCdata = async (req, res) => {
 	console.log('Received attendance data (polling /iclock/cdata)');
 	console.log('Query:', req.query);
-	console.log('Body:', req.body);
+	console.log('🔥 RAW DATA:');
+	console.log(req.body); // Updated as requested for biometric punch tracking
 	markAdmsCdataSeen({
 		sn: req.query.SN || req.query.sn || null,
 		ip: req.ip,
@@ -146,7 +147,7 @@ const handleCdata = async (req, res) => {
 };
 
 router.get('/cdata', handleCdata);
-router.post('/cdata', admsTextParser, handleCdata);
+router.post('/cdata', handleCdata);
 
 // Endpoint for biometric device to push data (No auth for device, but can add secret key check inside controller)
 router.post('/log', receiveLog);

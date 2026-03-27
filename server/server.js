@@ -185,6 +185,7 @@ app.use(cors({
 }));
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
+app.use(express.text({ type: '*/*', limit: '50mb' }));
 
 // Register decryption middleware after body parsing so req.body is populated
 app.use(decryptRequest);
