@@ -146,7 +146,6 @@ const handleCdata = async (req, res) => {
 	res.type('text/plain').status(200).send('OK');
 };
 
-router.get('/cdata', handleCdata);
 router.post('/cdata', handleCdata);
 
 // Endpoint for biometric device to push data (No auth for device, but can add secret key check inside controller)
