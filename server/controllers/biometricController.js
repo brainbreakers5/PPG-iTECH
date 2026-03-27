@@ -198,7 +198,6 @@ const rebuildAttendanceFromBiometricTimeline = async (normalizedEmpId, dateStr) 
 
     const STD_IN_MINS = 540;
     const STD_OUT_MINS = 1005;
-    const MORNING_HALF_DAY_END_MINS = 755;
     const EVENING_HALF_DAY_START_MINS = 810;
 
     let flags = [];
@@ -220,8 +219,9 @@ const rebuildAttendanceFromBiometricTimeline = async (normalizedEmpId, dateStr) 
             isLateCovered = segments.some((s) => s.type !== 'Present');
             flags.push(`Late Entry (${physIn})`);
             if (!isLateCovered) {
-                lateLopUnits = inMins <= MORNING_HALF_DAY_END_MINS ? 0.5 : 1;
-                if (lateLopUnits === 0.5) flags.push('Morning Session LOP (09:00-12:35)');
+                // Late arrival always marks only the morning session as LOP.
+                lateLopUnits = 0.5;
+                flags.push('Morning Session LOP (09:00-12:35)');
             }
         }
 
@@ -521,7 +521,6 @@ exports.receiveLog = async (req, res) => {
             // 4. Detailed Calculation for Late Entry / Early Exit / Working Hours
             const STD_IN_MINS = 540;   // 09:00
             const STD_OUT_MINS = 1005; // 16:45
-            const MORNING_HALF_DAY_END_MINS = 755; // 12:35
             const EVENING_HALF_DAY_START_MINS = 810; // 13:30
 
             let flags = [];
@@ -551,11 +550,9 @@ exports.receiveLog = async (req, res) => {
                     flags.push(`Late Entry (${physIn})`);
 
                     if (!isLateCovered) {
-                        // Morning-only LOP window: 09:00 to 12:35 counts as half-day LOP.
-                        lateLopUnits = inMins <= MORNING_HALF_DAY_END_MINS ? 0.5 : 1;
-                        if (lateLopUnits === 0.5) {
-                            flags.push('Morning Session LOP (09:00-12:35)');
-                        }
+                        // Late arrival always marks only the morning session as LOP.
+                        lateLopUnits = 0.5;
+                        flags.push('Morning Session LOP (09:00-12:35)');
                     }
                 }
 

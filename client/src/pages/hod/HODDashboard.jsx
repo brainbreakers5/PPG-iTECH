@@ -249,7 +249,7 @@ const HODDashboard = () => {
             if (statusLabel === 'Present') return s.startsWith('PRESENT');
             if (statusLabel === 'Absent') {
                 if (isNonWorkingDay) return false;
-                return (!s || s === 'ABSENT') && s !== 'LOP';
+                return !s || (s.includes('ABSENT') && !s.includes('LOP'));
             }
             if (statusLabel === 'On Duty') return s === 'OD' || remarks.includes('OD') || remarks.includes('ON DUTY');
             if (statusLabel === 'Casual Leave') return s === 'CL' || s === 'LEAVE' || remarks.includes('CL') || remarks.includes('CASUAL');

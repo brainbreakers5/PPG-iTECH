@@ -203,7 +203,8 @@ const AdminDashboard = () => {
             if (statusLabel === 'Present') return s === 'Present';
             if (statusLabel === 'Absent') {
                 if (isNonWorkingDay) return false;
-                return (!s || s === 'Absent') && s !== 'LOP';
+                const normalizedStatus = String(s).toUpperCase();
+                return !normalizedStatus || (normalizedStatus.includes('ABSENT') && !normalizedStatus.includes('LOP'));
             }
             if (statusLabel === 'On Duty') return s === 'OD';
             if (statusLabel === 'Casual Leave') return s === 'CL' || s === 'Leave';

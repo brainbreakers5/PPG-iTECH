@@ -213,7 +213,7 @@ const Dashboard = () => {
             if (statusLabel === 'Present') return s.includes('PRESENT');
             if (statusLabel === 'Absent') {
                 if (isNonWorkingDay) return false;
-                return (!s || s === 'ABSENT') && s !== 'LOP';
+                return !s || (s.includes('ABSENT') && !s.includes('LOP'));
             }
             if (statusLabel === 'On Duty') return s === 'OD' || rem.includes('OD') || rem.includes('ON DUTY');
             if (statusLabel === 'Casual Leave') return (s.includes('CL') || rem.includes('CL') || rem.includes('CASUAL')) && !s.includes('COMP') && !rem.includes('COMP');
