@@ -68,20 +68,21 @@ const getAdmsBodyText = (req) => {
 
 // ADMS heartbeat endpoint (device polls this URL)
 router.get('/getrequest', (req, res) => {
-	console.log('Device polling /iclock/getrequest');
+	console.log('📡 Device polling /iclock/getrequest...');
 	markAdmsHeartbeatSeen({
 		sn: req.query.SN || req.query.sn || null,
 		ip: req.ip,
 	});
-	res.type('text/plain').status(200).send('OK');
+	res.set('Content-Type', 'text/plain');
+	// "" (empty string) triggers the device to switch from check mode to push mode
+	res.send('');
 });
 
 // ADMS attendance payload endpoint (some devices use POST, some can hit GET)
 const handleCdata = async (req, res) => {
-	console.log('Received attendance data (polling /iclock/cdata)');
-	console.log('Query:', req.query);
-	console.log('🔥 RAW DATA:');
-	console.log(req.body); // Updated as requested for biometric punch tracking
+	console.log("🔥 METHOD:", req.method);
+	console.log("🔥 QUERY:", req.query);
+	console.log("🔥 BODY:", req.body);
 	markAdmsCdataSeen({
 		sn: req.query.SN || req.query.sn || null,
 		ip: req.ip,
@@ -146,7 +147,7 @@ const handleCdata = async (req, res) => {
 	res.type('text/plain').status(200).send('OK');
 };
 
-router.post('/cdata', handleCdata);
+router.all('/cdata', handleCdata);
 
 // Endpoint for biometric device to push data (No auth for device, but can add secret key check inside controller)
 router.post('/log', receiveLog);
