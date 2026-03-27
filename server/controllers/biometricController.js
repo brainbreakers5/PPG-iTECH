@@ -268,6 +268,30 @@ const rebuildAttendanceFromBiometricTimeline = async (normalizedEmpId, dateStr) 
         else dbStatus = 'Absent';
     }
 
+    // MAP TO VALID DATABASE ENUM VALUES (Present, LOP, Absent, CL, ML, OD, etc.)
+    // Detailed info like "LOP (Late) + CL" must go in remarks because the status column is a strict ENUM.
+    let enumStatus = 'Present';
+    if (dbStatus.includes('LOP')) {
+        enumStatus = 'LOP';
+    } else if (dbStatus.includes('Absent')) {
+        enumStatus = 'Absent';
+    } else if (dbStatus.includes('CL')) {
+        enumStatus = 'CL';
+    } else if (dbStatus.includes('ML')) {
+        enumStatus = 'ML';
+    } else if (dbStatus.includes('OD')) {
+        enumStatus = 'OD';
+    } else if (dbStatus.includes('Comp Leave')) {
+        enumStatus = 'Comp Leave';
+    } else if (dbStatus.includes('Holiday')) {
+        enumStatus = 'Holiday';
+    } else if (dbStatus.includes('Weekend')) {
+        enumStatus = 'Weekend';
+    } else if (dbStatus.includes('Present')) {
+        enumStatus = 'Present';
+    }
+
+
     const approvedInfoList = segments
         .filter((s) => s.type !== 'Present')
         .map((s) => {
@@ -280,10 +304,12 @@ const rebuildAttendanceFromBiometricTimeline = async (normalizedEmpId, dateStr) 
         });
 
     const finalRemarks = [
+        `Status: ${dbStatus}`, // Keep the detailed string here for UI
         `Working Hours: ${workingHoursStr}`,
         flags.length > 0 ? `Alerts: ${flags.join(', ')}` : null,
         approvedInfoList.length > 0 ? `Approved Segments: ${approvedInfoList.join(' | ')}` : null
     ].filter(Boolean).join(' | ');
+
 
     await runWithSequenceFix(
         `INSERT INTO biometric_attendance (user_id, date, intime, outtime)
@@ -305,7 +331,7 @@ const rebuildAttendanceFromBiometricTimeline = async (normalizedEmpId, dateStr) 
             out_time = EXCLUDED.out_time,
             status = EXCLUDED.status,
             remarks = EXCLUDED.remarks`,
-        [normalizedEmpId, dateStr, physIn || null, physOut || null, dbStatus, finalRemarks || null],
+        [normalizedEmpId, dateStr, physIn || null, physOut || null, enumStatus, finalRemarks || null],
         'attendance_records'
     );
 
@@ -630,6 +656,19 @@ exports.receiveLog = async (req, res) => {
                 }
             }
 
+            // MAP TO VALID DATABASE ENUM VALUES
+            let enumStatus = 'Present';
+            if (dbStatus.includes('LOP')) enumStatus = 'LOP';
+            else if (dbStatus.includes('Absent')) enumStatus = 'Absent';
+            else if (dbStatus.includes('CL')) enumStatus = 'CL';
+            else if (dbStatus.includes('ML')) enumStatus = 'ML';
+            else if (dbStatus.includes('OD')) enumStatus = 'OD';
+            else if (dbStatus.includes('Comp Leave')) enumStatus = 'Comp Leave';
+            else if (dbStatus.includes('Holiday')) enumStatus = 'Holiday';
+            else if (dbStatus.includes('Weekend')) enumStatus = 'Weekend';
+            else if (dbStatus.includes('Present')) enumStatus = 'Present';
+
+
             // Reconstruct Remarks: Work Duration | Status Flags | Approved Segments with Period & Duration
             const approvedInfoList = segments
                 .filter(s => s.type !== 'Present')
@@ -643,10 +682,12 @@ exports.receiveLog = async (req, res) => {
                 });
 
             const finalRemarks = [
+                `Status: ${dbStatus}`, // Keep the detailed string here for UI
                 `Working Hours: ${workingHoursStr}`,
                 flags.length > 0 ? `Alerts: ${flags.join(', ')}` : null,
                 approvedInfoList.length > 0 ? `Approved Segments: ${approvedInfoList.join(' | ')}` : null
             ].filter(Boolean).join(' | ');
+
 
             console.log(`Syncing Attendance for ${refreshedUserRows[0].emp_id} on ${dateStr}: Status=${dbStatus}, In=${physIn}, Out=${physOut}`);
 
@@ -660,7 +701,7 @@ exports.receiveLog = async (req, res) => {
                     out_time = EXCLUDED.out_time,
                     status = EXCLUDED.status,
                     remarks = EXCLUDED.remarks`,
-                [refreshedUserRows[0].emp_id, dateStr, physIn || null, physOut || null, dbStatus, finalRemarks || null],
+                [refreshedUserRows[0].emp_id, dateStr, physIn || null, physOut || null, enumStatus, finalRemarks || null],
                 'attendance_records'
             );
 
