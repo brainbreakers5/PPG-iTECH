@@ -65,7 +65,7 @@ const BiometricMonitor = ({ empId, onDataChange }) => {
             const map = {};
             const nextStats = {
                 totalUsers: Number(statsRes?.data?.total_registered) || 0,
-                present: 0,
+                present: Number(statsRes?.data?.total_users) || 0,
                 absent: 0,
                 lop: 0,
                 lateEntry: 0,
@@ -79,12 +79,10 @@ const BiometricMonitor = ({ empId, onDataChange }) => {
                 const status = String(rec.status || '').toUpperCase();
                 const remarks = String(rec.remarks || '').toUpperCase();
 
-                const isPresent = status.includes('PRESENT');
                 const isLop = status.includes('LOP') || remarks.includes('LOP') || remarks.includes('LOSS OF PAY');
                 const isAbsent = status.includes('ABSENT') && !isLop;
                 const isLate = remarks.includes('LATE ENTRY');
 
-                if (isPresent) nextStats.present += 1;
                 if (isAbsent) nextStats.absent += 1;
                 if (isLop) nextStats.lop += 1;
                 if (isLate) nextStats.lateEntry += 1;
@@ -93,6 +91,9 @@ const BiometricMonitor = ({ empId, onDataChange }) => {
             if (!nextStats.totalUsers) {
                 nextStats.totalUsers = attendanceRows.length || Number(statsRes?.data?.total_users) || 0;
             }
+
+            // For biometric sync, absent is users without today's biometric presence.
+            nextStats.absent = Math.max(0, nextStats.totalUsers - nextStats.present);
 
             setAttendanceMap(map);
             setAttendanceStats(nextStats);
