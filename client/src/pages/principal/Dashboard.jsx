@@ -112,47 +112,31 @@ const Dashboard = () => {
             const map = {};
             (todayAtt || []).forEach(r => { map[r.emp_id] = r; });
             setAttendanceMap(map);
-            // Aggregate per-user rows into role-based stats
+            // Aggregate today's attendance rows into role-based stats (employee-level counts).
             const agg = {
                 present: 0, absent: 0, od: 0, cl: 0, ml: 0, comp_leave: 0, lop: 0, late_entry: 0,
                 principal: { present: 0, absent: 0, od: 0, cl: 0, ml: 0, comp_leave: 0, lop: 0, late_entry: 0 },
                 hod: { present: 0, absent: 0, od: 0, cl: 0, ml: 0, comp_leave: 0, lop: 0, late_entry: 0 },
                 staff: { present: 0, absent: 0, od: 0, cl: 0, ml: 0, comp_leave: 0, lop: 0, late_entry: 0 }
             };
-            (summary || []).forEach(r => {
-                const role = (r.role || '').toLowerCase();
-                const bucket = agg[role] || agg.staff;
-                const p = Number(r.total_present) || 0;
-                const l = Number(r.total_leave) || 0;
-                const o = Number(r.total_od) || 0;
-                const lp = Number(r.total_lop) || 0;
-                const late = Number(r.total_late) || 0;
-                bucket.present += p;
-                bucket.od += o;
-                bucket.lop += lp;
-                bucket.late_entry += late;
-                
-                // Only count as absent if it's a working day
-                if (!isTodayNonWorking && p === 0 && l === 0 && o === 0 && lp === 0) {
-                    bucket.absent += 1;
-                    agg.absent += 1;
-                }
-                
-                agg.present += p;
-                agg.od += o;
-                agg.lop += lp;
-                agg.late_entry += late;
-            });
-            // Count individual leave types from attendance map
+
             (emps || []).forEach(emp => {
+                const role = (emp.role || '').toLowerCase();
+                if (!['principal', 'hod', 'staff'].includes(role)) return;
+
                 const rec = map[emp.emp_id] || {};
                 const s = (rec.status || '').toUpperCase();
                 const rem = (rec.remarks || '').toUpperCase();
-                const role = (emp.role || '').toLowerCase();
                 const bucket = agg[role] || agg.staff;
+
+                if (s.includes('PRESENT')) { bucket.present++; agg.present++; }
+                if (!isTodayNonWorking && (!s || (s.includes('ABSENT') && !s.includes('LOP')))) { bucket.absent++; agg.absent++; }
+                if (s.includes('OD') || rem.includes('ON DUTY') || rem.includes(' OD')) { bucket.od++; agg.od++; }
                 if ((s.includes('CL') || rem.includes('CL') || rem.includes('CASUAL')) && !s.includes('COMP') && !rem.includes('COMP')) { bucket.cl++; agg.cl++; }
                 if (s.includes('ML') || rem.includes('ML') || rem.includes('MEDICAL')) { bucket.ml++; agg.ml++; }
                 if (s.includes('COMP LEAVE') || rem.includes('COMP LEAVE')) { bucket.comp_leave++; agg.comp_leave++; }
+                if (s.includes('LOP') || rem.includes('LOP') || rem.includes('LOSS OF PAY')) { bucket.lop++; agg.lop++; }
+                if (rem.includes('LATE ENTRY')) { bucket.late_entry++; agg.late_entry++; }
             });
             setStats(agg);
             const daysInMonth = new Date(curYear, curMonth, 0).getDate();

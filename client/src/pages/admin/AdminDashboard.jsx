@@ -114,41 +114,24 @@ const AdminDashboard = () => {
                 staff: { present: 0, absent: 0, od: 0, cl: 0, ml: 0, comp_leave: 0, lop: 0, late_entry: 0 }
             };
 
-            (summary || []).forEach(r => {
-                const role = (r.role || '').toLowerCase();
-                const bucket = agg[role] || agg.staff;
-                const p = Number(r.total_present) || 0;
-                const l = Number(r.total_leave) || 0;
-                const o = Number(r.total_od) || 0;
-                const lp = Number(r.total_lop) || 0;
-                const late = Number(r.total_late) || 0;
-                
-                bucket.present += p;
-                bucket.od += o;
-                bucket.lop += lp;
-                bucket.late_entry += late;
-                
-                // Only count as absent if it's a working day
-                if (!isTodayNonWorking && p === 0 && l === 0 && o === 0 && lp === 0) {
-                    bucket.absent += 1;
-                    agg.absent += 1;
-                }
-                
-                agg.present += p;
-                agg.od += o;
-                agg.lop += lp;
-                agg.late_entry += late;
-            });
-
-            // Count individual leave types from attendance map
+            // Attendance Core counters are per-employee for today, derived from today's attendance map.
             (emps || []).forEach(emp => {
-                const r = map[emp.emp_id];
-                const s = r?.status || '';
                 const role = (emp.role || '').toLowerCase();
+                if (!['principal', 'hod', 'staff'].includes(role)) return;
+
+                const rec = map[emp.emp_id] || {};
+                const status = String(rec.status || '').toUpperCase();
+                const remarks = String(rec.remarks || '').toUpperCase();
                 const bucket = agg[role] || agg.staff;
-                if (s === 'CL' || s === 'Leave') { bucket.cl++; agg.cl++; }
-                else if (s === 'ML') { bucket.ml++; agg.ml++; }
-                else if (s === 'Comp Leave') { bucket.comp_leave++; agg.comp_leave++; }
+
+                if (status.includes('PRESENT')) { bucket.present++; agg.present++; }
+                if (!isTodayNonWorking && (!status || (status.includes('ABSENT') && !status.includes('LOP')))) { bucket.absent++; agg.absent++; }
+                if (status.includes('OD') || remarks.includes('ON DUTY') || remarks.includes(' OD')) { bucket.od++; agg.od++; }
+                if ((status.includes('CL') || remarks.includes('CL') || remarks.includes('CASUAL')) && !status.includes('COMP') && !remarks.includes('COMP')) { bucket.cl++; agg.cl++; }
+                if (status.includes('ML') || remarks.includes('ML') || remarks.includes('MEDICAL')) { bucket.ml++; agg.ml++; }
+                if (status.includes('COMP LEAVE') || remarks.includes('COMP LEAVE')) { bucket.comp_leave++; agg.comp_leave++; }
+                if (status.includes('LOP') || remarks.includes('LOP') || remarks.includes('LOSS OF PAY')) { bucket.lop++; agg.lop++; }
+                if (remarks.includes('LATE ENTRY')) { bucket.late_entry++; agg.late_entry++; }
             });
             setStats(agg);
 
@@ -210,7 +193,7 @@ const AdminDashboard = () => {
             if (statusLabel === 'Casual Leave') return s === 'CL' || s === 'Leave';
             if (statusLabel === 'Medical Leave') return s === 'ML';
             if (statusLabel === 'Comp Leave') return s === 'Comp Leave';
-            if (statusLabel === 'Loss Of Pay') return s === 'LOP';
+            if (statusLabel === 'Loss Of Pay') return String(s).toUpperCase().includes('LOP');
             if (statusLabel === 'Late Entry') return (r?.remarks || '').includes('Late Entry');
             return false;
         });
