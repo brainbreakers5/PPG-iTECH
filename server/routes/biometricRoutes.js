@@ -68,29 +68,22 @@ const getAdmsBodyText = (req) => {
 
 // ADMS heartbeat endpoint (device polls this URL)
 router.get('/getrequest', (req, res) => {
+	console.log('Device polling /iclock/getrequest');
 	markAdmsHeartbeatSeen({
 		sn: req.query.SN || req.query.sn || null,
 		ip: req.ip,
-	});
-	console.log('ADMS device connected:', {
-		query: req.query,
-		ip: req.ip,
-		userAgent: req.get('user-agent')
 	});
 	res.type('text/plain').status(200).send('OK');
 });
 
 // ADMS attendance payload endpoint (some devices use POST, some can hit GET)
 const handleCdata = async (req, res) => {
+	console.log('Received attendance data (polling /iclock/cdata)');
+	console.log('Query:', req.query);
+	console.log('Body:', req.body);
 	markAdmsCdataSeen({
 		sn: req.query.SN || req.query.sn || null,
 		ip: req.ip,
-	});
-	console.log('ADMS attendance data received:', {
-		query: req.query,
-		body: req.body,
-		ip: req.ip,
-		userAgent: req.get('user-agent')
 	});
 
 	try {

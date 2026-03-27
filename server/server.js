@@ -196,10 +196,9 @@ app.set('trust proxy', 1);
 
 // Routes Registration
 // Compatibility aliases for biometric devices that ping these paths directly.
+// These are now handled by biometricRoutes mounted at /iclock and as a fallback below.
 app.get('/getrequest', (req, res) => {
-    res.type('text/plain').status(200).send('OK');
-});
-app.get('/iclock/getrequest', (req, res) => {
+    console.log('Device polling /getrequest');
     res.type('text/plain').status(200).send('OK');
 });
 
