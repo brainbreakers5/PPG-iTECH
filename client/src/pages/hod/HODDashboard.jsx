@@ -98,9 +98,12 @@ const HODDashboard = () => {
             const holidayDateSet = new Set();
             (holidayData || []).forEach(h => { holidayDateSet.add(h.h_date); });
             
-            const isTodayHoliday = holidayDateSet.has(date);
+            const todayCalendarEntry = (holidayData || []).find(h => h.h_date === date);
+            const todayType = String(todayCalendarEntry?.type || '').toLowerCase();
+            const isWorkingOverride = todayType === 'working day';
+            const isTodayHoliday = todayType === 'holiday';
             const todayDOW = new Date().getDay();
-            const isTodayNonWorking = isTodayHoliday || todayDOW === 0 || todayDOW === 6;
+            const isTodayNonWorking = isTodayHoliday || ((todayDOW === 0 || todayDOW === 6) && !isWorkingOverride);
             setIsNonWorkingDay(isTodayNonWorking);
 
             const counts = { present: 0, absent: 0, od: 0, cl: 0, ml: 0, comp_leave: 0, lop: 0, late_entry: 0 };
@@ -140,6 +143,8 @@ const HODDashboard = () => {
                 const rec = map[emp.emp_id] || {};
                 const s = (rec.status || '').toUpperCase();
                 const rem = (rec.remarks || '').toUpperCase();
+                const inTime = String(rec.in_time || '').slice(0, 5);
+                const isLateByPunchIn = !!inTime && inTime > '09:00';
                 const bucket = isHod ? agg.hod : agg.staff;
 
                 if (s.includes('PRESENT')) { bucket.present++; agg.present++; }
@@ -149,7 +154,7 @@ const HODDashboard = () => {
                 if (s.includes('ML') || rem.includes('ML') || rem.includes('MEDICAL')) { bucket.ml++; agg.ml++; }
                 if (s.includes('COMP LEAVE') || rem.includes('COMP LEAVE')) { bucket.comp_leave++; agg.comp_leave++; }
                 if (s.includes('LOP') || rem.includes('LOP') || rem.includes('LOSS OF PAY')) { bucket.lop++; agg.lop++; }
-                if (rem.includes('LATE ENTRY')) { bucket.late_entry++; agg.late_entry++; }
+                if (rem.includes('LATE ENTRY') || isLateByPunchIn) { bucket.late_entry++; agg.late_entry++; }
             });
             setStats(agg);
             
@@ -229,7 +234,11 @@ const HODDashboard = () => {
             if (statusLabel === 'Medical Leave') return s === 'ML' || remarks.includes('ML') || remarks.includes('MEDICAL');
             if (statusLabel === 'Comp Leave') return s.includes('COMP LEAVE') || remarks.includes('COMP LEAVE');
             if (statusLabel === 'Loss Of Pay') return s === 'LOP' || remarks.includes('LOP') || remarks.includes('LOSS OF PAY');
-            if (statusLabel === 'Late Entry') return remarks.includes('LATE ENTRY');
+            if (statusLabel === 'Late Entry') {
+                const inTime = String(rec.in_time || '').slice(0, 5);
+                const isLateByPunchIn = !!inTime && inTime > '09:00';
+                return remarks.includes('LATE ENTRY') || isLateByPunchIn;
+            }
             return false;
         });
     };

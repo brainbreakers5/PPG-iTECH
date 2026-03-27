@@ -48,9 +48,12 @@ const ManagementDashboard = () => {
             const holidayDateSet = new Set();
             (holidayData || []).forEach(h => { holidayDateSet.add(h.h_date); });
             
-            const isTodayHoliday = holidayDateSet.has(date);
+            const todayCalendarEntry = (holidayData || []).find(h => h.h_date === date);
+            const todayType = String(todayCalendarEntry?.type || '').toLowerCase();
+            const isWorkingOverride = todayType === 'working day';
+            const isTodayHoliday = todayType === 'holiday';
             const todayDOW = new Date().getDay();
-            const isTodayNonWorking = isTodayHoliday || todayDOW === 0 || todayDOW === 6;
+            const isTodayNonWorking = isTodayHoliday || ((todayDOW === 0 || todayDOW === 6) && !isWorkingOverride);
             setIsNonWorkingDay(isTodayNonWorking);
 
             const agg = {
@@ -67,6 +70,8 @@ const ManagementDashboard = () => {
                 const rec = map[emp.emp_id] || {};
                 const status = String(rec.status || '').toUpperCase();
                 const remarks = String(rec.remarks || '').toUpperCase();
+                const inTime = String(rec.in_time || '').slice(0, 5);
+                const isLateByPunchIn = !!inTime && inTime > '09:00';
                 const bucket = agg[role] || agg.staff;
 
                 if (status.includes('PRESENT')) { bucket.present++; agg.present++; }
@@ -76,7 +81,7 @@ const ManagementDashboard = () => {
                 if (status.includes('ML') || remarks.includes('ML') || remarks.includes('MEDICAL')) { bucket.ml++; agg.ml++; }
                 if (status.includes('COMP LEAVE') || remarks.includes('COMP LEAVE')) { bucket.comp_leave++; agg.comp_leave++; }
                 if (status.includes('LOP') || remarks.includes('LOP') || remarks.includes('LOSS OF PAY')) { bucket.lop++; agg.lop++; }
-                if (remarks.includes('LATE ENTRY')) { bucket.late_entry++; agg.late_entry++; }
+                if (remarks.includes('LATE ENTRY') || isLateByPunchIn) { bucket.late_entry++; agg.late_entry++; }
             });
             setStats(agg);
             const daysInMonth = new Date(curYear, curMonth, 0).getDate();
@@ -131,7 +136,11 @@ const ManagementDashboard = () => {
             if (statusLabel === 'Medical Leave') return s === 'ML';
             if (statusLabel === 'Comp Leave') return s === 'Comp Leave';
             if (statusLabel === 'Loss Of Pay') return String(s).toUpperCase().includes('LOP');
-            if (statusLabel === 'Late Entry') return (r?.remarks || '').includes('Late Entry');
+            if (statusLabel === 'Late Entry') {
+                const inTime = String(r?.in_time || '').slice(0, 5);
+                const isLateByPunchIn = !!inTime && inTime > '09:00';
+                return (r?.remarks || '').includes('Late Entry') || isLateByPunchIn;
+            }
             return false;
         });
     };
