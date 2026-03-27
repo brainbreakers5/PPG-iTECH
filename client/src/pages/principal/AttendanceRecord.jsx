@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import Layout from '../../components/Layout';
 import api from '../../utils/api';
-import { FaFileDownload, FaFilter, FaSearch, FaEye, FaCalendarAlt, FaSync } from 'react-icons/fa';
+import { FaFileDownload, FaFilter, FaSearch, FaEye, FaCalendarAlt, FaSync, FaTimes, FaUserTimes } from 'react-icons/fa';
 import { motion, AnimatePresence } from 'framer-motion';
 import { finalizePrintWindow } from '../../utils/printUtils';
 import { useSocket } from '../../context/SocketContext';
@@ -32,6 +32,7 @@ const AttendanceRecord = () => {
     const [detailedRecords, setDetailedRecords] = useState([]);
     const [biometricRecords, setBiometricRecords] = useState([]);
     const [departments, setDepartments] = useState([]);
+    const [absentModal, setAbsentModal] = useState(null); // { emp_id, name, dates: [] }
     const [viewMode, setViewMode] = useState(() => {
         const hash = window.location.hash.replace('#', '');
         if (hash === 'summary') return 'summary';
@@ -707,7 +708,36 @@ const AttendanceRecord = () => {
                                                     <span className="px-3 py-1 bg-gray-100 rounded-full">{rec.role}</span>
                                                 </td>
                                                 <td className="p-5 text-sm font-black text-center text-sky-600">{formatDayCount(rec.total_present)}</td>
-                                                <td className="p-5 text-sm font-black text-center text-rose-500">{formatDayCount(rec.total_actual_absent ?? (Number(rec.total_absent || 0) + (rec.total_computed_absent || 0)))}</td>
+                                                <td className="p-5 text-sm font-black text-center text-rose-500">
+                                                    {Number(rec.total_actual_absent ?? (Number(rec.total_absent || 0) + (rec.total_computed_absent || 0))) > 0 ? (
+                                                        <button
+                                                            onClick={() => {
+                                                                // Filter detailedRecords for absent days: status === 'Absent', not Holiday, not LOP
+                                                                const empRecords = detailedRecords.filter(r => {
+                                                                    if (r.emp_id !== rec.emp_id) return false;
+                                                                    const s = String(r.status || '').toUpperCase();
+                                                                    // Only include explicitly marked Absent (not Holiday, not LOP, not Present)
+                                                                    return s === 'ABSENT';
+                                                                });
+                                                                setAbsentModal({
+                                                                    emp_id: rec.emp_id,
+                                                                    name: rec.name,
+                                                                    role: rec.role,
+                                                                    department: rec.department_name,
+                                                                    total: Number(rec.total_actual_absent ?? (Number(rec.total_absent || 0) + (rec.total_computed_absent || 0))),
+                                                                    dates: empRecords.sort((a, b) => new Date(a.date) - new Date(b.date))
+                                                                });
+                                                            }}
+                                                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-rose-50 border border-rose-100 text-rose-600 font-black text-sm hover:bg-rose-100 transition-all group"
+                                                            title="Click to view absent dates"
+                                                        >
+                                                            {formatDayCount(rec.total_actual_absent ?? (Number(rec.total_absent || 0) + (rec.total_computed_absent || 0)))}
+                                                            <FaUserTimes size={10} className="opacity-60 group-hover:opacity-100 transition-opacity" />
+                                                        </button>
+                                                    ) : (
+                                                        <span className="text-rose-300">0</span>
+                                                    )}
+                                                </td>
                                                 <td className="p-5 text-sm font-black text-center text-rose-800">{formatDayCount(rec.total_lop)}</td>
                                                 <td className="p-5 text-sm font-black text-center text-amber-500">{formatDayCount(rec.total_cl)}</td>
                                                 <td className="p-5 text-sm font-black text-center text-orange-500">{formatDayCount(rec.total_ml)}</td>
@@ -939,6 +969,118 @@ const AttendanceRecord = () => {
                 )}
 
             </div>
+
+            {/* Absent Detail Modal */}
+            <AnimatePresence>
+                {absentModal && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="fixed inset-0 bg-white z-50 flex flex-col"
+                    >
+                        {/* Header */}
+                        <div className="px-6 md:px-10 py-5 border-b border-gray-100 bg-gradient-to-r from-rose-50 to-red-50 flex items-center justify-between flex-shrink-0">
+                            <div className="flex items-center gap-4">
+                                <div className="h-12 w-12 rounded-2xl bg-gradient-to-br from-rose-500 to-rose-700 flex items-center justify-center text-white shadow-lg">
+                                    <FaUserTimes size={20} />
+                                </div>
+                                <div>
+                                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
+                                                        {absentModal.emp_id}{absentModal.department ? ` · ${absentModal.department}` : ''} · {absentModal.role?.toUpperCase()}
+                                                    </p>
+                                    <p className="text-xl font-black text-gray-800 tracking-tight">{absentModal.name} — Absent Days</p>
+                                </div>
+                                <span className="ml-2 bg-rose-100 text-rose-700 px-4 py-1.5 rounded-xl text-xs font-black">
+                                    {absentModal.total} Absent Day{absentModal.total !== 1 ? 's' : ''}
+                                </span>
+                            </div>
+                            <button
+                                onClick={() => setAbsentModal(null)}
+                                className="p-3 rounded-2xl bg-white hover:bg-rose-50 text-gray-400 hover:text-rose-500 transition-all border border-gray-200 shadow-sm"
+                            >
+                                <FaTimes size={18} />
+                            </button>
+                        </div>
+
+                        {/* Body */}
+                        <div className="flex-1 overflow-auto px-6 md:px-10 py-6">
+                            {absentModal.dates.length === 0 ? (
+                                <div className="flex flex-col items-center justify-center h-64 gap-4">
+                                    <div className="h-16 w-16 rounded-full bg-rose-50 flex items-center justify-center text-rose-300">
+                                        <FaUserTimes size={28} />
+                                    </div>
+                                    <div className="text-center">
+                                        <p className="text-sm font-black text-gray-400 uppercase tracking-widest">No Absent Records Found</p>
+                                        <p className="text-xs text-gray-300 mt-1">Absent days may be calculated but not stored as individual records.</p>
+                                    </div>
+                                    <div className="mt-2 px-6 py-4 bg-amber-50 border border-amber-100 rounded-2xl max-w-md text-center">
+                                        <p className="text-[10px] font-black text-amber-600 uppercase tracking-widest mb-1">Note</p>
+                                        <p className="text-xs text-amber-700">
+                                            Total absent = <strong>{absentModal.total} days</strong> calculated as: Working Days − (Present + Leaves + OD).
+                                            Individual absent records are only created when explicitly marked.
+                                        </p>
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="overflow-x-auto">
+                                    <div className="mb-4 flex items-center gap-2">
+                                        <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Absent Dates for Period: {new Date(startDate).toLocaleDateString('en-GB')} – {new Date(endDate).toLocaleDateString('en-GB')}</span>
+                                    </div>
+                                    <table className="min-w-[500px] w-full text-left">
+                                        <thead className="sticky top-0 z-10">
+                                            <tr className="bg-gray-50">
+                                                <th className="px-5 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">#</th>
+                                                <th className="px-5 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Date</th>
+                                                <th className="px-5 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Day</th>
+                                                <th className="px-5 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Status</th>
+                                                <th className="px-5 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Remarks</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-gray-50">
+                                            {absentModal.dates.map((rec, idx) => {
+                                                const d = new Date(String(rec.date).slice(0, 10) + 'T00:00:00+05:30');
+                                                const isSun = d.getDay() === 0;
+                                                const isSat = d.getDay() === 6;
+                                                return (
+                                                    <motion.tr
+                                                        key={rec.date || idx}
+                                                        initial={{ opacity: 0, y: 5 }}
+                                                        animate={{ opacity: 1, y: 0 }}
+                                                        transition={{ delay: idx * 0.02 }}
+                                                        className="hover:bg-rose-50/40 transition-colors"
+                                                    >
+                                                        <td className="px-5 py-4 text-sm font-black text-gray-300">{idx + 1}</td>
+                                                        <td className="px-5 py-4 text-sm font-black text-gray-800 whitespace-nowrap">
+                                                            {d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+                                                        </td>
+                                                        <td className="px-5 py-4 whitespace-nowrap">
+                                                            <span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest border ${
+                                                                isSun || isSat ? 'bg-gray-50 text-gray-400 border-gray-100' : 'bg-rose-50 text-rose-500 border-rose-100'
+                                                            }`}>
+                                                                {d.toLocaleDateString('en-US', { weekday: 'long' })}
+                                                                {(isSun || isSat) ? ' (Weekend)' : ''}
+                                                            </span>
+                                                        </td>
+                                                        <td className="px-5 py-4 whitespace-nowrap">
+                                                            <span className="px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest border bg-rose-50 text-rose-600 border-rose-100">
+                                                                {rec.status || 'ABSENT'}
+                                                            </span>
+                                                        </td>
+                                                        <td className="px-5 py-4 text-xs text-gray-500 italic max-w-[200px] truncate" title={rec.remarks}>
+                                                            {rec.remarks || '—'}
+                                                        </td>
+                                                    </motion.tr>
+                                                );
+                                            })}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            )}
+                        </div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
         </Layout>
     );
 };

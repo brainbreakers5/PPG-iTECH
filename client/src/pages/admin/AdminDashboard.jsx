@@ -330,28 +330,6 @@ const AdminDashboard = () => {
                             </div>
                         </div>
                     </div>
-                    {/* Rebuild Today's LOP Button */}
-                    <div className="mt-4 pt-4 border-t border-gray-50 flex items-center justify-between gap-4 flex-wrap">
-                        <div>
-                            <p className="text-[9px] font-black text-rose-500 uppercase tracking-widest">Biometric LOP Enforcement</p>
-                            <p className="text-[10px] font-bold text-gray-500">Re-calculate LOP for all employees who punched in after 9:00 AM today</p>
-                        </div>
-                        <div className="flex items-center gap-3">
-                            {rebuildResult && (
-                                <span className={`text-[9px] font-black uppercase tracking-widest px-3 py-1.5 rounded-xl border ${rebuildResult.success ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-rose-50 text-rose-600 border-rose-100'}`}>
-                                    {rebuildResult.message}
-                                </span>
-                            )}
-                            <button
-                                onClick={handleRebuildToday}
-                                disabled={rebuildingToday}
-                                className="flex items-center gap-2 px-5 py-2.5 bg-rose-600 text-white rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-rose-700 transition-all shadow-md shadow-rose-100 disabled:opacity-60 disabled:cursor-not-allowed"
-                            >
-                                <FaSync className={rebuildingToday ? 'animate-spin' : ''} size={10} />
-                                {rebuildingToday ? 'Rebuilding...' : "Rebuild Today's LOP"}
-                            </button>
-                        </div>
-                    </div>
                 </div>
             </motion.div>
 
