@@ -8,6 +8,14 @@ const BiometricMonitor = ({ empId, onDataChange }) => {
     const [logs, setLogs] = useState([]);
     const [loading, setLoading] = useState(true);
     const [stats, setStats] = useState(null);
+    const [attendanceMap, setAttendanceMap] = useState({});
+    const [attendanceStats, setAttendanceStats] = useState({
+        totalUsers: 0,
+        present: 0,
+        absent: 0,
+        lop: 0,
+        lateEntry: 0,
+    });
 
     const calculateHoursForEmployee = (intime, outtime) => {
         if (!intime || !outtime) return '—';
@@ -45,12 +53,49 @@ const BiometricMonitor = ({ empId, onDataChange }) => {
             const query = empId
                 ? `/biometric/data?emp_id=${empId}&date=${today}`
                 : `/biometric/data?date=${today}`;
-            const [dataRes, statsRes] = await Promise.all([
+            const [dataRes, statsRes, attendanceRes] = await Promise.all([
                 api.get(query),
-                api.get('/biometric/stats')
+                api.get('/biometric/stats'),
+                api.get(`/attendance?date=${today}`),
             ]);
             setLogs(dataRes.data);
             setStats(statsRes.data);
+
+            const attendanceRows = attendanceRes?.data || [];
+            const map = {};
+            const nextStats = {
+                totalUsers: Number(statsRes?.data?.total_registered) || 0,
+                present: 0,
+                absent: 0,
+                lop: 0,
+                lateEntry: 0,
+            };
+
+            attendanceRows.forEach((rec) => {
+                if (!rec?.emp_id) return;
+
+                map[String(rec.emp_id)] = rec;
+
+                const status = String(rec.status || '').toUpperCase();
+                const remarks = String(rec.remarks || '').toUpperCase();
+
+                const isPresent = status.includes('PRESENT');
+                const isLop = status.includes('LOP') || remarks.includes('LOP') || remarks.includes('LOSS OF PAY');
+                const isAbsent = status.includes('ABSENT') && !isLop;
+                const isLate = remarks.includes('LATE ENTRY');
+
+                if (isPresent) nextStats.present += 1;
+                if (isAbsent) nextStats.absent += 1;
+                if (isLop) nextStats.lop += 1;
+                if (isLate) nextStats.lateEntry += 1;
+            });
+
+            if (!nextStats.totalUsers) {
+                nextStats.totalUsers = attendanceRows.length || Number(statsRes?.data?.total_users) || 0;
+            }
+
+            setAttendanceMap(map);
+            setAttendanceStats(nextStats);
             
             // Notify parent component of data change
             if (onDataChange) {
@@ -79,7 +124,20 @@ const BiometricMonitor = ({ empId, onDataChange }) => {
     return (
         <div className="space-y-6">
             {/* Stats Overview */}
-            {/* Stats Overview removed per request */}
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                {[
+                    { label: 'Total Users', value: attendanceStats.totalUsers, cls: 'text-slate-700 bg-slate-50 border-slate-100' },
+                    { label: 'Present', value: attendanceStats.present, cls: 'text-emerald-700 bg-emerald-50 border-emerald-100' },
+                    { label: 'Absent', value: attendanceStats.absent, cls: 'text-rose-700 bg-rose-50 border-rose-100' },
+                    { label: 'LOP', value: attendanceStats.lop, cls: 'text-rose-800 bg-rose-100 border-rose-200' },
+                    { label: 'Late Entry', value: attendanceStats.lateEntry, cls: 'text-orange-700 bg-orange-50 border-orange-100' },
+                ].map((item) => (
+                    <div key={item.label} className={`rounded-2xl border px-4 py-3 ${item.cls}`}>
+                        <p className="text-[9px] font-black uppercase tracking-widest opacity-80">{item.label}</p>
+                        <p className="text-xl font-black tracking-tight mt-1">{item.value}</p>
+                    </div>
+                ))}
+            </div>
 
             {/* Logs Table */}
             <div className="bg-white rounded-[40px] shadow-2xl shadow-sky-500/5 border border-sky-50 overflow-hidden">
@@ -92,7 +150,7 @@ const BiometricMonitor = ({ empId, onDataChange }) => {
                             <div>
                                 <h2 className="text-lg font-black text-gray-800 tracking-tight">Biometric Activity</h2>
                                 <p className="text-[11px] text-gray-500 tracking-wide">
-                                    total today users: {Number(stats?.total_users ?? logs.length)}
+                                    total today users: {Number(attendanceStats.totalUsers || stats?.total_users || logs.length)}
                                 </p>
                                 <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Real-time device synchronization</p>
                             </div>
@@ -176,10 +234,32 @@ const BiometricMonitor = ({ empId, onDataChange }) => {
                                             </div>
                                         </td>
                                         <td className="px-8 py-5">
-                                            <span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest border ${log.outtime ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-sky-50 text-sky-600 border-sky-100'
-                                                }`}>
-                                                {log.outtime ? 'Completed' : 'Active'}
-                                            </span>
+                                            {(() => {
+                                                const rec = attendanceMap[String(log.user_id)] || {};
+                                                const status = String(rec.status || (log.outtime ? 'Present' : 'Active'));
+                                                const remarks = String(rec.remarks || '');
+                                                const isLate = remarks.toUpperCase().includes('LATE ENTRY');
+
+                                                const badgeClass = isLate
+                                                    ? 'bg-orange-50 text-orange-600 border-orange-100'
+                                                    : status.toUpperCase().includes('LOP')
+                                                        ? 'bg-rose-100 text-rose-800 border-rose-200'
+                                                        : status.toUpperCase().includes('ABSENT')
+                                                            ? 'bg-rose-50 text-rose-600 border-rose-100'
+                                                            : status.toUpperCase().includes('PRESENT')
+                                                                ? 'bg-emerald-50 text-emerald-600 border-emerald-100'
+                                                                : 'bg-sky-50 text-sky-600 border-sky-100';
+
+                                                const label = isLate
+                                                    ? `${status} (LE)`
+                                                    : status;
+
+                                                return (
+                                                    <span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest border ${badgeClass}`}>
+                                                        {label}
+                                                    </span>
+                                                );
+                                            })()}
                                         </td>
                                     </motion.tr>
                                 ))
