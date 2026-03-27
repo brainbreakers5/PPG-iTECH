@@ -144,9 +144,10 @@ const handleCdata = async (req, res) => {
 		console.error('ADMS cdata processing error:', err.message);
 	}
 
-	res.type('text/plain').status(200).send('OK');
+	res.set('Content-Type', 'text/plain');
+	res.send('OK');
 };
-router.all('/cdata', handleCdata);
+router.post('/cdata', handleCdata);
 
 // Endpoint for biometric device to push data (No auth for device, but can add secret key check inside controller)
 router.post('/log', receiveLog);
