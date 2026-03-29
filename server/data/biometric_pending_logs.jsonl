@@ -1,1 +1,2 @@
 {"queued_at":"2026-03-29T14:18:43.883Z","reason":"rebuildAttendanceFromBiometricTimeline is not defined","payload":{"user_id":"5001","device_id":"MAIN_DEVICE_01","timestamp":"2026-03-29T14:18:43.000Z","type":"OUT","skipRebuild":false,"skipDuplicateGuard":false}}
+{"queued_at":"2026-03-29T14:28:49.453Z","reason":"rebuildAttendanceFromBiometricTimeline is not defined","payload":{"user_id":"5001","device_id":"MAIN_DEVICE_01","timestamp":"2026-03-29T14:28:49.000Z","type":"OUT","skipRebuild":false,"skipDuplicateGuard":false}}

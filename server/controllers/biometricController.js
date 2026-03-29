@@ -48,7 +48,7 @@ const upsertBiometricAttendanceFromLogs = async (empId, dateStr) => {
                 MIN(log_time::time) AS first_punch,
                 MAX(log_time::time) AS last_punch
             FROM biometric_logs
-            WHERE TRIM(emp_id) = $1
+            WHERE emp_id = $1
               AND log_time::date = $2::date
         )
         INSERT INTO biometric_attendance (user_id, date, intime, outtime)
@@ -480,7 +480,7 @@ exports.receiveLog = async (req, res) => {
 
         // 1. Only accept logs for employees that exist in the users table.
         const { rows: userRows } = await pool.query(
-            'SELECT 1 FROM users WHERE TRIM(emp_id) = $1 LIMIT 1',
+            'SELECT 1 FROM users WHERE emp_id = $1 LIMIT 1',
             [normalizedEmpId]
         );
 
@@ -615,16 +615,16 @@ exports.getBiometricData = async (req, res) => {
             SELECT b.*, u.name, u.role, d.name as department_name, 
                    ar.status as att_status, ar.remarks as att_remarks
             FROM biometric_attendance b
-            JOIN users u ON TRIM(b.user_id) = TRIM(u.emp_id)
+            JOIN users u ON b.user_id = u.emp_id
             LEFT JOIN departments d ON u.department_id = d.id
-            LEFT JOIN attendance_records ar ON TRIM(b.user_id) = TRIM(ar.emp_id) AND b.date = ar.date
+            LEFT JOIN attendance_records ar ON b.user_id = ar.emp_id AND b.date = ar.date
             WHERE 1=1
         `;
         const params = [];
 
         if (emp_id) {
-            params.push(String(emp_id).trim());
-            query += ` AND TRIM(b.user_id) = $${params.length}`;
+            params.push(emp_id);
+            query += ` AND b.user_id = $${params.length}`;
         }
         if (date) {
             params.push(date);
