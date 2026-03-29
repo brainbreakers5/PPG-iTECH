@@ -34,66 +34,108 @@ async function pushToServer(log, options = {}) {
       axiosOptions.httpsAgent = new https.Agent({ rejectUnauthorized: false });
     }
 
-    // Identify user ID safely (ZK devices use different names depending on library version)
-    const rawId = log.deviceUserId || log.userId || log.pin;
+    // Identify user ID and time safely (Handles underscore and camelCase)
+    const rawId = log.user_id || log.deviceUserId || log.userId || log.pin;
     const empId = rawId ? String(rawId).trim() : "UNKNOWN";
+    const timeValue = log.record_time || log.recordTime;
+
+    if (!timeValue) return;
 
     await axios.post(
       SERVER_API_URL,
       {
         user_id: empId,
         device_id: 'MAIN_DEVICE_01',
-        timestamp: log.recordTime, // 🔥 DEVICE TIME (Past and Realtime)
-        type: new Date(log.recordTime).getHours() < 12 ? 'IN' : 'OUT',
+        timestamp: timeValue, 
+        type: new Date(timeValue).getHours() < 12 ? 'IN' : 'OUT',
         skipRebuild: options.skipRebuild || false // Efficiency for historical sync
       },
       axiosOptions
     );
 
-    console.log(`🚀 Sent → User ${empId} @ ${log.recordTime}`);
+    console.log(`🚀 Sent → User ${empId} @ ${timeValue}`);
   } catch (err) {
-    console.error(`❌ Push failed for User ${log.deviceUserId || log.userId || '??'}:`, err.message);
+    console.error(`❌ Push failed for User ${log.user_id || log.deviceUserId || log.userId || '??'}:`, err.message);
   }
 }
 
 async function syncPastData() {
   try {
-    console.log("📥 Fetching past attendance logs from device memory...");
+    // 🎯 Robust Date Calculation for India (+05:30)
+    const options = { timeZone: 'Asia/Kolkata' };
+    const todayStr = new Date().toLocaleDateString('en-CA', options); // YYYY-MM-DD
+    
+    console.log(`📥 Fetching logs for TODAY (${todayStr}) only...`);
     const logs = await zkInstance.getAttendances();
 
     if (!logs || !logs.data || logs.data.length === 0) {
-      console.log("⚠️ No past data found or device memory empty");
+      console.log("⚠️ No logs found on device memory");
       return;
     }
 
-    console.log(`📊 Total logs available: ${logs.data.length}`);
+    // 🔥 Filter for TODAY only (handling underscore naming)
+    const todayLogs = logs.data.filter(log => {
+        const timeValue = log.record_time || log.recordTime;
+        if (!timeValue) return false;
+        return new Date(timeValue).toLocaleDateString('en-CA', options) === todayStr;
+    });
+
+    if (todayLogs.length === 0) {
+        console.log(`📊 Today's relevant logs: 0. Skipping sync.`);
+        return;
+    }
+
+    // 🎯 Group by User ID and find Min/Max to get Earliest & Latest only
+    const userGroups = {};
+    todayLogs.forEach(entry => {
+        const id = entry.user_id || entry.deviceUserId || entry.userId || entry.pin;
+        if (!id) return;
+        if (!userGroups[id]) userGroups[id] = [];
+        userGroups[id].push(entry);
+    });
+
+    const bestLogs = [];
+    for (const id in userGroups) {
+        // Sort by time
+        const sorted = userGroups[id].sort((a, b) => 
+            new Date(a.record_time || a.recordTime) - new Date(b.record_time || b.recordTime)
+        );
+        
+        // Push the Earliest (IN)
+        bestLogs.push(sorted[0]);
+        // Push the Latest (OUT) if it's different (e.g., user has more than 1 punch)
+        if (sorted.length > 1) {
+            bestLogs.push(sorted[sorted.length - 1]);
+        }
+    }
+
+    console.log(`📊 Today's relevant logs: ${todayLogs.length} found. (Pushing Earliest/Latest: ${bestLogs.length} total)`);
 
     const uniqueDates = new Set();
     let count = 0;
 
-    for (const log of logs.data) {
+    for (const log of bestLogs) {
+      const timeValue = log.record_time || log.recordTime;
       await pushToServer(log, { skipRebuild: true });
-      lastTimestamp = log.recordTime;
-      uniqueDates.add(new Date(log.recordTime).toLocaleDateString('en-CA'));
+      lastTimestamp = timeValue;
+      uniqueDates.add(new Date(timeValue).toLocaleDateString('en-CA', options));
       count++;
-      if (count % 50 === 0) console.log(`Progress: ${count}/${logs.data.length}...`);
     }
 
-    console.log("✅ Past data sync completed. Stored logs in database.");
+    console.log("✅ Sync completed. Processing attendance totals...");
 
-    // Trigger rebuild for all affected days at once (High efficiency)
+    // Trigger rebuild for Today only
     if (uniqueDates.size > 0) {
-        const sorted = Array.from(uniqueDates).sort();
-        console.log(`🔄 Triggering attendance rebuild for range: ${sorted[0]} to ${sorted[sorted.length-1]}`);
+        console.log(`🔄 Updating dashboard calculations for ${todayStr}...`);
         try {
             const rebuildUrl = SERVER_API_URL.replace('/log', '/rebuild-today'); 
             await axios.post(rebuildUrl, {
-                fromDate: sorted[0],
-                toDate: sorted[sorted.length - 1]
+                fromDate: todayStr,
+                toDate: todayStr
             });
-            console.log("🌟 Attendance records successfully updated/recalculated!");
+            console.log("🌟 Today's dashboard is now UP TO DATE!");
         } catch (rebuildErr) {
-            console.error("❌ Failed to trigger rebuild:", rebuildErr.message);
+            console.error("❌ Failed to update dashboard stats:", rebuildErr.message);
         }
     }
   } catch (err) {
