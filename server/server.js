@@ -201,23 +201,7 @@ app.get('/', (req, res) => {
 });
 
 // Routes Registration
-// ✅ FINAL FIX for ADMS Biometric Connection
-app.get('/iclock/getrequest', (req, res) => {
-    console.log("📡 Device polling /iclock/getrequest...");
-    const { markAdmsHeartbeatSeen } = require('./controllers/biometricController');
-    markAdmsHeartbeatSeen({ sn: req.query.SN || null, ip: req.ip });
-    res.set('Content-Type', 'text/plain');
-    res.send(''); // Crucial: Empty response switches device to "Push Mode"
-});
-
-// Fallback for root-level pollers
-app.get('/getrequest', (req, res) => {
-    console.log('📡 Device polling /getrequest fallback...');
-    const { markAdmsHeartbeatSeen } = require('./controllers/biometricController');
-    markAdmsHeartbeatSeen({ sn: req.query.SN || null, ip: req.ip });
-    res.set('Content-Type', 'text/plain');
-    res.send(''); 
-});
+// ✅ ADMS Biometric Handlers are registered via biometricRoutes mounted at /iclock and /api/biometric
 
 app.use('/api/auth', authRoutes);
 app.use('/api/employees', employeeRoutes);
@@ -234,6 +218,7 @@ app.use('/api/leave-limits', leaveLimitRoutes);
 app.use('/api/leave-types', leaveTypeRoutes);
 app.use('/api/biometric', biometricRoutes);
 app.use('/iclock', biometricRoutes);
+app.use('/', biometricRoutes); // Catch-all for ADMS devices hitting root endpoints like /getrequest and /cdata
 app.use('/api/certificates', certificateRoutes);
 app.use('/api/permissions', permissionRoutes);
 app.use('/api/settings', settingsRoutes);

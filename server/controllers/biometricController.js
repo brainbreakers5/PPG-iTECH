@@ -15,6 +15,8 @@ const admsLastSeenState = {
     cdataMeta: null,
 };
 
+const admsCommandQueue = []; // Queue of { sn: string, command: string, id: string }
+
 const toIsoNow = () => new Date().toISOString();
 
 exports.markAdmsHeartbeatSeen = (meta = null) => {
@@ -25,6 +27,37 @@ exports.markAdmsHeartbeatSeen = (meta = null) => {
 exports.markAdmsCdataSeen = (meta = null) => {
     admsLastSeenState.cdata = toIsoNow();
     admsLastSeenState.cdataMeta = meta;
+};
+
+// @desc    Store a command for an ADMS device to pick up on its next heartbeat poll
+exports.enqueueAdmsCommand = (sn, commandText) => {
+    const id = `CMD_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+    admsCommandQueue.push({ id, sn, command: commandText, status: 'pending' });
+    console.log(`[BIOMETRIC] Command enqueued for SN=${sn}: ${commandText} (ID: ${id})`);
+    return id;
+};
+
+// @desc    Retrieve the next pending command for a device SN
+exports.getNextAdmsCommand = (sn) => {
+    const idx = admsCommandQueue.findIndex(c => c.sn === sn && c.status === 'pending');
+    if (idx !== -1) {
+        const cmd = admsCommandQueue[idx];
+        cmd.status = 'sent';
+        cmd.sentAt = toIsoNow();
+        // ZKTeco format: C:ID:COMMANDNAME ARGS
+        return `C:${cmd.id}:${cmd.command}`;
+    }
+    return null;
+};
+
+// @desc    Confirm command execution from device
+exports.reportAdmsCommandStatus = (id, status) => {
+    const cmd = admsCommandQueue.find(c => c.id === id);
+    if (cmd) {
+        cmd.status = status || 'completed';
+        cmd.completedAt = toIsoNow();
+        console.log(`[BIOMETRIC] Command ${id} marked as ${cmd.status}`);
+    }
 };
 
 // @desc    Get ADMS last heartbeat/cdata seen times
@@ -161,7 +194,7 @@ const rebuildAttendanceFromBiometricTimeline = async (normalizedEmpId, dateStr) 
         [normalizedEmpId, dateStr]
     );
 
-    let segments = [];
+    let segments = [];++
     let physIn = null;
     let physOut = null;
 
@@ -384,397 +417,82 @@ exports.receiveLog = async (req, res) => {
         const dateStr = logDate.toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' }); // YYYY-MM-DD in IST
         const timeStr = logDate.toLocaleTimeString('en-US', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', hour12: true }); // HH:MM AM/PM in IST
 
-        // Block rapid duplicate punches only for the SAME employee ID.
-        // Different employee IDs are always allowed, even at the same second.
-        const { rows: lastPunchRows } = await pool.query(
-            `SELECT log_time
+        // 1. Block rapid duplicate punches for the same employee within 10 minutes of the target timestamp.
+        // This works correctly for both live data AND past memory dumps.
+        const marginMs = MIN_PUNCH_INTERVAL_MS;
+        const startTime = new Date(logDate.getTime() - marginMs);
+        const endTime = new Date(logDate.getTime() + marginMs);
+
+        const { rows: nearPunchRows } = await pool.query(
+            `SELECT id, log_time
              FROM biometric_logs
              WHERE TRIM(emp_id) = $1
-             ORDER BY log_time DESC
+             AND log_time >= $2 AND log_time <= $3
              LIMIT 1`,
-            [normalizedEmpId]
+            [normalizedEmpId, startTime, endTime]
         );
 
-        if (lastPunchRows.length > 0) {
-            const lastLogDate = new Date(lastPunchRows[0].log_time);
-            const lastMs = lastLogDate.getTime();
-            const currentMs = logDate.getTime();
-            const nextAllowedAtMs = lastMs + MIN_PUNCH_INTERVAL_MS;
-
-            if (currentMs <= nextAllowedAtMs) {
-                const waitMs = Math.max(0, nextAllowedAtMs - currentMs);
-                const mins = Math.floor(waitMs / 60000);
-                const secs = Math.floor((waitMs % 60000) / 1000);
-                return res.status(200).json({
-                    message: `Duplicate punch ignored. Same employee can punch again only after 10 minutes. Please wait ${mins}m ${secs}s.`,
-                    skipped: true,
-                    reason: 'TOO_SOON'
-                });
-            }
-        }
-
-        // 1. Check if User exists in the system
-        const { rows: userRows } = await pool.query(
-            'SELECT id, name, emp_id FROM users WHERE emp_id = $1',
-            [normalizedEmpId]
-        );
-
-        let userExists = userRows.length > 0;
-        if (!userExists) {
-            await ensureBiometricUser(normalizedEmpId);
-        }
-
-        const { rows: refreshedUserRows } = await pool.query(
-            'SELECT id, name, emp_id FROM users WHERE emp_id = $1',
-            [normalizedEmpId]
-        );
-
-        userExists = refreshedUserRows.length > 0;
-        const userName = userExists ? refreshedUserRows[0].name : `Unknown (${normalizedEmpId})`;
-
-        // 2. Store raw log in biometric_logs (Audit Trail)
-        try {
-            await runWithSequenceFix(
-                'INSERT INTO biometric_logs (device_id, emp_id, log_time, type) VALUES ($1, $2, $3, $4)',
-                [device_id, normalizedEmpId, logDate, type || (logDate.getHours() < 12 ? 'IN' : 'OUT')],
-                'biometric_logs'
-            );
-        } catch (logInsertError) {
-            const isUserFkError =
-                logInsertError &&
-                logInsertError.code === '23503' &&
-                String(logInsertError.constraint || '').includes('biometric_logs_emp_id_fkey');
-
-            if (!isUserFkError) {
-                throw logInsertError;
-            }
-
-            // Race-safe fallback: create user again and retry insert once.
-            await ensureBiometricUser(normalizedEmpId);
-            await runWithSequenceFix(
-                'INSERT INTO biometric_logs (device_id, emp_id, log_time, type) VALUES ($1, $2, $3, $4)',
-                [device_id, normalizedEmpId, logDate, type || (logDate.getHours() < 12 ? 'IN' : 'OUT')],
-                'biometric_logs'
-            );
-        }
-
-        if (!userExists) {
-            console.warn(`⚠️ User ${normalizedEmpId} not found in users table. Skipping attendance sync.`);
+        if (nearPunchRows.length > 0) {
+            console.log(`[BIOMETRIC] Duplicate punch ignored for ${normalizedEmpId} at ${logDate.toISOString()} (Found existing at ${nearPunchRows[0].log_time})`);
             return res.status(200).json({
-                message: 'Log saved, but user not found in system for attendance sync'
+                message: `Duplicate punch ignored. Punch already exists within 10 minutes.`,
+                skipped: true,
+                reason: 'DUPLICATE_OR_TOO_SOON'
             });
         }
 
-        // 3. Update biometric_attendance summary
-        const { rows: existing } = await pool.query(
-            'SELECT * FROM biometric_attendance WHERE user_id = $1 AND date = $2',
-            [normalizedEmpId, dateStr]
+        // 2. Ensure User exists (Race-safe fallback handled by ensureBiometricUser logic)
+        await ensureBiometricUser(normalizedEmpId);
+
+        // 3. Store raw log in biometric_logs (Audit Trail)
+        // This log table stores EVERYTHING (minutely/hourly records for full history)
+        await runWithSequenceFix(
+            'INSERT INTO biometric_logs (device_id, emp_id, log_time, type) VALUES ($1, $2, $3, $4)',
+            [device_id || 'ADMS', normalizedEmpId, logDate, type || (logDate.getHours() < 12 ? 'IN' : 'OUT')],
+            'biometric_logs'
         );
 
-        const isFirstPunch = existing.length === 0;
-        if (existing.length === 0) {
-            await runWithSequenceFix(
-                'INSERT INTO biometric_attendance (user_id, date, intime) VALUES ($1, $2, $3)',
-                [normalizedEmpId, dateStr, timeStr],
-                'biometric_attendance'
-            );
-        } else {
-            await pool.query(
-                'UPDATE biometric_attendance SET outtime = $1 WHERE id = $2',
-                [timeStr, existing[0].id]
-            );
-        }
+        // 4. Sync summaries (biometric_attendance and attendance_records)
+        // We use the unified rebuild function to ensure consistency and handle past-date updates properly.
+        // This function automatically picks min(time) as in, max(time) as out, and replaces existing values.
+        const syncResult = await rebuildAttendanceFromBiometricTimeline(normalizedEmpId, dateStr);
 
-        // 4. Sync with main attendance table (attendance_records)
-        // Reconstruct the daily timeline for the remarks field
-            try {
-            const COLLEGE_START = '09:00';
-            const COLLEGE_END = '16:45';
+        // 5. Real-time notifications and socket updates
+        const userName = `User ${normalizedEmpId}`; // Fallback if name not looked up
+        const isFirstPunch = !syncResult.physOut; // If physOut is null, it's either the first punch or only one punch exists
+        const message = `Biometric Punch Recorded: ${type || (isFirstPunch ? 'IN' : 'OUT')} at ${timeStr} for ${normalizedEmpId}`;
 
-            // Utility to convert HH:MM to minutes for comparison
-            const toMins = (t) => {
-                if (!t) return 0;
-                const [h, m] = t.split(':').map(Number);
-                return (h || 0) * 60 + (m || 0);
-            };
+        // Notifications (best-effort)
+        try {
+            await createNotification(normalizedEmpId, message, 'attendance', null, null, true);
+        } catch (e) {}
 
-            // Get all physical punches for today
-            const { rows: allPunches } = await pool.query(
-                `SELECT log_time FROM biometric_logs 
-                 WHERE emp_id = $1 AND (log_time AT TIME ZONE 'Asia/Kolkata')::date = $2::date 
-                 ORDER BY log_time ASC`,
-                [normalizedEmpId, dateStr]
-            );
-
-            // Get all approved leave segments
-            const { rows: approvedLeaves } = await pool.query(
-                `SELECT leave_type, is_half_day, dates_detail FROM leave_requests 
-                 WHERE emp_id = $1 AND status = 'Approved' 
-                 AND from_date <= $2 AND to_date >= $2`,
-                [normalizedEmpId, dateStr]
-            );
-
-            // Get all approved permissions
-            const { rows: approvedPerms } = await pool.query(
-                `SELECT from_time, to_time FROM permission_requests 
-                 WHERE emp_id = $1 AND status = 'Approved' AND date = $2`,
-                [normalizedEmpId, dateStr]
-            );
-
-            let segments = [];
-
-            // 1. Add Physical presence segments
-            let physIn = null;
-            let physOut = null;
-            if (allPunches.length > 0) {
-                physIn = new Date(allPunches[0].log_time).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Kolkata' });
-                if (allPunches.length > 1) {
-                    physOut = new Date(allPunches[allPunches.length - 1].log_time).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Kolkata' });
-                }
-                segments.push({ type: 'Present', from: physIn, to: physOut || physIn, fromMins: toMins(physIn), toMins: toMins(physOut || physIn) });
-            }
-
-            // 2. Add Leave/OD segments
-            approvedLeaves.forEach(leave => {
-                let details = [];
-                try {
-                    details = Array.isArray(leave.dates_detail) ? leave.dates_detail : (typeof leave.dates_detail === 'string' ? JSON.parse(leave.dates_detail) : []);
-                } catch (e) { details = []; }
-
-                const dayDetail = details.find(d => d.date === dateStr);
-                if (dayDetail && (dayDetail.day_type || !dayDetail.is_full_day)) {
-                    let f, t;
-                    if (dayDetail.day_type === 'Half Day AM') { f = '09:00'; t = '13:00'; }
-                    else if (dayDetail.day_type === 'Half Day PM') { f = '13:30'; t = '16:45'; }
-                    else { f = dayDetail.from_time || '09:00'; t = dayDetail.to_time || '16:45'; }
-                    segments.push({ type: leave.leave_type, from: f, to: t, fromMins: toMins(f), toMins: toMins(t), day_type: dayDetail.day_type });
-                } else if (!leave.is_half_day) {
-                    segments.push({ type: leave.leave_type, from: '09:00', to: '16:45', fromMins: toMins('09:00'), toMins: toMins('16:45'), isFull: true });
-                }
-            });
-
-            // 3. Add Permission segments
-            approvedPerms.forEach(perm => {
-                segments.push({ type: 'Permission', from: perm.from_time, to: perm.to_time, fromMins: toMins(perm.from_time), toMins: toMins(perm.to_time) });
-            });
-
-            // 4. Detailed Calculation for Late Entry / Early Exit / Working Hours
-            const STD_IN_MINS = 540;   // 09:00
-            const STD_OUT_MINS = 1005; // 16:45
-            const MORNING_HALF_DAY_END_MINS = 755; // 12:35
-            const EVENING_HALF_DAY_START_MINS = 810; // 13:30
-
-            let flags = [];
-            let workingHoursStr = '0h 0m';
-            let dbStatus = 'Present';
-
-            if (physIn) {
-                const inMins = toMins(physIn);
-                const outMins = physOut ? toMins(physOut) : inMins;
-                
-                // Calculate Working Hours
-                const diff = outMins - inMins;
-                workingHoursStr = `${Math.floor(diff / 60)}h ${diff % 60}m`;
-
-                // Check Late Entry: if punch-in is after standard 9:00
-                let isLateEntry = false;
-                let isEarlyExit = false;
-                let isLateCovered = true;
-                let isEarlyCovered = true;
-                let lateLopUnits = 0;
-                let earlyLopUnits = 0;
-
-                if (inMins > STD_IN_MINS) {
-                    isLateEntry = true;
-                    // Any approved leave or permission cancels the automatic LOP for being late
-                    isLateCovered = segments.filter(s => s.type !== 'Present' && s.type !== 'Permission').some(s => s.fromMins <= STD_IN_MINS && s.toMins >= inMins);
-                    flags.push(`Late Entry (${physIn})`);
-
-                    if (!isLateCovered) {
-                        // Morning-only LOP window: 09:00 to 12:35 counts as half-day LOP.
-                        lateLopUnits = inMins <= MORNING_HALF_DAY_END_MINS ? 0.5 : 1;
-                        if (lateLopUnits === 0.5) {
-                            flags.push('Late LOP (Morning)');
-                        } else {
-                            flags.push('Late LOP (Full Day)');
-                        }
-                    }
-                }
-
-                // Check Early Exit: if punch-out is before standard 16:45
-                // Only evaluate if there's actually a punch out
-                if (physOut && outMins < STD_OUT_MINS) {
-                    isEarlyExit = true;
-                    // Any approved leave or permission cancels the automatic LOP for early exit
-                    isEarlyCovered = segments.filter(s => s.type !== 'Present' && s.type !== 'Permission').some(s => s.fromMins <= outMins && s.toMins >= STD_OUT_MINS);
-                    flags.push(`Early Exit (${physOut})`);
-
-                    if (!isEarlyCovered) {
-                        // Evening-only LOP window: 13:30 to 16:45 counts as half-day LOP.
-                        earlyLopUnits = outMins >= EVENING_HALF_DAY_START_MINS ? 0.5 : 1;
-                        if (earlyLopUnits === 0.5) {
-                            flags.push('Early Exit LOP (Evening)');
-                        } else {
-                            flags.push('Early Exit LOP (Full Day)');
-                        }
-                    }
-                }
-
-                // Status Logic: 
-                const leaveSegments = segments.filter(s => s.type !== 'Present' && s.type !== 'Permission');
-                const leaveInfo = leaveSegments.length > 0 ? leaveSegments.map(s => `${s.type} (${s.from}-${s.to})`).join(' + ') : null;
-
-                const lopUnits = Math.min(1, lateLopUnits + earlyLopUnits);
-
-                // 1. Uncovered late/early -> LOP
-                //    Half-day LOP is represented as "LOP + Present" so salary aggregation counts 0.5 unpaid.
-                if (lopUnits >= 1) {
-                    dbStatus = leaveInfo ? `LOP + ${leaveInfo}` : 'LOP';
-                } else if (lopUnits === 0.5) {
-                    if (isLateEntry && !isLateCovered) {
-                        dbStatus = leaveInfo ? `LOP (Late) + ${leaveInfo}` : 'LOP (Late Entry) + Present';
-                    } else if (isEarlyExit && !isEarlyCovered) {
-                        dbStatus = leaveInfo ? `LOP (Early) + ${leaveInfo}` : 'LOP (Early Exit) + Present';
-                    } else {
-                        dbStatus = 'LOP + Present';
-                    }
-                } else {
-                    dbStatus = leaveInfo ? (isLateEntry ? `Present (Late) + ${leaveInfo}` : `Present + ${leaveInfo}`) : (isLateEntry ? 'Present (Late Entry)' : 'Present');
-                }
-            } else {
-                const fullDay = segments.find(s => s.isFull);
-                const otherSegments = segments.filter(s => s.type !== 'Present' && s.type !== 'Permission' && !s.isFull);
-                const leaveInfo = otherSegments.length > 0 ? otherSegments.map(s => `${s.type} (${s.from}-${s.to})`).join(' + ') : null;
-
-                if (fullDay) {
-                    dbStatus = fullDay.type;
-                } else if (leaveInfo) {
-                    // Has partial leaves but no punch -> Absent + Leaves
-                    dbStatus = `Absent + ${leaveInfo}`; 
-                } else {
-                    dbStatus = 'Absent';
-                }
-            }
-
-            // MAP TO VALID DATABASE ENUM VALUES
-            let enumStatus = 'Present';
-            if (dbStatus.includes('LOP')) enumStatus = 'LOP';
-            else if (dbStatus.includes('Absent')) enumStatus = 'Absent';
-            else if (dbStatus.includes('CL')) enumStatus = 'CL';
-            else if (dbStatus.includes('ML')) enumStatus = 'ML';
-            else if (dbStatus.includes('OD')) enumStatus = 'OD';
-            else if (dbStatus.includes('Comp Leave')) enumStatus = 'Comp Leave';
-            else if (dbStatus.includes('Holiday')) enumStatus = 'Holiday';
-            else if (dbStatus.includes('Weekend')) enumStatus = 'Weekend';
-            else if (dbStatus.includes('Present')) enumStatus = 'Present';
-
-
-            // Reconstruct Remarks: Work Duration | Status Flags | Approved Segments with Period & Duration
-            const approvedInfoList = segments
-                .filter(s => s.type !== 'Present')
-                .map(s => {
-                    const fromTimeStr = new Date(`2000-01-01T${s.from}`).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
-                    const toTimeStr = new Date(`2000-01-01T${s.to}`).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
-                    const durationInMins = s.toMins - s.fromMins;
-                    const h = Math.floor(durationInMins / 60);
-                    const m = durationInMins % 60;
-                    return `${s.type}${s.day_type ? ' (' + s.day_type + ')' : ''}: ${fromTimeStr}-${toTimeStr} (${h}h ${m}m)`;
-                });
-
-            const finalRemarks = [
-                `Status: ${dbStatus}`, // Keep the detailed string here for UI
-                `Working Hours: ${workingHoursStr}`,
-                flags.length > 0 ? `Alerts: ${flags.join(', ')}` : null,
-                approvedInfoList.length > 0 ? `Approved Segments: ${approvedInfoList.join(' | ')}` : null
-            ].filter(Boolean).join(' | ');
-
-
-            console.log(`Syncing Attendance for ${refreshedUserRows[0].emp_id} on ${dateStr}: Status=${dbStatus}, In=${physIn}, Out=${physOut}`);
-
-            // We ALWAYS overwrite status, in_time, and out_time here because segments reflect the full truth
-            await runWithSequenceFix(
-                `INSERT INTO attendance_records (emp_id, date, in_time, out_time, status, remarks) 
-                 VALUES ($1, $2, $3, $4, $5, $6) 
-                 ON CONFLICT (emp_id, date) 
-                 DO UPDATE SET 
-                    in_time = EXCLUDED.in_time, 
-                    out_time = EXCLUDED.out_time,
-                    status = EXCLUDED.status,
-                    remarks = EXCLUDED.remarks`,
-                [refreshedUserRows[0].emp_id, dateStr, physIn || null, physOut || null, enumStatus, finalRemarks || null],
-                'attendance_records'
-            );
-
-        } catch (syncError) {
-            console.error('Attendance reconstruction/sync error for', emp_id, ':', syncError.message);
-            if (syncError.detail) console.error('Error detail:', syncError.detail);
-        }
-
-        // 5. Send persistent notifications to the user and all admins
-        const message = `Biometric Punch Recorded: ${type || (isFirstPunch ? 'IN' : 'OUT')} at ${timeStr} for ${userName}`;
-
-        // Notification for the user (skip email for punch events)
-        await createNotification(normalizedEmpId, message, 'attendance', null, null, true);
-
-        // Notifications for all admins
-        const { rows: admins } = await pool.query("SELECT emp_id, id FROM users WHERE role = 'admin'");
-        for (const admin of admins) {
-            if (admin.emp_id !== normalizedEmpId) { // Don't duplicate if user is also an admin
-                await createNotification(admin.emp_id, message, 'attendance', null, null, true);
-            }
-        }
-
-        // 6. Real-time update via socket - ONLY to user and admins
+        // Socket emitter
         const io = req.app.get('io');
         if (io) {
             const punchData = {
                 emp_id: normalizedEmpId,
-                name: userName,
                 type: type || (isFirstPunch ? 'IN' : 'OUT'),
                 time: timeStr,
                 date: dateStr
             };
-
-            // Emit to the user (identified by their ID as sent in the join event)
-            if (refreshedUserRows[0].id) {
-                io.to(refreshedUserRows[0].id).emit('biometric_punch', punchData);
-            }
-
-            // Emit to each admin
-            admins.forEach(admin => {
-                if (admin.id && admin.id !== refreshedUserRows[0].id) {
-                    io.to(admin.id).emit('biometric_punch', punchData);
-                }
-            });
+            io.emit('biometric_punch', punchData); // Broadcast for updates
         }
 
-        // Best-effort replay of previously queued logs whenever DB is healthy again.
+        // 6. Best-effort replay of previously queued logs
         try {
-            const replay = await drainPendingBiometricLogs(25);
-            if (replay.replayed > 0) {
-                console.log(`Replayed ${replay.replayed} queued biometric logs. Remaining: ${replay.remaining}`);
-            }
-        } catch (replayErr) {
-            console.warn('Queued biometric replay skipped:', replayErr.message);
-        }
+            await drainPendingBiometricLogs(5);
+        } catch (e) {}
 
-        res.status(200).json({ message: 'Log processed successfully' });
+        return res.status(200).json({ message: 'Log processed successfully (Attendance Synced)' });
     } catch (error) {
         console.error('🔴 Biometric processing error:', error);
         if (isTransientDbError(error)) {
             queuePendingBiometricLog(req.body, error);
-            return res.status(202).json({
-                message: 'Biometric punch queued due to temporary DB connectivity issue',
-                error: error.message,
-            });
+            return res.status(202).json({ message: 'Biometric punch queued due to temporary DB issue' });
         }
-
-        // Reliability fallback: keep punch payload for replay even on non-transient failures.
         queuePendingBiometricLog(req.body, error);
-        res.status(202).json({
-            message: 'Biometric punch queued for retry due to processing error',
-            error: error.message
-        });
+        return res.status(202).json({ message: 'Biometric punch queued for retry' });
     }
 };
 
@@ -970,5 +688,25 @@ exports.backfillTodayFromAttendance = async (req, res) => {
         });
     } finally {
         client.release();
+    }
+};
+// @desc    Initiate a pull of all logs from the device memory
+// @route   POST /api/biometric/pull-logs
+// @access  Private (Admin)
+exports.pullLogs = async (req, res) => {
+    try {
+        const { sn } = req.body;
+        if (!sn) return res.status(400).json({ message: 'Device Serial Number (SN) is required' });
+
+        // DATA QUERY ATTLOG is the standard ADMS command to request all attendance logs
+        exports.enqueueAdmsCommand(sn, 'DATA QUERY ATTLOG');
+
+        return res.status(200).json({ 
+            message: `Pull Logs command enqueued for device ${sn}. It will be delivered on the next device poll.`,
+            sn 
+        });
+    } catch (error) {
+        console.error('Error enqueuing pull logs command:', error);
+        res.status(500).json({ message: 'Server Error' });
     }
 };

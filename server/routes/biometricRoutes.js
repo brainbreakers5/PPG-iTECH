@@ -9,6 +9,9 @@ const {
 	getAdmsLastSeen,
 	markAdmsHeartbeatSeen,
 	markAdmsCdataSeen,
+	getNextAdmsCommand,
+	reportAdmsCommandStatus,
+	pullLogs,
 } = require('../controllers/biometricController');
 const { protect, restrictTo } = require('../middleware/authMiddleware');
 
@@ -68,14 +71,52 @@ const getAdmsBodyText = (req) => {
 
 // ADMS heartbeat endpoint (device polls this URL)
 router.get('/getrequest', (req, res) => {
-	console.log('📡 Device polling /iclock/getrequest...');
+	const sn = req.query.SN || req.query.sn || null;
+	console.log(`📡 Device polling /iclock/getrequest (SN: ${sn})...`);
+	
 	markAdmsHeartbeatSeen({
-		sn: req.query.SN || req.query.sn || null,
+		sn,
 		ip: req.ip,
 	});
+
 	res.set('Content-Type', 'text/plain');
+
+	// Check for pending commands for this specific device
+	if (sn) {
+		const cmd = getNextAdmsCommand(sn);
+		if (cmd) {
+			console.log(`[BIOMETRIC] Delivering command to SN=${sn}: ${cmd}`);
+			return res.send(cmd);
+		}
+	}
+
 	// "" (empty string) triggers the device to switch from check mode to push mode
-	res.send('');
+	res.send('OK');
+});
+
+// ADMS command result endpoint (device sends results here)
+router.all('/devicecmd', (req, res) => {
+	const sn = req.query.SN || req.query.sn || null;
+	console.log(`📡 Device reporting command result (SN: ${sn})...`);
+	
+	const rawBody = getAdmsBodyText(req);
+	const lines = String(rawBody || '').split(/\r?\n/).filter(Boolean);
+	
+	for (const line of lines) {
+		// Example: ID=CMD_123&Return=0
+		const parts = line.split('&');
+		const idPart = parts.find(p => p.startsWith('ID='));
+		const returnPart = parts.find(p => p.startsWith('Return='));
+		
+		if (idPart) {
+			const id = idPart.split('=')[1];
+			const code = returnPart ? returnPart.split('=')[1] : '0';
+			reportAdmsCommandStatus(id, code === '0' ? 'completed' : 'failed');
+		}
+	}
+
+	res.set('Content-Type', 'text/plain');
+	res.send('OK');
 });
 
 // ADMS attendance payload endpoint (some devices use POST, some can hit GET)
@@ -161,5 +202,6 @@ router.post('/rebuild-today', protect, restrictTo('admin', 'management'), rebuil
 router.get('/data', protect, getBiometricData);
 router.get('/stats', protect, getBiometricStats);
 router.get('/adms-last-seen', protect, restrictTo('admin'), getAdmsLastSeen);
+router.post('/pull-logs', protect, restrictTo('admin'), pullLogs);
 
 module.exports = router;
