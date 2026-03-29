@@ -578,8 +578,18 @@ exports.getBiometricData = async (req, res) => {
     }
 };
 
+// @desc    Get all registered employee IDs (internal bridge utility)
+exports.getRegisteredEmpIds = async (req, res) => {
+    try {
+        const { rows } = await pool.query('SELECT emp_id FROM users');
+        res.json(rows.map(r => String(r.emp_id).trim()));
+    } catch (error) {
+        console.error('Error fetching registered IDs:', error);
+        res.status(500).json({ message: 'Server Error' });
+    }
+};
+
 // @desc    Get biometric statistics
-// @route   GET /api/biometric/stats
 exports.getBiometricStats = async (req, res) => {
     try {
         const { rows: stats } = await pool.query(`

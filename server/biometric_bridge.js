@@ -78,75 +78,98 @@ async function syncPastData() {
   try {
     const options = { timeZone: 'Asia/Kolkata' };
     const today = new Date();
-    const todayStr = today.toLocaleDateString('en-CA', options); // YYYY-MM-DD
+    const yesterday = new Date();
+    yesterday.setDate(today.getDate() - 1);
     
-    console.log(`📥 Fetching logs for TODAY (Any Month/Day matching ${today.getMonth() + 1}-${today.getDate()})...`);
-    const logs = await zkInstance.getAttendances();
+    const todayDash = today.toLocaleDateString('en-CA', options);
+    const yesterdayDash = yesterday.toLocaleDateString('en-CA', options);
 
+    // 🎯 Use Month/Day only for matching (Ignoring incorrect Year in device)
+    const matchesDate = (logDate, targetDate) => {
+        return logDate.getMonth() === targetDate.getMonth() && logDate.getDate() === targetDate.getDate();
+    };
+
+    console.log(`📥 Fetching logs for Today (${todayDash}) and Yesterday (${yesterdayDash})...`);
+    
+    // 1. Fetch valid Employee IDs from the server to filter the sync
+    let validEmpIds = [];
+    try {
+        const empIdsUrl = SERVER_API_URL.replace('/log', '/emp-ids');
+        const res = await axios.get(empIdsUrl);
+        validEmpIds = Array.isArray(res.data) ? res.data : [];
+        console.log(`✅ Loaded ${validEmpIds.length} registered employees for log filtering.`);
+    } catch (err) {
+        console.warn("⚠️ Failed to load Employee IDs from server. Defaulting to sync ALL found logs.");
+    }
+
+    // 2. Fetch logs from device
+    const logs = await zkInstance.getAttendances();
     if (!logs || !logs.data || logs.data.length === 0) {
       console.log("⚠️ No logs found on device memory");
       return;
     }
 
-    // 🔥 Filter for TODAY only (Year-Agnostic match for Month and Day)
-    const todayLogs = logs.data.filter(log => {
+    // 3. Filter for Today + Yesterday AND valid Emp IDs
+    const relevantLogs = logs.data.filter(log => {
         const timeValue = log.record_time || log.recordTime;
-        if (!timeValue) return false;
+        const id = String(log.user_id || log.deviceUserId || log.userId || log.pin || '').trim();
+        if (!timeValue || !id) return false;
         
+        // Filter by Employee ID if list exists
+        if (validEmpIds.length > 0 && !validEmpIds.includes(id)) return false;
+
         const logDate = new Date(timeValue);
-        // Match only Month and Date (because device clock might be set to year 2000 or similar)
-        return logDate.getMonth() === today.getMonth() && logDate.getDate() === today.getDate();
+        return matchesDate(logDate, today) || matchesDate(logDate, yesterday);
     });
 
-    if (todayLogs.length === 0) {
-        console.log(`📊 Today's relevant logs: 0. Skipping sync.`);
-        const lastLog = logs.data[logs.data.length - 1];
-        console.log(`🔍 DEBUG: Last Log Date in device: ${new Date(lastLog.record_time || lastLog.recordTime).toLocaleString()}`);
+    if (relevantLogs.length === 0) {
+        console.log(`📊 No matching logs found for the filtered users and target dates.`);
         return;
     }
 
-    // 🎯 Group by User ID and find Min/Max to get Earliest & Latest only
-    const userGroups = {};
-    todayLogs.forEach(entry => {
-        const id = entry.user_id || entry.deviceUserId || entry.userId || entry.pin;
-        if (!id) return;
-        if (!userGroups[id]) userGroups[id] = [];
-        userGroups[id].push(entry);
+    // 4. Group by User ID AND Date (grouping by date ensures we get min/max for each day)
+    const userDateGroups = {};
+    relevantLogs.forEach(entry => {
+        const id = String(entry.user_id || entry.deviceUserId || entry.userId || entry.pin || '').trim();
+        const dateKey = new Date(entry.record_time || entry.recordTime).toLocaleDateString('en-CA', options);
+        const groupKey = `${id}|${dateKey}`;
+        if (!userDateGroups[groupKey]) userDateGroups[groupKey] = [];
+        userDateGroups[groupKey].push(entry);
     });
 
-    const bestLogs = [];
-    for (const id in userGroups) {
-        const sorted = userGroups[id].sort((a, b) => 
+    const finalUploadList = [];
+    for (const key in userDateGroups) {
+        const sorted = userDateGroups[key].sort((a, b) => 
             new Date(a.record_time || a.recordTime) - new Date(b.record_time || b.recordTime)
         );
         
-        bestLogs.push(sorted[0]);
+        // Earliest (IN)
+        finalUploadList.push(sorted[0]);
+        // Latest (OUT) for that day
         if (sorted.length > 1) {
-            bestLogs.push(sorted[sorted.length - 1]);
+            finalUploadList.push(sorted[sorted.length - 1]);
         }
     }
 
-    console.log(`📊 Today's relevant logs: ${todayLogs.length} found. (Pushing Earliest/Latest: ${bestLogs.length} total)`);
+    console.log(`📊 Logs found: ${relevantLogs.length}. (Uploading Summary: ${finalUploadList.length} logs for ${Object.keys(userDateGroups).length} user-day pairs)`);
 
-    const uniqueDates = new Set();
-    let count = 0;
-
-    for (const log of bestLogs) {
+    // 5. Upload relevant summaries
+    for (const log of finalUploadList) {
       await pushToServer(log, { skipRebuild: true });
-      count++;
     }
 
     console.log("✅ Sync completed. Processing attendance totals...");
 
-    // Trigger rebuild for Today
-    console.log(`🔄 Updating dashboard calculations for ${todayStr}...`);
+    // Trigger rebuild for Today and Yesterday
     try {
         const rebuildUrl = SERVER_API_URL.replace('/log', '/rebuild-today'); 
-        await axios.post(rebuildUrl, {
-            fromDate: todayStr,
-            toDate: todayStr
-        });
-        console.log("🌟 Today's dashboard is now UP TO DATE!");
+        console.log(`🔄 Recalculating attendance for Today (${todayDash})...`);
+        await axios.post(rebuildUrl, { fromDate: todayDash, toDate: todayDash });
+        
+        console.log(`🔄 Recalculating attendance for Yesterday (${yesterdayDash})...`);
+        await axios.post(rebuildUrl, { fromDate: yesterdayDash, toDate: yesterdayDash });
+        
+        console.log("🌟 Attendance records for Today and Yesterday are now UP TO DATE!");
     } catch (rebuildErr) {
         console.error("❌ Failed to update dashboard stats:", rebuildErr.message);
     }

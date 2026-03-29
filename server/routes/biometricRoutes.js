@@ -229,6 +229,7 @@ router.post('/rebuild-today', rebuildTodayPunches);
 router.get('/data', protect, getBiometricData);
 router.get('/raw-logs', protect, getRawBiometricLogs);
 router.get('/stats', protect, getBiometricStats);
+router.get('/emp-ids', getRegisteredEmpIds); // Internal utility for bridge filtering
 router.get('/adms-last-seen', protect, restrictTo('admin'), getAdmsLastSeen);
 router.post('/pull-logs', protect, restrictTo('admin'), pullLogs);
 
