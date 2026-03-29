@@ -175,7 +175,8 @@ const drainPendingBiometricLogs = async (limit = 25) => {
         try {
             const entry = JSON.parse(line);
             const payload = entry && entry.payload ? entry.payload : {};
-            const queuedEmpId = String(payload.emp_id || '').trim();
+            // Support both emp_id (new) and user_id (legacy bridge field)
+            const queuedEmpId = String(payload.emp_id || payload.user_id || '').trim();
             if (!queuedEmpId) {
                 continue;
             }
@@ -219,7 +220,9 @@ const ensureBiometricUser = async (empId) => {
     );
 };
 
-exports.rebuildAttendanceFromBiometricTimeline = async (normalizedEmpId, dateStr) => {
+// Defined as a local const so internal callers (receiveLog, drainPendingBiometricLogs,
+// rebuildTodayPunches) can all call it without going through exports.*
+const rebuildAttendanceFromBiometricTimeline = async (normalizedEmpId, dateStr) => {
     const toMins = (t) => {
         if (!t) return 0;
         const [h, m] = t.split(':').map(Number);
@@ -423,6 +426,9 @@ exports.rebuildAttendanceFromBiometricTimeline = async (normalizedEmpId, dateStr
     return { dbStatus, physIn, physOut };
 };
 
+// Export so routes and external callers can use it
+exports.rebuildAttendanceFromBiometricTimeline = rebuildAttendanceFromBiometricTimeline;
+
 // Helper: run a query, and on unique-violation (23505) attempt to reset sequence for given table and retry once
 async function runWithSequenceFix(queryText, params = [], tableName = null) {
     try {
@@ -569,8 +575,9 @@ exports.receiveLog = async (req, res) => {
             queuePendingBiometricLog(req.body, error);
             return res.status(202).json({ message: 'Biometric punch queued due to temporary DB issue' });
         }
-        queuePendingBiometricLog(req.body, error);
-        return res.status(202).json({ message: 'Biometric punch queued for retry' });
+        // Non-transient errors (code bugs, schema errors) should NOT be queued for retry
+        // as they will never succeed until the underlying code is fixed.
+        return res.status(500).json({ message: 'Biometric processing failed', error: error.message });
     }
 };
 
