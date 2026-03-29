@@ -582,11 +582,21 @@ exports.getBiometricData = async (req, res) => {
 // @desc    Get all registered employee IDs (internal bridge utility)
 exports.getRegisteredEmpIds = async (req, res) => {
     try {
-        const { rows } = await pool.query('SELECT emp_id FROM users');
-        res.json(rows.map(r => String(r.emp_id).trim()));
+        console.log('📡 Bridge is fetching Employee IDs...');
+        const result = await pool.query('SELECT emp_id FROM users');
+        const ids = result.rows
+            .filter(r => r.emp_id) // Skip users with no ID
+            .map(r => String(r.emp_id).trim());
+            
+        console.log(`✅ Bridge Sync: Sending list of ${ids.length} registered users.`);
+        res.json(ids);
     } catch (error) {
-        console.error('Error fetching registered IDs:', error);
-        res.status(500).json({ message: 'Server Error' });
+        // 🎯 Catch the exact error reason
+        console.error('❌ Database Access Error:', error.message);
+        res.status(500).json({ 
+            message: 'Database Access Error', 
+            error: error.message 
+        });
     }
 };
 

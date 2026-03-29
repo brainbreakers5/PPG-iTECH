@@ -12,9 +12,10 @@ const SERVER_API_URL =
 
 let zkInstance;
 let lastTimestamp = null; // for duplicate prevention
+let validEmpIds = []; // Global filter for registered users (Synchronized with App)
 
 async function connectDevice() {
-  zkInstance = new ZKLib(DEVICE_IP, DEVICE_PORT, 10000, 4000);
+  zkInstance = new ZKLib(DEVICE_IP, DEVICE_PORT, 30000, 4000);
 
   try {
     console.log(`🔌 Connecting to device ${DEVICE_IP}...`);
@@ -91,16 +92,7 @@ async function syncPastData() {
 
     console.log(`📥 Fetching logs for Today (${todayDash}) and Yesterday (${yesterdayDash})...`);
     
-    // 1. Fetch valid Employee IDs from the server to filter the sync
-    let validEmpIds = [];
-    try {
-        const empIdsUrl = SERVER_API_URL.replace('/log', '/emp-ids');
-        const res = await axios.get(empIdsUrl);
-        validEmpIds = Array.isArray(res.data) ? res.data : [];
-        console.log(`✅ Loaded ${validEmpIds.length} registered employees for log filtering.`);
-    } catch (err) {
-        console.warn("⚠️ Failed to load Employee IDs from server. Defaulting to sync ALL found logs.");
-    }
+    // 1. Fetch valid Employee IDs from the server (STRICT) -> Now moved to startBridge!
 
     // 2. Fetch logs from device
     const logs = await zkInstance.getAttendances();
@@ -108,22 +100,40 @@ async function syncPastData() {
       console.log("⚠️ No logs found on device memory");
       return;
     }
+    
+    console.log(`🔍 DIAGNOSTIC: Successfully fetched ${logs.data.length} total raw logs from device memory.`);
 
     // 3. Filter for Today + Yesterday AND valid Emp IDs
     const relevantLogs = logs.data.filter(log => {
         const timeValue = log.record_time || log.recordTime;
-        const id = String(log.user_id || log.deviceUserId || log.userId || log.pin || '').trim();
-        if (!timeValue || !id) return false;
+        const rawId = String(log.user_id || log.deviceUserId || log.userId || log.pin || '').trim();
+        if (!timeValue || !rawId) return false;
         
-        // Filter by Employee ID if list exists
-        if (validEmpIds.length > 0 && !validEmpIds.includes(id)) return false;
+        // STRICT FILTER: Match registered IDs (Handle leading zeros e.g. '005001' vs '5001')
+        const exactMatch = validEmpIds.includes(rawId);
+        const fuzzyMatch = validEmpIds.includes(String(parseInt(rawId, 10)));
+        
+        if (!exactMatch && !fuzzyMatch) return false;
 
         const logDate = new Date(timeValue);
         return matchesDate(logDate, today) || matchesDate(logDate, yesterday);
     });
 
     if (relevantLogs.length === 0) {
-        console.log(`📊 No matching logs found for the filtered users and target dates.`);
+        console.log(`📊 No matching logs found for today/yesterday for the ${validEmpIds.length} registered users.`);
+        
+        // 🎯 DEBUG Check if there were any logs at all for today that just didn't match IDs
+        const anyTodayLogs = logs.data.filter(l => {
+            const tv = l.record_time || l.recordTime;
+            if(!tv) return false;
+            return matchesDate(new Date(tv), today) || matchesDate(new Date(tv), yesterday);
+        });
+        
+        if (anyTodayLogs.length > 0) {
+            console.log(`🔍 DEBUG: Found ${anyTodayLogs.length} logs for today/yesterday, but their User IDs are NOT in our App!`);
+            const sampleIds = [...new Set(anyTodayLogs.map(l => l.user_id || l.deviceUserId || l.userId || l.pin))].slice(0, 5);
+            console.log(`🔍 DEBUG: Unmatched Device IDs: [${sampleIds.join(', ')}]`);
+        }
         return;
     }
 
@@ -151,7 +161,7 @@ async function syncPastData() {
         }
     }
 
-    console.log(`📊 Logs found: ${relevantLogs.length}. (Uploading Summary: ${finalUploadList.length} logs for ${Object.keys(userDateGroups).length} user-day pairs)`);
+    console.log(`📊 Logs found: ${relevantLogs.length}. (Uploading Summary: ${finalUploadList.length} logs for ${Object.keys(userDateGroups).length} matching user-day sessions)`);
 
     // 5. Upload relevant summaries
     for (const log of finalUploadList) {
@@ -180,27 +190,63 @@ async function syncPastData() {
 
 function startRealtime() {
   zkInstance.getRealTimeLogs(async (data) => {
-    console.log(`🔔 Punch detected → ${data.userId}`);
+    const id = String(data.user_id || data.deviceUserId || data.userId || data.pin || '').trim();
+    console.log(`🔔 Punch detected → User ${id}`);
 
-    // ❗ Prevent duplicates
-    if (lastTimestamp && data.recordTime <= lastTimestamp) {
-      console.log("⚠️ Duplicate skipped");
+    // STRICT: Only push if the employee exists in our App's database
+    if (validEmpIds.length > 0 && !validEmpIds.includes(id)) {
+        console.log(`⚠️ Ignored punch for Unknown User: ${id} (Not in App list)`);
+        return;
+    }
+
+    // ❗ Prevent duplicates (already exists in backend but good to have)
+    const timeValue = data.record_time || data.recordTime;
+    const currentTimeMs = new Date(timeValue).getTime();
+    
+    if (lastTimestamp && currentTimeMs <= new Date(lastTimestamp).getTime()) {
+      console.log("⚠️ Duplicate realtime punch skipped");
       return;
     }
 
-    lastTimestamp = data.recordTime;
+    lastTimestamp = timeValue;
 
     await pushToServer(data);
   });
 }
 
+async function updateValidEmpIds() {
+    try {
+        const empIdsUrl = SERVER_API_URL.replace('/log', '/emp-ids');
+        const res = await axios.get(empIdsUrl);
+        validEmpIds = Array.isArray(res.data) ? res.data : [];
+        if (validEmpIds.length === 0) {
+            console.error("❌ CRITICAL: No registered employees found in database. Check your Employee list!");
+            return false;
+        }
+        console.log(`✅ Loaded ${validEmpIds.length} registered Employees. (IDs: ${validEmpIds.join(', ')})`);
+        return true;
+    } catch (err) {
+        console.error(`❌ CRITICAL: Could not fetch Employee ID list from server. [Reason: ${err.message}]`);
+        return false;
+    }
+}
+
 async function startBridge() {
+  // 🔥 STEP 1: Load Employee IDs from Web Server FIRST (so device doesn't time out while waiting)
+  const idSuccess = await updateValidEmpIds();
+  if (!idSuccess) {
+      console.log("⚠️ Bridge will not start syncing until Server is online. Retrying in 10s...");
+      setTimeout(startBridge, 10000);
+      return;
+  }
+
+  // 🔥 STEP 2: Connect to the Biometric Device ONLY AFTER we are ready
   await connectDevice();
 
-  // 🔥 STEP 1: Sync past data
+  // 🔥 STEP 3: Sync past data using the active, fresh socket
   await syncPastData();
 
-  // 🔥 STEP 2: Start realtime listening
+  // 🔥 STEP 4: Start realtime listening
   startRealtime();
 }
 
