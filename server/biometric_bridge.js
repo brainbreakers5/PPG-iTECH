@@ -41,19 +41,34 @@ async function pushToServer(log, options = {}) {
 
     if (!timeValue) return;
 
+    // 🔥 YEAR CORRECTION: If device time is in 2000 but we want today, 
+    // we use SERVER year for the API call to ensure it appears on dashboard.
+    const logDate = new Date(timeValue);
+    const serverNow = new Date();
+    
+    // Construct corrected date (use Server Year, but Log Month and Day)
+    const correctedTimestamp = new Date(
+        serverNow.getFullYear(),
+        logDate.getMonth(),
+        logDate.getDate(),
+        logDate.getHours(),
+        logDate.getMinutes(),
+        logDate.getSeconds()
+    );
+
     await axios.post(
       SERVER_API_URL,
       {
         user_id: empId,
         device_id: 'MAIN_DEVICE_01',
-        timestamp: timeValue, 
-        type: new Date(timeValue).getHours() < 12 ? 'IN' : 'OUT',
+        timestamp: correctedTimestamp.toISOString(), 
+        type: logDate.getHours() < 12 ? 'IN' : 'OUT',
         skipRebuild: options.skipRebuild || false // Efficiency for historical sync
       },
       axiosOptions
     );
 
-    console.log(`🚀 Sent → User ${empId} @ ${timeValue}`);
+    console.log(`🚀 Sent → User ${empId} @ ${correctedTimestamp.toLocaleString()} (Source: ${timeValue})`);
   } catch (err) {
     console.error(`❌ Push failed for User ${log.user_id || log.deviceUserId || log.userId || '??'}:`, err.message);
   }
@@ -61,11 +76,11 @@ async function pushToServer(log, options = {}) {
 
 async function syncPastData() {
   try {
-    // 🎯 Robust Date Calculation for India (+05:30)
     const options = { timeZone: 'Asia/Kolkata' };
-    const todayStr = new Date().toLocaleDateString('en-CA', options); // YYYY-MM-DD
+    const today = new Date();
+    const todayStr = today.toLocaleDateString('en-CA', options); // YYYY-MM-DD
     
-    console.log(`📥 Fetching logs for TODAY (${todayStr}) only...`);
+    console.log(`📥 Fetching logs for TODAY (Any Month/Day matching ${today.getMonth() + 1}-${today.getDate()})...`);
     const logs = await zkInstance.getAttendances();
 
     if (!logs || !logs.data || logs.data.length === 0) {
@@ -73,15 +88,20 @@ async function syncPastData() {
       return;
     }
 
-    // 🔥 Filter for TODAY only (handling underscore naming)
+    // 🔥 Filter for TODAY only (Year-Agnostic match for Month and Day)
     const todayLogs = logs.data.filter(log => {
         const timeValue = log.record_time || log.recordTime;
         if (!timeValue) return false;
-        return new Date(timeValue).toLocaleDateString('en-CA', options) === todayStr;
+        
+        const logDate = new Date(timeValue);
+        // Match only Month and Date (because device clock might be set to year 2000 or similar)
+        return logDate.getMonth() === today.getMonth() && logDate.getDate() === today.getDate();
     });
 
     if (todayLogs.length === 0) {
         console.log(`📊 Today's relevant logs: 0. Skipping sync.`);
+        const lastLog = logs.data[logs.data.length - 1];
+        console.log(`🔍 DEBUG: Last Log Date in device: ${new Date(lastLog.record_time || lastLog.recordTime).toLocaleString()}`);
         return;
     }
 
@@ -96,14 +116,11 @@ async function syncPastData() {
 
     const bestLogs = [];
     for (const id in userGroups) {
-        // Sort by time
         const sorted = userGroups[id].sort((a, b) => 
             new Date(a.record_time || a.recordTime) - new Date(b.record_time || b.recordTime)
         );
         
-        // Push the Earliest (IN)
         bestLogs.push(sorted[0]);
-        // Push the Latest (OUT) if it's different (e.g., user has more than 1 punch)
         if (sorted.length > 1) {
             bestLogs.push(sorted[sorted.length - 1]);
         }
@@ -115,28 +132,23 @@ async function syncPastData() {
     let count = 0;
 
     for (const log of bestLogs) {
-      const timeValue = log.record_time || log.recordTime;
       await pushToServer(log, { skipRebuild: true });
-      lastTimestamp = timeValue;
-      uniqueDates.add(new Date(timeValue).toLocaleDateString('en-CA', options));
       count++;
     }
 
     console.log("✅ Sync completed. Processing attendance totals...");
 
-    // Trigger rebuild for Today only
-    if (uniqueDates.size > 0) {
-        console.log(`🔄 Updating dashboard calculations for ${todayStr}...`);
-        try {
-            const rebuildUrl = SERVER_API_URL.replace('/log', '/rebuild-today'); 
-            await axios.post(rebuildUrl, {
-                fromDate: todayStr,
-                toDate: todayStr
-            });
-            console.log("🌟 Today's dashboard is now UP TO DATE!");
-        } catch (rebuildErr) {
-            console.error("❌ Failed to update dashboard stats:", rebuildErr.message);
-        }
+    // Trigger rebuild for Today
+    console.log(`🔄 Updating dashboard calculations for ${todayStr}...`);
+    try {
+        const rebuildUrl = SERVER_API_URL.replace('/log', '/rebuild-today'); 
+        await axios.post(rebuildUrl, {
+            fromDate: todayStr,
+            toDate: todayStr
+        });
+        console.log("🌟 Today's dashboard is now UP TO DATE!");
+    } catch (rebuildErr) {
+        console.error("❌ Failed to update dashboard stats:", rebuildErr.message);
     }
   } catch (err) {
     console.error("❌ Past sync error:", err.message);
