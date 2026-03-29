@@ -11,7 +11,6 @@ const SERVER_API_URL =
   `http://localhost:${process.env.PORT || 5000}/api/biometric/log`;
 
 let zkInstance;
-let lastTimestamp = null; // for duplicate prevention
 let validEmpIds = []; // Global filter for registered users (Synchronized with App)
 
 async function connectDevice() {
@@ -64,7 +63,8 @@ async function pushToServer(log, options = {}) {
         device_id: 'MAIN_DEVICE_01',
         timestamp: correctedTimestamp.toISOString(), 
         type: logDate.getHours() < 12 ? 'IN' : 'OUT',
-        skipRebuild: options.skipRebuild || false // Efficiency for historical sync
+        skipRebuild: options.skipRebuild || false, // Efficiency for historical sync
+        skipDuplicateGuard: options.skipDuplicateGuard || false
       },
       axiosOptions
     );
@@ -137,35 +137,11 @@ async function syncPastData() {
         return;
     }
 
-    // 4. Group by User ID AND Date (grouping by date ensures we get min/max for each day)
-    const userDateGroups = {};
-    relevantLogs.forEach(entry => {
-        const id = String(entry.user_id || entry.deviceUserId || entry.userId || entry.pin || '').trim();
-        const dateKey = new Date(entry.record_time || entry.recordTime).toLocaleDateString('en-CA', options);
-        const groupKey = `${id}|${dateKey}`;
-        if (!userDateGroups[groupKey]) userDateGroups[groupKey] = [];
-        userDateGroups[groupKey].push(entry);
-    });
+    console.log(`📊 Logs found: ${relevantLogs.length}. Uploading all matching punches...`);
 
-    const finalUploadList = [];
-    for (const key in userDateGroups) {
-        const sorted = userDateGroups[key].sort((a, b) => 
-            new Date(a.record_time || a.recordTime) - new Date(b.record_time || b.recordTime)
-        );
-        
-        // Earliest (IN)
-        finalUploadList.push(sorted[0]);
-        // Latest (OUT) for that day
-        if (sorted.length > 1) {
-            finalUploadList.push(sorted[sorted.length - 1]);
-        }
-    }
-
-    console.log(`📊 Logs found: ${relevantLogs.length}. (Uploading Summary: ${finalUploadList.length} logs for ${Object.keys(userDateGroups).length} matching user-day sessions)`);
-
-    // 5. Upload relevant summaries
-    for (const log of finalUploadList) {
-      await pushToServer(log, { skipRebuild: true });
+    // 4. Upload all relevant logs (no data loss)
+    for (const log of relevantLogs) {
+      await pushToServer(log, { skipRebuild: true, skipDuplicateGuard: true });
     }
 
     console.log("✅ Sync completed. Processing attendance totals...");
@@ -199,18 +175,7 @@ function startRealtime() {
         return;
     }
 
-    // ❗ Prevent duplicates (already exists in backend but good to have)
-    const timeValue = data.record_time || data.recordTime;
-    const currentTimeMs = new Date(timeValue).getTime();
-    
-    if (lastTimestamp && currentTimeMs <= new Date(lastTimestamp).getTime()) {
-      console.log("⚠️ Duplicate realtime punch skipped");
-      return;
-    }
-
-    lastTimestamp = timeValue;
-
-    await pushToServer(data);
+    await pushToServer(data, { skipDuplicateGuard: true });
   });
 }
 

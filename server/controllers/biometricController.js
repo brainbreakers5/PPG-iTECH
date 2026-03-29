@@ -129,7 +129,7 @@ const drainPendingBiometricLogs = async (limit = 25) => {
             }
 
             const queuedLogDate = payload.timestamp ? new Date(payload.timestamp) : new Date(entry.queued_at || Date.now());
-            await ensureBiometricUser(queuedEmpId);
+            // No longer forcing user creation here
             await runWithSequenceFix(
                 'INSERT INTO biometric_logs (device_id, emp_id, log_time, type) VALUES ($1, $2, $3, $4)',
                 [payload.device_id || 'PENDING_QUEUE', queuedEmpId, queuedLogDate, payload.type || (queuedLogDate.getHours() < 12 ? 'IN' : 'OUT')],
@@ -399,7 +399,7 @@ async function runWithSequenceFix(queryText, params = [], tableName = null) {
 // @route   POST /api/biometric/log
 // @access  Public (or protected with device key)
 exports.receiveLog = async (req, res) => {
-    const { device_id, emp_id, user_id, timestamp, recordTime, type, device_ip } = req.body;
+    const { device_id, emp_id, user_id, timestamp, recordTime, type, device_ip, skipDuplicateGuard } = req.body;
     const finalEmpId = String(emp_id || user_id || '').trim();
 
     if (!finalEmpId) {
@@ -420,32 +420,44 @@ exports.receiveLog = async (req, res) => {
         const dateStr = logDate.toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' }); // YYYY-MM-DD in IST
         const timeStr = logDate.toLocaleTimeString('en-US', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', hour12: true }); // HH:MM AM/PM in IST
 
-        // 1. Block rapid duplicate punches for the same employee within 10 minutes of the target timestamp.
-        // This works correctly for both live data AND past memory dumps.
-        const marginMs = MIN_PUNCH_INTERVAL_MS;
-        const startTime = new Date(logDate.getTime() - marginMs);
-        const endTime = new Date(logDate.getTime() + marginMs);
-
-        const { rows: nearPunchRows } = await pool.query(
-            `SELECT id, log_time
-             FROM biometric_logs
-             WHERE TRIM(emp_id) = $1
-             AND log_time >= $2 AND log_time <= $3
-             LIMIT 1`,
-            [normalizedEmpId, startTime, endTime]
+        // 1. Only accept logs for employees that exist in the users table.
+        const { rows: userRows } = await pool.query(
+            'SELECT 1 FROM users WHERE TRIM(emp_id) = $1 LIMIT 1',
+            [normalizedEmpId]
         );
 
-        if (nearPunchRows.length > 0) {
-            console.log(`[BIOMETRIC] Duplicate punch ignored for ${normalizedEmpId} at ${logDate.toISOString()} (Found existing at ${nearPunchRows[0].log_time})`);
+        if (userRows.length === 0) {
             return res.status(200).json({
-                message: `Duplicate punch ignored. Punch already exists within 10 minutes.`,
+                message: `Unknown employee ${normalizedEmpId}. Log ignored.`,
                 skipped: true,
-                reason: 'DUPLICATE_OR_TOO_SOON'
+                reason: 'UNKNOWN_EMPLOYEE'
             });
         }
 
-        // 2. Ensure User exists (Race-safe fallback handled by ensureBiometricUser logic)
-        await ensureBiometricUser(normalizedEmpId);
+        // 2. Optionally block rapid duplicate punches for the same employee within 10 minutes.
+        if (!skipDuplicateGuard) {
+            const marginMs = MIN_PUNCH_INTERVAL_MS;
+            const startTime = new Date(logDate.getTime() - marginMs);
+            const endTime = new Date(logDate.getTime() + marginMs);
+
+            const { rows: nearPunchRows } = await pool.query(
+                `SELECT id, log_time
+                 FROM biometric_logs
+                 WHERE TRIM(emp_id) = $1
+                 AND log_time >= $2 AND log_time <= $3
+                 LIMIT 1`,
+                [normalizedEmpId, startTime, endTime]
+            );
+
+            if (nearPunchRows.length > 0) {
+                console.log(`[BIOMETRIC] Duplicate punch ignored for ${normalizedEmpId} at ${logDate.toISOString()} (Found existing at ${nearPunchRows[0].log_time})`);
+                return res.status(200).json({
+                    message: `Duplicate punch ignored. Punch already exists within 10 minutes.`,
+                    skipped: true,
+                    reason: 'DUPLICATE_OR_TOO_SOON'
+                });
+            }
+        }
 
         // 3. Store raw log in biometric_logs (Audit Trail)
         // This log table stores EVERYTHING (minutely/hourly records for full history)
@@ -547,16 +559,16 @@ exports.getBiometricData = async (req, res) => {
             SELECT b.*, u.name, u.role, d.name as department_name, 
                    ar.status as att_status, ar.remarks as att_remarks
             FROM biometric_attendance b
-            JOIN users u ON b.user_id = u.emp_id
+            JOIN users u ON TRIM(b.user_id) = TRIM(u.emp_id)
             LEFT JOIN departments d ON u.department_id = d.id
-            LEFT JOIN attendance_records ar ON b.user_id = ar.emp_id AND b.date = ar.date
+            LEFT JOIN attendance_records ar ON TRIM(b.user_id) = TRIM(ar.emp_id) AND b.date = ar.date
             WHERE 1=1
         `;
         const params = [];
 
         if (emp_id) {
-            params.push(emp_id);
-            query += ` AND b.user_id = $${params.length}`;
+            params.push(String(emp_id).trim());
+            query += ` AND TRIM(b.user_id) = $${params.length}`;
         }
         if (date) {
             params.push(date);
