@@ -13,6 +13,48 @@ const SERVER_API_URL =
 let zkInstance;
 let validEmpIds = []; // Global filter for registered users (Synchronized with App)
 
+const parseDeviceTime = (timeValue) => {
+  if (!timeValue) return new Date(); // Fallback to current server time if device misses time field
+  if (timeValue instanceof Date && !Number.isNaN(timeValue.getTime())) return timeValue;
+
+  if (typeof timeValue === 'number') {
+    const ms = timeValue < 1e12 ? timeValue * 1000 : timeValue;
+    const d = new Date(ms);
+    return Number.isNaN(d.getTime()) ? null : d;
+  }
+
+  const raw = String(timeValue).trim();
+  if (!raw) return null;
+
+  const mdMatch = raw.match(/^(\d{2})-(\d{2})\s+(\d{2}):(\d{2})(?::(\d{2}))?$/);
+  if (mdMatch) {
+    const now = new Date();
+    const month = parseInt(mdMatch[1], 10) - 1;
+    const day = parseInt(mdMatch[2], 10);
+    const hour = parseInt(mdMatch[3], 10);
+    const minute = parseInt(mdMatch[4], 10);
+    const second = parseInt(mdMatch[5] || '0', 10);
+    const d = new Date(now.getFullYear(), month, day, hour, minute, second);
+    return Number.isNaN(d.getTime()) ? null : d;
+  }
+
+  if (/^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}(:\d{2})?$/.test(raw)) {
+    const d = new Date(raw.replace(' ', 'T'));
+    return Number.isNaN(d.getTime()) ? null : d;
+  }
+
+  const d = new Date(raw);
+  return Number.isNaN(d.getTime()) ? null : d;
+};
+
+const toDateKey = (date) => {
+  if (!date) return '';
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+};
+
 async function connectDevice() {
   zkInstance = new ZKLib(DEVICE_IP, DEVICE_PORT, 30000, 4000);
 
@@ -37,13 +79,23 @@ async function pushToServer(log, options = {}) {
     // Identify user ID and time safely (Handles underscore and camelCase)
     const rawId = log.user_id || log.deviceUserId || log.userId || log.pin;
     const empId = rawId ? String(rawId).trim() : "UNKNOWN";
-    const timeValue = log.record_time || log.recordTime;
+    const timeValue = log.record_time || log.recordTime || log.time; // Added log.time for real-time compatibility
+    const missingTime = !timeValue;
 
-    if (!timeValue) return;
+    if (process.env.BIOMETRIC_DEBUG === '1') {
+      console.log(`📡 Attempting push for User ${empId}. Raw time field: ${timeValue}`);
+    }
+
+    if (missingTime) {
+      console.warn(`⚠️ Missing device timestamp for User ${empId}. Using server time.`);
+    }
+
+    const parsedLogDate = parseDeviceTime(timeValue);
+    if (!parsedLogDate) return;
 
     // 🔥 YEAR CORRECTION: If device time is in 2000 but we want today, 
     // we use SERVER year for the API call to ensure it appears on dashboard.
-    const logDate = new Date(timeValue);
+    const logDate = parsedLogDate;
     const serverNow = new Date();
     
     // Construct corrected date (use Server Year, but Log Month and Day)
@@ -56,7 +108,7 @@ async function pushToServer(log, options = {}) {
         logDate.getSeconds()
     );
 
-    await axios.post(
+    const response = await axios.post(
       SERVER_API_URL,
       {
         user_id: empId,
@@ -70,6 +122,9 @@ async function pushToServer(log, options = {}) {
     );
 
     console.log(`🚀 Sent → User ${empId} @ ${correctedTimestamp.toLocaleString()} (Source: ${timeValue})`);
+    if (response?.data?.skipped) {
+      console.warn(`⚠️ Server skipped punch for ${empId}: ${response.data.reason || 'UNKNOWN'}`);
+    }
   } catch (err) {
     console.error(`❌ Push failed for User ${log.user_id || log.deviceUserId || log.userId || '??'}:`, err.message);
   }
@@ -103,11 +158,30 @@ async function syncPastData() {
     
     console.log(`🔍 DIAGNOSTIC: Successfully fetched ${logs.data.length} total raw logs from device memory.`);
 
-    // 3. Filter for Today + Yesterday AND valid Emp IDs
-    const relevantLogs = logs.data.filter(log => {
+    if (process.env.BIOMETRIC_DEBUG === '1') {
+      const sample = logs.data.slice(0, 5).map((log) => {
         const timeValue = log.record_time || log.recordTime;
         const rawId = String(log.user_id || log.deviceUserId || log.userId || log.pin || '').trim();
-        if (!timeValue || !rawId) return false;
+        const parsedDate = parseDeviceTime(timeValue);
+        const isValidDate = parsedDate && !Number.isNaN(parsedDate.getTime());
+        const exactMatch = rawId ? validEmpIds.includes(rawId) : false;
+        const fuzzyMatch = rawId ? validEmpIds.includes(String(parseInt(rawId, 10))) : false;
+        return {
+          rawId,
+          timeValue,
+          isValidDate,
+          parsedIso: isValidDate ? parsedDate.toISOString() : null,
+          exactMatch,
+          fuzzyMatch,
+        };
+      });
+      console.log('🔎 DEBUG SAMPLE (first 5 logs):', sample);
+    }
+
+    const filterByDates = (targetDates) => logs.data.filter(log => {
+      const timeValue = log.record_time || log.recordTime;
+        const rawId = String(log.user_id || log.deviceUserId || log.userId || log.pin || '').trim();
+      if (!timeValue || !rawId) return false;
         
         // STRICT FILTER: Match registered IDs (Handle leading zeros e.g. '005001' vs '5001')
         const exactMatch = validEmpIds.includes(rawId);
@@ -115,18 +189,32 @@ async function syncPastData() {
         
         if (!exactMatch && !fuzzyMatch) return false;
 
-        const logDate = new Date(timeValue);
-        return matchesDate(logDate, today) || matchesDate(logDate, yesterday);
+        const logDate = parseDeviceTime(timeValue);
+        if (!logDate) return false;
+        return targetDates.some((d) => matchesDate(logDate, d));
     });
+
+      // 3. Filter for Today + Yesterday AND valid Emp IDs
+      let relevantLogs = filterByDates([today, yesterday]);
+      let rebuildDates = [todayDash, yesterdayDash];
+
+    if (process.env.BIOMETRIC_DEBUG === '1' && relevantLogs.length > 0) {
+      const matchedIds = [...new Set(relevantLogs.map(l => String(l.user_id || l.deviceUserId || l.userId || l.pin || '').trim()))]
+        .filter(Boolean)
+        .slice(0, 25);
+      console.log(`✅ DEBUG: Matched device IDs (sample up to 25): [${matchedIds.join(', ')}]`);
+    }
 
     if (relevantLogs.length === 0) {
         console.log(`📊 No matching logs found for today/yesterday for the ${validEmpIds.length} registered users.`);
         
         // 🎯 DEBUG Check if there were any logs at all for today that just didn't match IDs
         const anyTodayLogs = logs.data.filter(l => {
-            const tv = l.record_time || l.recordTime;
-            if(!tv) return false;
-            return matchesDate(new Date(tv), today) || matchesDate(new Date(tv), yesterday);
+          const tv = l.record_time || l.recordTime;
+          if (!tv) return false;
+          const parsed = parseDeviceTime(tv);
+          if (!parsed) return false;
+          return matchesDate(parsed, today) || matchesDate(parsed, yesterday);
         });
         
         if (anyTodayLogs.length > 0) {
@@ -134,7 +222,39 @@ async function syncPastData() {
             const sampleIds = [...new Set(anyTodayLogs.map(l => l.user_id || l.deviceUserId || l.userId || l.pin))].slice(0, 5);
             console.log(`🔍 DEBUG: Unmatched Device IDs: [${sampleIds.join(', ')}]`);
         }
-        return;
+
+        // Fallback: use latest two available dates from valid employee logs
+        const validDatedLogs = logs.data
+          .map((log) => {
+            const timeValue = log.record_time || log.recordTime;
+            const rawId = String(log.user_id || log.deviceUserId || log.userId || log.pin || '').trim();
+            if (!timeValue || !rawId) return null;
+
+            const exactMatch = validEmpIds.includes(rawId);
+            const fuzzyMatch = validEmpIds.includes(String(parseInt(rawId, 10)));
+            if (!exactMatch && !fuzzyMatch) return null;
+
+            const logDate = parseDeviceTime(timeValue);
+            if (!logDate) return null;
+            return { log, logDate };
+          })
+          .filter(Boolean);
+
+        if (validDatedLogs.length === 0) return;
+
+        const mostRecent = validDatedLogs.reduce((max, entry) => {
+          return entry.logDate > max ? entry.logDate : max;
+        }, validDatedLogs[0].logDate);
+
+        const prevDate = new Date(mostRecent);
+        prevDate.setDate(prevDate.getDate() - 1);
+
+        const fallbackTargets = [mostRecent, prevDate];
+        rebuildDates = fallbackTargets.map((d) => toDateKey(d));
+        console.log(`🔁 Fallback: syncing latest device dates [${toDateKey(mostRecent)}, ${toDateKey(prevDate)}] for registered employees.`);
+        relevantLogs = filterByDates(fallbackTargets);
+
+        if (relevantLogs.length === 0) return;
     }
 
     console.log(`📊 Logs found: ${relevantLogs.length}. Uploading all matching punches...`);
@@ -146,16 +266,14 @@ async function syncPastData() {
 
     console.log("✅ Sync completed. Processing attendance totals...");
 
-    // Trigger rebuild for Today and Yesterday
+    // Trigger rebuild for the dates that were actually synced
     try {
         const rebuildUrl = SERVER_API_URL.replace('/log', '/rebuild-today'); 
-        console.log(`🔄 Recalculating attendance for Today (${todayDash})...`);
-        await axios.post(rebuildUrl, { fromDate: todayDash, toDate: todayDash });
-        
-        console.log(`🔄 Recalculating attendance for Yesterday (${yesterdayDash})...`);
-        await axios.post(rebuildUrl, { fromDate: yesterdayDash, toDate: yesterdayDash });
-        
-        console.log("🌟 Attendance records for Today and Yesterday are now UP TO DATE!");
+      for (const dateStr of rebuildDates) {
+        console.log(`🔄 Recalculating attendance for ${dateStr}...`);
+        await axios.post(rebuildUrl, { fromDate: dateStr, toDate: dateStr });
+      }
+      console.log(`🌟 Attendance records for ${rebuildDates.join(', ')} are now UP TO DATE!`);
     } catch (rebuildErr) {
         console.error("❌ Failed to update dashboard stats:", rebuildErr.message);
     }
@@ -165,17 +283,31 @@ async function syncPastData() {
 }
 
 function startRealtime() {
+  console.log('🟢 Realtime listener started (waiting for new punches)...');
   zkInstance.getRealTimeLogs(async (data) => {
-    const id = String(data.user_id || data.deviceUserId || data.userId || data.pin || '').trim();
-    console.log(`🔔 Punch detected → User ${id}`);
+    try {
+      const rawId = String(data.user_id || data.deviceUserId || data.userId || data.pin || '').trim();
+      const id = rawId;
+      console.log(`🔔 Punch detected → User ${id}`);
 
-    // STRICT: Only push if the employee exists in our App's database
-    if (validEmpIds.length > 0 && !validEmpIds.includes(id)) {
-        console.log(`⚠️ Ignored punch for Unknown User: ${id} (Not in App list)`);
-        return;
+      // STRICT: Only push if the employee exists in our App's database
+      // Using fuzzy matching to handle leading zero differences (e.g. 005001 vs 5001)
+      const exactMatch = validEmpIds.includes(id);
+      const fuzzyMatch = validEmpIds.includes(String(parseInt(id, 10)));
+
+      if (validEmpIds.length > 0 && !exactMatch && !fuzzyMatch) {
+          console.log(`⚠️ Ignored punch for Unknown User: ${id} (Not in App list)`);
+          return;
+      }
+
+      const matchId = exactMatch ? id : String(parseInt(id, 10));
+      // Replace with normalized ID in the push
+      data.user_id = matchId; 
+
+      await pushToServer(data, { skipDuplicateGuard: false });
+    } catch (realtimeErr) {
+      console.error('❌ Error processing real-time punch:', realtimeErr.message);
     }
-
-    await pushToServer(data, { skipDuplicateGuard: true });
   });
 }
 
@@ -208,11 +340,17 @@ async function startBridge() {
   // 🔥 STEP 2: Connect to the Biometric Device ONLY AFTER we are ready
   await connectDevice();
 
-  // 🔥 STEP 3: Sync past data using the active, fresh socket
-  await syncPastData();
-
-  // 🔥 STEP 4: Start realtime listening
+  // 🔥 STEP 3: Start realtime listening immediately
   startRealtime();
+
+  // 🔥 STEP 4: Sync past data only if explicitly enabled (run in background)
+  if (process.env.BIOMETRIC_SYNC_ON_START === '1') {
+    syncPastData().catch((err) => {
+      console.error('❌ Past sync failed:', err.message);
+    });
+  } else {
+    console.log('⏭️  Past sync skipped (set BIOMETRIC_SYNC_ON_START=1 to enable)');
+  }
 }
 
 // Auto-reconnect on crash

@@ -1,2 +1,1 @@
-{"queued_at":"2026-03-29T08:43:52.998Z","reason":"Connection terminated due to connection timeout","payload":{"user_id":"207","device_id":"MAIN_DEVICE_01","timestamp":"2026-03-28T04:17:03.000Z","type":"IN","skipRebuild":true}}
-{"queued_at":"2026-03-29T10:00:15.602Z","reason":"Connection terminated due to connection timeout","payload":{"user_id":"5001","device_id":"TEST","timestamp":"2026-03-29T10:00:05.493Z","type":"IN"}}
+{"queued_at":"2026-03-29T14:18:43.883Z","reason":"rebuildAttendanceFromBiometricTimeline is not defined","payload":{"user_id":"5001","device_id":"MAIN_DEVICE_01","timestamp":"2026-03-29T14:18:43.000Z","type":"OUT","skipRebuild":false,"skipDuplicateGuard":false}}

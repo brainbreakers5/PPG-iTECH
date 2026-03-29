@@ -19,6 +19,58 @@ const admsCommandQueue = []; // Queue of { sn: string, command: string, id: stri
 
 const toIsoNow = () => new Date().toISOString();
 
+const toIstParts = (date) => {
+    const formatter = new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'Asia/Kolkata',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false,
+    });
+    const parts = formatter.formatToParts(date).reduce((acc, part) => {
+        if (part.type !== 'literal') acc[part.type] = part.value;
+        return acc;
+    }, {});
+    const dateStr = `${parts.year}-${parts.month}-${parts.day}`;
+    const timeStr = `${parts.hour}:${parts.minute}:${parts.second}`;
+    return { dateStr, timeStr, timestamp: `${dateStr} ${timeStr}` };
+};
+
+const upsertBiometricAttendanceFromLogs = async (empId, dateStr) => {
+    // We treat log_time as already being in IST local time (timestamp without time zone)
+    // to avoid triple-conversion bugs that shift dashboard data by 5.5 hours.
+    await pool.query(
+        `WITH agg AS (
+            SELECT
+                MIN(log_time::time) AS first_punch,
+                MAX(log_time::time) AS last_punch
+            FROM biometric_logs
+            WHERE TRIM(emp_id) = $1
+              AND log_time::date = $2::date
+        )
+        INSERT INTO biometric_attendance (user_id, date, intime, outtime)
+        SELECT $1, $2::date, first_punch, last_punch
+        FROM agg
+        WHERE first_punch IS NOT NULL
+        ON CONFLICT (user_id, date)
+        DO UPDATE SET
+            intime = CASE
+                WHEN biometric_attendance.intime IS NULL THEN EXCLUDED.intime
+                WHEN EXCLUDED.intime IS NULL THEN biometric_attendance.intime
+                ELSE LEAST(biometric_attendance.intime, EXCLUDED.intime)
+            END,
+            outtime = CASE
+                WHEN biometric_attendance.outtime IS NULL THEN EXCLUDED.outtime
+                WHEN EXCLUDED.outtime IS NULL THEN biometric_attendance.outtime
+                ELSE GREATEST(biometric_attendance.outtime, EXCLUDED.outtime)
+            END`,
+        [empId, dateStr]
+    );
+};
+
 exports.markAdmsHeartbeatSeen = (meta = null) => {
     admsLastSeenState.heartbeat = toIsoNow();
     admsLastSeenState.heartbeatMeta = meta;
@@ -417,8 +469,14 @@ exports.receiveLog = async (req, res) => {
         if (Number.isNaN(logDate.getTime())) {
             return res.status(400).json({ message: 'Invalid timestamp format' });
         }
-        const dateStr = logDate.toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' }); // YYYY-MM-DD in IST
-        const timeStr = logDate.toLocaleTimeString('en-US', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', hour12: true }); // HH:MM AM/PM in IST
+        const istParts = toIstParts(logDate);
+        const dateStr = istParts.dateStr;
+        const timeStr = new Intl.DateTimeFormat('en-US', {
+            timeZone: 'Asia/Kolkata',
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: true,
+        }).format(logDate);
 
         // 1. Only accept logs for employees that exist in the users table.
         const { rows: userRows } = await pool.query(
@@ -436,17 +494,14 @@ exports.receiveLog = async (req, res) => {
 
         // 2. Optionally block rapid duplicate punches for the same employee within 10 minutes.
         if (!skipDuplicateGuard) {
-            const marginMs = MIN_PUNCH_INTERVAL_MS;
-            const startTime = new Date(logDate.getTime() - marginMs);
-            const endTime = new Date(logDate.getTime() + marginMs);
-
             const { rows: nearPunchRows } = await pool.query(
                 `SELECT id, log_time
                  FROM biometric_logs
                  WHERE TRIM(emp_id) = $1
-                 AND log_time >= $2 AND log_time <= $3
+                 AND log_time >= ($2::timestamp - interval '10 minutes')
+                 AND log_time <= ($2::timestamp + interval '10 minutes')
                  LIMIT 1`,
-                [normalizedEmpId, startTime, endTime]
+                [normalizedEmpId, istParts.timestamp]
             );
 
             if (nearPunchRows.length > 0) {
@@ -467,11 +522,12 @@ exports.receiveLog = async (req, res) => {
              VALUES ($1, $2, $3, $4)
              ON CONFLICT (emp_id, log_time) 
              DO UPDATE SET device_id = EXCLUDED.device_id, type = EXCLUDED.type`,
-            [deviceId || 'ADMS', normalizedEmpId, logDate, type || (logDate.getHours() < 12 ? 'IN' : 'OUT')],
+            [deviceId || 'ADMS', normalizedEmpId, istParts.timestamp, type || (logDate.getHours() < 12 ? 'IN' : 'OUT')],
             'biometric_logs'
         );
 
         // 4. Sync summaries (biometric_attendance and attendance_records)
+        await upsertBiometricAttendanceFromLogs(normalizedEmpId, dateStr);
         // We use the unified rebuild function to ensure consistency and handle past-date updates properly.
         // This function automatically picks min(time) as in, max(time) as out, and replaces existing values.
         let syncResult = { dbStatus: 'Present', physIn: null, physOut: null };
