@@ -231,7 +231,7 @@ const rebuildAttendanceFromBiometricTimeline = async (normalizedEmpId, dateStr) 
 
     const { rows: allPunches } = await pool.query(
         `SELECT log_time FROM biometric_logs
-         WHERE TRIM(emp_id) = $1 AND (log_time AT TIME ZONE 'Asia/Kolkata')::date = $2::date
+         WHERE TRIM(emp_id) = $1 AND log_time::date = $2::date
          ORDER BY log_time ASC`,
         [normalizedEmpId, dateStr]
     );
@@ -601,7 +601,7 @@ exports.getRawBiometricLogs = async (req, res) => {
         }
         if (date) {
             params.push(date);
-            query += ` AND (l.log_time AT TIME ZONE 'Asia/Kolkata')::date = $${params.length}`;
+            query += ` AND l.log_time::date = $${params.length}`;
         }
         query += ` ORDER BY l.log_time DESC LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
         params.push(limit, offset);
@@ -708,10 +708,10 @@ exports.rebuildTodayPunches = async (req, res) => {
 
         // Get all employees who have biometric logs in the range
         const { rows: affectedEmployees } = await pool.query(
-            `SELECT DISTINCT TRIM(emp_id) as emp_id, (log_time AT TIME ZONE 'Asia/Kolkata')::date as log_date
+            `SELECT DISTINCT TRIM(emp_id) as emp_id, log_time::date as log_date
              FROM biometric_logs
-             WHERE (log_time AT TIME ZONE 'Asia/Kolkata')::date >= $1::date
-               AND (log_time AT TIME ZONE 'Asia/Kolkata')::date <= $2::date`,
+             WHERE log_time::date >= $1::date
+               AND log_time::date <= $2::date`,
             [start, end]
         );
 
@@ -800,12 +800,12 @@ exports.backfillTodayFromAttendance = async (req, res) => {
             WITH today_rollup AS (
                 SELECT
                     b.emp_id AS user_id,
-                    (b.log_time AT TIME ZONE 'Asia/Kolkata')::date AS punch_date,
-                    MIN((b.log_time AT TIME ZONE 'Asia/Kolkata')::time) AS first_punch,
-                    MAX((b.log_time AT TIME ZONE 'Asia/Kolkata')::time) AS last_punch
+                    b.log_time::date AS punch_date,
+                    MIN(b.log_time::time) AS first_punch,
+                    MAX(b.log_time::time) AS last_punch
                 FROM biometric_logs b
-                WHERE (b.log_time AT TIME ZONE 'Asia/Kolkata')::date = (NOW() AT TIME ZONE 'Asia/Kolkata')::date
-                GROUP BY b.emp_id, (b.log_time AT TIME ZONE 'Asia/Kolkata')::date
+                WHERE b.log_time::date = (NOW() AT TIME ZONE 'Asia/Kolkata')::date
+                GROUP BY b.emp_id, b.log_time::date
             )
             INSERT INTO biometric_attendance (user_id, date, intime, outtime)
             SELECT user_id, punch_date, first_punch, last_punch
