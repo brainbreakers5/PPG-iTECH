@@ -194,7 +194,7 @@ const rebuildAttendanceFromBiometricTimeline = async (normalizedEmpId, dateStr) 
         [normalizedEmpId, dateStr]
     );
 
-    let segments = [];++
+    let segments = [];
     let physIn = null;
     let physOut = null;
 
