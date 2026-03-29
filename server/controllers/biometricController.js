@@ -399,18 +399,21 @@ async function runWithSequenceFix(queryText, params = [], tableName = null) {
 // @route   POST /api/biometric/log
 // @access  Public (or protected with device key)
 exports.receiveLog = async (req, res) => {
-    const { device_id, emp_id, timestamp, type } = req.body;
+    const { device_id, emp_id, user_id, timestamp, recordTime, type, device_ip } = req.body;
+    const finalEmpId = String(emp_id || user_id || '').trim();
 
-    if (!emp_id) {
-        return res.status(400).json({ message: 'emp_id is required' });
+    if (!finalEmpId) {
+        return res.status(400).json({ message: 'emp_id or user_id is required' });
     }
 
     try {
-        const normalizedEmpId = String(emp_id).trim();
-        console.log(`Processing punch for User: ${normalizedEmpId}, Device: ${device_id}`);
+        const normalizedEmpId = finalEmpId;
+        const deviceId = device_id || device_ip || 'ZK_ZKTECO';
+        const finalTimestamp = timestamp || recordTime;
+        console.log(`Processing punch for User: ${normalizedEmpId}, Device: ${deviceId}`);
 
         // Use provided timestamp or current server time
-        const logDate = timestamp ? new Date(timestamp) : new Date();
+        const logDate = finalTimestamp ? new Date(finalTimestamp) : new Date();
         if (Number.isNaN(logDate.getTime())) {
             return res.status(400).json({ message: 'Invalid timestamp format' });
         }
