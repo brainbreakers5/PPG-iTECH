@@ -453,7 +453,8 @@ exports.receiveLog = async (req, res) => {
         await runWithSequenceFix(
             `INSERT INTO biometric_logs (device_id, emp_id, log_time, type) 
              VALUES ($1, $2, $3, $4)
-             ON CONFLICT (emp_id, log_time) DO NOTHING`,
+             ON CONFLICT (emp_id, log_time) 
+             DO UPDATE SET device_id = EXCLUDED.device_id, type = EXCLUDED.type`,
             [deviceId || 'ADMS', normalizedEmpId, logDate, type || (logDate.getHours() < 12 ? 'IN' : 'OUT')],
             'biometric_logs'
         );

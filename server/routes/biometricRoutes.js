@@ -4,6 +4,7 @@ const {
 	receiveLog,
 	getBiometricData,
 	getBiometricStats,
+	getRegisteredEmpIds,
 	backfillTodayFromAttendance,
 	rebuildTodayPunches,
 	getAdmsLastSeen,
