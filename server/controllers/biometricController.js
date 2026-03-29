@@ -449,9 +449,12 @@ exports.receiveLog = async (req, res) => {
 
         // 3. Store raw log in biometric_logs (Audit Trail)
         // This log table stores EVERYTHING (minutely/hourly records for full history)
+        // Uses ON CONFLICT to swallow exact duplicates sent by device/sync scripts
         await runWithSequenceFix(
-            'INSERT INTO biometric_logs (device_id, emp_id, log_time, type) VALUES ($1, $2, $3, $4)',
-            [device_id || 'ADMS', normalizedEmpId, logDate, type || (logDate.getHours() < 12 ? 'IN' : 'OUT')],
+            `INSERT INTO biometric_logs (device_id, emp_id, log_time, type) 
+             VALUES ($1, $2, $3, $4)
+             ON CONFLICT (emp_id, log_time) DO NOTHING`,
+            [deviceId || 'ADMS', normalizedEmpId, logDate, type || (logDate.getHours() < 12 ? 'IN' : 'OUT')],
             'biometric_logs'
         );
 

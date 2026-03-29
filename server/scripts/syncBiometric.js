@@ -2,45 +2,68 @@ const ZKLib = require('zkteco-js');
 
 /**
  * Syncs attendance data from a physical ZKteco device to the server API.
- * This script uses 'zkteco-js' (instead of node-zklib) as it is already in your package.json.
+ * This script now supports filtering for a SPECIFIC DATE or all dates.
+ * 
+ * @param {string} deviceIp - Device IP Address
+ * @param {string} targetDate - Optional (Format: 'YYYY-MM-DD'). If null, syncs ALL logs.
+ * @param {number} devicePort - Default ZK port is 4370
  */
-async function syncBiometricDevice(deviceIp, devicePort = 4370) {
+async function syncBiometricDevice(deviceIp, targetDate = null, devicePort = 4370) {
     const zk = new ZKLib(deviceIp, devicePort, 10000, 4000);
     
     try {
-        console.log(`[SYNC] Connecting to device at ${deviceIp}:${devicePort}...`);
+        console.log(`[SYNC] 📡 Connecting to device at ${deviceIp}:${devicePort}...`);
         await zk.createSocket();
-        console.log('[SYNC] Connected successfully.');
+        console.log('[SYNC] ✅ Connected successfully.');
 
         // 1. Fetch all attendance logs from device memory
+        console.log('[SYNC] 📥 Retrieving logs from memory...');
         const logs = await zk.getAttendances();
-        console.log(`[SYNC] Total logs retrieved: ${logs.data.length}`);
 
-        if (logs.data.length === 0) {
-            console.log('[SYNC] No logs to process.');
+        if (!logs || !logs.data || logs.data.length === 0) {
+            console.log('[SYNC] ⚠️ No logs found on device.');
             return;
         }
 
-        // 2. Push logs to server API
-        console.log('[SYNC] Pushing logs to server...');
+        // 2. Filter for specific date if provided
+        let logsToProcess = logs.data;
+        if (targetDate) {
+            console.log(`[SYNC] 🔍 Filtering logs for DATE: ${targetDate}`);
+            logsToProcess = logs.data.filter(log => {
+                const logDate = new Date(log.recordTime).toLocaleDateString('en-CA'); // YYYY-MM-DD
+                return logDate === targetDate;
+            });
+        }
+
+        console.log(`[SYNC] 📊 Total logs to process after filtering: ${logsToProcess.length}`);
+
+        if (logsToProcess.length === 0) {
+            console.log('[SYNC] ⚠️ No logs to process for the specified criteria.');
+            return;
+        }
+
+        // 3. Push logs to server API
+        console.log('[SYNC] 🚀 Pushing logs to server...');
         let success = 0;
         let errors = 0;
         
         // Track unique dates to rebuild at the end (optimization)
         const uniqueDates = new Set();
+        if (targetDate) uniqueDates.add(targetDate);
 
-        for (const log of logs.data) {
+        for (const log of logsToProcess) {
             try {
-                // Formatting timestamp as ISO
                 const recordTime = log.recordTime; 
-                const dateKey = new Date(recordTime).toLocaleDateString('en-CA'); // YYYY-MM-DD
-                uniqueDates.add(dateKey);
+                if (!targetDate) {
+                    const dateKey = new Date(recordTime).toLocaleDateString('en-CA');
+                    uniqueDates.add(dateKey);
+                }
 
                 const response = await fetch('http://localhost:5000/api/biometric/log', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        user_id: log.deviceUserId, // ZKteco-js uses deviceUserId
+                        user_id: log.deviceUserId, 
                         timestamp: recordTime,
                         device_ip: deviceIp,
                         skipRebuild: true // OPTIMIZATION: Don't rebuild DB for every single log
@@ -51,7 +74,7 @@ async function syncBiometricDevice(deviceIp, devicePort = 4370) {
                     success++;
                 } else {
                     const errTxt = await response.text();
-                    console.warn(`[SYNC] Failed to push log for user ${log.deviceUserId} at ${recordTime}: ${errTxt}`);
+                    console.warn(`[SYNC] Failed to push log for user ${log.deviceUserId} at ${recordTime} (Code: ${response.status}): ${errTxt}`);
                     errors++;
                 }
             } catch (err) {
@@ -59,20 +82,21 @@ async function syncBiometricDevice(deviceIp, devicePort = 4370) {
                 errors++;
             }
 
-            if ((success + errors) % 100 === 0) {
-                console.log(`[SYNC] Progress: ${success + errors}/${logs.data.length}...`);
+            if ((success + errors) % 50 === 0) {
+                console.log(`[SYNC] Progress: ${success + errors}/${logsToProcess.length}...`);
             }
         }
 
         console.log(`[SYNC] Finished pushing logs. Success: ${success}, Errors: ${errors}`);
 
-        // 3. Trigger a full rebuild for the affected dates to update attendance summaries correctly
+        // 4. Trigger a full rebuild for the affected dates to update attendance summaries correctly
         if (uniqueDates.size > 0) {
-            console.log(`[SYNC] Triggering attendance rebuild for ${uniqueDates.size} dates...`);
             const datesArray = Array.from(uniqueDates).sort();
             const fromDate = datesArray[0];
             const toDate = datesArray[datesArray.length - 1];
 
+            console.log(`[SYNC] 🔄 Triggering attendance rebuild for ${uniqueDates.size} dates (Range: ${fromDate} to ${toDate})...`);
+            
             try {
                 const rebuildResponse = await fetch('http://localhost:5000/api/biometric/rebuild-today', {
                     method: 'POST',
@@ -81,7 +105,7 @@ async function syncBiometricDevice(deviceIp, devicePort = 4370) {
                 });
                 
                 if (rebuildResponse.ok) {
-                    console.log(`[SYNC] Attendance summaries updated successfully via rebuild-range (${fromDate} to ${toDate}).`);
+                    console.log(`[SYNC] Attendance summaries updated successfully via rebuild-range API.`);
                 } else {
                     console.error('[SYNC] Failed to trigger attendance rebuild.');
                 }
@@ -91,7 +115,7 @@ async function syncBiometricDevice(deviceIp, devicePort = 4370) {
         }
 
     } catch (e) {
-        console.error('[SYNC] Fatal error during sync:', e.message);
+        console.error('[SYNC] ❌ Fatal error during sync:', e.message);
     } finally {
         try {
             await zk.disconnect();
@@ -99,7 +123,9 @@ async function syncBiometricDevice(deviceIp, devicePort = 4370) {
     }
 }
 
-// Example usage:
-// syncBiometricDevice('172.16.100.81'); 
+// Example usage patterns:
+// ---------------------------------
+// syncBiometricDevice('172.16.100.81');               // Sync ALL available device history
+// syncBiometricDevice('172.16.100.81', '2026-03-29'); // Sync only a specific date
 
 module.exports = { syncBiometricDevice };
