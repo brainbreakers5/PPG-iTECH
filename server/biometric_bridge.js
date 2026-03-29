@@ -34,10 +34,14 @@ async function pushToServer(log, options = {}) {
       axiosOptions.httpsAgent = new https.Agent({ rejectUnauthorized: false });
     }
 
+    // Identify user ID safely (ZK devices use different names depending on library version)
+    const rawId = log.deviceUserId || log.userId || log.pin;
+    const empId = rawId ? String(rawId).trim() : "UNKNOWN";
+
     await axios.post(
       SERVER_API_URL,
       {
-        user_id: log.userId.toString(),
+        user_id: empId,
         device_id: 'MAIN_DEVICE_01',
         timestamp: log.recordTime, // 🔥 DEVICE TIME (Past and Realtime)
         type: new Date(log.recordTime).getHours() < 12 ? 'IN' : 'OUT',
@@ -46,9 +50,9 @@ async function pushToServer(log, options = {}) {
       axiosOptions
     );
 
-    console.log(`🚀 Sent → ${log.userId} @ ${log.recordTime}`);
+    console.log(`🚀 Sent → User ${empId} @ ${log.recordTime}`);
   } catch (err) {
-    console.error(`❌ Push failed for ${log.userId}:`, err.message);
+    console.error(`❌ Push failed for User ${log.deviceUserId || log.userId || '??'}:`, err.message);
   }
 }
 
