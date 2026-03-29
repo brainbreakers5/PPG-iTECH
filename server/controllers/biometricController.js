@@ -167,7 +167,7 @@ const ensureBiometricUser = async (empId) => {
     );
 };
 
-const rebuildAttendanceFromBiometricTimeline = async (normalizedEmpId, dateStr) => {
+exports.rebuildAttendanceFromBiometricTimeline = async (normalizedEmpId, dateStr) => {
     const toMins = (t) => {
         if (!t) return 0;
         const [h, m] = t.split(':').map(Number);
@@ -176,7 +176,7 @@ const rebuildAttendanceFromBiometricTimeline = async (normalizedEmpId, dateStr) 
 
     const { rows: allPunches } = await pool.query(
         `SELECT log_time FROM biometric_logs
-         WHERE emp_id = $1 AND (log_time AT TIME ZONE 'Asia/Kolkata')::date = $2::date
+         WHERE TRIM(emp_id) = $1 AND (log_time AT TIME ZONE 'Asia/Kolkata')::date = $2::date
          ORDER BY log_time ASC`,
         [normalizedEmpId, dateStr]
     );
@@ -455,7 +455,10 @@ exports.receiveLog = async (req, res) => {
         // 4. Sync summaries (biometric_attendance and attendance_records)
         // We use the unified rebuild function to ensure consistency and handle past-date updates properly.
         // This function automatically picks min(time) as in, max(time) as out, and replaces existing values.
-        const syncResult = await rebuildAttendanceFromBiometricTimeline(normalizedEmpId, dateStr);
+        let syncResult = { dbStatus: 'Present', physIn: null, physOut: null };
+        if (!req.body.skipRebuild) {
+            syncResult = await rebuildAttendanceFromBiometricTimeline(normalizedEmpId, dateStr);
+        }
 
         // 5. Real-time notifications and socket updates
         const userName = `User ${normalizedEmpId}`; // Fallback if name not looked up
@@ -498,6 +501,38 @@ exports.receiveLog = async (req, res) => {
 
 // @desc    Get biometric attendance data
 // @route   GET /api/biometric/data
+// @desc    Get raw biometric punch logs for auditing
+// @route   GET /api/biometric/raw-logs
+exports.getRawBiometricLogs = async (req, res) => {
+    try {
+        const { emp_id, date, limit = 50, offset = 0 } = req.query;
+        let query = `
+            SELECT l.*, u.name 
+            FROM biometric_logs l
+            LEFT JOIN users u ON TRIM(l.emp_id) = u.emp_id
+            WHERE 1=1
+        `;
+        const params = [];
+        if (emp_id) {
+            params.push(emp_id);
+            query += ` AND TRIM(l.emp_id) = $${params.length}`;
+        }
+        if (date) {
+            params.push(date);
+            query += ` AND (l.log_time AT TIME ZONE 'Asia/Kolkata')::date = $${params.length}`;
+        }
+        query += ` ORDER BY l.log_time DESC LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
+        params.push(limit, offset);
+
+        const { rows } = await pool.query(query, params);
+        res.json(rows);
+    } catch (error) {
+        console.error('Error fetching raw biometric logs:', error);
+        res.status(500).json({ message: 'Server Error' });
+    }
+};
+
+// @desc    Get biometric attendance data
 exports.getBiometricData = async (req, res) => {
     try {
         const { emp_id, date, month, startDate, endDate } = req.query;
@@ -556,53 +591,62 @@ exports.getBiometricStats = async (req, res) => {
     }
 };
 
-// @desc    Retroactively rebuild today's attendance status from biometric logs (apply LOP/Late Entry rules)
+// @desc    Retroactively rebuild attendance status from biometric logs for a range or today
 // @route   POST /api/biometric/rebuild-today
 // @access  Private (Admin)
 exports.rebuildTodayPunches = async (req, res) => {
     try {
+        const { fromDate, toDate } = req.body;
         const todayStr = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
+        
+        const start = fromDate || todayStr;
+        const end = toDate || todayStr;
 
-        // Get all employees who have biometric logs today
-        const { rows: todayEmployees } = await pool.query(
-            `SELECT DISTINCT emp_id FROM biometric_logs
-             WHERE (log_time AT TIME ZONE 'Asia/Kolkata')::date = $1::date`,
-            [todayStr]
+        console.log(`[BIOMETRIC] Rebuilding attendance from ${start} to ${end}`);
+
+        // Get all employees who have biometric logs in the range
+        const { rows: affectedEmployees } = await pool.query(
+            `SELECT DISTINCT TRIM(emp_id) as emp_id, (log_time AT TIME ZONE 'Asia/Kolkata')::date as log_date
+             FROM biometric_logs
+             WHERE (log_time AT TIME ZONE 'Asia/Kolkata')::date >= $1::date
+               AND (log_time AT TIME ZONE 'Asia/Kolkata')::date <= $2::date`,
+            [start, end]
         );
 
-        if (todayEmployees.length === 0) {
-            return res.status(200).json({ message: 'No biometric punches found for today.', updated: 0 });
+        if (affectedEmployees.length === 0) {
+            return res.status(200).json({ message: 'No biometric punches found for the specified range.', updated: 0 });
         }
 
         let updated = 0;
         let errors = 0;
         const results = [];
 
-        for (const row of todayEmployees) {
+        for (const row of affectedEmployees) {
             try {
-                const result = await rebuildAttendanceFromBiometricTimeline(row.emp_id, todayStr);
+                const dateStr = row.log_date; // This will be YYYY-MM-DD string due to pg-types parser
+                const result = await rebuildAttendanceFromBiometricTimeline(row.emp_id, dateStr);
                 updated++;
-                results.push({ emp_id: row.emp_id, status: result.dbStatus, in: result.physIn, out: result.physOut });
+                results.push({ emp_id: row.emp_id, date: dateStr, status: result.dbStatus, in: result.physIn, out: result.physOut });
             } catch (err) {
                 errors++;
-                console.error(`Failed to rebuild attendance for ${row.emp_id}:`, err.message);
+                console.error(`Failed to rebuild attendance for ${row.emp_id} on ${row.log_date}:`, err.message);
             }
         }
 
         // Emit real-time update so dashboards refresh
         const io = req.app.get('io');
-        if (io) io.emit('attendance_updated', { date: todayStr, action: 'rebuild_today', count: updated });
+        if (io) io.emit('attendance_updated', { range: { start, end }, action: 'rebuild', count: updated });
 
         return res.status(200).json({
-            message: `Rebuilt attendance for ${updated} employees (${errors} errors).`,
-            date: todayStr,
+            message: `Rebuilt attendance for ${updated} records (${errors} errors).`,
+            range: { start, end },
             updated,
             errors,
-            results
+            results: results.slice(0, 50) // Don't overwhelm response if thousands
         });
     } catch (error) {
-        console.error('Error rebuilding today punch attendance:', error);
-        return res.status(500).json({ message: 'Failed to rebuild today attendance', error: error.message });
+        console.error('Error rebuilding attendance from logs:', error);
+        return res.status(500).json({ message: 'Failed to rebuild attendance', error: error.message });
     }
 };
 

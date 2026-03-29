@@ -12,6 +12,8 @@ const {
 	getNextAdmsCommand,
 	reportAdmsCommandStatus,
 	pullLogs,
+	getRawBiometricLogs,
+	rebuildAttendanceFromBiometricTimeline,
 } = require('../controllers/biometricController');
 const { protect, restrictTo } = require('../middleware/authMiddleware');
 
@@ -157,6 +159,8 @@ const handleCdata = async (req, res) => {
 		let processed = 0;
 		let failed = 0;
 
+		const uniqueUserDates = new Set();
+
 		for (const punch of parsed) {
 			const mockReq = {
 				body: {
@@ -164,6 +168,7 @@ const handleCdata = async (req, res) => {
 					emp_id: punch.emp_id,
 					timestamp: punch.timestamp,
 					type: punch.type,
+					skipRebuild: true, // Optimization for batch ADMS push
 				},
 				app: req.app,
 			};
@@ -175,12 +180,34 @@ const handleCdata = async (req, res) => {
 				send(payload) { this.payload = payload; return this; },
 			};
 
-			await receiveLog(mockReq, mockRes);
-			if (mockRes.statusCode >= 200 && mockRes.statusCode < 300) processed += 1;
-			else failed += 1;
+			// receiveLog stores the punch log. 
+			// We wrap it to track success.
+			try {
+				await receiveLog(mockReq, mockRes);
+				if (mockRes.statusCode >= 200 && mockRes.statusCode < 300) {
+					processed += 1;
+					// Track (emp_id | date) to rebuild attendance later once
+					const dateOnly = punch.timestamp.split('T')[0];
+					uniqueUserDates.add(`${String(punch.emp_id).trim()}|${dateOnly}`);
+				} else {
+					failed += 1;
+				}
+			} catch (err) {
+				failed += 1;
+			}
 		}
 
-		console.log(`ADMS cdata processed. device=${deviceId}, total=${parsed.length}, success=${processed}, failed=${failed}`);
+		// After all punches are stored, trigger a single rebuild per user/date
+		for (const pairing of uniqueUserDates) {
+			const [empId, dateStr] = pairing.split('|');
+			try {
+				await rebuildAttendanceFromBiometricTimeline(empId, dateStr);
+			} catch (rebuildErr) {
+				console.error(`Batch rebuild failed for ${empId} on ${dateStr}:`, rebuildErr.message);
+			}
+		}
+
+		console.log(`ADMS cdata processed. device=${deviceId}, total=${parsed.length}, success=${processed}, failed=${failed}, rebuilds=${uniqueUserDates.size}`);
 	} catch (err) {
 		console.error('ADMS cdata processing error:', err.message);
 	}
@@ -200,6 +227,7 @@ router.post('/rebuild-today', protect, restrictTo('admin', 'management'), rebuil
 
 // Endpoints for web frontend to fetch data
 router.get('/data', protect, getBiometricData);
+router.get('/raw-logs', protect, getRawBiometricLogs);
 router.get('/stats', protect, getBiometricStats);
 router.get('/adms-last-seen', protect, restrictTo('admin'), getAdmsLastSeen);
 router.post('/pull-logs', protect, restrictTo('admin'), pullLogs);
