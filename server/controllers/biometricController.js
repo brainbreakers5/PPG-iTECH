@@ -635,7 +635,7 @@ exports.getBiometricData = async (req, res) => {
             JOIN users u ON b.user_id = u.emp_id
             LEFT JOIN departments d ON u.department_id = d.id
             LEFT JOIN attendance_records ar ON b.user_id = ar.emp_id AND b.date = ar.date
-            WHERE 1=1
+            WHERE u.role NOT IN ('admin', 'management')
         `;
         const params = [];
 
@@ -690,11 +690,12 @@ exports.getBiometricStats = async (req, res) => {
     try {
         const { rows: stats } = await pool.query(`
             SELECT 
-                COUNT(DISTINCT user_id) as total_users,
+                COUNT(DISTINCT b.user_id) as total_users,
                 COUNT(*) as total_punches_today,
-                (SELECT COUNT(*) FROM users) as total_registered
-            FROM biometric_attendance
-            WHERE date = CURRENT_DATE
+                (SELECT COUNT(*) FROM users WHERE role NOT IN ('admin', 'management')) as total_registered
+            FROM biometric_attendance b
+            JOIN users u ON b.user_id = u.emp_id
+            WHERE b.date = CURRENT_DATE AND u.role NOT IN ('admin', 'management')
         `);
         res.json(stats[0]);
     } catch (error) {
