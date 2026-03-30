@@ -59,16 +59,8 @@ const upsertBiometricAttendanceFromLogs = async (empId, dateStr) => {
         WHERE first_punch IS NOT NULL
         ON CONFLICT (user_id, date)
         DO UPDATE SET
-            intime = CASE
-                WHEN biometric_attendance.intime IS NULL THEN EXCLUDED.intime
-                WHEN EXCLUDED.intime IS NULL THEN biometric_attendance.intime
-                ELSE LEAST(biometric_attendance.intime, EXCLUDED.intime)
-            END,
-            outtime = CASE
-                WHEN biometric_attendance.outtime IS NULL THEN EXCLUDED.outtime
-                WHEN EXCLUDED.outtime IS NULL THEN biometric_attendance.outtime
-                ELSE GREATEST(biometric_attendance.outtime, EXCLUDED.outtime)
-            END`,
+            intime = LEAST(biometric_attendance.intime, EXCLUDED.intime),
+            outtime = GREATEST(biometric_attendance.outtime, EXCLUDED.outtime)`,
         [empId, dateStr]
     );
 };
@@ -486,28 +478,25 @@ exports.receiveLog = async (req, res) => {
             hour12: true,
         }).format(logDate);
 
-        // 1. Only accept logs for employees that exist in the users table.
+        // 1. Ensure employee exists in the users table, auto-create if missing
         const { rows: userRows } = await pool.query(
             'SELECT 1 FROM users WHERE emp_id = $1 LIMIT 1',
             [normalizedEmpId]
         );
 
         if (userRows.length === 0) {
-            return res.status(200).json({
-                message: `Unknown employee ${normalizedEmpId}. Log ignored.`,
-                skipped: true,
-                reason: 'UNKNOWN_EMPLOYEE'
-            });
+            console.log(`[BIOMETRIC] Employee ${normalizedEmpId} not in DB; auto-creating placeholder.`);
+            await ensureBiometricUser(normalizedEmpId);
         }
 
-        // 2. Optionally block rapid duplicate punches for the same employee within 10 minutes.
+        // 2. Block rapid duplicate punches for the same employee within 2 minutes (debouncer).
         if (!skipDuplicateGuard) {
             const { rows: nearPunchRows } = await pool.query(
                 `SELECT id, log_time
                  FROM biometric_logs
                  WHERE TRIM(emp_id) = $1
-                 AND log_time >= ($2::timestamp - interval '10 minutes')
-                 AND log_time <= ($2::timestamp + interval '10 minutes')
+                 AND log_time >= ($2::timestamp - interval '2 minutes')
+                 AND log_time <= ($2::timestamp + interval '2 minutes')
                  LIMIT 1`,
                 [normalizedEmpId, istParts.timestamp]
             );
@@ -515,7 +504,7 @@ exports.receiveLog = async (req, res) => {
             if (nearPunchRows.length > 0) {
                 console.log(`[BIOMETRIC] Duplicate punch ignored for ${normalizedEmpId} at ${logDate.toISOString()} (Found existing at ${nearPunchRows[0].log_time})`);
                 return res.status(200).json({
-                    message: `Duplicate punch ignored. Punch already exists within 10 minutes.`,
+                    message: `Duplicate punch ignored. Punch already exists within 2 minutes.`,
                     skipped: true,
                     reason: 'DUPLICATE_OR_TOO_SOON'
                 });
