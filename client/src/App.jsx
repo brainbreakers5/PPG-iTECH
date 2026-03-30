@@ -237,7 +237,6 @@ const AppContent = () => {
             <Route path="timetable" element={<HODTimetable />} />
             <Route path="timetable/:empId" element={<HODTimetable />} />
             <Route path="leave-limits" element={<LeaveLimitation />} />
-            <Route path="activity-logs" element={<ActivityLogs />} />
             <Route path="timetable-setup" element={<TimetableSetup />} />
             <Route path="profile/:id" element={<ProfilePage />} />
             <Route path="personnel/:role" element={<PersonnelListPage />} />

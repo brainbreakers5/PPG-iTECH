@@ -90,7 +90,6 @@ const AI_KNOWLEDGE_BASE = {
         { q: "Biometric Sync", link: "/admin/attendance", hash: "sync", p: true },
         { q: "Leave Balance", link: "/admin/leave-limits", desc: "Configure yearly leave limitations and balances." },
         { q: "Timetable Setup", link: "/admin/timetable-setup", desc: "Set up and assign timetables to staff." },
-        { q: "Security Log", link: "/admin/activity-logs", desc: "View system activities and admin actions." },
         { q: "Academic Calendar", link: "/admin/calendar" },
         { q: "Purchase Requests", link: "/admin/purchase", p: true, desc: "Manage all approved purchase requests from Principal and HOD approvals. View Approved_Principal (ready for procurement) and mark items as Purchased or Rejected." },
         { q: "Profile", link: "/admin/profile" },
@@ -427,7 +426,7 @@ const AiAssistant = ({ isSidebar, onClose, userRole, isAiMinimized }) => {
                 } else if (!cleanText || cleanText.length < 2) {
                     reply = "Please tell me what you want to do in this app. For example: open attendance records, apply leave, view salary details, or print report.";
                 } else if (pageContext?.q) {
-                    reply = `You are on ${pageContext.q}. Do you want help with this page or should I open a related module like Attendance Records, Leave Management, Profile, or Security Log?`;
+                    reply = `You are on ${pageContext.q}. Do you want help with this page or should I open a related module like Attendance Records, Leave Management, or Profile?`;
                 } else {
                     reply = "Try a feature keyword like attendance, leave, payroll, profile, timetable, purchase, calendar, or notifications.";
                 }

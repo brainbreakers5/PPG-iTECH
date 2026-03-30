@@ -348,14 +348,15 @@ const AttendanceRecord = () => {
                     .join(', ');
 
                 return `
-                    <div style="margin-bottom: 25px; page-break-inside: avoid; border: 2px solid #e2e8f0; border-radius: 12px; overflow: hidden;">
-                        <div style="background: #1e3a8a; color: white; padding: 8px 15px; font-weight: 900; font-size: 10pt; display: flex; justify-content: space-between;">
-                            <span>${emp.emp_id} | ${emp.name} | ${emp.department_name || ''}</span>
-                            <span style="opacity: 0.8; font-size: 8pt;">${emp.role.toUpperCase()}</span>
-                        </div>
+                    <div style="margin-bottom: 25px; page-break-inside: avoid; border: 2px solid #e2e8f0; border-radius: 12px; overflow: hidden;" class="print-avoid-break">
                         <div style="overflow-x: auto;">
                             <table style="width: 100%; border-collapse: collapse; table-layout: fixed;">
                                 <thead>
+                                    <tr style="background: #1e3a8a; color: white;">
+                                        <th colspan="${uniqueDates.length + 1}" style="padding: 10px; font-size: 10pt; font-weight: 900; text-align: left; border: 1px solid #cbd5e1;">
+                                            ${emp.emp_id} | ${emp.name} | ${emp.department_name || ''} - ${emp.role.toUpperCase()}
+                                        </th>
+                                    </tr>
                                     <tr style="background: #f1f5f9;">
                                         <th style="width: 80px; border: 1px solid #cbd5e1; padding: 6px; font-size: 8pt; color: #475569; text-align: left;">Day &rarr;</th>
                                         ${datesRow}

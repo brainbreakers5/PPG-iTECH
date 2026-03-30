@@ -533,14 +533,33 @@ exports.receiveLog = async (req, res) => {
         }
 
         // 5. Real-time notifications and socket updates
-        const userName = `User ${normalizedEmpId}`; // Fallback if name not looked up
-        const isFirstPunch = !syncResult.physOut; // If physOut is null, it's either the first punch or only one punch exists
-        const message = `Biometric Punch Recorded: ${type || (isFirstPunch ? 'IN' : 'OUT')} at ${timeStr} for ${normalizedEmpId}`;
+        let userName = normalizedEmpId;
+        try {
+            const { rows: userRows } = await pool.query("SELECT name FROM users WHERE TRIM(emp_id) = TRIM($1)", [normalizedEmpId]);
+            if (userRows.length > 0) userName = userRows[0].name;
+        } catch (e) {
+            console.error('Failed to lookup user name for notification:', e);
+        }
+
+        const isFirstPunch = !syncResult.physOut;
+        const message = `🔔 Biometric Punch: ${type || (isFirstPunch ? 'IN' : 'OUT')} - ${userName} (${normalizedEmpId}) at ${timeStr}`;
 
         // Notifications (best-effort)
         try {
+            // 1. Notify the individual employee
             await createNotification(normalizedEmpId, message, 'attendance', null, null, true);
-        } catch (e) {}
+            
+            // 2. NEW: Notify all high-level authorities (Admin & Management)
+            const { rows: admins } = await pool.query("SELECT emp_id FROM users WHERE role IN ('admin', 'management')");
+            for (const admin of admins) {
+                // Skip if the employee is also the admin (already notified)
+                if ((admin.emp_id || '').trim() !== (normalizedEmpId || '').trim()) {
+                    await createNotification(admin.emp_id, message, 'attendance', null, null, true);
+                }
+            }
+        } catch (e) {
+            console.error('Failed to send punch notifications:', e);
+        }
 
         // Socket emitter
         const io = req.app.get('io');

@@ -150,15 +150,19 @@ const sanitizeFileName = (value, fallback = 'report') => {
 
 const parseTableFromHtml = (html) => {
     const doc = new DOMParser().parseFromString(String(html || ''), 'text/html');
-    const table = doc.querySelector('table');
-    if (!table) return [];
+    const tables = doc.querySelectorAll('table');
+    if (!tables.length) return [];
 
-    const rows = [];
-    table.querySelectorAll('tr').forEach((tr) => {
-        const cells = Array.from(tr.querySelectorAll('th, td')).map((cell) => String(cell.textContent || '').trim());
-        if (cells.length) rows.push(cells);
+    const allRows = [];
+    tables.forEach((table, index) => {
+        if (index > 0) allRows.push([]); // Add empty spacer row between tables
+
+        table.querySelectorAll('tr').forEach((tr) => {
+            const cells = Array.from(tr.querySelectorAll('th, td')).map((cell) => String(cell.textContent || '').trim());
+            if (cells.length) allRows.push(cells);
+        });
     });
-    return rows;
+    return allRows;
 };
 
 const downloadExcelFromHtml = ({ html, title }) => {
@@ -474,9 +478,7 @@ export const choosePrintMode = async () => {
         input: 'radio',
         inputOptions: {
             print: 'Print',
-            pdf: 'PDF',
-            excel: 'Excel',
-            share: 'Share'
+            excel: 'Excel'
         },
         inputValue: 'print',
         showCancelButton: true,
