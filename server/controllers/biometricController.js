@@ -35,7 +35,9 @@ const toIstParts = (date) => {
         return acc;
     }, {});
     const dateStr = `${parts.year}-${parts.month}-${parts.day}`;
-    const timeStr = `${parts.hour}:${parts.minute}:${parts.second}`;
+    let hour = parts.hour;
+    if (hour === '24') hour = '00';
+    const timeStr = `${hour}:${parts.minute}:${parts.second}`;
     return { dateStr, timeStr, timestamp: `${dateStr} ${timeStr}` };
 };
 
