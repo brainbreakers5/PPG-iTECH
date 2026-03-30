@@ -1,7 +1,16 @@
-const { pool } = require('./config/db');
+require('dotenv').config();
+const { Pool } = require('pg');
+const pool = new Pool({
+  host: process.env.DB_HOST,
+  user: process.env.DB_USER,
+  password: process.env.DB_PASSWORD,
+  database: process.env.DB_NAME,
+  port: process.env.DB_PORT,
+  max: 1
+});
 
-async function check() {
-  const ids = ['5001', '5045', '844', '1119', '242', '1112', '1181', '970', '878'];
+async function check() {4
+  const ids = ['5001', '505', '844', '1119', '242', '1112', '1181', '970', '878'];
   const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
 
   try {
