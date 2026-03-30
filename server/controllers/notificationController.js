@@ -6,7 +6,7 @@ const webpush = require('web-push');
 // Configure web-push with VAPID keys
 if (process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
     webpush.setVapidDetails(
-        process.env.VAPID_SUBJECT || 'mailto:zorvian agency@gmail.com',
+        process.env.VAPID_SUBJECT || 'mailto:admin@example.com',
         process.env.VAPID_PUBLIC_KEY,
         process.env.VAPID_PRIVATE_KEY
     );
@@ -38,7 +38,7 @@ exports.createNotification = async (emp_id, message, type = 'info', metadata = n
         }
 
         // 5. Send Web Push Notification (Mobile/Desktop background)
-        const { rows: subscriptions } = await pool.query('SELECT subscription FROM push_subscriptions WHERE user_id = $1', [emp_id]);
+        const { rows: subscriptions } = await db.query('SELECT subscription FROM push_subscriptions WHERE user_id = $1', [emp_id]);
         if (subscriptions.length > 0) {
             const payload = JSON.stringify({
                 title: 'PPG EMP HUB',
@@ -51,11 +51,26 @@ exports.createNotification = async (emp_id, message, type = 'info', metadata = n
             });
 
             subscriptions.forEach(sub => {
-                webpush.sendNotification(sub.subscription, payload).catch(err => {
-                    console.error('Push notification failed for a subscription:', err.statusCode);
+                let pushSub = sub.subscription;
+                try {
+                    if (typeof pushSub === 'string') {
+                        pushSub = JSON.parse(pushSub);
+                    }
+                } catch (parseErr) {
+                    console.error('Failed to parse push subscription:', parseErr);
+                    return; // Skip this subscription
+                }
+
+                webpush.sendNotification(pushSub, payload).catch(async err => {
+                    console.error('Push notification failed for a subscription:', err.statusCode || err.message);
                     if (err.statusCode === 410 || err.statusCode === 404) {
-                        // Cleanup expired subscriptions
-                        pool.query('DELETE FROM push_subscriptions WHERE subscription = $1', [JSON.stringify(sub.subscription)]);
+                        // Cleanup expired subscriptions. Try both stringified and direct formats depending on how it was stored
+                        try {
+                            // Using db.query instead of pool.query ensures it uses the passed transaction client if any
+                            await db.query('DELETE FROM push_subscriptions WHERE subscription::text = $1', [JSON.stringify(sub.subscription)]);
+                        } catch (delErr) {
+                            console.error('Failed to clear expired subscription', delErr);
+                        }
                     }
                 });
             });
