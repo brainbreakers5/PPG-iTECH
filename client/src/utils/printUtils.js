@@ -154,14 +154,47 @@ const parseTableFromHtml = (html) => {
     if (!tables.length) return [];
 
     const allRows = [];
+    
     tables.forEach((table, index) => {
-        if (index > 0) allRows.push([]); // Add empty spacer row between tables
+        if (index > 0) allRows.push([]); // Spacer row
 
-        table.querySelectorAll('tr').forEach((tr) => {
-            const cells = Array.from(tr.querySelectorAll('th, td')).map((cell) => String(cell.textContent || '').trim());
-            if (cells.length) allRows.push(cells);
+        // We use a 2D grid approach to handle colspan/rowspan correctly
+        const rows = Array.from(table.querySelectorAll('tr'));
+        const grid = [];
+        
+        rows.forEach((tr, rowIndex) => {
+            if (!grid[rowIndex]) grid[rowIndex] = [];
+            let colIndex = 0;
+            
+            const cells = Array.from(tr.querySelectorAll('th, td'));
+            cells.forEach(cell => {
+                // Find next available slot in the grid (to handle rowspan from above)
+                while (grid[rowIndex][colIndex] !== undefined) {
+                    colIndex++;
+                }
+
+                const content = String(cell.textContent || '').trim();
+                const colspan = parseInt(cell.getAttribute('colspan') || '1');
+                const rowspan = parseInt(cell.getAttribute('rowspan') || '1');
+
+                for (let r = 0; r < rowspan; r++) {
+                    for (let c = 0; c < colspan; c++) {
+                        const targetRow = rowIndex + r;
+                        const targetCol = colIndex + c;
+                        
+                        if (!grid[targetRow]) grid[targetRow] = [];
+                        // Fill with content for the first cell of the merge, empty for others
+                        grid[targetRow][targetCol] = (r === 0 && c === 0) ? content : '';
+                    }
+                }
+                colIndex += colspan;
+            });
         });
+
+        // Filter out empty ghost rows that might have been created by rowspan lookahead
+        grid.filter(r => r.length > 0).forEach(r => allRows.push(r));
     });
+
     return allRows;
 };
 

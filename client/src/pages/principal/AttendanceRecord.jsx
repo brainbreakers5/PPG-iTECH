@@ -438,20 +438,22 @@ const AttendanceRecord = () => {
                 </style>
             </head>
             <body>
-                <div class="header">
-                    <div>
-                        <h1>${escapeHtml(title)}</h1>
-                        <p class="meta">
-                            Period: ${new Date(startDate).toLocaleDateString('en-GB')} - ${new Date(endDate).toLocaleDateString('en-GB')}
-                            &nbsp;|&nbsp; Working Days: <b>${summaryRecords[0]?.total_working_days || 0}</b>
-                            &nbsp;|&nbsp; Holidays: <b>${summaryRecords[0]?.total_holidays || 0}</b>
-                        </p>
-                    </div>
-                    <div class="print-time">
-                        <div class="brand">PPG EMP HUB</div>
-                        <div class="gen-date">Generated: ${formatTimestamp(new Date())}</div>
-                    </div>
-                </div>
+                    <table style="width: 100%; border-bottom: 3px solid #1e3a8a; margin-bottom: 20px;">
+                        <tr>
+                            <td style="text-align: left; vertical-align: bottom; padding: 0 0 10px 0;">
+                                <h1 style="margin: 0; color: #1e3a8a; font-size: 18pt; font-weight: 900; letter-spacing: -0.5px;">${escapeHtml(title)}</h1>
+                                <p style="font-size: 9pt; color: #64748b; font-weight: bold; margin-top: 5px;">
+                                    Period: ${new Date(startDate).toLocaleDateString('en-GB')} - ${new Date(endDate).toLocaleDateString('en-GB')}
+                                    &nbsp;|&nbsp; Working Days: <b>${summaryRecords[0]?.total_working_days || 0}</b>
+                                    &nbsp;|&nbsp; Holidays: <b>${summaryRecords[0]?.total_holidays || 0}</b>
+                                </p>
+                            </td>
+                            <td style="text-align: right; vertical-align: bottom; padding: 0 0 10px 0;">
+                                <div style="font-weight: 900; color: #1e3a8a; font-size: 11pt;">PPG EMP HUB</div>
+                                <div style="font-size: 8pt; color: #94a3b8;">Generated: ${formatTimestamp(new Date())}</div>
+                            </td>
+                        </tr>
+                    </table>
                 ${mainContentHtml}
             </body>
             </html>
