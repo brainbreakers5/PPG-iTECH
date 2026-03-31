@@ -785,8 +785,10 @@ exports.updateSalaryStatus = async (req, res) => {
         const { rows } = await pool.query('SELECT status FROM salary_records WHERE id = $1', [req.params.id]);
         if (rows.length === 0) return res.status(404).json({ message: 'Salary record not found' });
 
-        if (rows[0].status === 'Paid' && status !== 'Paid') {
-            return res.status(400).json({ message: 'Paid salary records are immutable and cannot be reverted' });
+        // Allow reverting status if the requester is an admin or specifically authorized.
+        // We can just remove the block or log it.
+        if (rows[0].status === 'Paid' && status !== 'Paid' && req.user.role !== 'admin') {
+            return res.status(403).json({ message: 'Only administrators can revert Paid salary records' });
         }
 
         await pool.query(

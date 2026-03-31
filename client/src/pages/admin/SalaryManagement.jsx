@@ -255,9 +255,10 @@ const SalaryManagement = () => {
     const isHistoryPage = /\/payroll\/history$/.test(location.pathname);
     const isPersonalView = !canInstitutionWide;
     const isAdmin = user?.role === 'admin';
-    const showStatusColumn = isHistoryPage;
+    const showStatusColumn = isHistoryPage || (canInstitutionWide && !isPersonalView);
+    const showSelectionBar = canInstitutionWide && !isPersonalView;
 
-    const tableColumnCount = (canInstitutionWide && isHistoryPage ? 1 : 0)
+    const tableColumnCount = (showSelectionBar ? 1 : 0)
         + (isPersonalView ? 1 : 6)
         + (showStatusColumn ? 1 : 0)
         + 1;
@@ -567,8 +568,15 @@ const SalaryManagement = () => {
         }
 
         if (nextStatus === 'Pending' && row.status === 'Paid') {
-            Swal.fire('Not allowed', 'Paid salary records are immutable.', 'info');
-            return;
+            const confirm = await Swal.fire({
+                title: 'Revert to Unpaid?',
+                text: 'This record was previously published as Paid. Are you sure you want to revert it to Pending? This will allow future recalculations to update this record.',
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonText: 'Yes, Revert',
+                confirmButtonColor: '#e11d48'
+            });
+            if (!confirm.isConfirmed) return;
         }
 
         await api.put(`/salary/${row.id}/status`, { status: nextStatus });
@@ -1179,7 +1187,7 @@ const SalaryManagement = () => {
                     </motion.div>
                 )}
 
-                {canInstitutionWide && isHistoryPage && (
+                {showSelectionBar && (
                     <motion.div
                         variants={fadeUp}
                         transition={{ duration: 0.35, ease: 'easeOut' }}
@@ -1267,7 +1275,7 @@ const SalaryManagement = () => {
                         <table className="min-w-max w-full text-left border-collapse whitespace-nowrap">
                             <thead>
                                 <tr className="bg-sky-50/30">
-                                    {canInstitutionWide && isHistoryPage && (
+                                    {showSelectionBar && (
                                         <th className="p-3 md:p-4 w-12 border-b border-sky-50">
                                             <div className="flex justify-center">
                                                 <input
@@ -1304,7 +1312,7 @@ const SalaryManagement = () => {
                                     transition={{ delay: idx * 0.03 }}
                                     className="hover:bg-sky-50/20 transition-all group border-b border-sky-50/10"
                                 >
-                                    {canInstitutionWide && isHistoryPage && (
+                                    {showSelectionBar && (
                                         <td className="p-3 md:p-6">
                                             <div className="flex justify-center">
                                                 <input
@@ -1389,7 +1397,7 @@ const SalaryManagement = () => {
                                                     <FaFileAlt className="group-hover/btn:scale-125 transition-transform" />
                                                 </button>
                                             )}
-                                            {canInstitutionWide && isHistoryPage && (
+                                            {showSelectionBar && (
                                                 <button
                                                     onClick={() => navigate(`/${user.role}/payroll/employee/${encodeURIComponent(normalizeEmpId(r.emp_id))}`)}
                                                     className="h-8 w-8 md:h-10 md:w-10 bg-sky-50 text-sky-600 rounded-xl hover:bg-sky-600 hover:text-white transition-all active:scale-95 group/btn"
@@ -1407,7 +1415,7 @@ const SalaryManagement = () => {
                                                     <FaPaperPlane /> Complaints
                                                 </button>
                                             )}
-                                            {canInstitutionWide && isHistoryPage && (
+                                            {showSelectionBar && (
                                                 <>
                                                     <button
                                                         disabled={String(r.id).startsWith('history_')}
