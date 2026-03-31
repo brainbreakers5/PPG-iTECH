@@ -21,19 +21,10 @@ const ProfilePage = () => {
                     // Viewing another employee's profile by emp_id (management visiting dept staff profile)
                     const { data } = await api.get(`/employees/${id}`);
                     setTargetUser(data);
-                } else if (authUser?.role === 'management' || authUser?.role === 'admin') {
-                    // Admin/Management viewing their OWN profile (no id in URL = header profile icon click)
-                    const fallbackLabel = authUser?.role === 'admin' ? 'Admin' : 'Management';
-                    setTargetUser({
-                        id: authUser?.role || fallbackLabel.toLowerCase(),
-                        name: authUser?.name || fallbackLabel,
-                        role: authUser?.role || fallbackLabel.toLowerCase(),
-                        emp_id: authUser?.emp_id || fallbackLabel
-                    });
                 } else {
-                    // Other roles viewing own profile
+                    // Viewing own profile (any role)
                     if (!authUser?.emp_id) return;
-                    const { data } = await api.get(`/employees/${authUser.emp_id}`);
+                    const { data } = await api.get(`/employees/${authUser.emp_id}?lookup=emp_id`);
                     setTargetUser(data);
                 }
             } catch (error) {

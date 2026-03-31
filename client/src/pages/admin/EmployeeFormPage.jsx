@@ -56,7 +56,6 @@ const EmployeeFormPage = () => {
     const [existingCerts, setExistingCerts] = useState([]);
     const [deductionForm, setDeductionForm] = useState({
         employ_pf: '',
-        pf_duration_years: '1',
         pf_interest_percentage: '12',
         salary_advance: '',
         salary_advance_duration_type: 'single',
@@ -122,7 +121,6 @@ const EmployeeFormPage = () => {
                 if (Array.isArray(loadedDeductions)) {
                     const normalized = {
                         employ_pf: '',
-                        pf_duration_years: '1',
                         pf_interest_percentage: '12',
                         salary_advance: '',
                         salary_advance_duration_type: 'single',
@@ -147,11 +145,7 @@ const EmployeeFormPage = () => {
 
                         if (lowerType.includes('pf')) {
                             normalized.employ_pf = String((Number(normalized.employ_pf) || 0) + amount);
-                            const durationMatch = type.match(/duration:\s*(\d+(?:\.\d+)?)/i);
                             const interestMatch = type.match(/(\d+(?:\.\d+)?)\s*%/);
-                            if (durationMatch && !normalized.pf_duration_years) {
-                                normalized.pf_duration_years = durationMatch[1];
-                            }
                             if (interestMatch && !normalized.pf_interest_percentage) {
                                 normalized.pf_interest_percentage = interestMatch[1];
                             }
@@ -291,7 +285,6 @@ const EmployeeFormPage = () => {
 
     const getMonthlyPfDeduction = () => {
         const basicAmount = Number(deductionForm.employ_pf || 0) || 0;
-        const durationYears = Number(deductionForm.pf_duration_years || 0) || 0;
         const deductionRatePerMonth = Number(deductionForm.pf_interest_percentage || 0) || 0;
 
         if (basicAmount <= 0) return 0;
@@ -299,13 +292,6 @@ const EmployeeFormPage = () => {
 
         // Concept: monthly PF deduction is a percentage of PF Basic each month.
         return (basicAmount * deductionRatePerMonth) / 100;
-    };
-
-    const getTotalPfDeductionForDuration = () => {
-        const durationYears = Number(deductionForm.pf_duration_years || 0) || 0;
-        const monthlyDeduction = Number(getMonthlyPfDeduction() || 0);
-        if (durationYears <= 0) return monthlyDeduction;
-        return monthlyDeduction * durationYears * 12;
     };
 
     const serializeDeductions = () => {
@@ -717,19 +703,6 @@ const EmployeeFormPage = () => {
                                 </div>
                                 {(Number(deductionForm.employ_pf || 0) > 0) && (
                                     <>
-                                        <div>
-                                            <label className={labelClass}>PF Duration (Years)</label>
-                                            <input
-                                                type="number"
-                                                min="0"
-                                                step="0.5"
-                                                value={deductionForm.pf_duration_years}
-                                                onChange={(e) => setDeductionValue('pf_duration_years', e.target.value)}
-                                                className={inputClass}
-                                                placeholder="e.g. 2"
-                                                disabled={!isAdmin}
-                                            />
-                                        </div>
                                         <div>
                                             <label className={labelClass}>PF Deduction % Per Month</label>
                                             <input

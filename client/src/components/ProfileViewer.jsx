@@ -61,6 +61,9 @@ const ProfileViewer = ({ user, onClose }) => {
         authUser.emp_id === user.emp_id
     );
 
+    const viewerRole = String(user?.role || '').trim().toLowerCase();
+    const isEmployeeProfile = viewerRole !== 'management' && viewerRole !== 'admin';
+
     // HOD & Principal are restricted when viewing OTHERS' profiles
     // Principal & HOD can view sensitive info for others they are authorized to view
     const canViewSensitiveInfo = isOwnProfile || ['admin', 'management'].includes(authUser.role);
@@ -275,46 +278,50 @@ const ProfileViewer = ({ user, onClose }) => {
     const handlePrintProfile = async () => {
         const title = `Profile - ${user.name}`;
 
-        Swal.fire({
-            title: 'Preparing report...',
-            text: 'Please wait while we load certificates.',
-            allowOutsideClick: false,
-            didOpen: () => Swal.showLoading()
-        });
-        
-        const certDataPromises = certificates.map(async (cert) => {
-            try {
-                const { data } = await api.get(`/certificates/file/${cert.id}`);
-                return { ...cert, ...data };
-            } catch {
-                return cert;
+        let fullCertificates = certificates;
+        try {
+            if (certificates.length > 0) {
+                Swal.fire({
+                    title: 'Preparing report...',
+                    text: 'Please wait while we load certificates.',
+                    allowOutsideClick: false,
+                    didOpen: () => Swal.showLoading()
+                });
+
+                const certDataPromises = certificates.map(async (cert) => {
+                    try {
+                        const { data } = await api.get(`/certificates/file/${cert.id}`);
+                        return { ...cert, ...data };
+                    } catch {
+                        return cert;
+                    }
+                });
+
+                fullCertificates = await Promise.all(certDataPromises);
+                Swal.close();
             }
-        });
-        
-        const fullCertificates = await Promise.all(certDataPromises);
-        Swal.close();
 
-        const certsHtml = fullCertificates.map(cert => {
-            if (cert.file_data && (cert.file_type?.startsWith('image/') || cert.file_data?.startsWith('data:image/'))) {
-                return `
-                    <div style="margin-top: 30px; page-break-before: always; text-align: center;">
-                        <h2 style="font-size: 14pt; color: #0369a1; border-bottom: 2px solid #bae6fd; padding-bottom: 10px; margin-bottom: 20px;">${cert.certificate_name}</h2>
-                        <img src="${cert.file_data}" style="max-width: 100%; max-height: 800px; border: 1px solid #e2e8f0; padding: 10px; border-radius: 8px;" />
-                    </div>
-                `;
-            } else {
-                return `
-                    <div style="margin-top: 20px; border: 1px dashed #e2e8f0; padding: 15px; text-align: center; border-radius: 12px; background: #f8fafc;">
-                        <p style="font-size: 10pt; color: #64748b; margin: 0;">Certificate: <strong>${cert.certificate_name}</strong> (${cert.file_name})</p>
-                        <p style="font-size: 8pt; color: #94a3b8; margin: 4px 0 0;">[Attachment Type: ${cert.file_type || 'Unknown'}]</p>
-                    </div>
-                `;
-            }
-        }).join('');
+            const certsHtml = fullCertificates.map(cert => {
+                if (cert.file_data && (cert.file_type?.startsWith('image/') || cert.file_data?.startsWith('data:image/'))) {
+                    return `
+                        <div style="margin-top: 30px; page-break-before: always; text-align: center;">
+                            <h2 style="font-size: 14pt; color: #0369a1; border-bottom: 2px solid #bae6fd; padding-bottom: 10px; margin-bottom: 20px;">${cert.certificate_name}</h2>
+                            <img src="${cert.file_data}" style="max-width: 100%; max-height: 800px; border: 1px solid #e2e8f0; padding: 10px; border-radius: 8px;" />
+                        </div>
+                    `;
+                } else {
+                    return `
+                        <div style="margin-top: 20px; border: 1px dashed #e2e8f0; padding: 15px; text-align: center; border-radius: 12px; background: #f8fafc;">
+                            <p style="font-size: 10pt; color: #64748b; margin: 0;">Certificate: <strong>${cert.certificate_name}</strong> (${cert.file_name})</p>
+                            <p style="font-size: 8pt; color: #94a3b8; margin: 4px 0 0;">[Attachment Type: ${cert.file_type || 'Unknown'}]</p>
+                        </div>
+                    `;
+                }
+            }).join('');
 
-        const profilePic = picUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name)}&size=200&background=2563eb&color=fff&bold=true`;
+            const profilePic = picUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name)}&size=200&background=2563eb&color=fff&bold=true`;
 
-        const htmlContent = `
+            const htmlContent = `
             <html>
                 <head>
                     <title>${title}</title>
@@ -416,14 +423,23 @@ const ProfileViewer = ({ user, onClose }) => {
             </html>
         `;
 
-        await runPrintWindow({
-            title,
-            html: htmlContent,
-            modeLabel: 'the profile report',
-            closeAfterPrint: true,
-            delay: 450,
-            windowFeatures: 'width=1100,height=850'
-        });
+            const didRun = await runPrintWindow({
+                title,
+                html: htmlContent,
+                modeLabel: 'the profile report',
+                closeAfterPrint: true,
+                delay: 450,
+                windowFeatures: 'width=1100,height=850'
+            });
+
+            if (!didRun) {
+                // User cancelled the mode selection or the browser blocked print; keep quiet.
+                return;
+            }
+        } catch (error) {
+            try { Swal.close(); } catch { /* ignore */ }
+            Swal.fire('Error', error?.response?.data?.message || error?.message || 'Failed to generate report.', 'error');
+        }
     };
 
     const handleSaveName = async () => {
@@ -582,7 +598,7 @@ const ProfileViewer = ({ user, onClose }) => {
                             <p className="text-[10px] font-black text-sky-500 uppercase tracking-[0.3em] mt-1">Official Personnel Data</p>
                         </div>
                         <div className="flex items-center gap-2">
-                            {user.role !== 'management' && (
+                            {isEmployeeProfile && (
                                 <button
                                     onClick={handlePrintProfile}
                                     className="flex items-center gap-2 px-5 py-2.5 bg-white border border-gray-200 text-gray-600 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-gray-50 transition-all shadow-sm group"
@@ -655,7 +671,7 @@ const ProfileViewer = ({ user, onClose }) => {
                             <InfoRow icon={<FaBriefcase />} label="Designation" value={user.designation || user.role} />
 
                             {/* Personal, Family, Career & Location Sections (only for employees) */}
-                            {user.role !== 'management' && (
+                            {isEmployeeProfile && (
                                 <>
                                     {/* Personal Data */}
                                     <div className="col-span-full">
@@ -782,7 +798,7 @@ const ProfileViewer = ({ user, onClose }) => {
                             )}
 
                             {/* Certificates Section (only for employees) */}
-                            {user.role !== 'management' && canViewSensitiveInfo && (
+                            {isEmployeeProfile && canViewSensitiveInfo && (
                                 <>
                                     <div className="col-span-full">
                                         <SectionHeader title="Certificates" />
