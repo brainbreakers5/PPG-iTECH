@@ -270,7 +270,7 @@ const SalaryManagement = () => {
     const isAdmin = user?.role === 'admin';
     const isManagement = user?.role === 'management';
     const showStatusColumn = isHistoryPage || (canInstitutionWide && !isPersonalView);
-    const showSelectionBar = canInstitutionWide && !isPersonalView && !isManagement;
+    const showSelectionBar = canInstitutionWide && !isPersonalView && !isManagement && !isHistoryPage;
 
     const tableColumnCount = (showSelectionBar ? 1 : 0)
         + (isPersonalView ? 1 : 6)
@@ -612,6 +612,38 @@ const SalaryManagement = () => {
         } catch (error) {
             console.error('Failed to publish salaries:', error);
             Swal.fire('Error', 'Failed to publish selected salaries.', 'error');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handlePublishPeriod = async () => {
+        const confirm = await Swal.fire({
+            title: 'Publish Salaries for this Period? ',
+            text: `${selectedCycle.fromDate} to ${selectedCycle.toDate} (All employees)` ,
+            icon: 'question',
+            showCancelButton: true,
+            confirmButtonText: 'Yes, Publish',
+            confirmButtonColor: '#0ea5e9'
+        });
+
+        if (!confirm.isConfirmed) return;
+
+        setLoading(true);
+        try {
+            const { data } = await api.post('/salary/publish', {
+                month: selectedCycle.month,
+                year: selectedCycle.year,
+                fromDate: selectedCycle.fromDate,
+                toDate: selectedCycle.toDate
+            });
+
+            Swal.fire('Published!', data.message, 'success');
+            setSelectedIds([]);
+            await handleRefreshRows();
+        } catch (error) {
+            console.error('Failed to publish salaries:', error);
+            Swal.fire('Error', 'Failed to publish salaries for this period.', 'error');
         } finally {
             setLoading(false);
         }
@@ -1332,6 +1364,16 @@ const SalaryManagement = () => {
                                     >
                                         <FaFileAlt /> Report All
                                     </button>
+
+                                    {(isAdmin || isManagement) && (
+                                        <button
+                                            onClick={handlePublishPeriod}
+                                            className="bg-emerald-600 text-white px-4 py-2 rounded-xl shadow-lg shadow-emerald-100 hover:bg-emerald-700 transition-all active:scale-95 flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em]"
+                                            title="Publish salaries for the selected period"
+                                        >
+                                            <FaCheckCircle /> Publish Period
+                                        </button>
+                                    )}
                                 </>
                             )}
                         </div>

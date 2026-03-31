@@ -636,8 +636,12 @@ exports.getSalaryRecords = async (req, res) => {
           `, [empIds, period.fromDate, period.toDate, period.month, period.year]);
 
         const recMap = {};
+        // records are ORDER BY s.id DESC; keep the first (newest) record per employee
         records.forEach((r) => {
-            recMap[String(r.emp_id || '').trim()] = r;
+            const k = String(r.emp_id || '').trim();
+            if (!k) return;
+            if (recMap[k]) return;
+            recMap[k] = r;
         });
 
         const attendanceMap = await getAttendanceAggregateMap({
@@ -926,8 +930,7 @@ exports.publishSalaries = async (req, res) => {
         let query = `
             UPDATE salary_records
             SET status = 'Paid', paid_at = COALESCE(paid_at, NOW())
-            WHERE status = 'Pending'
-                AND (
+            WHERE (
                     (from_date IS NOT NULL AND to_date IS NOT NULL AND from_date::date = $1::date AND to_date::date = $2::date)
                     OR (month = $3 AND year = $4)
                 )
