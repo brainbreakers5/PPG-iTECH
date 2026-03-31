@@ -90,8 +90,6 @@ const Sidebar = ({ userRole = 'staff', isOpen, onClose }) => {
       { label: 'Dashboard', path: '/management', icon: <FaTachometerAlt /> },
       { label: 'Departments', path: '/management/departments', icon: <FaBuilding /> },
       { label: 'Salary Overview', path: '/management/payroll', icon: <FaMoneyBillWave /> },
-      { label: 'Salary History', path: '/management/payroll/history', icon: <FaMoneyBillWave /> },
-      { label: 'Salary Reports', path: '/management/payroll/reports', icon: <FaMoneyBillWave /> },
       { label: 'Attendance Records', path: '/management/attendance', icon: <FaCalendarCheck /> },
     ],
   };

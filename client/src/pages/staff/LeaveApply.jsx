@@ -117,7 +117,13 @@ const LeaveApply = () => {
         try {
             // Fetch all staff across departments for replacement selection
             const { data } = await api.get('/employees?all=true');
-            setStaffList(data);
+            const blockedRoles = new Set(['admin', 'principal', 'management', 'institutional management']);
+            const filtered = data.filter((emp) => {
+                const role = String(emp?.role || '').trim().toLowerCase();
+                const designation = String(emp?.designation || '').trim().toLowerCase();
+                return !blockedRoles.has(role) && designation !== 'institutional management';
+            });
+            setStaffList(filtered);
         } catch { console.error("Fetch staff failed"); }
     };
 

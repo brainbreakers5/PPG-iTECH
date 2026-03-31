@@ -63,9 +63,12 @@ const BiometricMonitor = ({ empId, onDataChange }) => {
 
             const attendanceRows = attendanceRes?.data || [];
             const map = {};
+            const hasLogs = Array.isArray(dataRes.data) && dataRes.data.length > 0;
+            const totalRegistered = Number(statsRes?.data?.total_registered) || 0;
+            const totalTodayUsers = Number(statsRes?.data?.total_users) || 0;
             const nextStats = {
-                totalUsers: Number(statsRes?.data?.total_registered) || 0,
-                present: Number(statsRes?.data?.total_users) || 0,
+                totalUsers: hasLogs ? totalRegistered : 0,
+                present: totalTodayUsers,
                 absent: 0,
                 lop: 0,
                 lateEntry: 0,
@@ -122,6 +125,8 @@ const BiometricMonitor = ({ empId, onDataChange }) => {
         </div>
     );
 
+    const totalTodayLabel = logs.length ? (Number(stats?.total_users) || logs.length) : 0;
+
     return (
         <div className="space-y-6">
             {/* Stats Overview */}
@@ -151,7 +156,7 @@ const BiometricMonitor = ({ empId, onDataChange }) => {
                             <div>
                                 <h2 className="text-lg font-black text-gray-800 tracking-tight">Biometric Activity</h2>
                                 <p className="text-[11px] text-gray-500 tracking-wide">
-                                    total today users: {Number(attendanceStats.totalUsers || stats?.total_users || logs.length)}
+                                    total today users: {Number(totalTodayLabel)}
                                 </p>
                                 <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Real-time device synchronization</p>
                             </div>

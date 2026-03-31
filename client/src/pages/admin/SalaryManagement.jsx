@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import Layout from '../../components/Layout';
 import api from '../../utils/api';
 import Swal from 'sweetalert2';
 import { runPrintWindow } from '../../utils/printUtils';
 import { useAuth } from '../../context/AuthContext';
+import { useSocket } from '../../context/SocketContext';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
     FaCheckCircle,
@@ -248,6 +249,7 @@ const staggerWrap = {
 
 const SalaryManagement = () => {
     const { user } = useAuth();
+    const socket = useSocket();
     const navigate = useNavigate();
     const location = useLocation();
 
@@ -255,8 +257,9 @@ const SalaryManagement = () => {
     const isHistoryPage = /\/payroll\/history$/.test(location.pathname);
     const isPersonalView = !canInstitutionWide;
     const isAdmin = user?.role === 'admin';
+    const isManagement = user?.role === 'management';
     const showStatusColumn = isHistoryPage || (canInstitutionWide && !isPersonalView);
-    const showSelectionBar = canInstitutionWide && !isPersonalView;
+    const showSelectionBar = canInstitutionWide && !isPersonalView && !isManagement;
 
     const tableColumnCount = (showSelectionBar ? 1 : 0)
         + (isPersonalView ? 1 : 6)
@@ -280,6 +283,7 @@ const SalaryManagement = () => {
     const [activeRole, setActiveRole] = useState('all');
     const [activeDepartment, setActiveDepartment] = useState('all');
     const [departments, setDepartments] = useState([]);
+    const [calendarTotals, setCalendarTotals] = useState({ workingDays: null, holidays: null });
 
     const [paidStatuses, setPaidStatuses] = useState(() => {
         const saved = localStorage.getItem('salary_paid_statuses');
@@ -317,9 +321,22 @@ const SalaryManagement = () => {
         return { gross, net };
     }, [filteredRows]);
 
-    const cycleWorkingDays = useMemo(() => {
+    const totalCycleDays = useMemo(() => {
         return getWorkingDaysFromRange(selectedCycle.fromDate, selectedCycle.toDate);
     }, [selectedCycle]);
+
+    const cycleWorkingDays = useMemo(() => {
+        const fromCalendar = Number(calendarTotals.workingDays);
+        if (Number.isFinite(fromCalendar) && fromCalendar > 0) return fromCalendar;
+        return totalCycleDays;
+    }, [calendarTotals.workingDays, totalCycleDays]);
+
+    const cycleHolidayDays = useMemo(() => {
+        const fromCalendar = Number(calendarTotals.holidays);
+        if (Number.isFinite(fromCalendar) && fromCalendar >= 0) return fromCalendar;
+        const computed = totalCycleDays - cycleWorkingDays;
+        return computed > 0 ? computed : 0;
+    }, [calendarTotals.holidays, totalCycleDays, cycleWorkingDays]);
 
     const livePersonalOverview = useMemo(() => {
         if (!isPersonalView || !rows.length) return null;
@@ -387,6 +404,31 @@ const SalaryManagement = () => {
         }
     };
 
+    const refreshCalendarTotals = useCallback(async () => {
+        if (!canInstitutionWide || isPersonalView) {
+            setCalendarTotals({ workingDays: null, holidays: null });
+            return;
+        }
+
+        try {
+            const params = new URLSearchParams({
+                startDate: selectedCycle.fromDate,
+                endDate: selectedCycle.toDate
+            });
+            const { data } = await api.get(`/attendance/summary?${params.toString()}`);
+            if (Array.isArray(data) && data.length > 0) {
+                const workingDays = Number(data[0]?.total_working_days || 0);
+                const holidays = Number(data[0]?.total_holidays || 0);
+                setCalendarTotals({ workingDays, holidays });
+            } else {
+                setCalendarTotals({ workingDays: null, holidays: null });
+            }
+        } catch (error) {
+            console.error('Failed to fetch calendar totals:', error);
+            setCalendarTotals({ workingDays: null, holidays: null });
+        }
+    }, [canInstitutionWide, isPersonalView, selectedCycle.fromDate, selectedCycle.toDate]);
+
     const handleRefreshRows = async () => {
         if (canInstitutionWide && !isHistoryPage && !isPersonalView) {
             try {
@@ -444,6 +486,23 @@ const SalaryManagement = () => {
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [location.pathname]);
+
+    useEffect(() => {
+        refreshCalendarTotals();
+    }, [refreshCalendarTotals]);
+
+    useEffect(() => {
+        if (!socket || isPersonalView) return;
+
+        const handleCalendarUpdate = () => {
+            refreshCalendarTotals();
+        };
+
+        socket.on('calendar_updated', handleCalendarUpdate);
+        return () => {
+            socket.off('calendar_updated', handleCalendarUpdate);
+        };
+    }, [socket, isPersonalView, refreshCalendarTotals]);
 
     useEffect(() => {
         const fetchDepartments = async () => {
@@ -838,7 +897,8 @@ const SalaryManagement = () => {
                 const grossSalary = Number(r.gross_salary ?? getEarnedSalary(r) ?? 0);
                 const earnedSalary = Number(getEarnedSalary(r) || 0);
                 const earnedSplit = getEarnedSalaryConceptSplit(earnedSalary);
-                const workingDays = Number(r.total_days_in_period || cycleWorkingDays || 0);
+                const totalDays = Number(r.total_days_in_period || totalCycleDays || 0);
+                const workingDays = Number(cycleWorkingDays || 0);
                 const paidDays = Number(r.with_pay_count ?? r.total_present ?? 0);
                 const unpaidDays = Number(r.without_pay_count ?? r.total_lop ?? 0);
                 return `
@@ -847,9 +907,10 @@ const SalaryManagement = () => {
                 <td>${escapeHtml(r.name)}</td>
                 <td>${escapeHtml(r.emp_id)}</td>
                 <td>${escapeHtml(r.department_name || '-')}</td>
-                <td class="right">${toCurrency(grossSalary)}</td>
+                <td class="right">${totalDays.toFixed(1)}</td>
+                <td class="right">${workingDays.toFixed(1)}</td>
                 <td class="right">${toCurrency(fixedSalary)}</td>
-                <td class="right excel-only">${workingDays.toFixed(1)}</td>
+                <td class="right">${toCurrency(grossSalary)}</td>
                 <td class="right excel-only">${paidDays.toFixed(1)}</td>
                 <td class="right excel-only">${unpaidDays.toFixed(1)}</td>
                 <td class="right excel-only">${toCurrency(earnedSalary)}</td>
@@ -912,9 +973,10 @@ const SalaryManagement = () => {
                                     <th>Employee</th>
                                     <th>Emp ID</th>
                                     <th>Department</th>
-                                    <th class="right">Gross Salary</th>
+                                    <th class="right">Total Days</th>
+                                    <th class="right">Total Working Days</th>
                                     <th class="right">Fixed Salary</th>
-                                    <th class="right excel-only">Total Working Days</th>
+                                    <th class="right">Gross Salary</th>
                                     <th class="right excel-only">Total Paid Days</th>
                                     <th class="right excel-only">Total Unpaid Days</th>
                                     <th class="right excel-only">Earned Salary</th>
@@ -1128,12 +1190,6 @@ const SalaryManagement = () => {
                                         >
                                             <FaHistory className="mr-3 group-hover:-rotate-12 transition-transform" /> History
                                         </button>
-                                        <button
-                                            onClick={() => navigate(`/${user.role}/payroll/reports`)}
-                                            className="bg-sky-600 text-white px-8 py-4 rounded-2xl shadow-xl shadow-sky-100 hover:bg-sky-700 transition-all active:scale-95 flex items-center font-black uppercase tracking-[0.2em] text-[10px]"
-                                        >
-                                            <FaEnvelope className="mr-3 group-hover:scale-110 transition-transform" /> Complaints
-                                        </button>
                                     </>
                                 )}
                                 {isHistoryPage && (
@@ -1235,6 +1291,7 @@ const SalaryManagement = () => {
                                     <span>Payroll Period</span>
                                     <span className="px-3 py-2 rounded-xl bg-sky-50 text-sky-700 border border-sky-100 normal-case tracking-normal text-xs font-bold">{selectedCycle.fromDate} to {selectedCycle.toDate}</span>
                                     <span className="px-3 py-2 rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-100 normal-case tracking-normal text-xs font-bold">Total Working Days: {cycleWorkingDays}</span>
+                                    <span className="px-3 py-2 rounded-xl bg-rose-50 text-rose-700 border border-rose-100 normal-case tracking-normal text-xs font-bold">Holidays: {cycleHolidayDays}</span>
                                 </div>
                             )}
                             {isHistoryPage && (
@@ -1404,15 +1461,6 @@ const SalaryManagement = () => {
                                                     title="View employee salary page"
                                                 >
                                                     <FaEye className="group-hover/btn:scale-125 transition-transform" />
-                                                </button>
-                                            )}
-                                            {isPersonalView && (
-                                                <button
-                                                    onClick={handleSubmitReport}
-                                                    className="bg-sky-600 text-white px-4 md:px-8 py-2.5 md:py-4 rounded-2xl shadow-xl shadow-sky-100 hover:bg-sky-700 transition-all active:scale-95 text-[9px] md:text-[10px] font-black uppercase tracking-[0.2em] flex items-center gap-2"
-                                                    title="Submit complaint"
-                                                >
-                                                    <FaPaperPlane /> Complaints
                                                 </button>
                                             )}
                                             {showSelectionBar && (

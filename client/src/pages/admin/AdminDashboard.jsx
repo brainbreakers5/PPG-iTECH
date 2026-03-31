@@ -53,10 +53,6 @@ const AdminDashboard = () => {
     const [employeeModal, setEmployeeModal] = useState(null); // { role, statusLabel }
     const [selectedEmployeeHistory, setSelectedEmployeeHistory] = useState(null); // { emp_id, name }
     const [isNonWorkingDay, setIsNonWorkingDay] = useState(false);
-    const [admsLastSeen, setAdmsLastSeen] = useState({
-        heartbeat_last_seen_at: null,
-        cdata_last_seen_at: null,
-    });
     const [rebuildingToday, setRebuildingToday] = useState(false);
     const [rebuildResult, setRebuildResult] = useState(null);
 
@@ -74,17 +70,6 @@ const AdminDashboard = () => {
         }
     };
 
-    const formatLastSeen = (isoTs) => {
-        if (!isoTs) return 'Never';
-        const d = new Date(isoTs);
-        if (Number.isNaN(d.getTime())) return 'Invalid time';
-        return d.toLocaleString('en-IN', {
-            timeZone: 'Asia/Kolkata',
-            year: 'numeric', month: 'short', day: '2-digit',
-            hour: '2-digit', minute: '2-digit', second: '2-digit',
-            hour12: true,
-        });
-    };
 
     const fetchDashboardData = useCallback(async () => {
         try {
@@ -94,13 +79,6 @@ const AdminDashboard = () => {
             setBirthdays(bdays);
             const { data: emps } = await api.get('/employees');
             setAllEmployees(emps);
-
-            const { data: admsSeen } = await api.get('/biometric/adms-last-seen');
-            setAdmsLastSeen({
-                heartbeat_last_seen_at: admsSeen?.heartbeat_last_seen_at || null,
-                cdata_last_seen_at: admsSeen?.cdata_last_seen_at || null,
-            });
-
 
             // Build attendance map: emp_id -> status for today
             const { data: todayAtt } = await api.get(`/attendance?date=${date}`);
@@ -308,27 +286,6 @@ const AdminDashboard = () => {
                                 </div>
                             </motion.div>
                         )}
-                    </div>
-                </div>
-            </motion.div>
-
-            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }} className="mb-6">
-                <div className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm">
-                    <div className="flex items-center justify-between gap-4 flex-wrap">
-                        <div>
-                            <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest">ADMS Connection Monitor</p>
-                            <p className="text-sm font-black text-gray-800 tracking-tight">Device Last Seen on Render</p>
-                        </div>
-                        <div className="flex items-center gap-6">
-                            <div className="text-right">
-                                <p className="text-[9px] font-black text-sky-500 uppercase tracking-widest">Heartbeat (/getrequest)</p>
-                                <p className="text-xs font-black text-gray-700">{formatLastSeen(admsLastSeen.heartbeat_last_seen_at)}</p>
-                            </div>
-                            <div className="text-right">
-                                <p className="text-[9px] font-black text-emerald-500 uppercase tracking-widest">Data Push (/cdata)</p>
-                                <p className="text-xs font-black text-gray-700">{formatLastSeen(admsLastSeen.cdata_last_seen_at)}</p>
-                            </div>
-                        </div>
                     </div>
                 </div>
             </motion.div>

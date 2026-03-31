@@ -77,6 +77,19 @@ const ProfileViewer = ({ user, onClose }) => {
         }
     })();
 
+    const formatDeductionLabel = (label) => {
+        const safeLabel = String(label || '').trim();
+        if (!safeLabel) return 'Deduction';
+        const lower = safeLabel.toLowerCase();
+        if (lower.includes('pf')) return 'PF Basic';
+        return safeLabel;
+    };
+
+    const displayDeductions = parsedDeductions.map((d) => ({
+        ...d,
+        label: formatDeductionLabel(d?.type || d?.label)
+    }));
+
     useEffect(() => {
         setPicUrl(user?.profile_pic || '');
         setEditableName(user?.name || '');
@@ -261,6 +274,13 @@ const ProfileViewer = ({ user, onClose }) => {
 
     const handlePrintProfile = async () => {
         const title = `Profile - ${user.name}`;
+
+        Swal.fire({
+            title: 'Preparing report...',
+            text: 'Please wait while we load certificates.',
+            allowOutsideClick: false,
+            didOpen: () => Swal.showLoading()
+        });
         
         const certDataPromises = certificates.map(async (cert) => {
             try {
@@ -272,6 +292,7 @@ const ProfileViewer = ({ user, onClose }) => {
         });
         
         const fullCertificates = await Promise.all(certDataPromises);
+        Swal.close();
 
         const certsHtml = fullCertificates.map(cert => {
             if (cert.file_data && (cert.file_type?.startsWith('image/') || cert.file_data?.startsWith('data:image/'))) {
@@ -698,22 +719,22 @@ const ProfileViewer = ({ user, onClose }) => {
                                                 <InfoRow icon={<FaUserCircle />} label="PF / UAN" value={`${user.pf_number || ''} ${user.uan_number ? `/ ${user.uan_number}` : ''}`} />
                                             )}
 
-                                            {canViewDeductions && parsedDeductions.length > 0 && (
+                                            {canViewDeductions && displayDeductions.length > 0 && (
                                                 <div className="col-span-full mt-4">
                                                     <div className="p-5 rounded-3xl bg-rose-50/50 border border-transparent">
                                                         <p className="text-[9px] font-black text-rose-500 uppercase tracking-widest leading-none mb-3 flex items-center gap-2">
                                                             <FaMinusCircle size={10} /> Monthly Deductions
                                                         </p>
                                                         <div className="space-y-2 max-w-sm">
-                                                            {parsedDeductions.map((d, i) => (
+                                                            {displayDeductions.map((d, i) => (
                                                                 <div key={i} className="flex justify-between items-center bg-white p-3 rounded-2xl shadow-sm border border-rose-100/50">
-                                                                    <span className="text-xs font-black text-gray-600 uppercase tracking-widest">{d.type}</span>
+                                                                    <span className="text-xs font-black text-gray-600 uppercase tracking-widest">{d.label}</span>
                                                                     <span className="text-sm font-bold text-rose-600 tracking-tight">₹{Number(d.amount).toLocaleString()}</span>
                                                                 </div>
                                                             ))}
                                                             <div className="flex justify-between items-center bg-rose-100 p-3 rounded-2xl !mt-3">
                                                                 <span className="text-[10px] font-black text-rose-700 uppercase tracking-widest">Total Deductions</span>
-                                                                <span className="text-sm font-black text-rose-700 tracking-tight">₹{parsedDeductions.reduce((a, b) => a + Number(b.amount || 0), 0).toLocaleString()}</span>
+                                                                <span className="text-sm font-black text-rose-700 tracking-tight">₹{displayDeductions.reduce((a, b) => a + Number(b.amount || 0), 0).toLocaleString()}</span>
                                                             </div>
                                                         </div>
                                                     </div>

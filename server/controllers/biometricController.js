@@ -293,53 +293,59 @@ const rebuildAttendanceFromBiometricTimeline = async (normalizedEmpId, dateStr) 
         const diff = outMins - inMins;
         workingHoursStr = `${Math.floor(diff / 60)}h ${diff % 60}m`;
 
-        let isLateEntry = false;
-        let isEarlyExit = false;
-        let isLateCovered = true;
-        let isEarlyCovered = true;
-        let lateLopUnits = 0;
-        let earlyLopUnits = 0;
-
-        if (inMins > STD_IN_MINS) {
-            isLateEntry = true;
-            isLateCovered = segments.filter(s => s.type !== 'Present' && s.type !== 'Permission').some(s => s.fromMins <= STD_IN_MINS && s.toMins >= inMins);
-            flags.push(`Late Entry (${physIn})`);
-            if (!isLateCovered) {
-                // If late after 9:00 and not covered by leave, mark as LOP
-                lateLopUnits = inMins <= MORNING_HALF_DAY_END_MINS ? 0.5 : 1;
-                if (lateLopUnits === 0.5) flags.push('Late LOP (Morning)');
-                else flags.push('Late LOP (Full Day)');
-            }
-        }
-
-        if (physOut && outMins < STD_OUT_MINS && outMins > inMins) {
-            isEarlyExit = true;
-            isEarlyCovered = segments.filter(s => s.type !== 'Present' && s.type !== 'Permission').some(s => s.fromMins <= outMins && s.toMins >= STD_OUT_MINS);
-            flags.push(`Early Exit (${physOut})`);
-            if (!isEarlyCovered) {
-                earlyLopUnits = outMins >= EVENING_HALF_DAY_START_MINS ? 0.5 : 1;
-                if (earlyLopUnits === 0.5) flags.push('Early Exit LOP (Evening)');
-                else flags.push('Early Exit LOP (Full Day)');
-            }
-        }
-
         const leaveSegments = segments.filter((s) => s.type !== 'Present' && s.type !== 'Permission');
         const leaveInfo = leaveSegments.length > 0 ? leaveSegments.map((s) => `${s.type} (${s.from}-${s.to})`).join(' + ') : null;
-        const lopUnits = Math.min(1, lateLopUnits + earlyLopUnits);
 
-        if (lopUnits >= 1) {
-            dbStatus = leaveInfo ? `LOP + ${leaveInfo}` : 'LOP';
-        } else if (lopUnits === 0.5) {
-            // Check if it was Late Entry specifically
-            if (isLateEntry && !isLateCovered) {
-                dbStatus = leaveInfo ? `LOP (Late) + ${leaveInfo}` : 'LOP (Late Entry) + Present';
-            } else if (isEarlyExit && !isEarlyCovered) {
-                dbStatus = leaveInfo ? `LOP (Early) + ${leaveInfo}` : 'LOP (Early Exit) + Present';
-            } else {
-                dbStatus = 'LOP + Present';
-            }
+        if (!physOut) {
+            flags.push('Missing Out Punch');
+            dbStatus = leaveInfo ? `LOP (Missing Out) + ${leaveInfo}` : 'LOP (Missing Out)';
         } else {
-            dbStatus = leaveInfo ? (isLateEntry ? `Present (Late) + ${leaveInfo}` : `Present + ${leaveInfo}`) : (isLateEntry ? 'Present (Late Entry)' : 'Present');
+            let isLateEntry = false;
+            let isEarlyExit = false;
+            let isLateCovered = true;
+            let isEarlyCovered = true;
+            let lateLopUnits = 0;
+            let earlyLopUnits = 0;
+
+            if (inMins > STD_IN_MINS) {
+                isLateEntry = true;
+                isLateCovered = segments.filter(s => s.type !== 'Present' && s.type !== 'Permission').some(s => s.fromMins <= STD_IN_MINS && s.toMins >= inMins);
+                flags.push(`Late Entry (${physIn})`);
+                if (!isLateCovered) {
+                    // If late after 9:00 and not covered by leave, mark as LOP
+                    lateLopUnits = inMins <= MORNING_HALF_DAY_END_MINS ? 0.5 : 1;
+                    if (lateLopUnits === 0.5) flags.push('Late LOP (Morning)');
+                    else flags.push('Late LOP (Full Day)');
+                }
+            }
+
+            if (outMins < STD_OUT_MINS && outMins > inMins) {
+                isEarlyExit = true;
+                isEarlyCovered = segments.filter(s => s.type !== 'Present' && s.type !== 'Permission').some(s => s.fromMins <= outMins && s.toMins >= STD_OUT_MINS);
+                flags.push(`Early Exit (${physOut})`);
+                if (!isEarlyCovered) {
+                    earlyLopUnits = outMins >= EVENING_HALF_DAY_START_MINS ? 0.5 : 1;
+                    if (earlyLopUnits === 0.5) flags.push('Early Exit LOP (Evening)');
+                    else flags.push('Early Exit LOP (Full Day)');
+                }
+            }
+
+            const lopUnits = Math.min(1, lateLopUnits + earlyLopUnits);
+
+            if (lopUnits >= 1) {
+                dbStatus = leaveInfo ? `LOP + ${leaveInfo}` : 'LOP';
+            } else if (lopUnits === 0.5) {
+                // Check if it was Late Entry specifically
+                if (isLateEntry && !isLateCovered) {
+                    dbStatus = leaveInfo ? `LOP (Late) + ${leaveInfo}` : 'LOP (Late Entry) + Present';
+                } else if (isEarlyExit && !isEarlyCovered) {
+                    dbStatus = leaveInfo ? `LOP (Early) + ${leaveInfo}` : 'LOP (Early Exit) + Present';
+                } else {
+                    dbStatus = 'LOP + Present';
+                }
+            } else {
+                dbStatus = leaveInfo ? (isLateEntry ? `Present (Late) + ${leaveInfo}` : `Present + ${leaveInfo}`) : (isLateEntry ? 'Present (Late Entry)' : 'Present');
+            }
         }
     } else {
         const fullDay = segments.find((s) => s.isFull);

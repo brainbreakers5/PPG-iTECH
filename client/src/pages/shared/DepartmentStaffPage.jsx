@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import Layout from '../../components/Layout';
 import api from '../../utils/api';
-import { finalizePrintWindow } from '../../utils/printUtils';
+import { runPrintWindow } from '../../utils/printUtils';
 import { useAuth } from '../../context/AuthContext';
 import { FaUserTie, FaEye, FaCalendarAlt, FaIdBadge, FaEnvelope, FaPhone, FaBuilding, FaSuitcase, FaArrowLeft, FaUsers, FaSearch, FaFilter, FaPrint } from 'react-icons/fa';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -21,6 +21,7 @@ const DepartmentStaffPage = () => {
     const [filteredPersonnel, setFilteredPersonnel] = useState([]);
 
     const canOpenSchedule = ['admin', 'principal', 'hod'].includes(effectiveRole);
+    const isManagementView = effectiveRole === 'management';
 
     useEffect(() => {
         const fetchDepartmentData = async () => {
@@ -65,9 +66,6 @@ const DepartmentStaffPage = () => {
     const handlePrint = async () => {
         if (!filteredPersonnel || filteredPersonnel.length === 0) return;
 
-        const printWindow = window.open('', '_blank', 'width=1200,height=800');
-        if (!printWindow) return;
-
         const escHtml = (v) => String(v ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
         const roleColors = { hod: '#0891b2', staff: '#16a34a', admin: '#7c3aed', principal: '#2563eb' };
 
@@ -88,7 +86,7 @@ const DepartmentStaffPage = () => {
             </tr>
         `).join('');
 
-        printWindow.document.write(`
+        const html = `
             <!doctype html><html><head><meta charset="UTF-8">
             <title>${escHtml(department?.name || 'Department')} — Staff & HOD Report</title>
             <style>
@@ -129,13 +127,13 @@ const DepartmentStaffPage = () => {
                 <tbody>${rowsHtml}</tbody>
             </table>
             </body></html>
-        `);
-        printWindow.document.close();
-        await finalizePrintWindow({
-            printWindow,
+        `;
+
+        await runPrintWindow({
             title: `${department?.name || 'Department'} Staff and HOD Report`,
-            delay: 250,
-            modeLabel: 'the department staff report'
+            html,
+            windowFeatures: 'width=1200,height=800',
+            closeAfterPrint: false
         });
     };
 
@@ -252,17 +250,32 @@ const DepartmentStaffPage = () => {
                                                 </div>
                                             </td>
                                             <td className="py-4 px-6 text-center">
-                                                {canOpenSchedule ? (
-                                                    <button
-                                                        onClick={() => handleOpenSchedule(member)}
-                                                        className="h-10 w-10 mx-auto rounded-xl bg-sky-50 text-sky-600 border border-sky-100 hover:bg-sky-600 hover:text-white transition-all flex items-center justify-center"
-                                                        title="View Timetable"
-                                                    >
-                                                        <FaCalendarAlt size={13} />
-                                                    </button>
-                                                ) : (
-                                                    <span className="text-[9px] font-black text-gray-300 uppercase tracking-widest">N/A</span>
-                                                )}
+                                                <div className="flex items-center justify-center gap-2">
+                                                    {canOpenSchedule && (
+                                                        <button
+                                                            onClick={() => handleOpenSchedule(member)}
+                                                            className="h-10 w-10 rounded-xl bg-sky-50 text-sky-600 border border-sky-100 hover:bg-sky-600 hover:text-white transition-all flex items-center justify-center"
+                                                            title="View Timetable"
+                                                        >
+                                                            <FaCalendarAlt size={13} />
+                                                        </button>
+                                                    )}
+                                                    {isManagementView && (
+                                                        <button
+                                                            onClick={() => {
+                                                                navigate(`/management/profile/${member.emp_id}`);
+                                                                window.dispatchEvent(new CustomEvent('closeSidebar'));
+                                                            }}
+                                                            className="h-10 w-10 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-100 hover:bg-emerald-600 hover:text-white transition-all flex items-center justify-center"
+                                                            title="View Profile"
+                                                        >
+                                                            <FaEye size={13} />
+                                                        </button>
+                                                    )}
+                                                    {!canOpenSchedule && !isManagementView && (
+                                                        <span className="text-[9px] font-black text-gray-300 uppercase tracking-widest">N/A</span>
+                                                    )}
+                                                </div>
                                             </td>
                                         </motion.tr>
                                     ))}

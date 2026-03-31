@@ -712,34 +712,7 @@ const AttendanceRecord = () => {
                                                 </td>
                                                 <td className="p-5 text-sm font-black text-center text-sky-600">{formatDayCount(rec.total_present)}</td>
                                                 <td className="p-5 text-sm font-black text-center text-rose-500">
-                                                    {Number(rec.total_actual_absent ?? (Number(rec.total_absent || 0) + (rec.total_computed_absent || 0))) > 0 ? (
-                                                        <button
-                                                            onClick={() => {
-                                                                // Filter detailedRecords for absent days: status === 'Absent', not Holiday, not LOP
-                                                                const empRecords = detailedRecords.filter(r => {
-                                                                    if (r.emp_id !== rec.emp_id) return false;
-                                                                    const s = String(r.status || '').toUpperCase();
-                                                                    // Only include explicitly marked Absent (not Holiday, not LOP, not Present)
-                                                                    return s === 'ABSENT';
-                                                                });
-                                                                setAbsentModal({
-                                                                    emp_id: rec.emp_id,
-                                                                    name: rec.name,
-                                                                    role: rec.role,
-                                                                    department: rec.department_name,
-                                                                    total: Number(rec.total_actual_absent ?? (Number(rec.total_absent || 0) + (rec.total_computed_absent || 0))),
-                                                                    dates: empRecords.sort((a, b) => new Date(a.date) - new Date(b.date))
-                                                                });
-                                                            }}
-                                                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-rose-50 border border-rose-100 text-rose-600 font-black text-sm hover:bg-rose-100 transition-all group"
-                                                            title="Click to view absent dates"
-                                                        >
-                                                            {formatDayCount(rec.total_actual_absent ?? (Number(rec.total_absent || 0) + (rec.total_computed_absent || 0)))}
-                                                            <FaUserTimes size={10} className="opacity-60 group-hover:opacity-100 transition-opacity" />
-                                                        </button>
-                                                    ) : (
-                                                        <span className="text-rose-300">0</span>
-                                                    )}
+                                                    {formatDayCount(rec.total_actual_absent ?? (Number(rec.total_absent || 0) + (rec.total_computed_absent || 0)))}
                                                 </td>
                                                 <td className="p-5 text-sm font-black text-center text-rose-800">{formatDayCount(rec.total_lop)}</td>
                                                 <td className="p-5 text-sm font-black text-center text-amber-500">{formatDayCount(rec.total_cl)}</td>

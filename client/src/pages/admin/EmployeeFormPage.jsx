@@ -310,15 +310,14 @@ const EmployeeFormPage = () => {
 
     const serializeDeductions = () => {
         const pfAmount = Number(getMonthlyPfDeduction() || 0);
-        const pfDuration = String(deductionForm.pf_duration_years || '').trim();
         const pfInterest = String(deductionForm.pf_interest_percentage || '').trim();
         const salaryAdvanceAmount = Number(deductionForm.salary_advance || 0) || 0;
         const salaryAdvanceDurationType = String(deductionForm.salary_advance_duration_type || 'single');
         const salaryAdvanceSingleMonth = String(deductionForm.salary_advance_month || '').trim();
         const salaryAdvanceFromMonth = String(deductionForm.salary_advance_from_month || '').trim();
         const salaryAdvanceToMonth = String(deductionForm.salary_advance_to_month || '').trim();
-        const pfTypeLabel = pfDuration || pfInterest
-            ? `Employ PF Monthly (PF Basic: ${deductionForm.employ_pf || '0'}, Duration: ${pfDuration || '0'} years, PF Deduction % Per Month: ${pfInterest || '0'}%)`
+        const pfTypeLabel = pfInterest
+            ? `Employ PF Monthly (PF Basic: ${deductionForm.employ_pf || '0'}, PF Deduction % Per Month: ${pfInterest || '0'}%)`
             : 'PF Basic';
         const salaryAdvanceTypeLabel = salaryAdvanceDurationType === 'range'
             ? `Salary Advance (From: ${salaryAdvanceFromMonth || '-'} To: ${salaryAdvanceToMonth || '-'})`
@@ -744,12 +743,12 @@ const EmployeeFormPage = () => {
                                                 disabled={!isAdmin}
                                             />
                                         </div>
-                                        <div className="md:col-span-2 bg-sky-50 border border-sky-100 rounded-2xl p-4">
-                                            <p className="text-[10px] font-black text-sky-600 uppercase tracking-widest">Auto Monthly PF Deduction</p>
-                                            <p className="text-lg font-black text-sky-700 mt-1">₹{Number(getMonthlyPfDeduction() || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })}</p>
+                                        <div className="md:col-span-2 bg-gray-50 border border-gray-100 rounded-2xl p-4">
+                                            <p className="text-[10px] font-black text-gray-600 uppercase tracking-widest">Auto Monthly PF Deduction</p>
+                                            <p className="text-lg font-black text-gray-800 mt-1">₹{Number(getMonthlyPfDeduction() || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })}</p>
                                             <p className="text-[10px] font-bold text-gray-500 mt-1">Formula: PF Monthly Deduction = PF Basic × (PF Deduction % Per Month / 100)</p>
-                                            <p className="text-[10px] font-bold text-gray-500 mt-1">Example: PF Basic ₹6,000, Duration 1 Year, PF Deduction % Per Month 12% → Monthly PF Deduction ₹720.00 and Total for Duration ₹8,640.00.</p>
-                                            <p className="text-[10px] font-bold text-gray-500 mt-1">Current Values: PF Basic ₹{Number(deductionForm.employ_pf || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })}, Duration {Number(deductionForm.pf_duration_years || 0) || 0} Year(s), PF Deduction % Per Month {Number(deductionForm.pf_interest_percentage || 0) || 0}% → Monthly ₹{Number(getMonthlyPfDeduction() || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })}, Duration Total ₹{Number(getTotalPfDeductionForDuration() || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })}.</p>
+                                            <p className="text-[10px] font-bold text-gray-500 mt-1">Example: PF Basic ₹6,000, PF Deduction % Per Month 12% → Monthly PF Deduction ₹720.00.</p>
+                                            <p className="text-[10px] font-bold text-gray-500 mt-1">Current Values: PF Basic ₹{Number(deductionForm.employ_pf || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })}, PF Deduction % Per Month {Number(deductionForm.pf_interest_percentage || 0) || 0}% → Monthly ₹{Number(getMonthlyPfDeduction() || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })}.</p>
                                         </div>
                                     </>
                                 )}

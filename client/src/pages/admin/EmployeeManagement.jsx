@@ -160,7 +160,6 @@ const EmployeeManagement = () => {
         marital_status: emp.marital_status || '',
         monthly_salary: emp.monthly_salary || '',
         experience: emp.experience || '',
-        status: emp.employment_status || 'active',
         profile_link: `${window.location.origin}/admin/profile/${encodeURIComponent(emp.emp_id || '')}`
     }));
 
@@ -188,7 +187,6 @@ const EmployeeManagement = () => {
                 <td>${escapeHtml(r.designation)}</td>
                 <td>${escapeHtml(r.email)}</td>
                 <td>${escapeHtml(r.phone)}</td>
-                <td>${escapeHtml(r.status)}</td>
                 <td class="excel-only">${escapeHtml(r.emp_code)}</td>
                 <td class="excel-only">${escapeHtml(r.category)}</td>
                 <td class="excel-only">${escapeHtml(r.caste)}</td>
@@ -257,7 +255,6 @@ const EmployeeManagement = () => {
                 <th>Designation</th>
                 <th>Email</th>
                 <th>Phone</th>
-                <th>Status</th>
                 <th class="excel-only">Emp Code</th>
                 <th class="excel-only">Category</th>
                 <th class="excel-only">Caste</th>

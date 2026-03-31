@@ -85,8 +85,6 @@ const Header = () => {
             { label: 'Dashboard', path: '/management' },
             { label: 'Departments', path: '/management/departments' },
             { label: 'Salary Overview', path: '/management/payroll' },
-            { label: 'Salary History', path: '/management/payroll/history' },
-            { label: 'Salary Reports', path: '/management/payroll/reports' },
             { label: 'Calendar', path: '/management/calendar' },
         ],
     };
