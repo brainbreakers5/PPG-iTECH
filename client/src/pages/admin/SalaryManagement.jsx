@@ -70,14 +70,9 @@ const getWorkingDaysFromRange = (fromDate, toDate) => {
     const to = new Date(toDate);
     if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime()) || from > to) return 0;
 
-    let workingDays = 0;
-    const cursor = new Date(from);
-    while (cursor <= to) {
-        const day = cursor.getDay();
-        if (day !== 0 && day !== 6) workingDays += 1;
-        cursor.setDate(cursor.getDate() + 1);
-    }
-    return workingDays;
+    // Use total calendar days as requested (not just business days).
+    const diffTime = Math.abs(to - from);
+    return Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
 };
 const parseDeductionItems = (raw) => {
     if (!raw) return [];
@@ -516,6 +511,55 @@ const SalaryManagement = () => {
         });
     };
 
+    const handlePublishSelected = async () => {
+        if (!selectedIds.length) return;
+        
+        const confirm = await Swal.fire({
+            title: 'Publish Salaries?',
+            text: `Are you sure you want to publish salaries for ${selectedIds.length} selected employees? This will mark them as Paid and notify the employees.`,
+            icon: 'question',
+            showCancelButton: true,
+            confirmButtonText: 'Yes, Publish',
+            confirmButtonColor: '#0ea5e9'
+        });
+
+        if (!confirm.isConfirmed) return;
+
+        setLoading(true);
+        try {
+            const { data } = await api.post('/salary/publish', {
+                month: selectedCycle.month,
+                year: selectedCycle.year,
+                fromDate: selectedCycle.fromDate,
+                toDate: selectedCycle.toDate,
+                emp_ids: selectedIds
+            });
+            
+            Swal.fire('Published!', data.message, 'success');
+            setSelectedIds([]);
+            await handleRefreshRows();
+        } catch (error) {
+            console.error('Failed to publish salaries:', error);
+            Swal.fire('Error', 'Failed to publish selected salaries.', 'error');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const toggleSelectAll = () => {
+        if (selectedIds.length === filteredRows.length) {
+            setSelectedIds([]);
+        } else {
+            setSelectedIds(filteredRows.map(r => r.emp_id));
+        }
+    };
+
+    const toggleSelectOne = (empId) => {
+        setSelectedIds(prev => 
+            prev.includes(empId) ? prev.filter(id => id !== empId) : [...prev, empId]
+        );
+    };
+
     const updateStatus = async (row, nextStatus) => {
         if (String(row.id).startsWith('history_')) {
             Swal.fire('Not allowed', 'Archived history entries cannot be changed.', 'info');
@@ -898,7 +942,7 @@ const SalaryManagement = () => {
     };
 
     const handleBulkMark = async (status) => {
-        const chosen = filteredRows.filter((r) => selectedIds.includes(r.id));
+        const chosen = filteredRows.filter((r) => selectedIds.includes(r.emp_id));
         if (!chosen.length) {
             Swal.fire('No selection', 'Select one or more records first.', 'info');
             return;
@@ -968,13 +1012,6 @@ const SalaryManagement = () => {
         }
     };
 
-    const toggleSelectAll = () => {
-        if (selectedIds.length === filteredRows.length) {
-            setSelectedIds([]);
-            return;
-        }
-        setSelectedIds(filteredRows.map((r) => r.id));
-    };
 
     useEffect(() => {
         if (!isHistoryPage) {
@@ -1149,6 +1186,16 @@ const SalaryManagement = () => {
                         className="modern-card p-6 border-sky-100 mb-6 flex flex-wrap gap-3 items-center"
                     >
                         <button onClick={toggleSelectAll} className="bg-gray-100 text-gray-600 px-6 py-3 rounded-2xl hover:bg-gray-200 transition-all font-black uppercase tracking-[0.2em] text-[10px] active:scale-95">{selectedIds.length === filteredRows.length ? 'Clear Selection' : 'Select All'}</button>
+                        
+                        {selectedIds.length > 0 && (
+                            <button 
+                                onClick={handlePublishSelected} 
+                                className="bg-emerald-600 text-white px-6 py-3 rounded-2xl shadow-lg shadow-emerald-100 hover:bg-emerald-700 transition-all font-black uppercase tracking-[0.2em] text-[10px] active:scale-95 flex items-center gap-2 animate-bounce-subtle"
+                            >
+                                <FaCheckCircle /> Publish Selected ({selectedIds.length})
+                            </button>
+                        )}
+
                         <button onClick={() => handleBulkMark('Paid')} className="bg-sky-600 text-white px-6 py-3 rounded-2xl shadow-lg shadow-sky-100 hover:bg-sky-700 transition-all font-black uppercase tracking-[0.2em] text-[10px] active:scale-95 flex items-center gap-2"><FaCheckCircle /> Publish All</button>
                         <button onClick={() => handleBulkMark('Pending')} className="bg-sky-600 text-white px-6 py-3 rounded-2xl shadow-lg shadow-sky-100 hover:bg-sky-700 transition-all font-black uppercase tracking-[0.2em] text-[10px] active:scale-95 flex items-center gap-2"><FaClock /> Mark All Unpaid</button>
                         <span className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400 ml-auto bg-gray-50 px-4 py-2 rounded-xl">Selected: {selectedIds.length}</span>
@@ -1220,7 +1267,18 @@ const SalaryManagement = () => {
                         <table className="min-w-max w-full text-left border-collapse whitespace-nowrap">
                             <thead>
                                 <tr className="bg-sky-50/30">
-                                    {canInstitutionWide && isHistoryPage && <th className="p-3 md:p-6 w-12 text-[9px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-sky-50 whitespace-nowrap"><div className="flex justify-center">Select</div></th>}
+                                    {canInstitutionWide && isHistoryPage && (
+                                        <th className="p-3 md:p-4 w-12 border-b border-sky-50">
+                                            <div className="flex justify-center">
+                                                <input
+                                                    type="checkbox"
+                                                    className="w-4 h-4 rounded border-sky-200 text-sky-600 focus:ring-sky-500 cursor-pointer"
+                                                    checked={selectedIds.length === filteredRows.length && filteredRows.length > 0}
+                                                    onChange={toggleSelectAll}
+                                                />
+                                            </div>
+                                        </th>
+                                    )}
                                     {!isPersonalView && <th className="p-3 md:p-6 text-[9px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-sky-50 whitespace-nowrap">Employee</th>}
                                     {isPersonalView && <th className="p-3 md:p-6 text-[9px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-sky-50 whitespace-nowrap">Period</th>}
                                     {!isPersonalView && <th className="p-3 md:p-6 text-[9px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-sky-50 text-right whitespace-nowrap">With/Without Pay</th>}
@@ -1252,8 +1310,8 @@ const SalaryManagement = () => {
                                                 <input
                                                     type="checkbox"
                                                     className="w-4 h-4 rounded border-sky-200 text-sky-600 focus:ring-sky-500 cursor-pointer"
-                                                    checked={selectedIds.includes(r.id)}
-                                                    onChange={() => setSelectedIds((prev) => prev.includes(r.id) ? prev.filter((x) => x !== r.id) : [...prev, r.id])}
+                                                    checked={selectedIds.includes(r.emp_id)}
+                                                    onChange={() => toggleSelectOne(r.emp_id)}
                                                 />
                                             </div>
                                         </td>

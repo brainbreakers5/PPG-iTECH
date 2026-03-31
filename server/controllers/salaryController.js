@@ -1,16 +1,13 @@
 const { pool } = require('../config/db');
 
 // Helper: count working days in a date range excluding weekends
-const getWorkingDays = (from, to) => {
-    let count = 0;
-    const cur = new Date(from);
+// Helper: count total calendar days in a date range
+const getTotalDays = (from, to) => {
+    const start = new Date(from);
     const end = new Date(to);
-    while (cur <= end) {
-        const day = cur.getDay();
-        if (day !== 0 && day !== 6) count++; // Exclude Sunday(0) and Saturday(6)
-        cur.setDate(cur.getDate() + 1);
-    }
-    return count;
+    if (isNaN(start.getTime()) || isNaN(end.getTime()) || start > end) return 0;
+    const diffTime = Math.abs(end - start);
+    return Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
 };
 
 const toIsoDate = (v) => String(v || '').slice(0, 10);
@@ -38,9 +35,17 @@ const buildPeriod = ({ month, year, fromDate, toDate }) => {
 
     const safeYear = Number.isFinite(y) ? y : new Date().getFullYear();
     const safeMonth = Number.isFinite(m) ? m : (new Date().getMonth() + 1);
-    const from = `${safeYear}-${String(safeMonth).padStart(2, '0')}-01`;
-    const to = `${safeYear}-${String(safeMonth).padStart(2, '0')}-${new Date(safeYear, safeMonth, 0).getDate()}`;
-    return { fromDate: from, toDate: to, month: safeMonth, year: safeYear };
+
+    // Dynamic Cycle: 26th of previous month to 25th of current month
+    const to = new Date(safeYear, safeMonth - 1, 25);
+    const from = new Date(safeYear, safeMonth - 2, 26);
+
+    return {
+        fromDate: toIsoDate(from.toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' })),
+        toDate: toIsoDate(to.toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' })),
+        month: safeMonth,
+        year: safeYear
+    };
 };
 
 const parseDeductions = (raw) => {
@@ -233,7 +238,10 @@ exports.calculateSalary = async (req, res) => {
         const rangeFrom = period.fromDate;
         const rangeTo = period.toDate;
         const effectiveCalcTo = getEffectiveCalcTo(rangeTo);
-        const totalWorkingDays = getWorkingDays(rangeFrom, effectiveCalcTo);
+        
+        // Use total calendar days for the divisor as requested.
+        const totalDaysInPeriod = getTotalDays(rangeFrom, rangeTo);
+        const daysUntilNow = getTotalDays(rangeFrom, effectiveCalcTo);
 
         // 1. Fetch all eligible employees
         let usersQuery = `
@@ -282,15 +290,18 @@ exports.calculateSalary = async (req, res) => {
             );
 
             const stats = statsMap[userEmpId] || { payable_days: 0, unpaid_days: 0 };
-            const resolvedPayableDays = (stats.payable_days > 0 || stats.total_records === 0)
-                ? stats.payable_days
-                : (stats.inferred_payable_days || 0);
+            
+            // Calculation Logic Update: 
+            // Payable Days = Total days elapsed so far in the period - Unpaid days (LOP).
+            // This implicitly includes weekends as paid.
+            const resolvedPayableDays = Math.max(0, daysUntilNow - (stats.unpaid_days || 0));
+            
             const grossSource = parseFloat(user.monthly_salary) || 0;
             const fixedDeductions = parseDeductions(user.deductions);
             const metrics = computeSalaryMetrics({
                 monthlySalary: grossSource,
                 deductions: fixedDeductions,
-                workingDaysInPeriod: totalWorkingDays,
+                workingDaysInPeriod: totalDaysInPeriod,
                 payableDays: resolvedPayableDays
             });
 
@@ -343,7 +354,7 @@ exports.calculateSalary = async (req, res) => {
                     metrics.lopDays,
                     metrics.deductionsApplied.toFixed(2),
                     metrics.grossSalary.toFixed(2),
-                    totalWorkingDays,
+                    totalDaysInPeriod,
                     rangeFrom,
                     rangeTo
                 ]);
@@ -370,7 +381,7 @@ exports.calculateSalary = async (req, res) => {
                     metrics.lopDays,
                     metrics.deductionsApplied.toFixed(2),
                     metrics.grossSalary.toFixed(2),
-                    totalWorkingDays,
+                    totalDaysInPeriod,
                     rangeFrom,
                     rangeTo
                 ]);
@@ -384,7 +395,7 @@ exports.calculateSalary = async (req, res) => {
                 calculated_salary: metrics.netSalary.toFixed(2),
                 payable_days: metrics.payableDays,
                 total_lop: metrics.lopDays,
-                range_days: totalWorkingDays,
+                range_days: totalDaysInPeriod,
                 gross_salary: metrics.grossSalary.toFixed(2),
                 deductions_applied: metrics.deductionsApplied.toFixed(2),
                 from_date: rangeFrom,
@@ -516,7 +527,8 @@ exports.getSalaryRecords = async (req, res) => {
             paidStatuses,
             unpaidStatuses
         });
-        const totalWorkingDays = getWorkingDays(period.fromDate, effectiveCalcTo);
+        const totalDaysInPeriod = getTotalDays(period.fromDate, period.toDate);
+        const daysUntilNow = getTotalDays(period.fromDate, effectiveCalcTo);
 
         const merged = users.map((u) => {
             const key = String(u.emp_id || '').trim();
@@ -546,13 +558,11 @@ exports.getSalaryRecords = async (req, res) => {
                     const metrics = computeSalaryMetrics({
                         monthlySalary: parseFloat(u.monthly_salary) || 0,
                         deductions: parseDeductions(u.deductions),
-                        workingDaysInPeriod: totalWorkingDays,
+                        workingDaysInPeriod: totalDaysInPeriod,
                         payableDays: (() => {
                             const attendanceStats = attendanceMap[key] || {};
-                            if ((attendanceStats.payable_days || 0) > 0 || (attendanceStats.total_records || 0) === 0) {
-                                return attendanceStats.payable_days || existing.total_present || 0;
-                            }
-                            return attendanceStats.inferred_payable_days || existing.total_present || 0;
+                            // Use Total - LOP for payable days.
+                            return Math.max(0, daysUntilNow - (attendanceStats.unpaid_days || 0));
                         })()
                     });
 
@@ -571,7 +581,7 @@ exports.getSalaryRecords = async (req, res) => {
                         deductions_applied: metrics.deductionsApplied.toFixed(2),
                         calculated_salary: metrics.netSalary.toFixed(2),
                         gross_salary: metrics.grossSalary.toFixed(2),
-                        total_days_in_period: totalWorkingDays,
+                        total_days_in_period: totalDaysInPeriod,
                         from_date: toIsoDate(existing.from_date) || period.fromDate,
                         to_date: toIsoDate(existing.to_date) || period.toDate
                     };
@@ -594,13 +604,11 @@ exports.getSalaryRecords = async (req, res) => {
             const metrics = computeSalaryMetrics({
                 monthlySalary: gross,
                 deductions: parseDeductions(u.deductions),
-                workingDaysInPeriod: totalWorkingDays,
+                workingDaysInPeriod: totalDaysInPeriod,
                 payableDays: (() => {
                     const attendanceStats = attendanceMap[key] || {};
-                    if ((attendanceStats.payable_days || 0) > 0 || (attendanceStats.total_records || 0) === 0) {
-                        return attendanceStats.payable_days || 0;
-                    }
-                    return attendanceStats.inferred_payable_days || 0;
+                    // Use Total - LOP for payable days.
+                    return Math.max(0, daysUntilNow - (attendanceStats.unpaid_days || 0));
                 })()
             });
 
@@ -619,7 +627,7 @@ exports.getSalaryRecords = async (req, res) => {
                 with_pay_count: metrics.payableDays,
                 without_pay_count: metrics.lopDays,
                 deductions_applied: metrics.deductionsApplied.toFixed(2),
-                total_days_in_period: totalWorkingDays,
+                total_days_in_period: totalDaysInPeriod,
                 from_date: period.fromDate,
                 to_date: period.toDate,
                 status: 'Pending',
@@ -662,8 +670,8 @@ exports.getDailyBreakdown = async (req, res) => {
         if (!empRows.length) return res.status(404).json({ message: 'Employee not found' });
         const baseSalary = parseFloat(empRows[0].monthly_salary) || 0;
 
-        // Working days in range are the proration denominator
-        const totalDays = Math.max(1, getWorkingDays(fromDate, toDate));
+        // Use total days instead of working days for daily rate
+        const totalDays = Math.max(1, getTotalDays(fromDate, toDate));
         const dailyRate = baseSalary / totalDays;
 
         // Fetch daily attendance
@@ -757,32 +765,46 @@ exports.updateSalaryStatus = async (req, res) => {
     }
 };
 
-// @desc    Publish all pending salaries for a month/year
+// @desc    Publish salaries (marks as Paid). Supports selective publishing via emp_ids.
 // @route   POST /api/salary/publish
 // @access  Private (Admin)
 exports.publishSalaries = async (req, res) => {
-    const { month, year, fromDate, toDate } = req.body;
+    const { month, year, fromDate, toDate, emp_ids } = req.body;
     const period = buildPeriod({ month, year, fromDate, toDate });
 
     try {
         await ensureSalarySchema();
-        const { rowCount } = await pool.query(
-            `UPDATE salary_records
-             SET status = 'Paid', paid_at = COALESCE(paid_at, NOW())
-             WHERE status = 'Pending'
-               AND (
+        
+        let query = `
+            UPDATE salary_records
+            SET status = 'Paid', paid_at = COALESCE(paid_at, NOW())
+            WHERE status = 'Pending'
+                AND (
                     (from_date IS NOT NULL AND to_date IS NOT NULL AND from_date::date = $1::date AND to_date::date = $2::date)
                     OR (month = $3 AND year = $4)
-               )`,
-            [period.fromDate, period.toDate, period.month, period.year]
-        );
+                )
+        `;
+        const params = [period.fromDate, period.toDate, period.month, period.year];
+
+        if (Array.isArray(emp_ids) && emp_ids.length > 0) {
+            query += ` AND TRIM(emp_id) = ANY($5::text[])`;
+            params.push(emp_ids);
+        }
+
+        const { rowCount } = await pool.query(query, params);
 
         const io = req.app.get('io');
-        if (io) io.emit('salary_published', { month: period.month, year: period.year, fromDate: period.fromDate, toDate: period.toDate });
+        if (io) io.emit('salary_published', { 
+            month: period.month, 
+            year: period.year, 
+            fromDate: period.fromDate, 
+            toDate: period.toDate,
+            emp_ids: emp_ids || 'all'
+        });
 
         res.json({ message: `${rowCount} salary records published`, count: rowCount });
     } catch (error) {
-        console.error(error);
+        console.error('PUBLISH SALARY ERROR:', error);
         res.status(500).json({ message: 'Server Error' });
     }
 };
