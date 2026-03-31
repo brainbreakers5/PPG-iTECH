@@ -579,7 +579,7 @@ exports.getSalaryRecords = async (req, res) => {
                 FROM salary_history h
                 LEFT JOIN users u ON TRIM(u.emp_id) = TRIM(h.emp_id)
                 LEFT JOIN departments d ON u.department_id = d.id
-                WHERE 1=1
+                WHERE h.status = 'Paid'
             `;
             const historyParams = [];
 

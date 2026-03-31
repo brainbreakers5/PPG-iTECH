@@ -308,13 +308,43 @@ const SalaryManagement = () => {
     const autoRefreshInFlightRef = useRef(false);
 
     const filteredRows = useMemo(() => {
-        return rows.filter((r) => {
-            const roleValue = String(r.role || '').toLowerCase();
-            const roleMatch = activeRole === 'all' || roleValue === activeRole;
-            const deptMatch = activeDepartment === 'all' || String(r.department_name || '').toLowerCase() === activeDepartment;
-            return roleMatch && deptMatch;
-        });
-    }, [rows, activeRole, activeDepartment]);
+        const matchesSelectedCycle = (r) => {
+            const rowMonth = Number(r.month);
+            const rowYear = Number(r.year);
+            const monthYearMatch = Number.isFinite(rowMonth) && Number.isFinite(rowYear)
+                ? (rowMonth === Number(selectedCycle.month) && rowYear === Number(selectedCycle.year))
+                : false;
+
+            const dateMatch = normalizeDateOnly(r.from_date) === normalizeDateOnly(selectedCycle.fromDate)
+                && normalizeDateOnly(r.to_date) === normalizeDateOnly(selectedCycle.toDate);
+
+            return monthYearMatch || dateMatch;
+        };
+
+        const baseRows = (isPersonalView && isHistoryPage)
+            ? (() => {
+                const matched = rows.filter(matchesSelectedCycle);
+                return matched.length ? matched : rows;
+            })()
+            : rows;
+
+        return baseRows.filter((r) => {
+                const roleValue = String(r.role || '').toLowerCase();
+                const roleMatch = activeRole === 'all' || roleValue === activeRole;
+                const deptMatch = activeDepartment === 'all' || String(r.department_name || '').toLowerCase() === activeDepartment;
+                return roleMatch && deptMatch;
+            });
+    }, [
+        rows,
+        activeRole,
+        activeDepartment,
+        isPersonalView,
+        isHistoryPage,
+        selectedCycle.fromDate,
+        selectedCycle.toDate,
+        selectedCycle.month,
+        selectedCycle.year
+    ]);
 
     const departmentOptions = useMemo(() => {
         const fromRows = rows
@@ -356,7 +386,7 @@ const SalaryManagement = () => {
             normalizeDateOnly(r.from_date) === normalizeDateOnly(selectedCycle.fromDate)
             && normalizeDateOnly(r.to_date) === normalizeDateOnly(selectedCycle.toDate)
         ));
-        const liveRow = currentCycleRecord || rows[0];
+        const liveRow = isHistoryPage ? currentCycleRecord : (currentCycleRecord || rows[0]);
         if (!liveRow) return null;
 
         return {
@@ -371,12 +401,21 @@ const SalaryManagement = () => {
             toDate: liveRow.to_date || selectedCycle.toDate,
             deductionBreakdown: getDeductionBreakdownText(liveRow.deductions, liveRow)
         };
-    }, [isPersonalView, rows, selectedCycle, cycleWorkingDays]);
+    }, [isPersonalView, isHistoryPage, rows, selectedCycle, cycleWorkingDays]);
 
     const refreshRows = async () => {
         setLoading(true);
         try {
             if (isPersonalView) {
+                if (isHistoryPage) {
+                    const { data } = await api.get('/salary?history=true');
+                    setRows(Array.isArray(data) ? data : []);
+                    setLiveDaily(null);
+                    setHasLoaded(true);
+                    setLoading(false);
+                    return;
+                }
+
                 const [{ data: currentCycleRows }, dailyRes] = await Promise.all([
                     api.get(`/salary?month=${currentCycle.month}&year=${currentCycle.year}&fromDate=${currentCycle.fromDate}&toDate=${currentCycle.toDate}`),
                     user?.emp_id
@@ -386,7 +425,12 @@ const SalaryManagement = () => {
                 ]);
 
                 const currentRows = Array.isArray(currentCycleRows) ? currentCycleRows : [];
-                const myCurrent = currentRows.find((r) => normalizeEmpId(r.emp_id) === normalizeEmpId(user?.emp_id));
+                const myCurrent = currentRows.find((r) => (
+                    normalizeEmpId(r.emp_id) === normalizeEmpId(user?.emp_id)
+                    && String(r.status).toLowerCase() === 'paid'
+                    && normalizeDateOnly(r.from_date) === normalizeDateOnly(currentCycle.fromDate)
+                    && normalizeDateOnly(r.to_date) === normalizeDateOnly(currentCycle.toDate)
+                ));
                 setRows(myCurrent ? [myCurrent] : []);
                 setLiveDaily(dailyRes?.data || null);
                 setHasLoaded(true);
@@ -1192,7 +1236,9 @@ const SalaryManagement = () => {
                     <div>
                         <h1 className="text-3xl md:text-4xl font-black text-gray-800 tracking-tighter">
                             {isPersonalView ? (
-                                <>My Salary <span className="text-sky-600">Details</span></>
+                                isHistoryPage
+                                    ? <>My Salary <span className="text-sky-600">History</span></>
+                                    : <>My Salary <span className="text-sky-600">Details</span></>
                             ) : isHistoryPage ? (
                                 <>Salary <span className="text-sky-600">History</span></>
                             ) : (
@@ -1201,7 +1247,9 @@ const SalaryManagement = () => {
                         </h1>
                         <p className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400 mt-2">
                             {isPersonalView
-                                ? 'Your own salary for the exact current payroll month is shown here with live updates.'
+                                ? (isHistoryPage
+                                    ? 'View your published salary for past payroll months.'
+                                    : 'Your own salary for the exact current payroll month is shown here with live updates.')
                                 : isHistoryPage
                                     ? 'Select period by month and year using fixed cycle 26 to 25.'
                                     : 'Current live payroll period is fixed and not editable.'}
@@ -1215,6 +1263,23 @@ const SalaryManagement = () => {
                                 className="bg-sky-600 text-white px-8 py-4 rounded-2xl shadow-xl shadow-sky-100 hover:bg-sky-700 transition-all active:scale-95 flex items-center font-black uppercase tracking-[0.2em] text-[10px]"
                             >
                                 <FaCog className="mr-3 group-hover:-rotate-12 transition-transform" /> Calculations
+                            </button>
+                        )}
+
+                        {isPersonalView && !isHistoryPage && (
+                            <button
+                                onClick={() => navigate(`/${user.role}/payroll/history`)}
+                                className="bg-sky-600 text-white px-8 py-4 rounded-2xl shadow-xl shadow-sky-100 hover:bg-sky-700 transition-all active:scale-95 flex items-center font-black uppercase tracking-[0.2em] text-[10px]"
+                            >
+                                <FaHistory className="mr-3 group-hover:-rotate-12 transition-transform" /> History
+                            </button>
+                        )}
+                        {isPersonalView && isHistoryPage && (
+                            <button
+                                onClick={() => navigate(`/${user.role}/payroll`)}
+                                className="bg-sky-600 text-white px-8 py-4 rounded-2xl shadow-xl shadow-sky-100 hover:bg-sky-700 transition-all active:scale-95 flex items-center font-black uppercase tracking-[0.2em] text-[10px]"
+                            >
+                                <FaSearch className="mr-3 group-hover:scale-110 transition-transform" /> Live
                             </button>
                         )}
                         {canInstitutionWide && (

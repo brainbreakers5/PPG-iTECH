@@ -253,6 +253,7 @@ const AppContent = () => {
             <Route path="leaves" element={<PrincipalLeaves />} />
             <Route path="leave-history" element={<PrincipalLeaveHistory />} />
             <Route path="payroll" element={<SalaryManagement />} />
+            <Route path="payroll/history" element={<SalaryManagement />} />
             <Route path="department" element={<PrincipalDepartment />} />
             <Route path="departments/:id/staff" element={<DepartmentStaffPage rolePrefix="principal" />} />
             <Route path="calendar" element={<InstitutionalCalendar />} />
@@ -278,6 +279,7 @@ const AppContent = () => {
             <Route path="/" element={<HODDashboard />} />
             <Route path="leaves" element={<StaffLeaveApply />} />
             <Route path="payroll" element={<SalaryManagement />} />
+            <Route path="payroll/history" element={<SalaryManagement />} />
             <Route path="department" element={<HODDepartment />} />
             <Route path="timetable" element={<HODTimetable />} />
             <Route path="timetable/:empId" element={<HODTimetable />} />
@@ -302,6 +304,7 @@ const AppContent = () => {
             <Route path="/" element={<StaffDashboard />} />
             <Route path="leaves" element={<StaffLeaveApply />} />
             <Route path="payroll" element={<SalaryManagement />} />
+            <Route path="payroll/history" element={<SalaryManagement />} />
             <Route path="items" element={<PrincipalPurchase />} />
             <Route path="purchase/new" element={<PurchaseRequestPage />} />
             <Route path="conversation" element={<PrincipalConversation />} />
