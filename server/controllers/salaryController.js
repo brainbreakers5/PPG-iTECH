@@ -289,6 +289,18 @@ exports.calculateSalary = async (req, res) => {
                                 [userEmpId, rangeFrom, rangeTo, period.month, period.year]
             );
 
+            // Skip recalculation if the record is already Paid (Published)
+            // As per user request: "salry publish after admin page not change the published salary"
+            if (existing.length > 0 && existing[0].status === 'Paid') {
+                results.push({
+                    emp_id: userEmpId,
+                    name: user.name,
+                    status: 'Paid',
+                    message: 'Already Published (Skipped)'
+                });
+                continue;
+            }
+
             const stats = statsMap[userEmpId] || { payable_days: 0, unpaid_days: 0 };
             
             // Calculation Logic Update: 
@@ -636,6 +648,29 @@ exports.getSalaryRecords = async (req, res) => {
                 is_preview: true
             };
         }).filter(Boolean);
+
+        // For employees/non-admin, also fetch their historical paid records from salary_history
+        if (!scopeWide) {
+            const { rows: historyRecords } = await pool.query(`
+                SELECT h.*, u.name, u.role, u.profile_pic, d.name AS department_name, u.monthly_salary, u.deductions
+                FROM salary_history h
+                LEFT JOIN users u ON TRIM(u.emp_id) = TRIM(h.emp_id)
+                LEFT JOIN departments d ON u.department_id = d.id
+                WHERE TRIM(h.emp_id) = $1 AND h.status = 'Paid'
+                ORDER BY h.year DESC, h.month DESC
+            `, [req.user.emp_id]);
+
+            const historyMapped = historyRecords.map(r => ({
+                ...r,
+                id: `history_${r.id}`,
+                is_history: true,
+                from_date: toIsoDate(r.from_date),
+                to_date: toIsoDate(r.to_date)
+            }));
+
+            // Merge current paid records with historical ones
+            return res.json([...merged, ...historyMapped]);
+        }
 
         res.json(merged);
     } catch (error) {
