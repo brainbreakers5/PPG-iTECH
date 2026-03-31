@@ -624,24 +624,35 @@ exports.getSalaryRecords = async (req, res) => {
         if (users.length === 0) return res.json([]);
 
         const empIds = users.map((u) => u.emp_id.trim());
-        const { rows: records } = await pool.query(`
-            SELECT s.*
-            FROM salary_records s
-            WHERE TRIM(s.emp_id) = ANY($1::text[])
-              AND (
-                  (s.from_date IS NOT NULL AND s.to_date IS NOT NULL AND s.from_date::date = $2::date AND s.to_date::date = $3::date)
-                  OR (s.month = $4 AND s.year = $5)
-              )
-            ORDER BY s.id DESC
-          `, [empIds, period.fromDate, period.toDate, period.month, period.year]);
+                const { rows: records } = await pool.query(`
+                        SELECT s.*
+                        FROM salary_records s
+                        WHERE TRIM(s.emp_id) = ANY($1::text[])
+                            AND (
+                                    (s.from_date IS NOT NULL AND s.to_date IS NOT NULL AND s.from_date::date = $2::date AND s.to_date::date = $3::date)
+                                    OR (s.month = $4 AND s.year = $5)
+                            )
+                        ORDER BY
+                                CASE WHEN (s.from_date IS NOT NULL AND s.to_date IS NOT NULL AND s.from_date::date = $2::date AND s.to_date::date = $3::date) THEN 0 ELSE 1 END,
+                                s.id DESC
+                    `, [empIds, period.fromDate, period.toDate, period.month, period.year]);
 
         const recMap = {};
-        // records are ORDER BY s.id DESC; keep the first (newest) record per employee
+        // Prefer a Paid record if any exists for the same employee+period; otherwise use the newest.
+        // This prevents a newer Pending duplicate from hiding the published (Paid) record.
         records.forEach((r) => {
             const k = String(r.emp_id || '').trim();
             if (!k) return;
-            if (recMap[k]) return;
-            recMap[k] = r;
+
+            const current = recMap[k];
+            if (!current) {
+                recMap[k] = r;
+                return;
+            }
+
+            if (String(current.status) !== 'Paid' && String(r.status) === 'Paid') {
+                recMap[k] = r;
+            }
         });
 
         const attendanceMap = await getAttendanceAggregateMap({
