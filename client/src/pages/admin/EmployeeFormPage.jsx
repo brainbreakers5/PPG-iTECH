@@ -57,6 +57,7 @@ const EmployeeFormPage = () => {
     const [deductionForm, setDeductionForm] = useState({
         employ_pf: '',
         pf_interest_percentage: '12',
+        employee_esi_enabled: false,
         salary_advance: '',
         salary_advance_duration_type: 'single',
         salary_advance_month: '',
@@ -122,6 +123,7 @@ const EmployeeFormPage = () => {
                     const normalized = {
                         employ_pf: '',
                         pf_interest_percentage: '12',
+                        employee_esi_enabled: false,
                         salary_advance: '',
                         salary_advance_duration_type: 'single',
                         salary_advance_month: '',
@@ -140,6 +142,12 @@ const EmployeeFormPage = () => {
                         const type = String(d?.type || d?.name || d?.label || '').trim();
                         const amount = Number(d?.amount || 0) || 0;
                         const lowerType = type.toLowerCase();
+
+                        // Auto deduction toggle (no fixed amount)
+                        if (String(d?.code || '').toUpperCase() === 'EMPLOYEE_ESI' || lowerType.includes('employee esi')) {
+                            normalized.employee_esi_enabled = true;
+                            return;
+                        }
 
                         if (!amount) return;
 
@@ -311,12 +319,13 @@ const EmployeeFormPage = () => {
 
         const rows = [
             { type: pfTypeLabel, amount: pfAmount },
+            ...(deductionForm.employee_esi_enabled ? [{ type: 'Employee ESI (Auto)', code: 'EMPLOYEE_ESI', mode: 'auto', amount: 0 }] : []),
             { type: salaryAdvanceTypeLabel, amount: salaryAdvanceAmount },
             { type: 'Hostel and Food Fees', amount: Number(deductionForm.hostel_and_food_fees || 0) || 0 },
             { type: 'Bus Fees', amount: Number(deductionForm.bus_fees || 0) || 0 },
             { type: 'LWF', amount: Number(deductionForm.lwf || 0) || 0 },
             { type: 'TDS', amount: Number(deductionForm.tds || 0) || 0 }
-        ].filter(row => row.amount > 0);
+        ].filter(row => (Number(row.amount || 0) > 0) || String(row.mode || '').toLowerCase() === 'auto');
 
         if (deductionForm.other_enabled) {
             const otherName = String(deductionForm.other_name || '').trim();
@@ -728,6 +737,21 @@ const EmployeeFormPage = () => {
                                 <div>
                                     <label className={labelClass}>Salary Advance (Rs / month)</label>
                                     <input type="number" min="0" value={deductionForm.salary_advance} onChange={(e) => setDeductionValue('salary_advance', e.target.value)} className={inputClass} disabled={!isAdmin} />
+                                </div>
+
+                                <div className="md:col-span-2 bg-sky-50 border border-sky-100 rounded-2xl p-4">
+                                    <label className="flex items-center gap-3 text-sm font-bold text-sky-800 cursor-pointer">
+                                        <input
+                                            type="checkbox"
+                                            checked={!!deductionForm.employee_esi_enabled}
+                                            onChange={(e) => setDeductionValue('employee_esi_enabled', e.target.checked)}
+                                            disabled={!isAdmin}
+                                        />
+                                        Employee ESI (Auto, only if Gross ≤ 20000)
+                                    </label>
+                                    <p className="text-[10px] font-bold text-sky-700 mt-2 leading-relaxed">
+                                        Formula: ESI Gross = Gross − Conveyance, Employee ESI = ESI Gross × 0.75%. This is calculated during payroll, so it is not included in the “Total Monthly Deductions” preview below.
+                                    </p>
                                 </div>
                                 {(Number(deductionForm.salary_advance || 0) > 0) && (
                                     <>

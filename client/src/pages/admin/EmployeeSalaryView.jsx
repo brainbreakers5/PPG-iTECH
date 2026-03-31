@@ -22,8 +22,14 @@ const parseDeductionItems = (raw) => {
         return [];
     }
 };
-const getDeductionBreakdownText = (raw) => {
+const getDeductionBreakdownText = (raw, row) => {
     const items = parseDeductionItems(raw);
+
+    const employeeEsi = Number(row?.employee_esi ?? 0) || 0;
+    const esiGross = Number(row?.esi_gross ?? 0) || 0;
+    if (employeeEsi > 0) items.unshift({ label: 'Employee ESI', amount: employeeEsi });
+    if (esiGross > 0) items.unshift({ label: 'ESI Gross', amount: esiGross });
+
     if (!items.length) return '';
     return items.map((item) => `${item.label}=${toCurrency(item.amount)}`).join(', ');
 };
@@ -104,9 +110,9 @@ const EmployeeSalaryView = () => {
                                     <td className="p-6 text-right">
                                         <div className="flex flex-col items-end gap-1">
                                             <span className="text-sm font-black text-rose-600 bg-rose-50 px-3 py-1.5 rounded-lg border border-rose-100 whitespace-nowrap">Rs {toCurrency(r.deductions_applied || 0)}</span>
-                                            {getDeductionBreakdownText(r.deductions) && (
-                                                <span className="text-[10px] font-black text-rose-500 uppercase tracking-[0.08em] max-w-[240px] text-right" title={getDeductionBreakdownText(r.deductions)}>
-                                                    {getDeductionBreakdownText(r.deductions)}
+                                            {getDeductionBreakdownText(r.deductions, r) && (
+                                                <span className="text-[10px] font-black text-rose-500 uppercase tracking-[0.08em] max-w-[240px] text-right" title={getDeductionBreakdownText(r.deductions, r)}>
+                                                    {getDeductionBreakdownText(r.deductions, r)}
                                                 </span>
                                             )}
                                         </div>

@@ -62,6 +62,87 @@ const parseDeductions = (raw) => {
     }
 };
 
+const parseDeductionItems = (raw) => {
+    if (!raw) return [];
+    try {
+        const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
+        if (!Array.isArray(parsed)) return [];
+        return parsed
+            .map((d) => {
+                const type = String(d?.type ?? d?.name ?? d?.label ?? '').trim();
+                const code = String(d?.code ?? '').trim();
+                const mode = String(d?.mode ?? '').trim().toLowerCase();
+                const amountRaw = d?.amount ?? d?.value ?? d?.deductionAmount ?? d?.deduction_amount ?? 0;
+                const amount = parseFloat(String(amountRaw).replace(/,/g, '')) || 0;
+                return { type, code, mode, amount };
+            })
+            .filter((d) => d.type || d.code);
+    } catch {
+        return [];
+    }
+};
+
+const round2 = (v) => {
+    const n = Number(v || 0);
+    if (!Number.isFinite(n)) return 0;
+    return Math.round(n * 100) / 100;
+};
+
+const computeEmployeeEsi = ({ grossSalary, conveyance }) => {
+    const gross = Number(grossSalary || 0);
+    const conv = Number(conveyance || 0);
+    if (!Number.isFinite(gross) || gross <= 0) return { esiGross: 0, employeeEsi: 0 };
+
+    // Rule: Apply only when Gross ≤ 20000
+    if (gross > 20000) return { esiGross: 0, employeeEsi: 0 };
+
+    // Formula:
+    // ESI Gross = Gross - Conveyance
+    // Employee ESI = ESI Gross * 0.75%
+    const esiGross = Math.max(0, gross - (Number.isFinite(conv) ? conv : 0));
+    const employeeEsi = esiGross * 0.0075;
+    return {
+        esiGross: round2(esiGross),
+        employeeEsi: round2(employeeEsi)
+    };
+};
+
+const computeDeductions = ({ rawDeductions, grossSalary, conveyance }) => {
+    const items = parseDeductionItems(rawDeductions);
+    let manualTotal = 0;
+
+    let hasAutoEmployeeEsi = false;
+    items.forEach((d) => {
+        const label = String(d.type || '').toLowerCase();
+        const code = String(d.code || '').toUpperCase();
+        const mode = String(d.mode || '').toLowerCase();
+
+        const looksLikeEmployeeEsi = code === 'EMPLOYEE_ESI' || label.includes('employee esi') || label === 'esi';
+        if (looksLikeEmployeeEsi) {
+            // If explicitly marked manual, treat as a normal fixed deduction amount.
+            if (mode === 'manual') {
+                manualTotal += Number(d.amount || 0) || 0;
+            } else {
+                hasAutoEmployeeEsi = true;
+            }
+            return;
+        }
+
+        manualTotal += Number(d.amount || 0) || 0;
+    });
+
+    const { esiGross, employeeEsi } = hasAutoEmployeeEsi
+        ? computeEmployeeEsi({ grossSalary, conveyance })
+        : { esiGross: 0, employeeEsi: 0 };
+
+    const total = round2(Math.max(0, manualTotal) + Math.max(0, employeeEsi));
+    return {
+        total,
+        esiGross,
+        employeeEsi
+    };
+};
+
 const BASIC_PERCENT = 55.2;
 const ALLOWANCE_PERCENT = 36.8;
 const CONVEYANCE_PERCENT = 8;
@@ -72,6 +153,8 @@ const ensureSalarySchema = async () => {
         ADD COLUMN IF NOT EXISTS with_pay_count NUMERIC(10, 2) DEFAULT 0,
         ADD COLUMN IF NOT EXISTS without_pay_count NUMERIC(10, 2) DEFAULT 0,
         ADD COLUMN IF NOT EXISTS deductions_applied NUMERIC(12, 2) DEFAULT 0,
+        ADD COLUMN IF NOT EXISTS esi_gross NUMERIC(12, 2) DEFAULT 0,
+        ADD COLUMN IF NOT EXISTS employee_esi NUMERIC(12, 2) DEFAULT 0,
         ADD COLUMN IF NOT EXISTS gross_salary NUMERIC(12, 2) DEFAULT 0,
         ADD COLUMN IF NOT EXISTS total_days_in_period INTEGER DEFAULT 0,
         ADD COLUMN IF NOT EXISTS from_date DATE,
@@ -94,6 +177,8 @@ const ensureSalarySchema = async () => {
             with_pay_count NUMERIC(10, 2),
             without_pay_count NUMERIC(10, 2),
             deductions_applied NUMERIC(12, 2),
+            esi_gross NUMERIC(12, 2),
+            employee_esi NUMERIC(12, 2),
             gross_salary NUMERIC(12, 2),
             total_days_in_period INTEGER,
             from_date DATE,
@@ -101,6 +186,12 @@ const ensureSalarySchema = async () => {
             paid_at TIMESTAMP,
             archived_at TIMESTAMP DEFAULT NOW()
         )
+    `);
+
+    await pool.query(`
+        ALTER TABLE salary_history
+        ADD COLUMN IF NOT EXISTS esi_gross NUMERIC(12, 2) DEFAULT 0,
+        ADD COLUMN IF NOT EXISTS employee_esi NUMERIC(12, 2) DEFAULT 0
     `);
 
     await pool.query(`
@@ -182,7 +273,7 @@ const getAttendanceAggregateMap = async ({ fromDate, toDate, paidStatuses, unpai
     return map;
 };
 
-const computeSalaryMetrics = ({ monthlySalary, deductions, workingDaysInPeriod, payableDays }) => {
+const computeSalaryMetrics = ({ monthlySalary, rawDeductions, deductions, workingDaysInPeriod, payableDays }) => {
     const fixedSalary = parseFloat(String(monthlySalary || 0).replace(/,/g, '')) || 0;
     const totalDays = Number(workingDaysInPeriod || 0);
     const divisor = totalDays > 0 ? totalDays : 1;
@@ -199,7 +290,10 @@ const computeSalaryMetrics = ({ monthlySalary, deductions, workingDaysInPeriod, 
     const grossSalary = basicSalary + allowance + conveyance;
 
     // Step 3 and 4: Net Salary = Gross Salary - Total Deduction
-    const deductionsApplied = Math.max(0, Number(deductions || 0));
+    const computed = rawDeductions
+        ? computeDeductions({ rawDeductions, grossSalary, conveyance })
+        : { total: Math.max(0, Number(deductions || 0)), esiGross: 0, employeeEsi: 0 };
+    const deductionsApplied = Math.max(0, Number(computed.total || 0));
     const netSalary = Math.max(0, grossSalary - deductionsApplied);
     const lopDays = Math.max(0, divisor - normalizedPayable);
 
@@ -214,7 +308,9 @@ const computeSalaryMetrics = ({ monthlySalary, deductions, workingDaysInPeriod, 
         payableDays: normalizedPayable,
         lopDays,
         deductionsApplied,
-        netSalary
+        netSalary,
+        esiGross: computed.esiGross || 0,
+        employeeEsi: computed.employeeEsi || 0
     };
 };
 
@@ -309,10 +405,9 @@ exports.calculateSalary = async (req, res) => {
             const resolvedPayableDays = Math.max(0, daysUntilNow - (stats.unpaid_days || 0));
             
             const grossSource = parseFloat(user.monthly_salary) || 0;
-            const fixedDeductions = parseDeductions(user.deductions);
             const metrics = computeSalaryMetrics({
                 monthlySalary: grossSource,
-                deductions: fixedDeductions,
+                rawDeductions: user.deductions,
                 workingDaysInPeriod: totalDaysInPeriod,
                 payableDays: resolvedPayableDays
             });
@@ -347,10 +442,12 @@ exports.calculateSalary = async (req, res) => {
                         with_pay_count = $8,
                         without_pay_count = $9,
                         deductions_applied = $10,
-                        gross_salary = $11,
-                        total_days_in_period = $12,
-                        from_date = $13::date,
-                        to_date = $14::date,
+                        esi_gross = $11,
+                        employee_esi = $12,
+                        gross_salary = $13,
+                        total_days_in_period = $14,
+                        from_date = $15::date,
+                        to_date = $16::date,
                         status = 'Pending',
                         paid_at = NULL
                     WHERE id = $1
@@ -365,6 +462,8 @@ exports.calculateSalary = async (req, res) => {
                     metrics.payableDays,
                     metrics.lopDays,
                     metrics.deductionsApplied.toFixed(2),
+                    metrics.esiGross.toFixed(2),
+                    metrics.employeeEsi.toFixed(2),
                     metrics.grossSalary.toFixed(2),
                     totalDaysInPeriod,
                     rangeFrom,
@@ -375,11 +474,11 @@ exports.calculateSalary = async (req, res) => {
                     INSERT INTO salary_records (
                         emp_id, month, year, total_present, total_leave, total_lop,
                         calculated_salary, status, with_pay_count, without_pay_count,
-                        deductions_applied, gross_salary, total_days_in_period, from_date, to_date
+                        deductions_applied, esi_gross, employee_esi, gross_salary, total_days_in_period, from_date, to_date
                     ) VALUES (
                         $1, $2, $3, $4, $5, $6,
                         $7, 'Pending', $8, $9,
-                        $10, $11, $12, $13::date, $14::date
+                        $10, $11, $12, $13, $14, $15::date, $16::date
                     )
                 `, [
                     userEmpId,
@@ -392,6 +491,8 @@ exports.calculateSalary = async (req, res) => {
                     metrics.payableDays,
                     metrics.lopDays,
                     metrics.deductionsApplied.toFixed(2),
+                    metrics.esiGross.toFixed(2),
+                    metrics.employeeEsi.toFixed(2),
                     metrics.grossSalary.toFixed(2),
                     totalDaysInPeriod,
                     rangeFrom,
@@ -410,6 +511,8 @@ exports.calculateSalary = async (req, res) => {
                 range_days: totalDaysInPeriod,
                 gross_salary: metrics.grossSalary.toFixed(2),
                 deductions_applied: metrics.deductionsApplied.toFixed(2),
+                esi_gross: metrics.esiGross.toFixed(2),
+                employee_esi: metrics.employeeEsi.toFixed(2),
                 from_date: rangeFrom,
                 to_date: rangeTo
             });
@@ -459,6 +562,8 @@ exports.getSalaryRecords = async (req, res) => {
                     h.with_pay_count,
                     h.without_pay_count,
                     h.deductions_applied,
+                    h.esi_gross,
+                    h.employee_esi,
                     h.gross_salary,
                     h.total_days_in_period,
                     h.from_date,
@@ -493,7 +598,9 @@ exports.getSalaryRecords = async (req, res) => {
                 from_date: toIsoDate(r.from_date),
                 to_date: toIsoDate(r.to_date),
                 monthly_salary: parseFloat(r.gross_salary) || parseFloat(r.monthly_salary) || 0,
-                gross_salary: parseFloat(r.gross_salary) || parseFloat(r.monthly_salary) || 0
+                gross_salary: parseFloat(r.gross_salary) || parseFloat(r.monthly_salary) || 0,
+                esi_gross: parseFloat(r.esi_gross) || 0,
+                employee_esi: parseFloat(r.employee_esi) || 0
             }));
 
             return res.json(historyMapped);
@@ -569,7 +676,7 @@ exports.getSalaryRecords = async (req, res) => {
                 if (existing.status !== 'Paid') {
                     const metrics = computeSalaryMetrics({
                         monthlySalary: parseFloat(u.monthly_salary) || 0,
-                        deductions: parseDeductions(u.deductions),
+                        rawDeductions: u.deductions,
                         workingDaysInPeriod: totalDaysInPeriod,
                         payableDays: (() => {
                             const attendanceStats = attendanceMap[key] || {};
@@ -593,6 +700,8 @@ exports.getSalaryRecords = async (req, res) => {
                         deductions_applied: metrics.deductionsApplied.toFixed(2),
                         calculated_salary: metrics.netSalary.toFixed(2),
                         gross_salary: metrics.grossSalary.toFixed(2),
+                        esi_gross: metrics.esiGross.toFixed(2),
+                        employee_esi: metrics.employeeEsi.toFixed(2),
                         total_days_in_period: totalDaysInPeriod,
                         from_date: toIsoDate(existing.from_date) || period.fromDate,
                         to_date: toIsoDate(existing.to_date) || period.toDate
@@ -615,7 +724,7 @@ exports.getSalaryRecords = async (req, res) => {
             const gross = parseFloat(u.monthly_salary) || 0;
             const metrics = computeSalaryMetrics({
                 monthlySalary: gross,
-                deductions: parseDeductions(u.deductions),
+                rawDeductions: u.deductions,
                 workingDaysInPeriod: totalDaysInPeriod,
                 payableDays: (() => {
                     const attendanceStats = attendanceMap[key] || {};
@@ -639,6 +748,8 @@ exports.getSalaryRecords = async (req, res) => {
                 with_pay_count: metrics.payableDays,
                 without_pay_count: metrics.lopDays,
                 deductions_applied: metrics.deductionsApplied.toFixed(2),
+                esi_gross: metrics.esiGross.toFixed(2),
+                employee_esi: metrics.employeeEsi.toFixed(2),
                 total_days_in_period: totalDaysInPeriod,
                 from_date: period.fromDate,
                 to_date: period.toDate,
@@ -941,6 +1052,8 @@ exports.getSalaryTimeline = async (req, res) => {
                 merged.with_pay_count,
                 merged.without_pay_count,
                 merged.deductions_applied,
+                merged.esi_gross,
+                merged.employee_esi,
                 merged.gross_salary,
                 merged.total_days_in_period,
                 merged.from_date,
@@ -968,6 +1081,8 @@ exports.getSalaryTimeline = async (req, res) => {
                     s.with_pay_count,
                     s.without_pay_count,
                     s.deductions_applied,
+                    s.esi_gross,
+                    s.employee_esi,
                     s.gross_salary,
                     s.total_days_in_period,
                     s.from_date,
@@ -993,6 +1108,8 @@ exports.getSalaryTimeline = async (req, res) => {
                     h.with_pay_count,
                     h.without_pay_count,
                     h.deductions_applied,
+                    h.esi_gross,
+                    h.employee_esi,
                     h.gross_salary,
                     h.total_days_in_period,
                     h.from_date,
@@ -1017,6 +1134,8 @@ exports.getSalaryTimeline = async (req, res) => {
             gross_salary: parseFloat(r.gross_salary) || parseFloat(r.monthly_salary) || 0,
             calculated_salary: parseFloat(r.calculated_salary) || 0,
             deductions_applied: parseFloat(r.deductions_applied) || 0,
+            esi_gross: parseFloat(r.esi_gross) || 0,
+            employee_esi: parseFloat(r.employee_esi) || 0,
             total_present: parseFloat(r.total_present) || 0,
             total_lop: parseFloat(r.total_lop) || 0,
             with_pay_count: parseFloat(r.with_pay_count) || 0,

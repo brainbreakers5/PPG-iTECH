@@ -121,9 +121,11 @@ const getMonthlyPfAmountFromLabel = (label, fallbackAmount) => {
     return safeFallbackAmount;
 };
 
-const getDetailedDeductionBreakdown = (raw) => {
+const getDetailedDeductionBreakdown = (raw, computed) => {
     const details = {
         employPf: 0,
+        employeeEsi: 0,
+        esiGross: 0,
         salaryAdvance: 0,
         hostelFoodFees: 0,
         busFees: 0,
@@ -132,6 +134,13 @@ const getDetailedDeductionBreakdown = (raw) => {
         other: 0,
         otherLabel: ''
     };
+
+    if (computed) {
+        const employeeEsi = Number(computed.employee_esi ?? computed.employeeEsi ?? 0) || 0;
+        const esiGross = Number(computed.esi_gross ?? computed.esiGross ?? 0) || 0;
+        if (employeeEsi > 0) details.employeeEsi = employeeEsi;
+        if (esiGross > 0) details.esiGross = esiGross;
+    }
 
     const items = parseDeductionItems(raw);
     items.forEach((item) => {
@@ -173,10 +182,12 @@ const getDetailedDeductionBreakdown = (raw) => {
 
     return details;
 };
-const getDeductionBreakdownText = (raw) => {
-    const details = getDetailedDeductionBreakdown(raw);
+const getDeductionBreakdownText = (raw, computed) => {
+    const details = getDetailedDeductionBreakdown(raw, computed);
     const lines = [];
     if (details.employPf > 0) lines.push(`Employ PF=${toCurrency(details.employPf)}`);
+    if (details.employeeEsi > 0) lines.push(`Employee ESI=${toCurrency(details.employeeEsi)}`);
+    if (details.esiGross > 0) lines.push(`ESI Gross=${toCurrency(details.esiGross)}`);
     if (details.salaryAdvance > 0) lines.push(`Salary Advance=${toCurrency(details.salaryAdvance)}`);
     if (details.hostelFoodFees > 0) lines.push(`Hostel/Food=${toCurrency(details.hostelFoodFees)}`);
     if (details.busFees > 0) lines.push(`Bus Fees=${toCurrency(details.busFees)}`);
@@ -358,7 +369,7 @@ const SalaryManagement = () => {
             workingDays: Number(liveRow.total_days_in_period || 0) || cycleWorkingDays,
             fromDate: liveRow.from_date || selectedCycle.fromDate,
             toDate: liveRow.to_date || selectedCycle.toDate,
-            deductionBreakdown: getDeductionBreakdownText(liveRow.deductions)
+            deductionBreakdown: getDeductionBreakdownText(liveRow.deductions, liveRow)
         };
     }, [isPersonalView, rows, selectedCycle, cycleWorkingDays]);
 
@@ -784,7 +795,7 @@ const SalaryManagement = () => {
 
         const bodyRows = filteredRows.map((r, index) => `
             ${(() => {
-                const detail = getDetailedDeductionBreakdown(r.deductions);
+                const detail = getDetailedDeductionBreakdown(r.deductions, r);
                 const monthlyFixed = Number(r.monthly_salary ?? 0);
                 const grossSalary = Number(r.gross_salary ?? getEarnedSalary(r) ?? 0);
                 const totalDeductions = Number(r.deductions_applied || 0);
@@ -891,7 +902,7 @@ const SalaryManagement = () => {
         const generatedAt = formatGeneratedAt();
         const bodyRows = filteredRows.map((r, index) => `
             ${(() => {
-                const detail = getDetailedDeductionBreakdown(r.deductions);
+                const detail = getDetailedDeductionBreakdown(r.deductions, r);
                 const otherLabel = detail.otherLabel ? `Other (${detail.otherLabel})` : 'Other';
                 const fixedSalary = Number(r.monthly_salary ?? 0);
                 const grossSalary = Number(r.gross_salary ?? getEarnedSalary(r) ?? 0);
@@ -1416,7 +1427,7 @@ const SalaryManagement = () => {
                                         </td>
                                     )}
                                     {!isPersonalView && (
-                                        <td className="p-3 md:p-6 text-right whitespace-nowrap" title={getDeductionBreakdownText(r.deductions) || ''}>
+                                        <td className="p-3 md:p-6 text-right whitespace-nowrap" title={getDeductionBreakdownText(r.deductions, r) || ''}>
                                             <span className="text-xs md:text-sm font-bold text-rose-600 bg-rose-50 px-2.5 md:px-3 py-1.5 rounded-lg border border-rose-100 whitespace-nowrap">Rs {toCurrency(r.deductions_applied || 0)}</span>
                                         </td>
                                     )}
