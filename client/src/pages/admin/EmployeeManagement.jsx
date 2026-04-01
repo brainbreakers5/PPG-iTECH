@@ -232,7 +232,7 @@ const EmployeeManagement = () => {
         th, td { border: 1px solid #cbd5e1; padding: 6px 8px; text-align: left; white-space: nowrap; }
         th { background: #e2e8f0; font-weight: 700; }
         tbody tr:nth-child(even) { background: #f8fafc; }
-        .excel-only { display: none; }
+        .excel-only { display: table-cell; }
         body.excel-preview .excel-only { display: table-cell; }
     </style>
 </head>

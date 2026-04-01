@@ -67,7 +67,10 @@ const ProfileViewer = ({ user, onClose }) => {
     // HOD & Principal are restricted when viewing OTHERS' profiles
     // Principal & HOD can view sensitive info for others they are authorized to view
     const canViewSensitiveInfo = isOwnProfile || ['admin', 'management'].includes(authUser.role);
-    const canViewDeductions = isOwnProfile || ['admin', 'management'].includes(authUser.role);
+    const canViewDeductions = false;
+    const isPrivilegedViewer = ['admin', 'management'].includes(authUser.role);
+    const isPrivilegedTarget = ['admin', 'management'].includes(viewerRole);
+    const canViewPin = (isOwnProfile && isPrivilegedTarget) || (!isOwnProfile && isPrivilegedViewer && isPrivilegedTarget);
 
     const parsedDeductions = (() => {
         try {
@@ -654,7 +657,7 @@ const ProfileViewer = ({ user, onClose }) => {
                                 onChange={handleChange}
                             />
                              <InfoRow icon={<FaUser />} label="Full Name" value={user.name} />
-                            {(isOwnProfile || authUser.role === 'admin' || authUser.role === 'management') && (
+                            {canViewPin && (
                                 <InfoRow 
                                     icon={<FaIdBadge />} 
                                     label="PIN" 

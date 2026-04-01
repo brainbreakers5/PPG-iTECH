@@ -86,6 +86,7 @@ const Timetable = ({ showToggle = true }) => {
 
         const { value: formValues } = await Swal.fire({
             title: entry ? 'Edit Period' : 'Add New Period',
+            showCloseButton: true,
             html: `
                 <div class="swal-custom-form">                    <div class="swal-field-group">
                         <label>Staff Member</label>
@@ -475,7 +476,7 @@ const Timetable = ({ showToggle = true }) => {
                                                                 <div className="space-y-2 min-w-0">
                                                                     <div className="flex items-start justify-between gap-2">
                                                                         <span className="px-2 py-0.5 bg-sky-100 text-sky-600 rounded-lg text-[8px] font-black uppercase tracking-widest max-w-[70px] truncate">{entry.subject_code || 'N/A'}</span>
-                                                                        <div className="flex gap-2 opacity-0 group-hover/entry:opacity-100 transition-all transform translate-y-[-10px] group-hover/entry:translate-y-0">
+                                                                        <div className="flex gap-2 opacity-100 md:opacity-0 md:group-hover/entry:opacity-100 transition-all md:transform md:translate-y-[-10px] md:group-hover/entry:translate-y-0">
                                                                             <button onClick={() => handleAction(entry)} className="text-sky-400 hover:text-sky-600 transition-colors"><FaEdit size={12} /></button>
                                                                             <button onClick={() => handleDelete(entry.id)} className="text-rose-400 hover:text-rose-600 transition-colors"><FaTrash size={12} /></button>
                                                                         </div>
@@ -499,7 +500,7 @@ const Timetable = ({ showToggle = true }) => {
                                                     </AnimatePresence>
 
                                                     {entries.length === 0 && (isManager || view === 'my') && (
-                                                        <div className="h-full flex items-center justify-center opacity-0 group-hover/cell:opacity-100 transition-all duration-300 transform scale-95 group-hover/cell:scale-100">
+                                                        <div className="h-full flex items-center justify-center opacity-100 md:opacity-0 md:group-hover/cell:opacity-100 transition-all duration-300 md:transform md:scale-95 md:group-hover/cell:scale-100">
                                                             <button
                                                                 onClick={() => handleAction({ day_of_week: day, period_number: p })}
                                                                 className="w-full h-full flex flex-col items-center justify-center text-gray-200 border-2 border-dashed border-gray-100 rounded-2xl hover:border-sky-200 hover:text-sky-300 hover:bg-white transition-all gap-2"

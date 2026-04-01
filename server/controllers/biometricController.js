@@ -423,7 +423,7 @@ const rebuildAttendanceFromBiometricTimeline = async (normalizedEmpId, dateStr) 
         'attendance_records'
     );
 
-    return { dbStatus, physIn, physOut };
+    return { dbStatus, enumStatus, remarks: finalRemarks || null, physIn, physOut };
 };
 
 // Export so routes and external callers can use it
@@ -548,7 +548,19 @@ exports.receiveLog = async (req, res) => {
         }
 
         const isFirstPunch = !syncResult.physOut;
-        const message = `🔔 Biometric Punch: ${type || (isFirstPunch ? 'IN' : 'OUT')} - ${userName} (${normalizedEmpId}) at ${timeStr}`;
+        const punchType = type || (isFirstPunch ? 'IN' : 'OUT');
+        const inTimeLabel = syncResult.physIn || '--:--';
+        const outTimeLabel = syncResult.physOut || 'Pending';
+        const compactRemarks = String(syncResult.remarks || '')
+            .replace(/^Status:\s*/i, '')
+            .trim();
+
+        const message = [
+            `🔔 ${punchType} Punch - ${userName} (${normalizedEmpId})`,
+            `In: ${inTimeLabel} | Out: ${outTimeLabel}`,
+            `Status: ${syncResult.enumStatus || syncResult.dbStatus || 'Present'}`,
+            compactRemarks ? `Remarks: ${compactRemarks}` : null,
+        ].filter(Boolean).join(' | ');
 
         // Notifications (best-effort)
         try {
@@ -572,9 +584,13 @@ exports.receiveLog = async (req, res) => {
         if (io) {
             const punchData = {
                 emp_id: normalizedEmpId,
-                type: type || (isFirstPunch ? 'IN' : 'OUT'),
+                type: punchType,
                 time: timeStr,
-                date: dateStr
+                date: dateStr,
+                in_time: syncResult.physIn || null,
+                out_time: syncResult.physOut || null,
+                status: syncResult.enumStatus || syncResult.dbStatus || null,
+                remarks: syncResult.remarks || null,
             };
             io.emit('biometric_punch', punchData); // Broadcast for updates
         }

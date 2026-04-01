@@ -398,8 +398,7 @@ const SalaryManagement = () => {
             unpaidDays: Number(liveRow.total_lop || liveRow.without_pay_count || 0),
             workingDays: Number(liveRow.total_days_in_period || 0) || cycleWorkingDays,
             fromDate: liveRow.from_date || selectedCycle.fromDate,
-            toDate: liveRow.to_date || selectedCycle.toDate,
-            deductionBreakdown: getDeductionBreakdownText(liveRow.deductions, liveRow)
+            toDate: liveRow.to_date || selectedCycle.toDate
         };
     }, [isPersonalView, isHistoryPage, rows, selectedCycle, cycleWorkingDays]);
 
@@ -1352,9 +1351,6 @@ const SalaryManagement = () => {
                         <motion.div variants={fadeUp} transition={{ duration: 0.35 }} className="modern-card p-5 border-rose-50">
                             <p className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">Total Deductions</p>
                             <p className="mt-2 text-xl font-black text-rose-700 tracking-tighter">Rs {toCurrency(livePersonalOverview.deductions)}</p>
-                            {livePersonalOverview.deductionBreakdown && (
-                                <p className="text-[10px] font-bold text-rose-500 mt-2 uppercase tracking-[0.08em]">{livePersonalOverview.deductionBreakdown}</p>
-                            )}
                         </motion.div>
                     </motion.div>
                 )}
@@ -1542,7 +1538,7 @@ const SalaryManagement = () => {
                                         </td>
                                     )}
                                     {!isPersonalView && (
-                                        <td className="p-3 md:p-6 text-right whitespace-nowrap" title={getDeductionBreakdownText(r.deductions, r) || ''}>
+                                        <td className="p-3 md:p-6 text-right whitespace-nowrap">
                                             <span className="text-xs md:text-sm font-bold text-rose-600 bg-rose-50 px-2.5 md:px-3 py-1.5 rounded-lg border border-rose-100 whitespace-nowrap">Rs {toCurrency(r.deductions_applied || 0)}</span>
                                         </td>
                                     )}
