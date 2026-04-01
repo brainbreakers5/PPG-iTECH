@@ -57,7 +57,7 @@ const EmployeeFormPage = () => {
     const [deductionForm, setDeductionForm] = useState({
         employ_pf: '',
         pf_interest_percentage: '12',
-        employee_esi_enabled: false,
+        employee_esi_enabled: true,
         salary_advance: '',
         salary_advance_duration_type: 'single',
         salary_advance_month: '',
@@ -123,7 +123,7 @@ const EmployeeFormPage = () => {
                     const normalized = {
                         employ_pf: '',
                         pf_interest_percentage: '12',
-                        employee_esi_enabled: false,
+                        employee_esi_enabled: true,
                         salary_advance: '',
                         salary_advance_duration_type: 'single',
                         salary_advance_month: '',
@@ -755,11 +755,8 @@ const EmployeeFormPage = () => {
                                             onChange={(e) => setDeductionValue('employee_esi_enabled', e.target.checked)}
                                             disabled={!isAdmin}
                                         />
-                                        Employee ESI (Auto, only if Gross ≤ 20000)
+                                        Employee ESI
                                     </label>
-                                    <p className="text-[10px] font-bold text-sky-700 mt-2 leading-relaxed">
-                                        Formula: ESI Gross = Gross − Conveyance, Employee ESI = ESI Gross × 0.75%. This is calculated during payroll, so it is not included in the “Total Monthly Deductions” preview below.
-                                    </p>
                                 </div>
                                 {(Number(deductionForm.salary_advance || 0) > 0) && (
                                     <>

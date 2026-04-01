@@ -19,7 +19,7 @@ const AttendanceHistory = ({ empId, month: propMonth, startDate, endDate, recent
             if (statusFilter) {
                 query += `&month=${selectedMonth}`;
             } else if (recentOnly) {
-                query += `&onlyUploaded=true&recent=true&limit=50`;
+                query += `&onlyUploaded=true&month=${selectedMonth}`;
             } else if (startDate && endDate) {
                 query += `&startDate=${startDate}&endDate=${endDate}`;
             } else {
@@ -90,7 +90,7 @@ const AttendanceHistory = ({ empId, month: propMonth, startDate, endDate, recent
             if (statusFilter === 'LOP') return s.includes('LOP') || rem.includes('LOP') || rem.includes('Loss of Pay');
             return s.includes(statusFilter) || rem.includes(statusFilter);
         })
-        : recentOnly ? records.slice(0, 10) : records; // show latest 10 for recent-only; else show all
+        : recentOnly ? records : records;
 
     const calculateHours = (inTime, outTime) => {
         if (!inTime || !outTime) return '—';
@@ -224,7 +224,7 @@ const AttendanceHistory = ({ empId, month: propMonth, startDate, endDate, recent
                                 {statusFilter
                                     ? `${displayedRecords.length} record(s) found for status: ${statusFilter}`
                                     : recentOnly
-                                        ? 'Showing latest 10 uploaded records'
+                                        ? `Showing full uploaded records for ${propMonth || 'this month'}`
                                         : (startDate && endDate
                                             ? `Records from ${startDate} to ${endDate}`
                                             : `Showing all records for ${propMonth || 'this month'}`)}
@@ -266,7 +266,7 @@ const AttendanceHistory = ({ empId, month: propMonth, startDate, endDate, recent
                         {displayedRecords.length === 0 ? (
                             <tr>
                                 <td colSpan="6" className="px-8 py-12 text-center text-gray-400 text-[10px] font-bold uppercase tracking-widest italic">
-                                    {recentOnly ? 'No uploaded attendance records found.' : 'No attendance records found for this period.'}
+                                    {recentOnly ? 'No uploaded attendance records found for this month.' : 'No attendance records found for this period.'}
                                 </td>
                             </tr>
                         ) : (

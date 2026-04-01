@@ -296,7 +296,7 @@ const Dashboard = () => {
                         </div>
                         <div>
                             <p className="text-[9px] font-black text-emerald-500 uppercase tracking-widest">Working Days</p>
-                            <p className="text-2xl font-black text-emerald-700 tracking-tighter">{monthStats.workingDays}</p>
+                            <p className="text-2xl font-black text-emerald-700 tracking-tighter">{Number(monthStats.workingDays || 0).toFixed(1)}</p>
                         </div>
                     </motion.div>
                     <motion.div
@@ -310,7 +310,7 @@ const Dashboard = () => {
                         </div>
                         <div>
                             <p className="text-[9px] font-black text-rose-500 uppercase tracking-widest">Holidays</p>
-                            <p className="text-2xl font-black text-rose-700 tracking-tighter">{monthStats.holidays}</p>
+                            <p className="text-2xl font-black text-rose-700 tracking-tighter">{Number(monthStats.holidays || 0).toFixed(1)}</p>
                         </div>
                     </motion.div>
                     <motion.div
@@ -324,7 +324,7 @@ const Dashboard = () => {
                         </div>
                         <div>
                             <p className="text-[9px] font-black text-amber-500 uppercase tracking-widest">Special Events</p>
-                            <p className="text-2xl font-black text-amber-700 tracking-tighter">{monthStats.specialEvents}</p>
+                            <p className="text-2xl font-black text-amber-700 tracking-tighter">{Number(monthStats.specialEvents || 0).toFixed(1)}</p>
                         </div>
                     </motion.div>
                 </div>
@@ -354,6 +354,7 @@ const Dashboard = () => {
                     onStatClick={handleStatClick} 
                     activeFilter={statusFilter} 
                     monthStats={monthStats}
+                    currentDayStatus={currentDayStatus}
                     onMonthStatsClick={() => navigate('/principal/calendar')}
                 />
             </motion.div>

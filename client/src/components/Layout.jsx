@@ -125,6 +125,9 @@ const Layout = ({ children }) => {
         const empId = String(user.emp_id).trim();
         if (empId === '5001' || empId === '5045') return;
 
+        const sessionKey = `feedback_prompt_shown_${empId}`;
+        if (sessionStorage.getItem(sessionKey) === '1') return;
+
         const timer = setTimeout(async () => {
             const { value } = await Swal.fire({
                 title: 'Share Your App Feedback',
@@ -155,6 +158,8 @@ const Layout = ({ children }) => {
                     Swal.fire('Error', error?.response?.data?.message || 'Failed to submit feedback.', 'error');
                 }
             }
+
+            sessionStorage.setItem(sessionKey, '1');
         }, 2200);
 
         return () => clearTimeout(timer);

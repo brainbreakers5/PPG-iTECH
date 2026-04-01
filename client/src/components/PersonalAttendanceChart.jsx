@@ -5,7 +5,8 @@ import { FaCalendarAlt, FaCalendarDay, FaStar } from 'react-icons/fa';
 
 ChartJS.register(ArcElement, Tooltip, Legend);
 
-const PersonalAttendanceChart = ({ stats, onStatClick, activeFilter, monthStats, onMonthStatsClick }) => {
+const PersonalAttendanceChart = ({ stats, onStatClick, activeFilter, monthStats, onMonthStatsClick, currentDayStatus }) => {
+    const formatDecimal = (value) => Number(value || 0).toFixed(1);
     const data = {
         labels: [
             'Present',
@@ -113,7 +114,7 @@ const PersonalAttendanceChart = ({ stats, onStatClick, activeFilter, monthStats,
                         <Doughnut data={data} options={options} />
                         <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
                             <span className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Total</span>
-                            <span className="text-4xl font-black text-gray-800 tracking-tighter leading-none">{totalSessions}</span>
+                            <span className="text-4xl font-black text-gray-800 tracking-tighter leading-none">{formatDecimal(totalSessions)}</span>
                             <span className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mt-1">Records</span>
                         </div>
                     </div>
@@ -154,7 +155,7 @@ const PersonalAttendanceChart = ({ stats, onStatClick, activeFilter, monthStats,
                                                     className="text-sm font-black tracking-tight leading-none"
                                                     style={{ color: item.color }}
                                                 >
-                                                    {item.value || 0}
+                                                    {formatDecimal(item.value)}
                                                 </span>
                                                 <span className="text-[8px] font-bold text-gray-300 tracking-tight">
                                                     {totalSessions > 0 ? Math.round(((item.value || 0) / totalSessions) * 100) : 0}%
@@ -178,35 +179,35 @@ const PersonalAttendanceChart = ({ stats, onStatClick, activeFilter, monthStats,
                         
                         <div 
                             onClick={onMonthStatsClick}
-                            className="p-4 bg-emerald-50 rounded-[24px] border border-emerald-100 flex flex-col gap-1 cursor-pointer hover:shadow-md transition-all group"
+                            className={`p-4 bg-emerald-50 rounded-[24px] border flex flex-col gap-1 cursor-pointer hover:shadow-md transition-all group ${currentDayStatus?.type === 'workingDays' ? 'border-blue-500 ring-2 ring-blue-100' : 'border-emerald-100'}`}
                         >
                             <div className="flex items-center gap-2 text-emerald-600">
                                 <FaCalendarAlt size={12} />
                                 <span className="text-[9px] font-black uppercase tracking-widest">Working Days</span>
                             </div>
-                            <span className="text-2xl font-black text-emerald-700 tracking-tighter">{monthStats.workingDays}</span>
+                            <span className="text-2xl font-black text-emerald-700 tracking-tighter">{formatDecimal(monthStats.workingDays)}</span>
                         </div>
 
                         <div 
                             onClick={onMonthStatsClick}
-                            className="p-4 bg-rose-50 rounded-[24px] border border-rose-100 flex flex-col gap-1 cursor-pointer hover:shadow-md transition-all"
+                            className={`p-4 bg-rose-50 rounded-[24px] border flex flex-col gap-1 cursor-pointer hover:shadow-md transition-all ${currentDayStatus?.type === 'holidays' ? 'border-blue-500 ring-2 ring-blue-100' : 'border-rose-100'}`}
                         >
                             <div className="flex items-center gap-2 text-rose-600">
                                 <FaCalendarDay size={12} />
                                 <span className="text-[9px] font-black uppercase tracking-widest">Holidays</span>
                             </div>
-                            <span className="text-2xl font-black text-rose-700 tracking-tighter">{monthStats.holidays}</span>
+                            <span className="text-2xl font-black text-rose-700 tracking-tighter">{formatDecimal(monthStats.holidays)}</span>
                         </div>
 
                         <div 
                             onClick={onMonthStatsClick}
-                            className="p-4 bg-amber-50 rounded-[24px] border border-amber-100 flex flex-col gap-1 cursor-pointer hover:shadow-md transition-all"
+                            className={`p-4 bg-amber-50 rounded-[24px] border flex flex-col gap-1 cursor-pointer hover:shadow-md transition-all ${currentDayStatus?.type === 'specialEvents' ? 'border-blue-500 ring-2 ring-blue-100' : 'border-amber-100'}`}
                         >
                             <div className="flex items-center gap-2 text-amber-600">
                                 <FaStar size={12} />
                                 <span className="text-[9px] font-black uppercase tracking-widest">Special Events</span>
                             </div>
-                            <span className="text-2xl font-black text-amber-700 tracking-tighter">{monthStats.specialEvents}</span>
+                            <span className="text-2xl font-black text-amber-700 tracking-tighter">{formatDecimal(monthStats.specialEvents)}</span>
                         </div>
                     </div>
                 )}

@@ -63,6 +63,7 @@ const LeaveApply = () => {
     const [conflicts, setConflicts] = useState([]);
     const [showStaffPicker, setShowStaffPicker] = useState(null); // { type: 'leave' | 'permission', index?: number }
     const [manageReplacements, setManageReplacements] = useState(null); // idx of the date in currentDate or formData.dates? Let's use it for the one being added.
+    const [timetableRows, setTimetableRows] = useState([]);
 
     // Helper function to get full leave type name
     const getLeaveTypeName = (type) => {
@@ -127,12 +128,65 @@ const LeaveApply = () => {
         } catch { console.error("Fetch staff failed"); }
     };
 
+    const fetchTimetable = async () => {
+        try {
+            const { data } = await api.get('/timetable');
+            setTimetableRows(Array.isArray(data) ? data : []);
+        } catch {
+            setTimetableRows([]);
+        }
+    };
+
+    const getDayNameFromDate = (dateStr) => {
+        if (!dateStr) return '';
+        const d = new Date(`${dateStr}T00:00:00`);
+        if (Number.isNaN(d.getTime())) return '';
+        return ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][d.getDay()];
+    };
+
+    const getMyTimetablePeriods = (dateStr) => {
+        const dayName = getDayNameFromDate(dateStr);
+        if (!dayName) return [];
+        return timetableRows
+            .filter((t) => String(t.emp_id) === String(user.emp_id) && String(t.day_of_week) === dayName)
+            .map((t) => ({
+                period_number: Number(t.period_number),
+                subject: t.subject,
+                start_time: t.start_time,
+                end_time: t.end_time
+            }))
+            .filter((t) => Number.isFinite(t.period_number))
+            .sort((a, b) => a.period_number - b.period_number);
+    };
+
+    const parseSelectedPeriods = (periodText) => {
+        return String(periodText || '')
+            .split(',')
+            .map((v) => Number(String(v).replace(/[^0-9]/g, '')))
+            .filter((n) => Number.isFinite(n) && n > 0);
+    };
+
+    const isStaffFreeForPeriods = (staffEmpId, dateStr, periodText) => {
+        const selectedPeriods = parseSelectedPeriods(periodText);
+        if (!selectedPeriods.length) return false;
+        const dayName = getDayNameFromDate(dateStr);
+        if (!dayName) return false;
+        const staffDayRows = timetableRows.filter(
+            (t) => String(t.emp_id) === String(staffEmpId) && String(t.day_of_week) === dayName
+        );
+        return selectedPeriods.every((p) => !staffDayRows.some((row) => Number(row.period_number) === p));
+    };
+
     const fetchLeaves = async () => {
         setLoading(true);
         try {
             const { data } = await api.get('/leaves');
             // User's own applications
-            setHistory(data.filter(l => l.emp_id === user.emp_id));
+            const ownHistory = data.filter(l => l.emp_id === user.emp_id);
+            const approvedReplacementHistory = data
+                .filter(l => l.emp_id !== user.emp_id && l.my_approver_type === 'replacement' && l.my_approval_status === 'Approved')
+                .map((l) => ({ ...l, is_replacement_history: true }));
+            setHistory([...approvedReplacementHistory, ...ownHistory]);
             // Requests waiting for user's approval
             setPendingApprovals(data.filter(l => l.my_approval_status === 'Pending' && l.emp_id !== user.emp_id));
             // Past requests user already acted on
@@ -293,6 +347,7 @@ const LeaveApply = () => {
 
     useEffect(() => {
         fetchStaff();
+        fetchTimetable();
         fetchLeaves();
         fetchEligibleCompDates();
         fetchPermissions();
@@ -848,6 +903,7 @@ const LeaveApply = () => {
                                         <div className="space-y-4">
                                             {currentDate.replacements.map((rep, idx) => {
                                                 const member = staffList.find(s => s.emp_id === rep.staff_id);
+                                                const myPeriods = getMyTimetablePeriods(currentDate.date);
                                                 return (
                                                     <div key={idx} className="bg-white p-5 rounded-3xl border-2 border-gray-100 flex flex-col md:flex-row gap-4 md:items-center shadow-sm hover:border-sky-200 transition-all">
                                                         {/* Staff selection button or display */}
@@ -855,7 +911,8 @@ const LeaveApply = () => {
                                                             {!rep.staff_id ? (
                                                                 <button
                                                                     type="button"
-                                                                    onClick={() => setShowStaffPicker({ type: 'leave', index: idx })}
+                                                                    onClick={() => setShowStaffPicker({ type: 'leave', index: idx, date: currentDate.date })}
+                                                                    disabled={!currentDate.date || !rep.periods}
                                                                     className="w-full py-4 border-2 border-dashed border-gray-200 rounded-2xl text-gray-400 font-black text-[10px] uppercase tracking-[0.2em] hover:text-sky-600 hover:border-sky-300 hover:bg-sky-50/50 transition-all flex items-center justify-center gap-3"
                                                                 >
                                                                     <FaPlusCircle size={16} /> Pick Alternative Staff
@@ -875,7 +932,8 @@ const LeaveApply = () => {
                                                                     </div>
                                                                     <button
                                                                         type="button"
-                                                                        onClick={() => setShowStaffPicker({ type: 'leave', index: idx })}
+                                                                        onClick={() => setShowStaffPicker({ type: 'leave', index: idx, date: currentDate.date })}
+                                                                        disabled={!currentDate.date || !rep.periods}
                                                                         className="h-10 w-10 flex-shrink-0 rounded-xl bg-gray-50 text-gray-400 hover:bg-sky-600 hover:text-white transition-all flex items-center justify-center active:scale-90"
                                                                     >
                                                                         <FaExchangeAlt size={14} />
@@ -890,23 +948,26 @@ const LeaveApply = () => {
                                                                 </div>
                                                             )}
                                                         </div>
-                                                        {/* Periods input if staff selected */}
-                                                        {rep.staff_id && (
-                                                            <div className="md:w-64">
-                                                                <div className="relative group">
-                                                                    <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-sky-500 transition-colors">
-                                                                        <FaClock size={14} />
-                                                                    </div>
-                                                                    <input
-                                                                        placeholder="Periods (e.g. 1st, 2nd)"
-                                                                        value={rep.periods}
-                                                                        onChange={(e) => handleCurrentReplacementChange(idx, 'periods', e.target.value)}
-                                                                        className="w-full bg-gray-50 border-2 border-transparent rounded-xl py-3.5 pl-10 pr-4 outline-none focus:bg-white focus:border-sky-500 focus:ring-4 focus:ring-sky-50 transition-all font-bold text-gray-700 text-xs shadow-sm"
-                                                                        required={!!rep.staff_id}
-                                                                    />
-                                                                </div>
+                                                        <div className="md:w-72">
+                                                            <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-2">Select Period</p>
+                                                            <div className="flex flex-wrap gap-2">
+                                                                {myPeriods.length > 0 ? myPeriods.map((p) => (
+                                                                    <button
+                                                                        key={`${idx}-${p.period_number}`}
+                                                                        type="button"
+                                                                        onClick={() => handleCurrentReplacementChange(idx, 'periods', String(p.period_number))}
+                                                                        className={`px-3 py-2 rounded-xl border text-[10px] font-black uppercase tracking-widest transition-all ${String(rep.periods) === String(p.period_number)
+                                                                            ? 'bg-sky-600 text-white border-sky-600'
+                                                                            : 'bg-gray-50 text-gray-500 border-gray-100 hover:bg-sky-50 hover:text-sky-700 hover:border-sky-200'
+                                                                        }`}
+                                                                    >
+                                                                        P{p.period_number}
+                                                                    </button>
+                                                                )) : (
+                                                                    <span className="text-[10px] font-bold text-gray-400">No timetable periods found for selected date.</span>
+                                                                )}
                                                             </div>
-                                                        )}
+                                                        </div>
                                                     </div>
                                                 );
                                             })}
@@ -1351,7 +1412,7 @@ const LeaveApply = () => {
 
 
                             {/* My Permission Requests */}
-                            {(() => {
+                            {false && (() => {
                                 const myPermissions = permissions.filter(p => p.emp_id === user.emp_id);
                                 return myPermissions.length > 0 ? (
                                     <div className="modern-card p-10 relative overflow-hidden mb-8">
@@ -1860,19 +1921,21 @@ const LeaveApply = () => {
                                     >
                                         <div className="flex justify-between items-start mb-6">
                                             <div className="flex flex-col gap-1">
-                                                <span className="text-[10px] font-black text-sky-500 uppercase tracking-[0.2em]">{getLeaveTypeName(leave.leave_type)}</span>
+                                                <span className="text-[10px] font-black text-sky-500 uppercase tracking-[0.2em]">
+                                                    {leave.is_replacement_history ? 'Replacement Approval' : getLeaveTypeName(leave.leave_type)}
+                                                </span>
                                                 <span className="text-[8px] font-black text-gray-400 uppercase tracking-widest">{new Date(leave.created_at).toLocaleDateString()}</span>
                                             </div>
-                                            <div className={`flex items-center gap-1.5 py-1 px-2.5 rounded-lg border ${leave.status === 'Approved' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' :
-                                                leave.status === 'Rejected' ? 'bg-rose-50 text-rose-600 border-rose-100' :
+                                            <div className={`flex items-center gap-1.5 py-1 px-2.5 rounded-lg border ${(leave.is_replacement_history ? leave.my_approval_status : leave.status) === 'Approved' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' :
+                                                (leave.is_replacement_history ? leave.my_approval_status : leave.status) === 'Rejected' ? 'bg-rose-50 text-rose-600 border-rose-100' :
                                                     'bg-amber-50 text-amber-600 border-amber-100'
                                                 }`}>
-                                                {leave.status === 'Approved' ? <FaCheckCircle size={10} /> :
-                                                    leave.status === 'Rejected' ? <FaTimesCircle size={10} /> :
+                                                {(leave.is_replacement_history ? leave.my_approval_status : leave.status) === 'Approved' ? <FaCheckCircle size={10} /> :
+                                                    (leave.is_replacement_history ? leave.my_approval_status : leave.status) === 'Rejected' ? <FaTimesCircle size={10} /> :
                                                         <FaHourglassHalf size={10} className="animate-spin-slow" />}
-                                                <span className="text-[9px] font-black uppercase tracking-widest">{leave.status}</span>
+                                                <span className="text-[9px] font-black uppercase tracking-widest">{leave.is_replacement_history ? leave.my_approval_status : leave.status}</span>
                                             </div>
-                                            {leave.status === 'Pending' && (
+                                            {!leave.is_replacement_history && leave.status === 'Pending' && (
                                                 <button
                                                     onClick={(e) => {
                                                         e.stopPropagation();
@@ -1912,13 +1975,17 @@ const LeaveApply = () => {
                                             </div>
                                         )}
 
-                                        <h4 className="text-lg font-black text-gray-800 tracking-tight group-hover:text-sky-600 transition-colors">{leave.subject || 'Leave Request'}</h4>
-                                        <p className="text-xs text-gray-400 font-medium mt-2 line-clamp-2 leading-relaxed">{leave.reason}</p>
+                                        <h4 className="text-lg font-black text-gray-800 tracking-tight group-hover:text-sky-600 transition-colors">{leave.subject || (leave.is_replacement_history ? 'Replacement Approval' : 'Leave Request')}</h4>
+                                        <p className="text-xs text-gray-400 font-medium mt-2 line-clamp-2 leading-relaxed">
+                                            {leave.is_replacement_history ? (leave.approval_notes || leave.reason || 'Replacement duty approved by you.') : leave.reason}
+                                        </p>
 
                                         <div className="mt-8 pt-6 border-t border-gray-50 flex items-center justify-between">
                                             <div className="flex items-center gap-2 text-[9px] font-black text-gray-400 uppercase tracking-widest">
                                                 <FaClock size={10} className="text-sky-300" />
-                                                { Number(leave.days_count) > 0 ? `${leave.days_count} days` : (leave.hours && Number(leave.hours) > 0 ? `${leave.hours} Hours` : `${leave.days_count} days`) }
+                                                {leave.is_replacement_history
+                                                    ? (leave.approval_notes || 'Replacement')
+                                                    : (Number(leave.days_count) > 0 ? `${leave.days_count} days` : (leave.hours && Number(leave.hours) > 0 ? `${leave.hours} Hours` : `${leave.days_count} days`))}
                                             </div>
                                             <div className="flex items-center gap-2 text-[9px] font-black text-gray-400 uppercase tracking-widest">
                                                 <FaCalendarCheck size={10} className="text-sky-200" />
@@ -2182,6 +2249,7 @@ const LeaveApply = () => {
 
                                     {staffList
                                         .filter(s => s.emp_id !== user.emp_id)
+                                        .filter(s => showStaffPicker.type !== 'leave' || isStaffFreeForPeriods(s.emp_id, showStaffPicker.date || currentDate.date, currentDate.replacements[showStaffPicker.index]?.periods))
                                         .filter(s =>
                                             s.name.toLowerCase().includes(staffSearch.toLowerCase()) ||
                                             (s.designation || '').toLowerCase().includes(staffSearch.toLowerCase()) ||

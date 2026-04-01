@@ -88,7 +88,37 @@ const StaffDashboard = () => {
             const entries = (ttData || [])
                 .filter(t => t.day_of_week === today)
                 .sort((a, b) => (a.period_number - b.period_number));
-            setTodayTimetable(entries);
+
+            const { data: leaveRows } = await api.get('/leaves');
+            const replacementRows = (leaveRows || []).filter((l) => {
+                const from = String(l.from_date || '').slice(0, 10);
+                const to = String(l.to_date || '').slice(0, 10);
+                return l.my_approver_type === 'replacement'
+                    && l.my_approval_status === 'Approved'
+                    && from && to
+                    && from <= date
+                    && to >= date;
+            });
+
+            const replacementPeriods = [];
+            replacementRows.forEach((row) => {
+                const periodText = String(row.approval_notes || '').replace(/^Periods:\s*/i, '').trim();
+                periodText.split(',').forEach((chunk) => {
+                    const periodNo = Number(String(chunk).replace(/[^0-9]/g, ''));
+                    if (!Number.isFinite(periodNo) || periodNo <= 0) return;
+                    replacementPeriods.push({
+                        period_number: periodNo,
+                        subject: `Replacement - ${row.applicant_name || row.emp_id}`,
+                        subject_code: 'REPL',
+                        room_number: '',
+                        start_time: getPeriodConfig(periodNo)?.start_time || null,
+                        end_time: getPeriodConfig(periodNo)?.end_time || null
+                    });
+                });
+            });
+
+            const combined = [...entries, ...replacementPeriods].sort((a, b) => (a.period_number - b.period_number));
+            setTodayTimetable(combined);
         } catch (error) {
             console.error('Staff dashboard error', error);
         } finally {
@@ -240,7 +270,7 @@ const StaffDashboard = () => {
                         </div>
                         <div>
                             <p className="text-[9px] font-black text-emerald-500 uppercase tracking-widest">Working Days</p>
-                            <p className="text-2xl font-black text-emerald-700 tracking-tighter">{monthStats.workingDays}</p>
+                            <p className="text-2xl font-black text-emerald-700 tracking-tighter">{Number(monthStats.workingDays || 0).toFixed(1)}</p>
                         </div>
                     </motion.div>
                     <motion.div
@@ -254,7 +284,7 @@ const StaffDashboard = () => {
                         </div>
                         <div>
                             <p className="text-[9px] font-black text-rose-500 uppercase tracking-widest">Holidays</p>
-                            <p className="text-2xl font-black text-rose-700 tracking-tighter">{monthStats.holidays}</p>
+                            <p className="text-2xl font-black text-rose-700 tracking-tighter">{Number(monthStats.holidays || 0).toFixed(1)}</p>
                         </div>
                     </motion.div>
                     <motion.div
@@ -268,7 +298,7 @@ const StaffDashboard = () => {
                         </div>
                         <div>
                             <p className="text-[9px] font-black text-amber-500 uppercase tracking-widest">Special Events</p>
-                            <p className="text-2xl font-black text-amber-700 tracking-tighter">{monthStats.specialEvents}</p>
+                            <p className="text-2xl font-black text-amber-700 tracking-tighter">{Number(monthStats.specialEvents || 0).toFixed(1)}</p>
                         </div>
                     </motion.div>
                 </div>
@@ -294,6 +324,7 @@ const StaffDashboard = () => {
                             onStatClick={handleStatClick} 
                             activeFilter={statusFilter} 
                             monthStats={monthStats}
+                            currentDayStatus={currentDayStatus}
                             onMonthStatsClick={() => navigate('/staff/calendar')}
                         />
                     </motion.div>
