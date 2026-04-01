@@ -76,7 +76,7 @@ const initDB = async () => {
                 id SERIAL PRIMARY KEY,
                 from_emp_id VARCHAR(50) NOT NULL,
                 to_emp_id VARCHAR(50) NOT NULL DEFAULT '5001',
-                rating VARCHAR(20) NOT NULL,
+                rating VARCHAR(20) NOT NULL DEFAULT 'General',
                 message TEXT NOT NULL,
                 submitted_by_role VARCHAR(30),
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP

@@ -97,7 +97,7 @@ const Sidebar = ({ userRole = 'staff', isOpen, onClose }) => {
   const currentMenuItems = menuItems[userRole] || menuItems.staff;
   const menuWithFeedback = (() => {
     const items = [...currentMenuItems];
-    if (String(user?.emp_id || '').trim() === '5001') {
+    if (['5001', '5045'].includes(String(user?.emp_id || '').trim())) {
       const roleBase = userRole === 'management' ? '/management' : `/${userRole}`;
       const exists = items.some((i) => i.path === `${roleBase}/feedback`);
       if (!exists) {

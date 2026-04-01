@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import Layout from '../../components/Layout';
 import api from '../../utils/api';
-import { FaCommentDots, FaSpinner } from 'react-icons/fa';
+import { FaCommentDots, FaSpinner, FaDownload } from 'react-icons/fa';
+import { useAuth } from '../../context/AuthContext';
 
 const badgeClass = (rating) => {
     const v = String(rating || '').toLowerCase();
@@ -11,8 +12,34 @@ const badgeClass = (rating) => {
 };
 
 const FeedbackInboxPage = () => {
+    const { user } = useAuth();
     const [loading, setLoading] = useState(true);
     const [rows, setRows] = useState([]);
+
+    const exportCsv = () => {
+        if (!rows.length) return;
+        const esc = (v) => `"${String(v ?? '').replaceAll('"', '""')}"`;
+        const header = ['From Emp ID', 'From Name', 'Designation', 'Department', 'Rating', 'Message', 'Submitted At'];
+        const body = rows.map((r) => [
+            r.from_emp_id,
+            r.from_name || '',
+            r.designation || '',
+            r.department_name || '',
+            r.rating || '',
+            r.message || '',
+            r.created_at ? new Date(r.created_at).toLocaleString('en-GB') : ''
+        ]);
+        const csv = [header, ...body].map((line) => line.map(esc).join(',')).join('\n');
+        const blob = new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `feedback-inbox-${String(user?.emp_id || 'receiver')}-${new Date().toLocaleDateString('en-CA')}.csv`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    };
 
     useEffect(() => {
         const fetchInbox = async () => {
@@ -35,8 +62,20 @@ const FeedbackInboxPage = () => {
         <Layout>
             <div className="max-w-7xl mx-auto">
                 <div className="mb-8">
-                    <h1 className="text-3xl font-black text-gray-800 tracking-tight">Employee Feedback Inbox</h1>
-                    <p className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400 mt-2">Visible only to employee 5001</p>
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                        <div>
+                            <h1 className="text-3xl font-black text-gray-800 tracking-tight">Employee Feedback Inbox</h1>
+                            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400 mt-2">Visible only to employee 5001 and 5045</p>
+                        </div>
+                        <button
+                            type="button"
+                            onClick={exportCsv}
+                            disabled={loading || rows.length === 0}
+                            className="px-5 py-3 rounded-2xl bg-sky-600 text-white text-[10px] font-black uppercase tracking-widest shadow-lg shadow-sky-100 hover:bg-sky-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                        >
+                            <FaDownload /> Download
+                        </button>
+                    </div>
                 </div>
 
                 <div className="modern-card !p-0 overflow-hidden border-sky-100">

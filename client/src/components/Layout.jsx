@@ -123,7 +123,7 @@ const Layout = ({ children }) => {
     useEffect(() => {
         if (!user?.emp_id) return;
         const empId = String(user.emp_id).trim();
-        if (empId === '5001') return;
+        if (empId === '5001' || empId === '5045') return;
 
         const todayKey = `feedback_prompted_${new Date().toLocaleDateString('en-CA')}`;
         const promptedListRaw = localStorage.getItem(todayKey);
@@ -135,14 +135,7 @@ const Layout = ({ children }) => {
                 title: 'Share Your App Feedback',
                 html: `
                     <div style="text-align:left; margin-top: 4px;">
-                        <label style="display:block; font-weight:700; color:#334155; margin-bottom:6px;">How is your experience?</label>
-                        <select id="feedback_rating" class="swal2-input" style="margin:0 0 12px 0;">
-                            <option value="">Select</option>
-                            <option value="difficult">Difficult</option>
-                            <option value="good">Good</option>
-                            <option value="excellent">Excellent</option>
-                        </select>
-                        <label style="display:block; font-weight:700; color:#334155; margin-bottom:6px;">Any difficulties or suggestions?</label>
+                        <label style="display:block; font-weight:700; color:#334155; margin-bottom:6px;">Share your feedback (Difficult / Good / Excellent / Suggestions)</label>
                         <textarea id="feedback_message" class="swal2-textarea" placeholder="Type your feedback here..." style="margin:0;"></textarea>
                     </div>
                 `,
@@ -151,21 +144,16 @@ const Layout = ({ children }) => {
                 cancelButtonText: 'Later',
                 confirmButtonColor: '#0284c7',
                 preConfirm: () => {
-                    const rating = document.getElementById('feedback_rating')?.value;
                     const message = document.getElementById('feedback_message')?.value?.trim();
-                    if (!rating) {
-                        Swal.showValidationMessage('Please choose feedback type.');
-                        return null;
-                    }
                     if (!message) {
                         Swal.showValidationMessage('Please enter feedback message.');
                         return null;
                     }
-                    return { rating, message };
+                    return { message };
                 }
             });
 
-            if (value?.rating && value?.message) {
+            if (value?.message) {
                 try {
                     await api.post('/feedback', value);
                     const nextPrompted = Array.isArray(promptedList) ? [...new Set([...promptedList, empId])] : [empId];
