@@ -215,8 +215,7 @@ const EmployeeFormPage = () => {
             setFormData(prev => ({
                 ...prev,
                 community: category,
-                role: category === 'Teaching' ? prev.role : 'staff',
-                department_id: category === 'Teaching' ? prev.department_id : ''
+                role: category === 'Teaching' ? prev.role : 'staff'
             }));
             return;
         }
@@ -341,6 +340,15 @@ const EmployeeFormPage = () => {
     const handleSubmit = async (e) => {
         if (e) e.preventDefault();
 
+        if (normalizeEmployeeCategory(formData.community) === 'Teaching' && !String(formData.department_id || '').trim()) {
+            return Swal.fire({
+                title: 'Department Required',
+                text: 'Department is mandatory for Teaching category.',
+                icon: 'warning',
+                confirmButtonColor: '#2563eb'
+            });
+        }
+
         const salaryAdvanceAmount = Number(deductionForm.salary_advance || 0) || 0;
         if (salaryAdvanceAmount > 0) {
             const durationType = String(deductionForm.salary_advance_duration_type || 'single');
@@ -391,7 +399,7 @@ const EmployeeFormPage = () => {
             const payload = {
                 ...formData,
                 community: normalizeEmployeeCategory(formData.community),
-                department_id: normalizeEmployeeCategory(formData.community) === 'Teaching' ? formData.department_id : '',
+                department_id: formData.department_id || '',
                 deductions: serializeDeductions()
             };
 
@@ -564,19 +572,19 @@ const EmployeeFormPage = () => {
                                         ))}
                                     </select>
                                 </div>
-                                {isTeachingCategory && (
-                                    <div>
-                                        <label className={labelClass}>Department</label>
-                                        <select name="department_id" value={formData.department_id || ''} onChange={handleChange} className={inputClass} disabled={!isAdmin}>
-                                            <option value="">Select Department</option>
-                                            {departments.map(d => (
-                                                <option key={d.id} value={d.id}>
-                                                    {d.name} {d.code ? `(${d.code})` : ''}
-                                                </option>
-                                            ))}
-                                        </select>
-                                    </div>
-                                )}
+                                <div>
+                                    <label className={labelClass}>
+                                        Department {isTeachingCategory ? '(Required for Teaching)' : '(Optional)'}
+                                    </label>
+                                    <select name="department_id" value={formData.department_id || ''} onChange={handleChange} className={inputClass} disabled={!isAdmin}>
+                                        <option value="">Select Department</option>
+                                        {departments.map(d => (
+                                            <option key={d.id} value={d.id}>
+                                                {d.name} {d.code ? `(${d.code})` : ''}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
                                 <div>
                                     <label className={labelClass}>Designation</label>
                                     <input name="designation" value={formData.designation || ''} onChange={handleChange} className={inputClass} disabled={!isAdmin} />
