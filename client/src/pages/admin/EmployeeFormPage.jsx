@@ -736,9 +736,6 @@ const EmployeeFormPage = () => {
                                         <div className="md:col-span-2 bg-gray-50 border border-gray-100 rounded-2xl p-4">
                                             <p className="text-[10px] font-black text-gray-600 uppercase tracking-widest">Auto Monthly PF Deduction</p>
                                             <p className="text-lg font-black text-gray-800 mt-1">₹{Number(getMonthlyPfDeduction() || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })}</p>
-                                            <p className="text-[10px] font-bold text-gray-500 mt-1">Formula: PF Monthly Deduction = PF Basic × (PF Deduction % Per Month / 100)</p>
-                                            <p className="text-[10px] font-bold text-gray-500 mt-1">Example: PF Basic ₹6,000, PF Deduction % Per Month 12% → Monthly PF Deduction ₹720.00.</p>
-                                            <p className="text-[10px] font-bold text-gray-500 mt-1">Current Values: PF Basic ₹{Number(deductionForm.employ_pf || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })}, PF Deduction % Per Month {Number(deductionForm.pf_interest_percentage || 0) || 0}% → Monthly ₹{Number(getMonthlyPfDeduction() || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })}.</p>
                                         </div>
                                     </>
                                 )}

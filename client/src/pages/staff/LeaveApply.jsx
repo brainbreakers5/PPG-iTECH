@@ -65,6 +65,22 @@ const LeaveApply = () => {
     const [manageReplacements, setManageReplacements] = useState(null); // idx of the date in currentDate or formData.dates? Let's use it for the one being added.
     const [timetableRows, setTimetableRows] = useState([]);
 
+    const getDateInputValue = (offsetDays = 0) => {
+        const base = new Date();
+        base.setHours(0, 0, 0, 0);
+        base.setDate(base.getDate() + Number(offsetDays || 0));
+        const y = base.getFullYear();
+        const m = String(base.getMonth() + 1).padStart(2, '0');
+        const d = String(base.getDate()).padStart(2, '0');
+        return `${y}-${m}-${d}`;
+    };
+
+    const quickDateOptions = [
+        { label: 'Today', value: getDateInputValue(0) },
+        { label: 'Tomorrow', value: getDateInputValue(1) },
+        { label: 'Next Day', value: getDateInputValue(2) }
+    ];
+
     // Helper function to get full leave type name
     const getLeaveTypeName = (type) => {
         const match = leaveTypes.find(ct => ct.label === type || ct.key === type);
@@ -875,6 +891,21 @@ const LeaveApply = () => {
                                                 onChange={(e) => handleCurrentDateChange('date', e.target.value)}
                                                 className="w-full px-6 py-5 bg-gray-50 border-2 border-gray-100 rounded-3xl font-bold text-sm text-gray-800 focus:ring-8 focus:ring-sky-50 focus:border-sky-500 transition-all outline-none shadow-sm"
                                             />
+                                            <div className="mt-3 flex flex-wrap gap-2">
+                                                {quickDateOptions.map((opt) => (
+                                                    <button
+                                                        key={`leave-${opt.label}`}
+                                                        type="button"
+                                                        onClick={() => handleCurrentDateChange('date', opt.value)}
+                                                        className={`px-3 py-2 rounded-xl border text-[9px] font-black uppercase tracking-widest transition-all ${currentDate.date === opt.value
+                                                            ? 'bg-sky-600 text-white border-sky-600'
+                                                            : 'bg-white text-gray-500 border-gray-100 hover:bg-sky-50 hover:text-sky-700 hover:border-sky-200'
+                                                        }`}
+                                                    >
+                                                        {opt.label}
+                                                    </button>
+                                                ))}
+                                            </div>
                                         </div>
                                         <div>
                                             <label className="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-3 ml-1">Day Configuration *</label>
@@ -1317,6 +1348,21 @@ const LeaveApply = () => {
                                                 className="w-full px-5 py-4 bg-gray-50 border-2 border-gray-100 rounded-2xl font-bold text-sm text-gray-800 focus:ring-4 focus:ring-teal-100 focus:border-teal-300 transition-all outline-none"
                                                 required
                                             />
+                                            <div className="mt-3 flex flex-wrap gap-2">
+                                                {quickDateOptions.map((opt) => (
+                                                    <button
+                                                        key={`perm-${opt.label}`}
+                                                        type="button"
+                                                        onClick={() => setPermForm(p => ({ ...p, date: opt.value }))}
+                                                        className={`px-3 py-2 rounded-xl border text-[9px] font-black uppercase tracking-widest transition-all ${permForm.date === opt.value
+                                                            ? 'bg-teal-600 text-white border-teal-600'
+                                                            : 'bg-white text-gray-500 border-gray-100 hover:bg-teal-50 hover:text-teal-700 hover:border-teal-200'
+                                                        }`}
+                                                    >
+                                                        {opt.label}
+                                                    </button>
+                                                ))}
+                                            </div>
                                         </div>
                                         <div>
                                             <label className="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2">Time Slot *</label>

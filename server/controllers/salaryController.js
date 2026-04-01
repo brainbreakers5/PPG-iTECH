@@ -314,6 +314,14 @@ const computeSalaryMetrics = ({ monthlySalary, rawDeductions, deductions, workin
     };
 };
 
+const resolvePayableDaysFromAttendanceStats = (stats) => {
+    const totalRecords = Number(stats?.total_records || 0);
+    if (!Number.isFinite(totalRecords) || totalRecords <= 0) return 0;
+
+    const payable = Number(stats?.payable_days || 0);
+    return Number.isFinite(payable) && payable > 0 ? payable : 0;
+};
+
 // @desc    Calculate Salary (supports exact date range)
 // @route   POST /api/salary/calculate
 // @access  Private (Admin)
@@ -397,12 +405,17 @@ exports.calculateSalary = async (req, res) => {
                 continue;
             }
 
-            const stats = statsMap[userEmpId] || { payable_days: 0, unpaid_days: 0 };
-            
-            // Calculation Logic Update: 
-            // Payable Days = Total days elapsed so far in the period - Unpaid days (LOP).
-            // This implicitly includes weekends as paid.
-            const resolvedPayableDays = Math.max(0, daysUntilNow - (stats.unpaid_days || 0));
+            const stats = statsMap[userEmpId] || { payable_days: 0, unpaid_days: 0, total_records: 0 };
+            const resolvedPayableDays = resolvePayableDaysFromAttendanceStats(stats);
+
+            // Add salary only for employees who have attendance records with payable days.
+            // Keep already Paid records untouched.
+            if (resolvedPayableDays <= 0) {
+                if (existing.length > 0 && existing[0].status !== 'Paid') {
+                    await pool.query('DELETE FROM salary_records WHERE id = $1', [existing[0].id]);
+                }
+                continue;
+            }
             
             const grossSource = parseFloat(user.monthly_salary) || 0;
             const metrics = computeSalaryMetrics({
@@ -662,8 +675,6 @@ exports.getSalaryRecords = async (req, res) => {
             unpaidStatuses
         });
         const totalDaysInPeriod = getTotalDays(period.fromDate, period.toDate);
-        const daysUntilNow = getTotalDays(period.fromDate, effectiveCalcTo);
-
         const merged = users.map((u) => {
             const key = String(u.emp_id || '').trim();
             const existing = recMap[key];
@@ -689,15 +700,15 @@ exports.getSalaryRecords = async (req, res) => {
 
             if (existing) {
                 if (existing.status !== 'Paid') {
+                    const attendanceStats = attendanceMap[key] || {};
+                    const payableDays = resolvePayableDaysFromAttendanceStats(attendanceStats);
+                    if (payableDays <= 0) return null;
+
                     const metrics = computeSalaryMetrics({
                         monthlySalary: parseFloat(u.monthly_salary) || 0,
                         rawDeductions: u.deductions,
                         workingDaysInPeriod: totalDaysInPeriod,
-                        payableDays: (() => {
-                            const attendanceStats = attendanceMap[key] || {};
-                            // Use Total - LOP for payable days.
-                            return Math.max(0, daysUntilNow - (attendanceStats.unpaid_days || 0));
-                        })()
+                        payableDays
                     });
 
                     return {
@@ -737,15 +748,15 @@ exports.getSalaryRecords = async (req, res) => {
             }
 
             const gross = parseFloat(u.monthly_salary) || 0;
+            const attendanceStats = attendanceMap[key] || {};
+            const payableDays = resolvePayableDaysFromAttendanceStats(attendanceStats);
+            if (payableDays <= 0) return null;
+
             const metrics = computeSalaryMetrics({
                 monthlySalary: gross,
                 rawDeductions: u.deductions,
                 workingDaysInPeriod: totalDaysInPeriod,
-                payableDays: (() => {
-                    const attendanceStats = attendanceMap[key] || {};
-                    // Use Total - LOP for payable days.
-                    return Math.max(0, daysUntilNow - (attendanceStats.unpaid_days || 0));
-                })()
+                payableDays
             });
 
             return {
