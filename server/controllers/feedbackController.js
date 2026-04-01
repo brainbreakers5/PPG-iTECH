@@ -76,3 +76,71 @@ exports.getFeedbackInbox = async (req, res) => {
         return res.status(500).json({ message: 'Failed to load feedback inbox.' });
     }
 };
+
+// @desc    Delete a single feedback from inbox
+// @route   DELETE /api/feedback/:id
+// @access  Private (emp_id 5001 / 5045 only)
+exports.deleteFeedback = async (req, res) => {
+    try {
+        const requesterEmpId = String(req.user?.emp_id || '').trim();
+        if (!['5001', '5045'].includes(requesterEmpId)) {
+            return res.status(403).json({ message: 'Only employee 5001 or 5045 can delete feedback.' });
+        }
+
+        const feedbackId = Number(req.params?.id);
+        if (!Number.isInteger(feedbackId) || feedbackId <= 0) {
+            return res.status(400).json({ message: 'Invalid feedback id.' });
+        }
+
+        const { rowCount } = await pool.query(
+            `DELETE FROM feedback_messages
+             WHERE id = $1 AND TRIM(to_emp_id) = TRIM($2)`,
+            [feedbackId, requesterEmpId]
+        );
+
+        if (rowCount === 0) {
+            return res.status(404).json({ message: 'Feedback not found in your inbox.' });
+        }
+
+        return res.json({ message: 'Feedback deleted successfully.' });
+    } catch (error) {
+        console.error('deleteFeedback error:', error);
+        return res.status(500).json({ message: 'Failed to delete feedback.' });
+    }
+};
+
+// @desc    Delete selected feedbacks from inbox
+// @route   DELETE /api/feedback
+// @access  Private (emp_id 5001 / 5045 only)
+exports.bulkDeleteFeedback = async (req, res) => {
+    try {
+        const requesterEmpId = String(req.user?.emp_id || '').trim();
+        if (!['5001', '5045'].includes(requesterEmpId)) {
+            return res.status(403).json({ message: 'Only employee 5001 or 5045 can delete feedback.' });
+        }
+
+        const rawIds = Array.isArray(req.body?.ids) ? req.body.ids : [];
+        const ids = rawIds
+            .map((id) => Number(id))
+            .filter((id) => Number.isInteger(id) && id > 0);
+
+        if (!ids.length) {
+            return res.status(400).json({ message: 'Please provide at least one valid feedback id.' });
+        }
+
+        const uniqueIds = [...new Set(ids)];
+        const { rowCount } = await pool.query(
+            `DELETE FROM feedback_messages
+             WHERE id = ANY($1::int[]) AND TRIM(to_emp_id) = TRIM($2)`,
+            [uniqueIds, requesterEmpId]
+        );
+
+        return res.json({
+            message: rowCount > 0 ? 'Selected feedback deleted successfully.' : 'No matching feedback found in your inbox.',
+            deletedCount: rowCount
+        });
+    } catch (error) {
+        console.error('bulkDeleteFeedback error:', error);
+        return res.status(500).json({ message: 'Failed to delete selected feedback.' });
+    }
+};

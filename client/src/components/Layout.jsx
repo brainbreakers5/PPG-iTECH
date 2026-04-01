@@ -130,7 +130,6 @@ const Layout = ({ children }) => {
                 title: 'Share Your App Feedback',
                 html: `
                     <div style="text-align:left; margin-top: 4px;">
-                        <label style="display:block; font-weight:700; color:#334155; margin-bottom:6px;">Share your feedback (Difficult / Good / Excellent / Suggestions)</label>
                         <textarea id="feedback_message" class="swal2-textarea" placeholder="Type your feedback here..." style="margin:0;"></textarea>
                     </div>
                 `,
