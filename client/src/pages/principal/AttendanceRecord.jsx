@@ -1043,8 +1043,8 @@ const AttendanceRecord = () => {
                                                                 {rec.status || 'ABSENT'}
                                                             </span>
                                                         </td>
-                                                        <td className="px-5 py-4 text-xs text-gray-500 italic max-w-[200px] truncate" title={rec.remarks}>
-                                                            {rec.remarks || '—'}
+                                                        <td className="px-5 py-4 text-xs text-gray-500 italic max-w-[200px] truncate" title={rec.remarks || rec.status || ''}>
+                                                            {rec.remarks || rec.status || '—'}
                                                         </td>
                                                     </motion.tr>
                                                 );

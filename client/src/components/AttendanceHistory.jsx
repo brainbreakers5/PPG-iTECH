@@ -126,7 +126,8 @@ const AttendanceHistory = ({ empId, month: propMonth, startDate, endDate, recent
     //  - No filter   → show full raw remarks
     const getRelevantRemark = (record) => {
         const raw = (record.remarks || '').trim();
-        if (!raw || raw === '—') return '—';
+        const fallbackStatus = String(record.status || '').trim();
+        if (!raw || raw === '—') return fallbackStatus || '—';
         if (!statusFilter) return raw; // no filter → full remarks
 
         // Split into pipe-separated sections
@@ -170,7 +171,7 @@ const AttendanceHistory = ({ empId, month: propMonth, startDate, endDate, recent
         }
 
         if (statusFilter === 'Absent') {
-            return '—'; // Absent records typically have no remarks
+            return fallbackStatus || '—';
         }
 
         // For leave types (OD, CL, ML, Comp Leave) — show the matching Approved Segment

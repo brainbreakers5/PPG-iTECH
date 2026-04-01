@@ -83,8 +83,7 @@ const ProfileViewer = ({ user, onClose }) => {
     const formatDeductionLabel = (label) => {
         const safeLabel = String(label || '').trim();
         if (!safeLabel) return 'Deduction';
-        const lower = safeLabel.toLowerCase();
-        if (lower.includes('pf')) return 'PF Basic';
+        // Keep the original label so PF formulas/details (PF Basic, % per month, etc.) remain visible.
         return safeLabel;
     };
 

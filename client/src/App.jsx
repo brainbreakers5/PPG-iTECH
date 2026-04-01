@@ -324,6 +324,7 @@ const AppContent = () => {
             <Route path="departments" element={<ManagementDepartment />} />
             <Route path="departments/:id/staff" element={<DepartmentStaffPage rolePrefix="management" />} />
             <Route path="payroll" element={<SalaryManagement />} />
+            <Route path="payroll/history" element={<SalaryManagement />} />
             <Route path="payroll/employee/:empId" element={<EmployeeSalaryView />} />
             <Route path="attendance" element={<PrincipalAttendance />} />
             <Route path="attendance/:empId/:month" element={<DetailedAttendancePage />} />

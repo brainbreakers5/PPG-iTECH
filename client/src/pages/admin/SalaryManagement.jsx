@@ -1292,6 +1292,14 @@ const SalaryManagement = () => {
                                         >
                                             <FaFileAlt className="mr-3 group-hover:scale-110 transition-transform" /> Report
                                         </button>
+                                        {isAdmin && (
+                                            <button
+                                                onClick={() => navigate(`/${user.role}/payroll/reports`)}
+                                                className="bg-sky-600 text-white px-8 py-4 rounded-2xl shadow-xl shadow-sky-100 hover:bg-sky-700 transition-all active:scale-95 flex items-center font-black uppercase tracking-[0.2em] text-[10px]"
+                                            >
+                                                <FaEnvelope className="mr-3 group-hover:scale-110 transition-transform" /> Complaints
+                                            </button>
+                                        )}
                                         <button
                                             onClick={() => navigate(`/${user.role}/payroll/history`)}
                                             className="bg-sky-600 text-white px-8 py-4 rounded-2xl shadow-xl shadow-sky-100 hover:bg-sky-700 transition-all active:scale-95 flex items-center font-black uppercase tracking-[0.2em] text-[10px]"
