@@ -125,11 +125,6 @@ const Layout = ({ children }) => {
         const empId = String(user.emp_id).trim();
         if (empId === '5001' || empId === '5045') return;
 
-        const todayKey = `feedback_prompted_${new Date().toLocaleDateString('en-CA')}`;
-        const promptedListRaw = localStorage.getItem(todayKey);
-        const promptedList = promptedListRaw ? JSON.parse(promptedListRaw) : [];
-        if (Array.isArray(promptedList) && promptedList.includes(empId)) return;
-
         const timer = setTimeout(async () => {
             const { value } = await Swal.fire({
                 title: 'Share Your App Feedback',
@@ -156,8 +151,6 @@ const Layout = ({ children }) => {
             if (value?.message) {
                 try {
                     await api.post('/feedback', value);
-                    const nextPrompted = Array.isArray(promptedList) ? [...new Set([...promptedList, empId])] : [empId];
-                    localStorage.setItem(todayKey, JSON.stringify(nextPrompted));
                     Swal.fire({ icon: 'success', title: 'Thank you!', text: 'Your feedback was submitted.', timer: 1400, showConfirmButton: false });
                 } catch (error) {
                     Swal.fire('Error', error?.response?.data?.message || 'Failed to submit feedback.', 'error');
