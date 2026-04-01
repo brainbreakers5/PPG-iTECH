@@ -11,3 +11,7 @@ CREATE TABLE IF NOT EXISTS biometric_attendance (
 
 -- Add device_ip to biometric_logs if needed for multi-device setup
 ALTER TABLE biometric_logs ADD COLUMN IF NOT EXISTS device_ip VARCHAR(50);
+
+-- Prevent exact duplicate punch rows for the same employee and timestamp
+CREATE UNIQUE INDEX IF NOT EXISTS ux_biometric_logs_emp_time
+ON biometric_logs (emp_id, log_time);

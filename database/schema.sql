@@ -218,6 +218,7 @@ CREATE TABLE IF NOT EXISTS biometric_logs (
     log_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     type ENUM('IN', 'OUT') -- If device distinguishes
 );
+CREATE UNIQUE INDEX ux_biometric_logs_emp_time ON biometric_logs (emp_id, log_time);
 
 -- Initial Data: Admin
 INSERT IGNORE INTO users (emp_id, password, pin, role, name) VALUES 

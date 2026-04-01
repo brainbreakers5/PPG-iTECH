@@ -14,6 +14,7 @@ const DEVICE_IP = process.env.BIOMETRIC_DEVICE_IP || '172.16.107.81';
 const DEVICE_PORT = Number(process.env.BIOMETRIC_DEVICE_PORT || 4370);
 const DEVICE_ID = process.env.BIOMETRIC_DEVICE_ID || 'MAIN_DEVICE_01';
 const POLL_INTERVAL_MS = Number(process.env.BIOMETRIC_POLL_INTERVAL_MS || 300000); // 5 minutes
+const POLL_PUSH_DELAY_MS = Number(process.env.BIOMETRIC_POLL_PUSH_DELAY_MS || 25);
 const SERVER_API_URL = process.env.SERVER_API_BIOMETRIC_URL || `http://localhost:${process.env.PORT || 5000}/api/biometric/log`; // Adjust if server is remote
 
 const makeAxiosOptions = () => {
@@ -29,6 +30,14 @@ const safeParseDate = (value) => {
   if (value instanceof Date) return Number.isNaN(value.getTime()) ? null : value;
   const d = new Date(value);
   return Number.isNaN(d.getTime()) ? null : d;
+};
+
+const normalizePunchType = (rawType, dateRef) => {
+  const val = String(rawType ?? '').trim().toUpperCase();
+  if (val === 'IN' || val === '0') return 'IN';
+  if (val === 'OUT' || val === '1') return 'OUT';
+  const dt = safeParseDate(dateRef) || new Date();
+  return dt.getHours() < 12 ? 'IN' : 'OUT';
 };
 
 // Lightweight local de-dupe to prevent realtime + polling from re-sending the same record repeatedly.
@@ -48,6 +57,35 @@ const rememberSeen = (key) => {
 };
 
 const buildPunchKey = (empId, timestampIso) => `${String(empId || '').trim()}|${String(timestampIso || '').trim()}`;
+
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, Math.max(0, Number(ms) || 0)));
+
+const getDateRangeForTodayAndYesterday = () => {
+  const now = new Date();
+  const startOfToday = new Date(now);
+  startOfToday.setHours(0, 0, 0, 0);
+
+  const startOfYesterday = new Date(startOfToday);
+  startOfYesterday.setDate(startOfYesterday.getDate() - 1);
+
+  const startOfTomorrow = new Date(startOfToday);
+  startOfTomorrow.setDate(startOfTomorrow.getDate() + 1);
+
+  return { startOfYesterday, startOfTomorrow };
+};
+
+const isDeviceConnectionError = (err) => {
+  const details = unwrapError(err);
+  const code = String(details?.code || '').toUpperCase();
+  const msg = String(details?.message || '').toLowerCase();
+  return (
+    ['ETIMEDOUT', 'ECONNREFUSED', 'EHOSTUNREACH', 'ENETUNREACH', 'ECONNRESET'].includes(code) ||
+    msg.includes('timeout') ||
+    msg.includes('timed out') ||
+    msg.includes('socket') ||
+    msg.includes('connect')
+  );
+};
 
 const unwrapError = (err) => {
   // zkteco-js sometimes wraps real Error inside nested "Errors" objects.
@@ -88,7 +126,7 @@ const pushToServer = async ({ userId, timestamp, recordTime, type, deviceId, raw
       emp_id: empId,
       device_id: deviceId || DEVICE_ID,
       timestamp: iso,
-      type: type || (dt ? (dt.getHours() < 12 ? 'IN' : 'OUT') : (new Date().getHours() < 12 ? 'IN' : 'OUT')),
+      type: normalizePunchType(type, dt),
       // Keep raw for debugging/backtracking if needed; server ignores unknown fields.
       raw
     };
@@ -107,6 +145,7 @@ async function startBridge() {
 
   let pollTimer = null;
   let lastPolledAt = null; // Date
+  let reconnectScheduled = false;
 
   const clearPolling = () => {
     if (pollTimer) {
@@ -123,51 +162,91 @@ async function startBridge() {
     } catch {}
   };
 
+  const scheduleReconnect = async (reason, delayMs = 10000) => {
+    if (reconnectScheduled) return;
+    reconnectScheduled = true;
+    clearPolling();
+    await safeDisconnect();
+    console.error(`[${new Date().toLocaleTimeString()}] 🔁 Reconnecting bridge in ${Math.round(delayMs / 1000)}s. Reason: ${reason}`);
+    setTimeout(startBridge, delayMs);
+  };
+
+  const pollOnce = async () => {
+    console.log(`[${new Date().toLocaleTimeString()}] 📥 Polling device logs...`);
+
+    // zkteco-js has different method names across versions; prefer getAttendances.
+    const getAttendancesFn = zkInstance.getAttendances || zkInstance.getAttendancesLog || zkInstance.getAttendances;
+    if (typeof getAttendancesFn !== 'function') {
+      console.log(`[${new Date().toLocaleTimeString()}] ⚠️ Polling skipped: zkInstance.getAttendances() not available in this library version.`);
+      return;
+    }
+
+    const logs = await getAttendancesFn.call(zkInstance);
+    const rows = Array.isArray(logs?.data) ? logs.data : Array.isArray(logs) ? logs : [];
+
+    const { startOfYesterday, startOfTomorrow } = getDateRangeForTodayAndYesterday();
+
+    // Filter incrementally to avoid re-sending huge history each poll.
+    // Keep a small overlap window to tolerate clock jitter and missed updates.
+    const overlapMs = 2 * 60 * 1000;
+    const cutoff = lastPolledAt ? new Date(lastPolledAt.getTime() - overlapMs) : null;
+
+    let newest = lastPolledAt;
+    let processed = 0;
+
+    for (const log of rows) {
+      const empId = log?.deviceUserId ?? log?.userId ?? log?.uid ?? log?.PIN ?? log?.emp_id;
+      const rt = log?.recordTime ?? log?.timestamp ?? log?.time ?? log?.logTime;
+      const dt = safeParseDate(rt);
+      if (!empId || !dt) continue;
+
+      // Requirement: keep only yesterday + today punches from device pull.
+      if (dt < startOfYesterday || dt >= startOfTomorrow) continue;
+
+      if (cutoff && dt <= cutoff) continue;
+
+      await pushToServer({
+        userId: empId,
+        recordTime: dt,
+        type: normalizePunchType(log?.type ?? log?.state ?? log?.status ?? log?.punch, dt),
+        deviceId: DEVICE_ID,
+        raw: { source: 'poll', log }
+      });
+
+      processed += 1;
+      if (POLL_PUSH_DELAY_MS > 0) {
+        await sleep(POLL_PUSH_DELAY_MS);
+      }
+
+      if (!newest || dt > newest) newest = dt;
+    }
+
+    if (newest) lastPolledAt = newest;
+    console.log(`[${new Date().toLocaleTimeString()}] ✅ Poll cycle complete. Total logs=${rows.length}, processed=${processed}`);
+  };
+
   const startPolling = () => {
     clearPolling();
     pollTimer = setInterval(async () => {
       try {
-        console.log(`[${new Date().toLocaleTimeString()}] 📥 Polling device logs...`);
-
-        // zkteco-js has different method names across versions; prefer getAttendances.
-        const getAttendancesFn = zkInstance.getAttendances || zkInstance.getAttendancesLog || zkInstance.getAttendances;
-        if (typeof getAttendancesFn !== 'function') {
-          console.log(`[${new Date().toLocaleTimeString()}] ⚠️ Polling skipped: zkInstance.getAttendances() not available in this library version.`);
-          return;
-        }
-
-        const logs = await getAttendancesFn.call(zkInstance);
-        const rows = Array.isArray(logs?.data) ? logs.data : Array.isArray(logs) ? logs : [];
-
-        // Filter incrementally to avoid re-sending huge history each poll.
-        // Keep a small overlap window to tolerate clock jitter and missed updates.
-        const overlapMs = 2 * 60 * 1000;
-        const cutoff = lastPolledAt ? new Date(lastPolledAt.getTime() - overlapMs) : null;
-
-        let newest = lastPolledAt;
-        for (const log of rows) {
-          const empId = log?.deviceUserId ?? log?.userId ?? log?.uid ?? log?.PIN ?? log?.emp_id;
-          const rt = log?.recordTime ?? log?.timestamp ?? log?.time ?? log?.logTime;
-          const dt = safeParseDate(rt);
-          if (!empId || !dt) continue;
-
-          if (cutoff && dt <= cutoff) continue;
-
-          await pushToServer({
-            userId: empId,
-            recordTime: dt,
-            deviceId: DEVICE_ID,
-            raw: { source: 'poll', log }
-          });
-
-          if (!newest || dt > newest) newest = dt;
-        }
-
-        if (newest) lastPolledAt = newest;
+        await pollOnce();
       } catch (err) {
-        console.log(`[${new Date().toLocaleTimeString()}] Polling error:`, err.message);
+        const details = unwrapError(err);
+        console.error(`[${new Date().toLocaleTimeString()}] ❌ Polling error:`, details);
+        if (isDeviceConnectionError(err)) {
+          await scheduleReconnect(details?.message || 'device connection error while polling', 10000);
+        }
       }
     }, POLL_INTERVAL_MS);
+
+    // Run once immediately so backup starts without waiting first 5-minute interval.
+    pollOnce().catch(async (err) => {
+      const details = unwrapError(err);
+      console.error(`[${new Date().toLocaleTimeString()}] ❌ Initial poll error:`, details);
+      if (isDeviceConnectionError(err)) {
+        await scheduleReconnect(details?.message || 'device connection error on initial poll', 10000);
+      }
+    });
   };
 
   try {  
@@ -184,7 +263,7 @@ async function startBridge() {
         await pushToServer({
           userId: empId,
           recordTime: deviceTime,
-          type: data?.type,
+          type: normalizePunchType(data?.type ?? data?.state ?? data?.status ?? data?.punch, deviceTime),
           deviceId: DEVICE_ID,
           raw: { source: 'realtime', data }
         });
@@ -199,8 +278,7 @@ async function startBridge() {
     console.error('Connection error details:', unwrapError(e));
     console.log("Retrying in 10 seconds...");  
     clearPolling();
-    await safeDisconnect();
-    setTimeout(startBridge, 10000);  
+    await scheduleReconnect('initial connect failure', 10000);
   }
 }
 

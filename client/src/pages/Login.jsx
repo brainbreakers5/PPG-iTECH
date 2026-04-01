@@ -40,18 +40,16 @@ const Login = () => {
     const [userRole, setUserRole] = useState('');
     const [expectedPinLength, setExpectedPinLength] = useState(4); // Default to 4
 
-    const [idAttempts, setIdAttempts] = useState(() => Number(localStorage.getItem('id_attempts')) || 0);
     const [pinAttempts, setPinAttempts] = useState(() => Number(localStorage.getItem('pin_attempts')) || 0);
     const [mgmtAttempts, setMgmtAttempts] = useState(() => Number(localStorage.getItem('mgmt_attempts')) || 0);
 
     const [lockoutText, setLockoutText] = useState('');
-    const [isIdLocked, setIsIdLocked] = useState(false);
     const [isPinLocked, setIsPinLocked] = useState(false);
     const [isMgmtLocked, setIsMgmtLocked] = useState(false);
 
     useEffect(() => {
         const timer = setInterval(() => {
-            const types = ['id', 'pin', 'mgmt'];
+            const types = ['pin', 'mgmt'];
             let activeLockout = false;
             
             for (const type of types) {
@@ -68,7 +66,6 @@ const Login = () => {
                     if (hours > 0) msg = `${hours}h ${minutes % 60}m ${seconds}s`;
                     
                     setLockoutText(msg);
-                    if (type === 'id') setIsIdLocked(true);
                     if (type === 'pin') setIsPinLocked(true);
                     if (type === 'mgmt') setIsMgmtLocked(true);
                     activeLockout = true;
@@ -76,14 +73,12 @@ const Login = () => {
                 } else if (lockUntil) {
                     localStorage.removeItem(`${type}_lock_until`);
                     localStorage.setItem(`${type}_attempts`, '0');
-                    if (type === 'id') { setIdAttempts(0); setIsIdLocked(false); }
                     if (type === 'pin') { setPinAttempts(0); setIsPinLocked(false); }
                     if (type === 'mgmt') { setMgmtAttempts(0); setIsMgmtLocked(false); }
                 }
             }
             if (!activeLockout) {
                 setLockoutText('');
-                setIsIdLocked(false);
                 setIsPinLocked(false);
                 setIsMgmtLocked(false);
             }
@@ -108,7 +103,6 @@ const Login = () => {
     const handleCheckId = async (e) => {
         if (e) e.preventDefault();
         if (!empId.trim()) return;
-        if (checkLockout('id')) return;
 
         setLoading(true);
         try {
@@ -118,33 +112,15 @@ const Login = () => {
                 setUserRole(data.role || '');
                 setStep('pin');
                 setExpectedPinLength(data.pin_length || 4);
-                // Clear ID attempts on successful ID find
-                localStorage.setItem('id_attempts', '0');
-                setIdAttempts(0);
             }
         } catch (error) {
             console.error('❌ Check ID error:', error);
-            const newAttempts = idAttempts + 1;
-            setIdAttempts(newAttempts);
-            localStorage.setItem('id_attempts', String(newAttempts));
-
-            if (newAttempts >= 3) {
-                const lockUntil = Date.now() + 30 * 60 * 1000; // 30 mins
-                localStorage.setItem('id_lock_until', String(lockUntil));
-                Swal.fire({
-                    icon: 'error',
-                    title: 'Too Many Attempts',
-                    text: 'Employee ID identification failed 3 times. Access locked for 30 minutes.',
-                    confirmButtonColor: '#2563eb'
-                });
-            } else {
-                Swal.fire({
-                    icon: 'error',
-                    title: 'Invalid ID',
-                    text: `Employee ID not found. ${3 - newAttempts} attempts remaining.`,
-                    confirmButtonColor: '#2563eb'
-                });
-            }
+            Swal.fire({
+                icon: 'error',
+                title: 'Invalid ID',
+                text: 'Employee ID not found.',
+                confirmButtonColor: '#2563eb'
+            });
         } finally {
             setLoading(false);
         }
@@ -352,25 +328,14 @@ const Login = () => {
                                     type="text"
                                     value={empId}
                                     onChange={(e) => setEmpId(e.target.value)}
-                                    placeholder={isIdLocked ? "System Locked" : "Enter your Employee ID"}
-                                    disabled={isIdLocked}
+                                    placeholder="Enter your Employee ID"
                                     required
                                     autoFocus
-                                    className={`w-full pl-11 pr-5 py-[14px] rounded-xl text-sm font-semibold text-gray-700 outline-none transition-all duration-200 placeholder:text-gray-300 placeholder:font-normal ${isIdLocked ? 'opacity-50 cursor-not-allowed bg-gray-100' : 'bg-white/70'}`}
+                                    className="w-full pl-11 pr-5 py-[14px] rounded-xl text-sm font-semibold text-gray-700 outline-none transition-all duration-200 placeholder:text-gray-300 placeholder:font-normal bg-white/70"
                                     style={{ border: '1.5px solid #e2e8f0' }}
                                 />
                             </div>
-                            {isIdLocked ? (
-                                <motion.p 
-                                    animate={{ scale: [1, 1.05, 1] }} 
-                                    transition={{ repeat: Infinity, duration: 2 }}
-                                    className="text-[11px] font-black text-red-400 uppercase text-center mt-3 tracking-widest shadow-sm"
-                                >
-                                    Security Lock: {lockoutText}
-                                </motion.p>
-                            ) : (
-                                <p className="text-[9px] text-sky-300/70 italic text-center mt-2">Press Enter to continue</p>
-                            )}
+                            <p className="text-[9px] text-sky-300/70 italic text-center mt-2">Press Enter to continue</p>
                         </motion.div>
                     ) : (
                         <motion.div 
@@ -420,9 +385,9 @@ const Login = () => {
 
                             <button 
                                 type="button" 
-                                disabled={isIdLocked || isPinLocked || isMgmtLocked}
+                                disabled={isPinLocked || isMgmtLocked}
                                 onClick={() => { setStep('id'); setPin(''); }}
-                                className={`w-full text-[9px] font-black uppercase tracking-widest ${isIdLocked || isPinLocked || isMgmtLocked ? 'text-gray-500/50' : 'text-sky-400 hover:text-sky-300'}`}
+                                className={`w-full text-[9px] font-black uppercase tracking-widest ${isPinLocked || isMgmtLocked ? 'text-gray-500/50' : 'text-sky-400 hover:text-sky-300'}`}
                             >
                                 Not you? Use another ID
                             </button>

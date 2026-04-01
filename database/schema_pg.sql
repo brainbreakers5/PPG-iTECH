@@ -316,6 +316,9 @@ CREATE TABLE IF NOT EXISTS biometric_logs (
     type biometric_log_type
 );
 
+CREATE UNIQUE INDEX IF NOT EXISTS ux_biometric_logs_emp_time
+ON biometric_logs (emp_id, log_time);
+
 -- Initial Data: Admin
 -- Note: ON CONFLICT DO NOTHING is the PG equivalent of INSERT IGNORE
 INSERT INTO users (emp_id, password, pin, role, name) 

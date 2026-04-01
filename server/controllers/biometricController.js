@@ -8,6 +8,14 @@ const PENDING_DIR = path.join(__dirname, '..', 'data');
 const PENDING_FILE = path.join(PENDING_DIR, 'biometric_pending_logs.jsonl');
 const MIN_PUNCH_INTERVAL_MS = 10 * 60 * 1000;
 
+const normalizePunchType = (rawType, dateRef) => {
+    const val = String(rawType ?? '').trim().toUpperCase();
+    if (val === 'IN' || val === '0') return 'IN';
+    if (val === 'OUT' || val === '1') return 'OUT';
+    const dt = dateRef instanceof Date && !Number.isNaN(dateRef.getTime()) ? dateRef : new Date();
+    return dt.getHours() < 12 ? 'IN' : 'OUT';
+};
+
 const admsLastSeenState = {
     heartbeat: null,
     heartbeatMeta: null,
@@ -475,6 +483,7 @@ exports.receiveLog = async (req, res) => {
         if (Number.isNaN(logDate.getTime())) {
             return res.status(400).json({ message: 'Invalid timestamp format' });
         }
+        const normalizedPunchType = normalizePunchType(type, logDate);
         const istParts = toIstParts(logDate);
         const dateStr = istParts.dateStr;
         const timeStr = new Intl.DateTimeFormat('en-US', {
@@ -484,15 +493,19 @@ exports.receiveLog = async (req, res) => {
             hour12: true,
         }).format(logDate);
 
-        // 1. Ensure employee exists in the users table, auto-create if missing
+        // 1. Process only known employees from users table
         const { rows: userRows } = await pool.query(
             'SELECT 1 FROM users WHERE emp_id = $1 LIMIT 1',
             [normalizedEmpId]
         );
 
         if (userRows.length === 0) {
-            console.log(`[BIOMETRIC] Employee ${normalizedEmpId} not in DB; auto-creating placeholder.`);
-            await ensureBiometricUser(normalizedEmpId);
+            console.log(`[BIOMETRIC] Employee ${normalizedEmpId} not found in users table. Skipping biometric punch.`);
+            return res.status(202).json({
+                message: `Employee ${normalizedEmpId} is not registered. Punch skipped.`,
+                skipped: true,
+                reason: 'UNKNOWN_EMPLOYEE'
+            });
         }
 
         // 2. Block rapid duplicate punches for the same employee within 2 minutes (debouncer).
@@ -525,7 +538,7 @@ exports.receiveLog = async (req, res) => {
              VALUES ($1, $2, $3, $4)
              ON CONFLICT (emp_id, log_time) 
              DO UPDATE SET device_id = EXCLUDED.device_id, type = EXCLUDED.type`,
-            [deviceId || 'ADMS', normalizedEmpId, istParts.timestamp, type || (logDate.getHours() < 12 ? 'IN' : 'OUT')],
+            [deviceId || 'ADMS', normalizedEmpId, istParts.timestamp, normalizedPunchType],
             'biometric_logs'
         );
 
@@ -547,8 +560,8 @@ exports.receiveLog = async (req, res) => {
             console.error('Failed to lookup user name for notification:', e);
         }
 
-        const isFirstPunch = !syncResult.physOut;
-        const punchType = type || (isFirstPunch ? 'IN' : 'OUT');
+        const isRecoveredFromPolling = String(req.body?.raw?.source || '').toLowerCase() === 'poll';
+        const punchType = normalizedPunchType;
         const inTimeLabel = syncResult.physIn || '--:--';
         const outTimeLabel = syncResult.physOut || 'Pending';
         const compactRemarks = String(syncResult.remarks || '')
@@ -556,7 +569,7 @@ exports.receiveLog = async (req, res) => {
             .trim();
 
         const message = [
-            `🔔 ${punchType} Punch - ${userName} (${normalizedEmpId})`,
+            `${isRecoveredFromPolling ? '🔁 Recovered' : '🔔'} ${punchType} Punch - ${userName} (${normalizedEmpId})`,
             `In: ${inTimeLabel} | Out: ${outTimeLabel}`,
             `Status: ${syncResult.enumStatus || syncResult.dbStatus || 'Present'}`,
             compactRemarks ? `Remarks: ${compactRemarks}` : null,
