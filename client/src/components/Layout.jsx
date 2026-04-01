@@ -6,6 +6,7 @@ import AiAssistant from './AiAssistant';
 import { useAuth } from '../context/AuthContext';
 import { AnimatePresence, motion } from 'framer-motion';
 import Swal from 'sweetalert2';
+import api from '../utils/api';
 
 const Layout = ({ children }) => {
     const [sidebarOpen, setSidebarOpen] = useState(() => window.innerWidth < 1024);
@@ -118,6 +119,66 @@ const Layout = ({ children }) => {
         const timer = setInterval(() => setNow(new Date()), 1000);
         return () => clearInterval(timer);
     }, []);
+
+    useEffect(() => {
+        if (!user?.emp_id) return;
+        const empId = String(user.emp_id).trim();
+        if (empId === '5001') return;
+
+        const todayKey = `feedback_prompted_${new Date().toLocaleDateString('en-CA')}`;
+        const promptedListRaw = localStorage.getItem(todayKey);
+        const promptedList = promptedListRaw ? JSON.parse(promptedListRaw) : [];
+        if (Array.isArray(promptedList) && promptedList.includes(empId)) return;
+
+        const timer = setTimeout(async () => {
+            const { value } = await Swal.fire({
+                title: 'Share Your App Feedback',
+                html: `
+                    <div style="text-align:left; margin-top: 4px;">
+                        <label style="display:block; font-weight:700; color:#334155; margin-bottom:6px;">How is your experience?</label>
+                        <select id="feedback_rating" class="swal2-input" style="margin:0 0 12px 0;">
+                            <option value="">Select</option>
+                            <option value="difficult">Difficult</option>
+                            <option value="good">Good</option>
+                            <option value="excellent">Excellent</option>
+                        </select>
+                        <label style="display:block; font-weight:700; color:#334155; margin-bottom:6px;">Any difficulties or suggestions?</label>
+                        <textarea id="feedback_message" class="swal2-textarea" placeholder="Type your feedback here..." style="margin:0;"></textarea>
+                    </div>
+                `,
+                confirmButtonText: 'Submit Feedback',
+                showCancelButton: true,
+                cancelButtonText: 'Later',
+                confirmButtonColor: '#0284c7',
+                preConfirm: () => {
+                    const rating = document.getElementById('feedback_rating')?.value;
+                    const message = document.getElementById('feedback_message')?.value?.trim();
+                    if (!rating) {
+                        Swal.showValidationMessage('Please choose feedback type.');
+                        return null;
+                    }
+                    if (!message) {
+                        Swal.showValidationMessage('Please enter feedback message.');
+                        return null;
+                    }
+                    return { rating, message };
+                }
+            });
+
+            if (value?.rating && value?.message) {
+                try {
+                    await api.post('/feedback', value);
+                    const nextPrompted = Array.isArray(promptedList) ? [...new Set([...promptedList, empId])] : [empId];
+                    localStorage.setItem(todayKey, JSON.stringify(nextPrompted));
+                    Swal.fire({ icon: 'success', title: 'Thank you!', text: 'Your feedback was submitted.', timer: 1400, showConfirmButton: false });
+                } catch (error) {
+                    Swal.fire('Error', error?.response?.data?.message || 'Failed to submit feedback.', 'error');
+                }
+            }
+        }, 2200);
+
+        return () => clearTimeout(timer);
+    }, [user?.emp_id]);
 
     if (loading && !isManagement) return <div className="h-screen w-screen flex items-center justify-center bg-sky-50">
         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-sky-600"></div>

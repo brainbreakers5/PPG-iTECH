@@ -53,6 +53,7 @@ import DepartmentFormPage from './pages/admin/DepartmentFormPage';
 import PurchaseRequestPage from './pages/shared/PurchaseRequestPage';
 import ActivityLogs from './pages/admin/ActivityLogs';
 import Notifications from './pages/shared/Notifications';
+import FeedbackInboxPage from './pages/shared/FeedbackInboxPage';
 
 // Management Pages
 import ManagementDashboard from './pages/management/ManagementDashboard';
@@ -241,6 +242,7 @@ const AppContent = () => {
             <Route path="profile/:id" element={<ProfilePage />} />
             <Route path="personnel/:role" element={<PersonnelListPage />} />
             <Route path="notifications" element={<Notifications />} />
+            <Route path="feedback" element={<FeedbackInboxPage />} />
             <Route path="biometric-history" element={<BiometricHistory />} />
           </Routes>
         </ProtectedRoute>
@@ -268,6 +270,7 @@ const AppContent = () => {
             <Route path="profile/:id" element={<ProfilePage />} />
             <Route path="personnel/:role" element={<PersonnelListPage />} />
             <Route path="notifications" element={<Notifications />} />
+            <Route path="feedback" element={<FeedbackInboxPage />} />
             <Route path="biometric-history" element={<BiometricHistory />} />
           </Routes>
         </ProtectedRoute>
@@ -293,6 +296,7 @@ const AppContent = () => {
             <Route path="profile/:id" element={<ProfilePage />} />
             <Route path="personnel/:role" element={<PersonnelListPage />} />
             <Route path="notifications" element={<Notifications />} />
+            <Route path="feedback" element={<FeedbackInboxPage />} />
             <Route path="biometric-history" element={<BiometricHistory />} />
           </Routes>
         </ProtectedRoute>
@@ -313,6 +317,7 @@ const AppContent = () => {
             <Route path="calendar" element={<InstitutionalCalendar />} />
             <Route path="profile/:id" element={<ProfilePage />} />
             <Route path="notifications" element={<Notifications />} />
+            <Route path="feedback" element={<FeedbackInboxPage />} />
           </Routes>
         </ProtectedRoute>
       } />
@@ -332,6 +337,7 @@ const AppContent = () => {
             <Route path="profile" element={<ProfilePage />} />
             <Route path="profile/:id" element={<ProfilePage />} />
             <Route path="notifications" element={<Notifications />} />
+            <Route path="feedback" element={<FeedbackInboxPage />} />
             <Route path="biometric-history" element={<BiometricHistory />} />
             <Route path="calendar" element={<InstitutionalCalendar />} />
           </Routes>

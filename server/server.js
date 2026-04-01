@@ -69,6 +69,20 @@ const initDB = async () => {
         // Ensure users table has deductions column
         await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS deductions JSONB DEFAULT \'[]\'');
         console.log('--- Users Table Deductions Column Verified ---');
+
+        // Ensure feedback messages table exists
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS feedback_messages (
+                id SERIAL PRIMARY KEY,
+                from_emp_id VARCHAR(50) NOT NULL,
+                to_emp_id VARCHAR(50) NOT NULL DEFAULT '5001',
+                rating VARCHAR(20) NOT NULL,
+                message TEXT NOT NULL,
+                submitted_by_role VARCHAR(30),
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        `);
+        console.log('--- Feedback Messages Table Verified ---');
     } catch (err) {
         console.error('Database Initialization Error:', err);
     }
@@ -95,6 +109,7 @@ const permissionRoutes = require('./routes/permissionRoutes');
 const settingsRoutes = require('./routes/settingsRoutes');
 const activityLogRoutes = require('./routes/activityLogRoutes');
 const statusRoutes = require('./routes/statusRoutes');
+const feedbackRoutes = require('./routes/feedbackRoutes');
 
 const helmet = require('helmet');
 const morgan = require('morgan');
@@ -224,6 +239,7 @@ app.use('/api/permissions', permissionRoutes);
 app.use('/api/settings', settingsRoutes);
 app.use('/api/activity-logs', activityLogRoutes);
 app.use('/api/status', statusRoutes);
+app.use('/api/feedback', feedbackRoutes);
 
 
 

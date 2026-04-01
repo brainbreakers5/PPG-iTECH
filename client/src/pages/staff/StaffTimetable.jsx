@@ -364,7 +364,11 @@ const StaffTimetable = () => {
                                     onChange={(e) => setSelectedStaff(e.target.value)}
                                 >
                                     <option value="">Select Staff...</option>
-                                    {staffList.map(s => <option key={s.emp_id} value={s.emp_id}>{s.name} ({s.designation})</option>)}
+                                    {staffList.map((s) => (
+                                        <option key={s.emp_id} value={s.emp_id}>
+                                            {s.name} ({s.designation || s.role || 'Staff'}) - {s.department_name || 'No Department'}
+                                        </option>
+                                    ))}
                                 </select>
                             </div>
                         </div>

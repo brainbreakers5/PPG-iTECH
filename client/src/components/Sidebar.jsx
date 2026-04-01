@@ -23,7 +23,7 @@ import { useAuth } from '../context/AuthContext';
 import LiveStatus from './LiveStatus';
 
 const Sidebar = ({ userRole = 'staff', isOpen, onClose }) => {
-  const { logout } = useAuth();
+  const { logout, user } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [now, setNow] = useState(new Date());
@@ -95,6 +95,17 @@ const Sidebar = ({ userRole = 'staff', isOpen, onClose }) => {
   };
 
   const currentMenuItems = menuItems[userRole] || menuItems.staff;
+  const menuWithFeedback = (() => {
+    const items = [...currentMenuItems];
+    if (String(user?.emp_id || '').trim() === '5001') {
+      const roleBase = userRole === 'management' ? '/management' : `/${userRole}`;
+      const exists = items.some((i) => i.path === `${roleBase}/feedback`);
+      if (!exists) {
+        items.push({ label: 'Feedback', path: `${roleBase}/feedback`, icon: <FaClipboardList /> });
+      }
+    }
+    return items;
+  })();
 
   const isItemActive = (itemPath) => {
     const itemSegments = itemPath.split('/').filter(Boolean).length;
@@ -132,7 +143,7 @@ const Sidebar = ({ userRole = 'staff', isOpen, onClose }) => {
       <div className="flex-1 overflow-x-auto overflow-y-hidden no-scrollbar py-2 px-2 max-[320px]:px-1 lg:overflow-y-auto lg:overflow-x-hidden lg:py-2 lg:max-[320px]:py-1.5 lg:px-1 lg:max-[320px]:px-0.5">
         <nav>
           <ul className="flex items-center gap-1.5 min-w-max max-[320px]:gap-1 lg:block lg:min-w-0 lg:space-y-3 lg:max-[320px]:space-y-2">
-            {currentMenuItems.map((item) => (
+            {menuWithFeedback.map((item) => (
               <li key={item.label} className="shrink-0 lg:shrink">
                 <NavLink
                   to={item.path}

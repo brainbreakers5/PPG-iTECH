@@ -302,7 +302,18 @@ const Header = () => {
 
         // Search menu pages
         const currentMenuItems = menuItems[effectiveRole] || [];
-        const matchedPages = currentMenuItems.filter(item =>
+        const menuWithFeedback = (() => {
+            const items = [...currentMenuItems];
+            if (String(user?.emp_id || '').trim() === '5001') {
+                const roleBase = effectiveRole === 'management' ? '/management' : `/${effectiveRole}`;
+                const exists = items.some((i) => i.path === `${roleBase}/feedback`);
+                if (!exists) {
+                    items.push({ label: 'Feedback', path: `${roleBase}/feedback` });
+                }
+            }
+            return items;
+        })();
+        const matchedPages = menuWithFeedback.filter(item =>
             item.label.toLowerCase().includes(lowerQuery)
         ).slice(0, 5);
 
