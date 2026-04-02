@@ -15,7 +15,8 @@ let hostFromConnectionString = '';
 
 if (connectionString) {
     try {
-        hostFromConnectionString = String(new URL(connectionString).hostname || '').toLowerCase();
+        const url = new URL(connectionString);
+        hostFromConnectionString = String(url.hostname || '').toLowerCase();
     } catch (error) {
         console.warn('Invalid DATABASE_URL format. Falling back to DB_HOST/DB_* variables.');
     }
@@ -26,25 +27,19 @@ const sslDisabled = ['0', 'false', 'no', 'disable'].includes(sslFlag);
 const sslEnabledByFlag = ['1', 'true', 'yes', 'require', 'verify-ca', 'verify-full'].includes(sslFlag);
 const sslEnabledByHost = resolvedHost.includes('supabase.co') || resolvedHost.includes('neon.tech') || resolvedHost.includes('render.com');
 const useSsl = !sslDisabled && (sslEnabledByFlag || (!sslFlag && sslEnabledByHost));
-const isProduction = process.env.NODE_ENV === 'production' || Boolean(process.env.RENDER);
-const defaultPoolMax = isProduction ? 3 : 5;
-const parsedPoolMax = Number(process.env.DB_POOL_MAX || process.env.PGPOOL_MAX || defaultPoolMax);
-const poolMaxRaw = Number.isFinite(parsedPoolMax) && parsedPoolMax > 0 ? parsedPoolMax : defaultPoolMax;
-const poolMax = Math.min(5, poolMaxRaw);
-const DEFAULT_QUERY_RETRIES = Math.max(0, Number(process.env.DB_QUERY_RETRIES || 2));
-const DEFAULT_RETRY_DELAY_MS = Math.max(100, Number(process.env.DB_QUERY_RETRY_DELAY_MS || 350));
+
+// STRICT POOL LIMITS: Supabase/Render free/session mode have very low limits (often 10 total).
+// We set max: 5 to ensure we don't hit "Max clients reached" easily.
+const poolMax = 5;
+
 const poolConfig = {
     connectionString,
     ssl: useSsl ? { rejectUnauthorized: false } : false,
     max: poolMax,
-    idleTimeoutMillis: 30000,
-    connectionTimeoutMillis: Number(process.env.DB_CONNECTION_TIMEOUT_MS || 10000),
+    idleTimeoutMillis: 10000, // Close idle clients after 10s to free up slots
+    connectionTimeoutMillis: 5000,  // Fast fail if no connection available
     keepAlive: true,
 };
-
-if ((process.env.NODE_ENV === 'production' || process.env.RENDER) && !connectionString) {
-    console.warn('DATABASE_URL is not set in production. Falling back to DB_* variables.');
-}
 
 if (!connectionString) {
     delete poolConfig.connectionString;
@@ -55,71 +50,118 @@ if (!connectionString) {
     poolConfig.port = process.env.DB_PORT || 5432;
 }
 
+// Create a single shared pool instance
 const pool = new Pool(poolConfig);
 
+/**
+ * Checks if a DB error is "retryable" (transient network or load issue).
+ */
 const isRetryableDbError = (error) => {
-    const code = String(error?.code || '').toUpperCase();
-    const msg = String(error?.message || '').toLowerCase();
+    if (!error) return false;
+    const code = String(error.code || '').toUpperCase();
+    const msg = String(error.message || '').toLowerCase();
+    
     return (
         [
             'ECONNREFUSED',
             'ETIMEDOUT',
             'ENOTFOUND',
             'EAI_AGAIN',
-            '57P01',
-            '57P03',
-            '53300',
-            'XX000',
+            '57P01', // admin_shutdown
+            '57P03', // cannot_connect_now
+            '53300', // too_many_connections
+            '53400', // configuration_limit_exceeded (custom for some pg hosts)
+            'XX000', // internal_error (sometimes thrown by Supabase/Render on load)
         ].includes(code) ||
         msg.includes('connection terminated') ||
         msg.includes('connection timeout') ||
         msg.includes('max clients reached') ||
         msg.includes('maxclientsinsessionmode') ||
-        msg.includes('too many clients')
+        msg.includes('too many clients') ||
+        msg.includes('terminating connection') ||
+        msg.includes('database system is starting up')
     );
 };
 
-const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, Math.max(0, Number(ms) || 0)));
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
+/**
+ * Executes a query with built-in retry logic for transient database errors.
+ * Use this for most queries to ensure stability.
+ */
 const queryWithRetry = async (text, params = [], options = {}) => {
-    const retries = Number.isFinite(options.retries) ? Number(options.retries) : DEFAULT_QUERY_RETRIES;
-    const retryDelayMs = Number.isFinite(options.retryDelayMs) ? Number(options.retryDelayMs) : DEFAULT_RETRY_DELAY_MS;
+    const maxRetries = options.retries !== undefined ? options.retries : 3;
+    const delayMs = options.retryDelayMs || 500;
 
-    let attempt = 0;
-    let lastError = null;
-
-    while (attempt <= retries) {
+    let lastError;
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
         try {
+            // Using pool.query directly is the safest way to ensure connection release
             return await pool.query(text, params);
         } catch (error) {
             lastError = error;
-            if (attempt >= retries || !isRetryableDbError(error)) {
-                throw error;
+            if (attempt < maxRetries && isRetryableDbError(error)) {
+                console.warn(`[DB RETRY] Query failed (attempt ${attempt + 1}/${maxRetries + 1}): ${error.message}`);
+                await sleep(delayMs * (attempt + 1)); // Exponential backoffish
+                continue;
             }
-            attempt += 1;
-            await sleep(retryDelayMs);
+            throw error;
         }
     }
-
     throw lastError;
 };
 
+/**
+ * Helper to safely handle a dedicated client from the pool.
+ * Use this for transactions or when multiple queries must use the same connection.
+ */
 const withDbClient = async (handler) => {
-    const client = await pool.connect();
+    let client;
+    let attempt = 0;
+    const maxRetries = 2; // Low retries for acquiring a client
+
+    while (attempt <= maxRetries) {
+        try {
+            client = await pool.connect();
+            break;
+        } catch (error) {
+            if (attempt < maxRetries && isRetryableDbError(error)) {
+                attempt++;
+                await sleep(500 * attempt);
+                continue;
+            }
+            throw error;
+        }
+    }
+
     try {
         return await handler(client);
     } finally {
-        client.release();
+        if (client) client.release();
     }
 };
 
 const connectDB = async () => {
     try {
         await queryWithRetry('SELECT 1');
-        console.log('PostgreSQL Database (Supabase) Connected Successfully');
+        console.log('PostgreSQL Database Connected Successfully (Max Pool: ' + poolMax + ')');
     } catch (error) {
-        console.error('Database Connection Failed:', error.message);
+        console.error('CRITICAL: Database Connection Failed:', error.message);
+        // Do not crash the process, allow for potential recovery via retries later
     }
 };
 
-module.exports = { pool, poolConfig, connectDB, queryWithRetry, withDbClient, isRetryableDbError };
+// Listen for pool errors to prevent process exit
+pool.on('error', (err) => {
+    console.error('Unexpected error on idle client:', err.message);
+});
+
+module.exports = { 
+    pool, 
+    poolConfig, 
+    connectDB, 
+    queryWithRetry, 
+    withDbClient, 
+    isRetryableDbError 
+};
+

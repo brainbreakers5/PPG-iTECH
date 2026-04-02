@@ -1,20 +1,8 @@
-const { pool, queryWithRetry } = require('../config/db');
+const { pool, queryWithRetry, isRetryableDbError } = require('../config/db');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const logActivity = require('../utils/activityLogger');
 const { createNotification } = require('./notificationController');
-
-const isDbUnavailableError = (error) => {
-    const code = String(error?.code || '').toUpperCase();
-    const msg = String(error?.message || '').toLowerCase();
-    return (
-        ['ECONNREFUSED', 'ETIMEDOUT', 'ENOTFOUND', 'EAI_AGAIN', '57P01', '57P03'].includes(code) ||
-        msg.includes('connection terminated') ||
-        msg.includes('connection timeout') ||
-        msg.includes('terminating connection') ||
-        msg.includes('the database system is starting up')
-    );
-};
 
 // Generate JWT
 const generateToken = (id) => {
@@ -37,6 +25,7 @@ exports.loginUser = async (req, res) => {
     }
 
     try {
+        // queryWithRetry now handles transient "Max Clients" errors automatically
         const { rows } = await queryWithRetry(
             "SELECT * FROM users WHERE LOWER(emp_id) = LOWER($1) AND role IN ('admin', 'principal', 'hod', 'staff')",
             [trimmedEmpId]
@@ -50,15 +39,11 @@ exports.loginUser = async (req, res) => {
             }
 
             // Check hashed password (priority) or hashed pin column if legacy
-            // We use bcrypt.compare for both to ensure everything is hashed
             let isMatch = false;
             
             if (user.password) {
                 isMatch = await bcrypt.compare(trimmedPin, user.password);
             } else if (user.pin) {
-                // If pin is stored as plain text (legacy), we might need to handle it once 
-                // but sebaiknya everything is already hashed.
-                // Let's check both for safety during transition
                 isMatch = (user.pin === trimmedPin);
                 
                 // Auto-upgrade to hashed password on successful plain-text login
@@ -77,7 +62,11 @@ exports.loginUser = async (req, res) => {
                 const loginMsg = `Employee Login: ${user.name} (${user.emp_id}) logged into the hub`;
                 for (const admin of admins) {
                     if (admin.emp_id !== user.emp_id) {
-                        await createNotification(admin.emp_id, loginMsg, 'login', { emp_id: user.emp_id }, null, false);
+                        try {
+                            await createNotification(admin.emp_id, loginMsg, 'login', { emp_id: user.emp_id }, null, false);
+                        } catch (notifErr) {
+                            console.error('Notification Error during login:', notifErr.message);
+                        }
                     }
                 }
 
@@ -100,12 +89,13 @@ exports.loginUser = async (req, res) => {
         }
     } catch (error) {
         console.error('Login Error:', error);
-        if (isDbUnavailableError(error)) {
-            return res.status(503).json({ message: 'Database unavailable. Please try again shortly.' });
+        if (isRetryableDbError(error)) {
+            return res.status(503).json({ message: 'Database is currently busy or unavailable. Please try again in a few seconds.' });
         }
         res.status(500).json({ message: 'Server Error' });
     }
 };
+
 
 // @desc    Management login with PIN
 // @route   POST /api/auth/management-login
@@ -150,8 +140,8 @@ exports.managementLogin = async (req, res) => {
         });
     } catch (error) {
         console.error('Management Login Error:', error);
-        if (isDbUnavailableError(error)) {
-            return res.status(503).json({ message: 'Database unavailable. Please try again shortly.' });
+        if (isRetryableDbError(error)) {
+            return res.status(503).json({ message: 'Database is currently busy. Please try again shortly.' });
         }
         res.status(500).json({ message: 'Server Error' });
     }
@@ -162,7 +152,7 @@ exports.managementLogin = async (req, res) => {
 // @access  Private
 exports.getUserProfile = async (req, res) => {
     try {
-        const { rows } = await pool.query(`
+        const { rows } = await queryWithRetry(`
             SELECT u.*, d.name as department_name
             FROM users u
             LEFT JOIN departments d ON u.department_id = d.id
@@ -212,8 +202,8 @@ exports.updateProfilePic = async (req, res) => {
         await logActivity(req.user.id, 'UPDATE_PROFILE_PIC', { emp_id: user.emp_id }, req.ip);
     } catch (error) {
         console.error(error);
-        if (isDbUnavailableError(error)) {
-            return res.status(503).json({ message: 'Database unavailable. Please try again shortly.' });
+        if (isRetryableDbError(error)) {
+            return res.status(503).json({ message: 'Database is busy. Please try again shortly.' });
         }
         res.status(500).json({ message: 'Server Error' });
     }
@@ -232,7 +222,7 @@ exports.updateProfile = async (req, res) => {
 
     try {
         if (emp_id) {
-            const { rows: existing } = await pool.query('SELECT id FROM users WHERE LOWER(emp_id) = LOWER($1) AND id != $2', [emp_id.trim(), req.user.id]);
+            const { rows: existing } = await queryWithRetry('SELECT id FROM users WHERE LOWER(emp_id) = LOWER($1) AND id != $2', [emp_id.trim(), req.user.id]);
             if (existing.length > 0) return res.status(400).json({ message: 'Employee ID already taken' });
         }
 
@@ -360,24 +350,24 @@ exports.updateManagementProfile = async (req, res) => {
     
     try {
         // Find the management user ID
-        const { rows } = await pool.query("SELECT id FROM users WHERE role = 'management' LIMIT 1");
+        const { rows } = await queryWithRetry("SELECT id FROM users WHERE role = 'management' LIMIT 1");
         if (rows.length === 0) {
             return res.status(404).json({ message: 'Management user not found' });
         }
         const mgmtId = rows[0].id;
 
         if (pin && emp_id) {
-             await pool.query(
+             await queryWithRetry(
                 "UPDATE users SET pin = $1, emp_id = $2 WHERE id = $3",
                 [pin.trim(), emp_id.trim(), mgmtId]
             );
         } else if (pin) {
-            await pool.query(
+            await queryWithRetry(
                 "UPDATE users SET pin = $1 WHERE id = $2",
                 [pin.trim(), mgmtId]
             );
         } else if (emp_id) {
-            await pool.query(
+            await queryWithRetry(
                 "UPDATE users SET emp_id = $1 WHERE id = $2",
                 [emp_id.trim(), mgmtId]
             );

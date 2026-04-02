@@ -1,4 +1,4 @@
-const { pool } = require('../config/db');
+const { pool, queryWithRetry } = require('../config/db');
 
 // @desc    Get attendance records (with filters)
 // @route   GET /api/attendance
@@ -79,7 +79,7 @@ exports.getAttendance = async (req, res) => {
                 LIMIT $${limitIdx}
             `;
 
-            const { rows } = await pool.query(uploadedQuery, params);
+            const { rows } = await queryWithRetry(uploadedQuery, params);
             return res.json(rows);
         }
 
@@ -165,7 +165,7 @@ exports.getAttendance = async (req, res) => {
             ORDER BY cd.d DESC, tu.name ASC
         `;
 
-        const { rows } = await pool.query(query, params);
+        const { rows } = await queryWithRetry(query, params);
         res.json(rows);
     } catch (error) {
         console.error('getAttendance ERROR:', error);
@@ -387,7 +387,7 @@ exports.getAttendanceSummary = async (req, res) => {
             ORDER BY u.name ASC
         `;
 
-        const { rows } = await pool.query(query, params);
+        const { rows } = await queryWithRetry(query, params);
         res.json(rows);
     } catch (error) {
         console.error('getAttendanceSummary ERROR:', error);
@@ -411,7 +411,7 @@ exports.getAttendanceTrend = async (req, res) => {
             GROUP BY TO_CHAR(date, 'YYYY-MM'), month_name
             ORDER BY TO_CHAR(date, 'YYYY-MM') ASC
         `;
-        const { rows } = await pool.query(query);
+        const { rows } = await queryWithRetry(query);
         res.json(rows);
     } catch (error) {
         console.error(error);

@@ -1,4 +1,4 @@
-const { pool } = require('../config/db');
+const { pool, queryWithRetry } = require('../config/db');
 
 // Helper: count working days in a date range excluding weekends
 // Helper: count total calendar days in a date range
@@ -148,7 +148,7 @@ const ALLOWANCE_PERCENT = 36.8;
 const CONVEYANCE_PERCENT = 8;
 
 const ensureSalarySchema = async () => {
-    await pool.query(`
+    await queryWithRetry(`
         ALTER TABLE salary_records
         ADD COLUMN IF NOT EXISTS with_pay_count NUMERIC(10, 2) DEFAULT 0,
         ADD COLUMN IF NOT EXISTS without_pay_count NUMERIC(10, 2) DEFAULT 0,
@@ -162,7 +162,7 @@ const ensureSalarySchema = async () => {
         ADD COLUMN IF NOT EXISTS paid_at TIMESTAMP
     `);
 
-    await pool.query(`
+    await queryWithRetry(`
         CREATE TABLE IF NOT EXISTS salary_history (
             id SERIAL PRIMARY KEY,
             source_salary_id INTEGER,
@@ -188,13 +188,13 @@ const ensureSalarySchema = async () => {
         )
     `);
 
-    await pool.query(`
+    await queryWithRetry(`
         ALTER TABLE salary_history
         ADD COLUMN IF NOT EXISTS esi_gross NUMERIC(12, 2) DEFAULT 0,
         ADD COLUMN IF NOT EXISTS employee_esi NUMERIC(12, 2) DEFAULT 0
     `);
 
-    await pool.query(`
+    await queryWithRetry(`
         CREATE TABLE IF NOT EXISTS salary_reports (
             id SERIAL PRIMARY KEY,
             emp_id VARCHAR(50) NOT NULL,
@@ -210,7 +210,7 @@ const ensureSalarySchema = async () => {
 };
 
 const getAttendanceAggregateMap = async ({ fromDate, toDate, paidStatuses, unpaidStatuses }) => {
-    const { rows } = await pool.query(`
+    const { rows } = await queryWithRetry(`
         SELECT
             TRIM(emp_id) AS emp_id,
             SUM(
@@ -412,7 +412,7 @@ exports.calculateSalary = async (req, res) => {
             // Keep already Paid records untouched.
             if (resolvedPayableDays <= 0) {
                 if (existing.length > 0 && existing[0].status !== 'Paid') {
-                    await pool.query('DELETE FROM salary_records WHERE id = $1', [existing[0].id]);
+                    await queryWithRetry('DELETE FROM salary_records WHERE id = $1', [existing[0].id]);
                 }
                 continue;
             }
@@ -427,7 +427,7 @@ exports.calculateSalary = async (req, res) => {
 
             if (existing.length > 0) {
                 if (existing[0].status === 'Paid') {
-                    await pool.query(`
+                    await queryWithRetry(`
                         INSERT INTO salary_history (
                             source_salary_id, emp_id, month, year, total_present, total_leave, total_lop,
                             calculated_salary, status, with_pay_count, without_pay_count,
@@ -444,7 +444,7 @@ exports.calculateSalary = async (req, res) => {
                     `, [existing[0].id]);
                 }
 
-                await pool.query(`
+                await queryWithRetry(`
                     UPDATE salary_records
                     SET month = $2,
                         year = $3,
@@ -483,7 +483,7 @@ exports.calculateSalary = async (req, res) => {
                     rangeTo
                 ]);
             } else {
-                await pool.query(`
+                await queryWithRetry(`
                     INSERT INTO salary_records (
                         emp_id, month, year, total_present, total_leave, total_lop,
                         calculated_salary, status, with_pay_count, without_pay_count,
@@ -602,7 +602,7 @@ exports.getSalaryRecords = async (req, res) => {
             }
 
             historyQuery += ' ORDER BY COALESCE(h.paid_at, h.archived_at) DESC, h.id DESC';
-            const { rows: historyRows } = await pool.query(historyQuery, historyParams);
+            const { rows: historyRows } = await queryWithRetry(historyQuery, historyParams);
 
             const historyMapped = historyRows.map((r) => ({
                 ...r,
@@ -788,7 +788,7 @@ exports.getSalaryRecords = async (req, res) => {
 
         // For employees/non-admin, also fetch their historical paid records from salary_history
         if (!scopeWide) {
-            const { rows: historyRecords } = await pool.query(`
+            const { rows: historyRecords } = await queryWithRetry(`
                 SELECT h.*, u.name, u.role, u.profile_pic, d.name AS department_name, u.monthly_salary, u.deductions
                 FROM salary_history h
                 LEFT JOIN users u ON TRIM(u.emp_id) = TRIM(h.emp_id)
