@@ -15,6 +15,7 @@ const DetailedAttendancePage = () => {
     // Support both month-based and range-based navigation
     const start = paramStart || (month ? `${month}-01` : null);
     const end = paramEnd || (month ? new Date(new Date(month).getFullYear(), new Date(month).getMonth() + 1, 0).toISOString().split('T')[0] : null);
+    const fmt = (value) => Number(value || 0).toFixed(1);
 
     const handlePrint = async () => {
         const container = printRef.current;
@@ -75,11 +76,11 @@ const DetailedAttendancePage = () => {
             <div class="meta">
                 Employee: <b>${empId}</b> &nbsp;|&nbsp; 
                 Period: ${periodLabel} &nbsp;|&nbsp; 
-                Working Days: <b>${summary.workingDays}</b> &nbsp;|&nbsp; 
-                Holidays: <b>${summary.holidays}</b> &nbsp;|&nbsp;
-                Absent: <b>${summary.absent}</b> &nbsp;|&nbsp;
-                LOP: <b>${summary.lop}</b> &nbsp;|&nbsp;
-                Late Entry: <b>${summary.lateEntry}</b>
+                Working Days: <b>${fmt(summary.workingDays)}</b> &nbsp;|&nbsp; 
+                Holidays: <b>${fmt(summary.holidays)}</b> &nbsp;|&nbsp;
+                Absent: <b>${fmt(summary.absent)}</b> &nbsp;|&nbsp;
+                LOP: <b>${fmt(summary.lop)}</b> &nbsp;|&nbsp;
+                Late Entry: <b>${fmt(summary.lateEntry)}</b>
             </div>
             <table>
                 <thead><tr><th>Date</th><th>Status</th><th>In Time</th><th>Out Time</th><th>Work Hours</th><th>Remarks</th></tr></thead>
@@ -117,15 +118,15 @@ const DetailedAttendancePage = () => {
                                 {start && end ? `${new Date(start).toLocaleDateString()} - ${new Date(end).toLocaleDateString()}` : 'Date Range'}
                             </span>
                             <span className="h-1 w-1 bg-gray-300 rounded-full"></span>
-                            <span className="flex items-center gap-1">W.Days: <b className="text-emerald-600 ml-1">{summary.workingDays}</b></span>
+                            <span className="flex items-center gap-1">W.Days: <b className="text-emerald-600 ml-1">{fmt(summary.workingDays)}</b></span>
                             <span className="h-1 w-1 bg-gray-300 rounded-full"></span>
-                            <span className="flex items-center gap-1">Holidays: <b className="text-rose-500 ml-1">{summary.holidays}</b></span>
+                            <span className="flex items-center gap-1">Holidays: <b className="text-rose-500 ml-1">{fmt(summary.holidays)}</b></span>
                             <span className="h-1 w-1 bg-gray-300 rounded-full"></span>
-                            <span className="flex items-center gap-1">Absent: <b className="text-rose-600 ml-1">{summary.absent}</b></span>
+                            <span className="flex items-center gap-1">Absent: <b className="text-rose-600 ml-1">{fmt(summary.absent)}</b></span>
                             <span className="h-1 w-1 bg-gray-300 rounded-full"></span>
-                            <span className="flex items-center gap-1">LOP: <b className="text-rose-900 ml-1">{summary.lop}</b></span>
+                            <span className="flex items-center gap-1">LOP: <b className="text-rose-900 ml-1">{fmt(summary.lop)}</b></span>
                             <span className="h-1 w-1 bg-gray-300 rounded-full"></span>
-                            <span className="flex items-center gap-1">Late: <b className="text-orange-600 ml-1">{summary.lateEntry}</b></span>
+                            <span className="flex items-center gap-1">Late: <b className="text-orange-600 ml-1">{fmt(summary.lateEntry)}</b></span>
                         </p>
                     </div>
                 </div>

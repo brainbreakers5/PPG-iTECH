@@ -274,8 +274,8 @@ const AttendanceRecord = () => {
 
     const formatDayCount = (value) => {
         const n = Number(value || 0);
-        if (!Number.isFinite(n)) return '0';
-        return Number.isInteger(n) ? String(n) : n.toFixed(1);
+        if (!Number.isFinite(n)) return '0.0';
+        return n.toFixed(1);
     };
 
     const escapeHtml = (value) => String(value ?? '')

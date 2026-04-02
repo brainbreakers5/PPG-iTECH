@@ -740,8 +740,8 @@ exports.receiveLog = async (req, res) => {
             : '0h 0m';
 
         const message = punchType === 'OUT'
-            ? `Punch In ${inTimeLabel}, Punch Out ${outTimeLabel}, Total Working Hours ${workingHours}, Status: ${statusLabel}, Name: ${userName}, Emp_ID: ${normalizedEmpId}`
-            : `Punch In at ${punchEventTime}, Status: ${statusLabel}, Name: ${userName}, Emp_ID: ${normalizedEmpId}`;
+            ? `🔔 Attendance Notification\n\nEmployee Name   : ${userName}\nEmployee ID     : ${normalizedEmpId}\nPunch-In Time   : ${inTimeLabel}\nPunch-Out Time  : ${outTimeLabel}\nTotal Work Time : ${workingHours}\nStatus          : ${statusLabel}\n\nRemark : Attendance completed successfully.`
+            : `🔔 Attendance Notification\n\nEmployee Name : ${userName}\nEmployee ID   : ${normalizedEmpId}\nPunch-In Time : ${punchEventTime}\nStatus        : ${statusLabel}\n\nRemark : Punch-in recorded successfully.`;
 
         // Notifications (best-effort)
         try {

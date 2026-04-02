@@ -21,6 +21,7 @@ const BATCH_SIZE = Math.max(1, Number(process.env.BIOMETRIC_QUEUE_BATCH_SIZE || 
 const BATCH_INTERVAL_MS = Math.max(200, Number(process.env.BIOMETRIC_QUEUE_INTERVAL_MS || 1000));
 const SEND_CONCURRENCY = Math.max(1, Number(process.env.BIOMETRIC_SEND_CONCURRENCY || 5));
 const KEEP_ALIVE_MS = Math.max(30000, Number(process.env.BIOMETRIC_KEEP_ALIVE_MS || 45000));
+const ALLOW_IDLE_RECONNECT = String(process.env.BIOMETRIC_IDLE_RECONNECT || '0').trim() === '1';
 const RETRY_BASE_MS = Math.max(250, Number(process.env.BIOMETRIC_RETRY_BASE_MS || 1000));
 const RETRY_MAX_MS = Math.max(5000, Number(process.env.BIOMETRIC_RETRY_MAX_MS || 60000));
 const RECENT_SEEN_MAX = Math.max(1000, Number(process.env.BIOMETRIC_RECENT_SEEN_MAX || 5000));
@@ -266,12 +267,17 @@ class BridgeRuntime {
 
         const ageMs = Date.now() - this.lastRealtimeAt;
         if (this.lastRealtimeAt > 0 && ageMs > KEEP_ALIVE_MS * 6) {
-          throw new Error(`No realtime events for ${Math.round(ageMs / 1000)}s`);
+          if (ALLOW_IDLE_RECONNECT) {
+            throw new Error(`No realtime events for ${Math.round(ageMs / 1000)}s`);
+          }
+          console.warn(
+            `[${new Date().toLocaleTimeString()}] Keep-alive idle: no realtime events for ${Math.round(ageMs / 1000)}s (connection kept alive)`
+          );
         }
       } catch (err) {
         const details = unwrapError(err);
         console.error(`[${new Date().toLocaleTimeString()}] Keep-alive failed:`, details);
-        if (isLikelyDeviceError(err) || String(details?.message || '').includes('No realtime events')) {
+        if (isLikelyDeviceError(err) || (ALLOW_IDLE_RECONNECT && String(details?.message || '').includes('No realtime events'))) {
           await this.safeDisconnect();
           this.scheduleReconnect(details?.message || 'keep-alive failure', 10000);
         }
