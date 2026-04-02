@@ -31,6 +31,29 @@ const normalizePunchType = (rawType, dateRef) => {
     return dt.getHours() < 12 ? 'IN' : 'OUT';
 };
 
+const calculateWorkingHours = (inTime, outTime) => {
+    const parseToMinutes = (value) => {
+        const [h, m] = String(value || '').split(':').map((n) => Number(n));
+        if (!Number.isFinite(h) || !Number.isFinite(m)) return null;
+        return (h * 60) + m;
+    };
+
+    const inMins = parseToMinutes(inTime);
+    const outMins = parseToMinutes(outTime);
+    if (inMins === null || outMins === null || outMins < inMins) return '0h 0m';
+
+    const total = outMins - inMins;
+    const hours = Math.floor(total / 60);
+    const minutes = total % 60;
+    return `${hours}h ${minutes}m`;
+};
+
+const removeStatusFromRemarks = (value) => String(value || '')
+    .replace(/\bStatus\s*:\s*[^|]+(\|\s*)?/gi, '')
+    .replace(/\s*\|\s*/g, ' | ')
+    .replace(/^\s*\|\s*|\s*\|\s*$/g, '')
+    .trim();
+
 const admsLastSeenState = {
     heartbeat: null,
     heartbeatMeta: null,
@@ -537,12 +560,11 @@ const rebuildAttendanceFromBiometricTimeline = async (normalizedEmpId, dateStr) 
             return `${s.type}${s.day_type ? ' (' + s.day_type + ')' : ''}: ${fromTimeStr}-${toTimeStr} (${h}h ${m}m)`;
         });
 
-    const finalRemarks = [
-        `Status: ${dbStatus}`, // Keep the detailed string here for UI
+    const finalRemarks = removeStatusFromRemarks([
         `Working Hours: ${workingHoursStr}`,
         flags.length > 0 ? `Alerts: ${flags.join(', ')}` : null,
         approvedInfoList.length > 0 ? `Approved Segments: ${approvedInfoList.join(' | ')}` : null
-    ].filter(Boolean).join(' | ');
+    ].filter(Boolean).join(' | '));
 
 
     await runWithSequenceFix(
@@ -708,20 +730,18 @@ exports.receiveLog = async (req, res) => {
             console.error('Failed to lookup user name for notification:', e);
         }
 
-        const isRecoveredFromPolling = String(req.body?.raw?.source || '').toLowerCase() === 'poll';
         const punchType = normalizedPunchType;
+        const statusLabel = syncResult.enumStatus || syncResult.dbStatus || 'Present';
+        const punchEventTime = timeStr;
         const inTimeLabel = syncResult.physIn || '--:--';
         const outTimeLabel = syncResult.physOut || 'Pending';
-        const compactRemarks = String(syncResult.remarks || '')
-            .replace(/^Status:\s*/i, '')
-            .trim();
+        const workingHours = (syncResult.physIn && syncResult.physOut)
+            ? calculateWorkingHours(syncResult.physIn, syncResult.physOut)
+            : '0h 0m';
 
-        const message = [
-            `${isRecoveredFromPolling ? '🔁 Recovered' : '🔔'} ${punchType} Punch - ${userName} (${normalizedEmpId})`,
-            `In: ${inTimeLabel} | Out: ${outTimeLabel}`,
-            `Status: ${syncResult.enumStatus || syncResult.dbStatus || 'Present'}`,
-            compactRemarks ? `Remarks: ${compactRemarks}` : null,
-        ].filter(Boolean).join(' | ');
+        const message = punchType === 'OUT'
+            ? `Punch In ${inTimeLabel}, Punch Out ${outTimeLabel}, Total Working Hours ${workingHours}, Status: ${statusLabel}, Name: ${userName}, Emp_ID: ${normalizedEmpId}`
+            : `Punch In at ${punchEventTime}, Status: ${statusLabel}, Name: ${userName}, Emp_ID: ${normalizedEmpId}`;
 
         // Notifications (best-effort)
         try {
