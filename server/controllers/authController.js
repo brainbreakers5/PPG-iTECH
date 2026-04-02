@@ -4,6 +4,18 @@ const bcrypt = require('bcryptjs');
 const logActivity = require('../utils/activityLogger');
 const { createNotification } = require('./notificationController');
 
+const isDbUnavailableError = (error) => {
+    const code = String(error?.code || '').toUpperCase();
+    const msg = String(error?.message || '').toLowerCase();
+    return (
+        ['ECONNREFUSED', 'ETIMEDOUT', 'ENOTFOUND', 'EAI_AGAIN', '57P01', '57P03'].includes(code) ||
+        msg.includes('connection terminated') ||
+        msg.includes('connection timeout') ||
+        msg.includes('terminating connection') ||
+        msg.includes('the database system is starting up')
+    );
+};
+
 // Generate JWT
 const generateToken = (id) => {
     return jwt.sign({ id }, process.env.JWT_SECRET, {
@@ -88,6 +100,9 @@ exports.loginUser = async (req, res) => {
         }
     } catch (error) {
         console.error('Login Error:', error);
+        if (isDbUnavailableError(error)) {
+            return res.status(503).json({ message: 'Database unavailable. Please try again shortly.' });
+        }
         res.status(500).json({ message: 'Server Error' });
     }
 };
@@ -135,6 +150,9 @@ exports.managementLogin = async (req, res) => {
         });
     } catch (error) {
         console.error('Management Login Error:', error);
+        if (isDbUnavailableError(error)) {
+            return res.status(503).json({ message: 'Database unavailable. Please try again shortly.' });
+        }
         res.status(500).json({ message: 'Server Error' });
     }
 };
@@ -194,6 +212,9 @@ exports.updateProfilePic = async (req, res) => {
         await logActivity(req.user.id, 'UPDATE_PROFILE_PIC', { emp_id: user.emp_id }, req.ip);
     } catch (error) {
         console.error(error);
+        if (isDbUnavailableError(error)) {
+            return res.status(503).json({ message: 'Database unavailable. Please try again shortly.' });
+        }
         res.status(500).json({ message: 'Server Error' });
     }
 };

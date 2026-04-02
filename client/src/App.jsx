@@ -48,6 +48,7 @@ import ProfilePage from './pages/shared/ProfilePage';
 import PersonnelListPage from './pages/shared/PersonnelListPage';
 import DepartmentStaffPage from './pages/shared/DepartmentStaffPage';
 import DetailedAttendancePage from './pages/shared/DetailedAttendancePage';
+import AttendanceMonthlySummaryPage from './pages/shared/AttendanceMonthlySummaryPage';
 import EmployeeFormPage from './pages/admin/EmployeeFormPage';
 import DepartmentFormPage from './pages/admin/DepartmentFormPage';
 import PurchaseRequestPage from './pages/shared/PurchaseRequestPage';
@@ -232,6 +233,7 @@ const AppContent = () => {
             <Route path="purchase" element={<AdminPurchase />} />
             <Route path="purchase/new" element={<PurchaseRequestPage />} />
             <Route path="attendance" element={<PrincipalAttendance />} />
+            <Route path="attendance/monthly-summary" element={<AttendanceMonthlySummaryPage />} />
             <Route path="attendance/:empId/:month" element={<DetailedAttendancePage />} />
             <Route path="attendance/:empId/:startDate/:endDate" element={<DetailedAttendancePage />} />
             <Route path="calendar" element={<AdminCalendar />} />
@@ -260,6 +262,7 @@ const AppContent = () => {
             <Route path="departments/:id/staff" element={<DepartmentStaffPage rolePrefix="principal" />} />
             <Route path="calendar" element={<InstitutionalCalendar />} />
             <Route path="attendance" element={<PrincipalAttendance />} />
+            <Route path="attendance/monthly-summary" element={<AttendanceMonthlySummaryPage />} />
             <Route path="attendance/:empId/:month" element={<DetailedAttendancePage />} />
             <Route path="attendance/:empId/:startDate/:endDate" element={<DetailedAttendancePage />} />
             <Route path="conversation" element={<PrincipalConversation />} />
@@ -287,6 +290,7 @@ const AppContent = () => {
             <Route path="timetable" element={<HODTimetable />} />
             <Route path="timetable/:empId" element={<HODTimetable />} />
             <Route path="attendance" element={<PrincipalAttendance />} />
+            <Route path="attendance/monthly-summary" element={<AttendanceMonthlySummaryPage />} />
             <Route path="attendance/:empId/:month" element={<DetailedAttendancePage />} />
             <Route path="attendance/:empId/:startDate/:endDate" element={<DetailedAttendancePage />} />
             <Route path="conversation" element={<PrincipalConversation />} />
@@ -332,6 +336,7 @@ const AppContent = () => {
             <Route path="payroll/history" element={<SalaryManagement />} />
             <Route path="payroll/employee/:empId" element={<EmployeeSalaryView />} />
             <Route path="attendance" element={<PrincipalAttendance />} />
+            <Route path="attendance/monthly-summary" element={<AttendanceMonthlySummaryPage />} />
             <Route path="attendance/:empId/:month" element={<DetailedAttendancePage />} />
             <Route path="attendance/:empId/:startDate/:endDate" element={<DetailedAttendancePage />} />
             <Route path="profile" element={<ProfilePage />} />

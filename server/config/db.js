@@ -31,9 +31,13 @@ const poolConfig = {
     ssl: useSsl ? { rejectUnauthorized: false } : false,
     max: 5,
     idleTimeoutMillis: 30000,
-    connectionTimeoutMillis: 2000,
+    connectionTimeoutMillis: Number(process.env.DB_CONNECTION_TIMEOUT_MS || 10000),
     keepAlive: true,
 };
+
+if ((process.env.NODE_ENV === 'production' || process.env.RENDER) && !connectionString) {
+    console.warn('DATABASE_URL is not set in production. Falling back to DB_* variables.');
+}
 
 if (!connectionString) {
     delete poolConfig.connectionString;

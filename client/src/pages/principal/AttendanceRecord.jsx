@@ -5,7 +5,7 @@ import { FaFileDownload, FaFilter, FaSearch, FaEye, FaCalendarAlt, FaSync, FaTim
 import { motion, AnimatePresence } from 'framer-motion';
 import { finalizePrintWindow } from '../../utils/printUtils';
 import { useSocket } from '../../context/SocketContext';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import BiometricMonitor from '../../components/biometric/BiometricMonitor';
 import { formatTo12Hr, formatTimestamp } from '../../utils/timeFormatter.js';
@@ -13,6 +13,8 @@ import { formatTo12Hr, formatTimestamp } from '../../utils/timeFormatter.js';
 const AttendanceRecord = () => {
     const { user } = useAuth();
     const navigate = useNavigate();
+    const location = useLocation();
+    const routePrefix = location.pathname.split('/').filter(Boolean)[0] || (user?.role || 'admin');
 
 
     // Default to current month (1st to Today)
@@ -543,6 +545,12 @@ const AttendanceRecord = () => {
                                 </button>
                             </>
                         )}
+                        <button
+                            onClick={() => navigate(`/${routePrefix}/attendance/monthly-summary`)}
+                            className="px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all text-gray-500 hover:text-sky-600"
+                        >
+                            Monthly Summary
+                        </button>
                     </div>
                 </div>
 
