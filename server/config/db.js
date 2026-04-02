@@ -26,10 +26,14 @@ const sslDisabled = ['0', 'false', 'no', 'disable'].includes(sslFlag);
 const sslEnabledByFlag = ['1', 'true', 'yes', 'require', 'verify-ca', 'verify-full'].includes(sslFlag);
 const sslEnabledByHost = resolvedHost.includes('supabase.co') || resolvedHost.includes('neon.tech') || resolvedHost.includes('render.com');
 const useSsl = !sslDisabled && (sslEnabledByFlag || (!sslFlag && sslEnabledByHost));
+const isProduction = process.env.NODE_ENV === 'production' || Boolean(process.env.RENDER);
+const defaultPoolMax = isProduction ? 1 : 5;
+const parsedPoolMax = Number(process.env.DB_POOL_MAX || process.env.PGPOOL_MAX || defaultPoolMax);
+const poolMax = Number.isFinite(parsedPoolMax) && parsedPoolMax > 0 ? parsedPoolMax : defaultPoolMax;
 const poolConfig = {
     connectionString,
     ssl: useSsl ? { rejectUnauthorized: false } : false,
-    max: 5,
+    max: poolMax,
     idleTimeoutMillis: 30000,
     connectionTimeoutMillis: Number(process.env.DB_CONNECTION_TIMEOUT_MS || 10000),
     keepAlive: true,

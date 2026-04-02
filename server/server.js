@@ -14,22 +14,59 @@ const socketUtil = require('./utils/socket');
 const path = require('path');
 const { pool, connectDB } = require('./config/db');
 
+const isTransientInitDbError = (error) => {
+    const code = String(error?.code || '').toUpperCase();
+    const msg = String(error?.message || '').toLowerCase();
+    return (
+        ['XX000', 'ETIMEDOUT', 'ECONNREFUSED', 'ENOTFOUND', 'EAI_AGAIN', '57P01', '57P03'].includes(code) ||
+        msg.includes('maxclientsinsessionmode') ||
+        msg.includes('max clients reached') ||
+        msg.includes('connection terminated') ||
+        msg.includes('timeout')
+    );
+};
+
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+const runWithRetry = async (fn, label, maxAttempts = 6, delayMs = 3000) => {
+    let lastError = null;
+    for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+        try {
+            return await fn();
+        } catch (error) {
+            lastError = error;
+            if (!isTransientInitDbError(error) || attempt === maxAttempts) {
+                throw error;
+            }
+            console.warn(`[DB INIT] ${label} failed (attempt ${attempt}/${maxAttempts}): ${error.message}. Retrying in ${delayMs}ms...`);
+            await sleep(delayMs);
+        }
+    }
+    throw lastError;
+};
+
 // Connect to Database
 connectDB();
 
 // Initialize Database Records (Seeding)
 const initDB = async () => {
     try {
-        const { rows } = await pool.query("SELECT id FROM users WHERE role = 'management' LIMIT 1");
+        const { rows } = await runWithRetry(
+            () => pool.query("SELECT id FROM users WHERE role = 'management' LIMIT 1"),
+            'management user check'
+        );
         if (rows.length === 0) {
             console.log('--- Initializing Management User ---');
             const bcrypt = require('bcryptjs');
             const defaultPin = '1234';
             const hashedPin = await bcrypt.hash(defaultPin, 10);
             
-            await pool.query(
-                "INSERT INTO users (emp_id, name, role, pin, password) VALUES ($1, $2, $3, $4, $5)",
-                ['Management', 'Management', 'management', defaultPin, hashedPin]
+            await runWithRetry(
+                () => pool.query(
+                    "INSERT INTO users (emp_id, name, role, pin, password) VALUES ($1, $2, $3, $4, $5)",
+                    ['Management', 'Management', 'management', defaultPin, hashedPin]
+                ),
+                'management user create'
             );
             console.log('--- Management User Created (ID: Management, PIN: 1234) ---');
         }
@@ -47,7 +84,10 @@ const initDB = async () => {
         // Ensure salary_records unique constraint for ON CONFLICT
         console.log('--- Checking salary_records constraint ---');
         try {
-            await pool.query('ALTER TABLE salary_records ADD CONSTRAINT unique_salary_record UNIQUE (emp_id, month, year)');
+            await runWithRetry(
+                () => pool.query('ALTER TABLE salary_records ADD CONSTRAINT unique_salary_record UNIQUE (emp_id, month, year)'),
+                'salary constraint check'
+            );
             console.log('--- Added unique constraint to salary_records ---');
         } catch (e) {
             // Log only if it's not a "already exists" error
@@ -56,32 +96,41 @@ const initDB = async () => {
             }
         }
         // Ensure push_subscriptions table exists
-        await pool.query(`
-            CREATE TABLE IF NOT EXISTS push_subscriptions (
-                id SERIAL PRIMARY KEY,
-                user_id VARCHAR(50) NOT NULL,
-                subscription JSONB NOT NULL UNIQUE,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        `);
+        await runWithRetry(
+            () => pool.query(`
+                CREATE TABLE IF NOT EXISTS push_subscriptions (
+                    id SERIAL PRIMARY KEY,
+                    user_id VARCHAR(50) NOT NULL,
+                    subscription JSONB NOT NULL UNIQUE,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            `),
+            'push_subscriptions ensure'
+        );
         console.log('--- Push Subscriptions Table Verified ---');
         
         // Ensure users table has deductions column
-        await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS deductions JSONB DEFAULT \'[]\'');
+        await runWithRetry(
+            () => pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS deductions JSONB DEFAULT \'[]\''),
+            'users deductions column ensure'
+        );
         console.log('--- Users Table Deductions Column Verified ---');
 
         // Ensure feedback messages table exists
-        await pool.query(`
-            CREATE TABLE IF NOT EXISTS feedback_messages (
-                id SERIAL PRIMARY KEY,
-                from_emp_id VARCHAR(50) NOT NULL,
-                to_emp_id VARCHAR(50) NOT NULL DEFAULT '5001',
-                rating VARCHAR(20) NOT NULL DEFAULT 'General',
-                message TEXT NOT NULL,
-                submitted_by_role VARCHAR(30),
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        `);
+        await runWithRetry(
+            () => pool.query(`
+                CREATE TABLE IF NOT EXISTS feedback_messages (
+                    id SERIAL PRIMARY KEY,
+                    from_emp_id VARCHAR(50) NOT NULL,
+                    to_emp_id VARCHAR(50) NOT NULL DEFAULT '5001',
+                    rating VARCHAR(20) NOT NULL DEFAULT 'General',
+                    message TEXT NOT NULL,
+                    submitted_by_role VARCHAR(30),
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            `),
+            'feedback_messages ensure'
+        );
         console.log('--- Feedback Messages Table Verified ---');
     } catch (err) {
         console.error('Database Initialization Error:', err);
