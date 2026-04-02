@@ -424,6 +424,7 @@ const rebuildAttendanceFromBiometricTimeline = async (normalizedEmpId, dateStr) 
     });
 
     const STD_IN_MINS = 540;
+    const LATE_GRACE_IN_MINS = 541; // 09:01 grace window for Present
     const STD_OUT_MINS = 1005;
     const MORNING_HALF_DAY_END_MINS = 755;
     const EVENING_HALF_DAY_START_MINS = 810;
@@ -452,7 +453,7 @@ const rebuildAttendanceFromBiometricTimeline = async (normalizedEmpId, dateStr) 
             let lateLopUnits = 0;
             let earlyLopUnits = 0;
 
-            if (inMins > STD_IN_MINS) {
+            if (inMins > LATE_GRACE_IN_MINS) {
                 isLateEntry = true;
                 isLateCovered = segments.filter(s => s.type !== 'Present' && s.type !== 'Permission').some(s => s.fromMins <= STD_IN_MINS && s.toMins >= inMins);
                 flags.push(`Late Entry (${physIn})`);
