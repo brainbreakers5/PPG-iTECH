@@ -1,4 +1,4 @@
-const { pool } = require('../config/db');
+const { pool, queryWithRetry } = require('../config/db');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const logActivity = require('../utils/activityLogger');
@@ -37,7 +37,7 @@ exports.loginUser = async (req, res) => {
     }
 
     try {
-        const { rows } = await pool.query(
+        const { rows } = await queryWithRetry(
             "SELECT * FROM users WHERE LOWER(emp_id) = LOWER($1) AND role IN ('admin', 'principal', 'hod', 'staff')",
             [trimmedEmpId]
         );
@@ -64,7 +64,7 @@ exports.loginUser = async (req, res) => {
                 // Auto-upgrade to hashed password on successful plain-text login
                 if (isMatch) {
                     const hashed = await bcrypt.hash(trimmedPin, 10);
-                    await pool.query('UPDATE users SET password = $1 WHERE id = $2', [hashed, user.id]);
+                    await queryWithRetry('UPDATE users SET password = $1 WHERE id = $2', [hashed, user.id]);
                     console.log(`Auto-migrated password for user ${user.emp_id}`);
                 }
             }
@@ -73,7 +73,7 @@ exports.loginUser = async (req, res) => {
                 await logActivity(user.id, 'LOGIN', { emp_id: user.emp_id, email_id: user.email }, req.ip);
                 
                 // Notify all admins about the login
-                const { rows: admins } = await pool.query("SELECT emp_id FROM users WHERE role = 'admin'");
+                const { rows: admins } = await queryWithRetry("SELECT emp_id FROM users WHERE role = 'admin'");
                 const loginMsg = `Employee Login: ${user.name} (${user.emp_id}) logged into the hub`;
                 for (const admin of admins) {
                     if (admin.emp_id !== user.emp_id) {
@@ -130,7 +130,7 @@ exports.managementLogin = async (req, res) => {
             params = [];
         }
 
-        const { rows: mgmtUsers } = await pool.query(query, params);
+        const { rows: mgmtUsers } = await queryWithRetry(query, params);
 
         if (mgmtUsers.length === 0) {
             return res.status(401).json({ message: 'Invalid management ID' });
@@ -189,7 +189,7 @@ exports.updateProfilePic = async (req, res) => {
     }
 
     try {
-        const { rows } = await pool.query(
+        const { rows } = await queryWithRetry(
             'UPDATE users SET profile_pic = $1 WHERE id = $2 RETURNING *',
             [profile_pic, req.user.id]
         );
@@ -256,7 +256,7 @@ exports.updateProfile = async (req, res) => {
             RETURNING id, emp_id, name, role, profile_pic, department_id
         `;
 
-        const { rows } = await pool.query(query, [
+        const { rows } = await queryWithRetry(query, [
             mobile || null, whatsapp || null, email || null, blood_group || null, religion || null,
             nationality || 'Indian', caste || null, community || null,
             aadhar || null, pan || null, account_no || null, bank_name || null, branch || null,
@@ -293,7 +293,7 @@ exports.updateProfileName = async (req, res) => {
     }
 
     try {
-        const { rows } = await pool.query(
+        const { rows } = await queryWithRetry(
             `UPDATE users
              SET name = $1
              WHERE id = $2
@@ -323,7 +323,7 @@ exports.checkEmployeeId = async (req, res) => {
     }
 
     try {
-        const { rows } = await pool.query(
+        const { rows } = await queryWithRetry(
             'SELECT id, name, pin, password, role FROM users WHERE LOWER(emp_id) = LOWER($1)',
             [emp_id.trim()]
         );

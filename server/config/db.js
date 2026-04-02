@@ -27,9 +27,12 @@ const sslEnabledByFlag = ['1', 'true', 'yes', 'require', 'verify-ca', 'verify-fu
 const sslEnabledByHost = resolvedHost.includes('supabase.co') || resolvedHost.includes('neon.tech') || resolvedHost.includes('render.com');
 const useSsl = !sslDisabled && (sslEnabledByFlag || (!sslFlag && sslEnabledByHost));
 const isProduction = process.env.NODE_ENV === 'production' || Boolean(process.env.RENDER);
-const defaultPoolMax = isProduction ? 1 : 5;
+const defaultPoolMax = isProduction ? 3 : 5;
 const parsedPoolMax = Number(process.env.DB_POOL_MAX || process.env.PGPOOL_MAX || defaultPoolMax);
-const poolMax = Number.isFinite(parsedPoolMax) && parsedPoolMax > 0 ? parsedPoolMax : defaultPoolMax;
+const poolMaxRaw = Number.isFinite(parsedPoolMax) && parsedPoolMax > 0 ? parsedPoolMax : defaultPoolMax;
+const poolMax = Math.min(5, poolMaxRaw);
+const DEFAULT_QUERY_RETRIES = Math.max(0, Number(process.env.DB_QUERY_RETRIES || 2));
+const DEFAULT_RETRY_DELAY_MS = Math.max(100, Number(process.env.DB_QUERY_RETRY_DELAY_MS || 350));
 const poolConfig = {
     connectionString,
     ssl: useSsl ? { rejectUnauthorized: false } : false,
@@ -54,13 +57,69 @@ if (!connectionString) {
 
 const pool = new Pool(poolConfig);
 
+const isRetryableDbError = (error) => {
+    const code = String(error?.code || '').toUpperCase();
+    const msg = String(error?.message || '').toLowerCase();
+    return (
+        [
+            'ECONNREFUSED',
+            'ETIMEDOUT',
+            'ENOTFOUND',
+            'EAI_AGAIN',
+            '57P01',
+            '57P03',
+            '53300',
+            'XX000',
+        ].includes(code) ||
+        msg.includes('connection terminated') ||
+        msg.includes('connection timeout') ||
+        msg.includes('max clients reached') ||
+        msg.includes('maxclientsinsessionmode') ||
+        msg.includes('too many clients')
+    );
+};
+
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, Math.max(0, Number(ms) || 0)));
+
+const queryWithRetry = async (text, params = [], options = {}) => {
+    const retries = Number.isFinite(options.retries) ? Number(options.retries) : DEFAULT_QUERY_RETRIES;
+    const retryDelayMs = Number.isFinite(options.retryDelayMs) ? Number(options.retryDelayMs) : DEFAULT_RETRY_DELAY_MS;
+
+    let attempt = 0;
+    let lastError = null;
+
+    while (attempt <= retries) {
+        try {
+            return await pool.query(text, params);
+        } catch (error) {
+            lastError = error;
+            if (attempt >= retries || !isRetryableDbError(error)) {
+                throw error;
+            }
+            attempt += 1;
+            await sleep(retryDelayMs);
+        }
+    }
+
+    throw lastError;
+};
+
+const withDbClient = async (handler) => {
+    const client = await pool.connect();
+    try {
+        return await handler(client);
+    } finally {
+        client.release();
+    }
+};
+
 const connectDB = async () => {
     try {
-        await pool.query('SELECT 1');
+        await queryWithRetry('SELECT 1');
         console.log('PostgreSQL Database (Supabase) Connected Successfully');
     } catch (error) {
         console.error('Database Connection Failed:', error.message);
     }
 };
 
-module.exports = { pool, poolConfig, connectDB };
+module.exports = { pool, poolConfig, connectDB, queryWithRetry, withDbClient, isRetryableDbError };

@@ -159,6 +159,7 @@ const settingsRoutes = require('./routes/settingsRoutes');
 const activityLogRoutes = require('./routes/activityLogRoutes');
 const statusRoutes = require('./routes/statusRoutes');
 const feedbackRoutes = require('./routes/feedbackRoutes');
+const { getDbHealth } = require('./controllers/statusController');
 
 const helmet = require('helmet');
 const morgan = require('morgan');
@@ -263,6 +264,9 @@ app.set('trust proxy', 1);
 app.get('/', (req, res) => {
     res.send('Server is running 🚀');
 });
+
+// Dedicated DB health endpoint
+app.get('/api/db-health', getDbHealth);
 
 // Routes Registration
 // ✅ ADMS Biometric Handlers are registered via biometricRoutes mounted at /iclock and /api/biometric
