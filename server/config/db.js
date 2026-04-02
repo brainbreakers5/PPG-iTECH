@@ -9,35 +9,50 @@ types.setTypeParser(1082, (val) => val);
 
 const normalizeFlag = (value) => String(value || '').trim().toLowerCase();
 const sslFlag = normalizeFlag(process.env.DB_SSL || process.env.PGSSLMODE);
+const connectionString = String(process.env.DATABASE_URL || '').trim();
 const host = String(process.env.DB_HOST || '').toLowerCase();
+let hostFromConnectionString = '';
+
+if (connectionString) {
+    try {
+        hostFromConnectionString = String(new URL(connectionString).hostname || '').toLowerCase();
+    } catch (error) {
+        console.warn('Invalid DATABASE_URL format. Falling back to DB_HOST/DB_* variables.');
+    }
+}
+
+const resolvedHost = hostFromConnectionString || host;
 const sslDisabled = ['0', 'false', 'no', 'disable'].includes(sslFlag);
 const sslEnabledByFlag = ['1', 'true', 'yes', 'require', 'verify-ca', 'verify-full'].includes(sslFlag);
-const sslEnabledByHost = host.includes('supabase.co') || host.includes('neon.tech') || host.includes('render.com');
+const sslEnabledByHost = resolvedHost.includes('supabase.co') || resolvedHost.includes('neon.tech') || resolvedHost.includes('render.com');
 const useSsl = !sslDisabled && (sslEnabledByFlag || (!sslFlag && sslEnabledByHost));
-const configuredPoolMax = Number(process.env.DB_POOL_MAX || process.env.PGPOOL_MAX || 5);
-const poolMax = Number.isFinite(configuredPoolMax) && configuredPoolMax > 0 ? configuredPoolMax : 5;
-
-const pool = new Pool({
-    host: process.env.DB_HOST,
-    user: process.env.DB_USER,
-    password: process.env.DB_PASSWORD,
-    database: process.env.DB_NAME,
-    port: process.env.DB_PORT || 5432,
+const poolConfig = {
+    connectionString,
     ssl: useSsl ? { rejectUnauthorized: false } : false,
-    max: poolMax,
+    max: 5,
     idleTimeoutMillis: 30000,
-    connectionTimeoutMillis: 10000,
+    connectionTimeoutMillis: 2000,
     keepAlive: true,
-});
+};
+
+if (!connectionString) {
+    delete poolConfig.connectionString;
+    poolConfig.host = process.env.DB_HOST;
+    poolConfig.user = process.env.DB_USER;
+    poolConfig.password = process.env.DB_PASSWORD;
+    poolConfig.database = process.env.DB_NAME;
+    poolConfig.port = process.env.DB_PORT || 5432;
+}
+
+const pool = new Pool(poolConfig);
 
 const connectDB = async () => {
     try {
-        const client = await pool.connect();
+        await pool.query('SELECT 1');
         console.log('PostgreSQL Database (Supabase) Connected Successfully');
-        client.release();
     } catch (error) {
         console.error('Database Connection Failed:', error.message);
     }
 };
 
-module.exports = { pool, connectDB };
+module.exports = { pool, poolConfig, connectDB };

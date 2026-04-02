@@ -1,6 +1,0 @@
-emp_id,employee_name,email,phone,department,designation,salary,joining_date,status
-EMP1001,Arun Kumar,arun.kumar@example.com,9876543210,Computer Science,Assistant Professor,35000,2024-06-10,active
-EMP1002,Meena Devi,meena.devi@example.com,9123456780,Mathematics,Lecturer,32000,2023-11-01,inactive
-EMP1003,Rahul Prasad,rahul.prasad@example.com,9000012345,Physics,Lab Assistant,22000,2022-07-18,active
-EMP1004,Priya Nair,priya.nair@example.com,9011122233,English,Associate Professor,48000,2021-01-05,active
-EMP1005,Sathish Raj,sathish.raj@example.com,9090909090,Commerce,Account Assistant,28000,2020-09-25,active

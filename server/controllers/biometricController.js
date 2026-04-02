@@ -7,6 +7,21 @@ const path = require('path');
 const PENDING_DIR = path.join(__dirname, '..', 'data');
 const PENDING_FILE = path.join(PENDING_DIR, 'biometric_pending_logs.jsonl');
 const MIN_PUNCH_INTERVAL_MS = 10 * 60 * 1000;
+const DB_RETRY_INTERVAL_MS = Number(process.env.BIOMETRIC_DB_RETRY_INTERVAL_MS || 7000);
+const DB_RECOVERY_BATCH_SIZE = Number(process.env.BIOMETRIC_DB_RECOVERY_BATCH_SIZE || 10);
+const DB_RECOVERY_ITEM_DELAY_MS = Number(process.env.BIOMETRIC_DB_RECOVERY_ITEM_DELAY_MS || 120);
+
+const dbRuntimeState = {
+    status: 'DB_CONNECTED',
+    lastError: null,
+    lastCheckedAt: null,
+    lastRecoveredAt: null,
+};
+
+const inMemoryPendingLogs = [];
+let pendingLogsLoaded = false;
+let recoveryWorkerStarted = false;
+let recoveryWorkerRunning = false;
 
 const normalizePunchType = (rawType, dateRef) => {
     const val = String(rawType ?? '').trim().toUpperCase();
@@ -139,8 +154,94 @@ const isTransientDbError = (error) => {
     );
 };
 
+const delay = (ms) => new Promise((resolve) => setTimeout(resolve, Math.max(0, Number(ms) || 0)));
+
+const normalizePendingPayload = (payload = {}, fallbackTimestamp = new Date().toISOString()) => {
+    const empId = String(payload.emp_id || payload.user_id || '').trim();
+    const timestamp = payload.timestamp || payload.recordTime || fallbackTimestamp;
+    return {
+        emp_id: empId,
+        timestamp,
+        device_id: payload.device_id || payload.device_ip || 'ZK_ZKTECO',
+        type: payload.type || null,
+        raw: payload.raw || null,
+    };
+};
+
+const markDbDisconnected = (error) => {
+    dbRuntimeState.status = 'DB_DISCONNECTED';
+    dbRuntimeState.lastError = error?.message || 'Unknown DB error';
+    dbRuntimeState.lastCheckedAt = new Date().toISOString();
+};
+
+const markDbConnected = () => {
+    const wasDisconnected = dbRuntimeState.status === 'DB_DISCONNECTED';
+    dbRuntimeState.status = 'DB_CONNECTED';
+    dbRuntimeState.lastError = null;
+    dbRuntimeState.lastCheckedAt = new Date().toISOString();
+    if (wasDisconnected) {
+        dbRuntimeState.lastRecoveredAt = new Date().toISOString();
+        console.log('[BIOMETRIC] DB recovered. Resuming queued punch replay.');
+    }
+};
+
+const persistPendingQueueSnapshot = () => {
+    try {
+        if (!fs.existsSync(PENDING_DIR)) {
+            fs.mkdirSync(PENDING_DIR, { recursive: true });
+        }
+
+        if (inMemoryPendingLogs.length === 0) {
+            if (fs.existsSync(PENDING_FILE)) fs.unlinkSync(PENDING_FILE);
+            return;
+        }
+
+        const lines = inMemoryPendingLogs.map((entry) => JSON.stringify(entry));
+        fs.writeFileSync(PENDING_FILE, `${lines.join('\n')}\n`, 'utf8');
+    } catch (err) {
+        console.error('Failed to persist biometric pending queue snapshot:', err.message);
+    }
+};
+
+const loadPendingQueueFromFile = () => {
+    if (pendingLogsLoaded) return;
+    pendingLogsLoaded = true;
+
+    try {
+        if (!fs.existsSync(PENDING_FILE)) return;
+        const raw = fs.readFileSync(PENDING_FILE, 'utf8');
+        const lines = raw.split('\n').filter(Boolean);
+
+        for (const line of lines) {
+            try {
+                const entry = JSON.parse(line);
+                const normalized = normalizePendingPayload(entry?.payload || {}, entry?.queued_at || new Date().toISOString());
+                if (!normalized.emp_id) continue;
+                inMemoryPendingLogs.push({
+                    queued_at: entry?.queued_at || new Date().toISOString(),
+                    reason: entry?.reason || 'Recovered from disk',
+                    payload: normalized,
+                });
+            } catch (lineErr) {
+                console.error('Skipping invalid queued biometric line:', lineErr.message);
+            }
+        }
+
+        if (inMemoryPendingLogs.length > 0) {
+            console.log(`[BIOMETRIC] Loaded ${inMemoryPendingLogs.length} queued punches from disk.`);
+        }
+    } catch (err) {
+        console.error('Failed to load biometric pending queue from disk:', err.message);
+    }
+};
+
 const queuePendingBiometricLog = (payload, error) => {
     try {
+        loadPendingQueueFromFile();
+
+        const normalized = normalizePendingPayload(payload, new Date().toISOString());
+        if (!normalized.emp_id) return;
+
         if (!fs.existsSync(PENDING_DIR)) {
             fs.mkdirSync(PENDING_DIR, { recursive: true });
         }
@@ -148,8 +249,10 @@ const queuePendingBiometricLog = (payload, error) => {
         const entry = {
             queued_at: new Date().toISOString(),
             reason: error?.message || 'Unknown DB error',
-            payload,
+            payload: normalized,
         };
+
+        inMemoryPendingLogs.push(entry);
 
         fs.appendFileSync(PENDING_FILE, `${JSON.stringify(entry)}\n`, 'utf8');
     } catch (queueErr) {
@@ -158,54 +261,88 @@ const queuePendingBiometricLog = (payload, error) => {
 };
 
 const drainPendingBiometricLogs = async (limit = 25) => {
-    if (!fs.existsSync(PENDING_FILE)) return { replayed: 0, remaining: 0 };
-
-    const raw = fs.readFileSync(PENDING_FILE, 'utf8');
-    const lines = raw.split('\n').filter(Boolean);
-    if (lines.length === 0) return { replayed: 0, remaining: 0 };
+    loadPendingQueueFromFile();
+    if (inMemoryPendingLogs.length === 0) return { replayed: 0, remaining: 0, failed: 0 };
 
     let replayed = 0;
-    const keep = [];
+    let failed = 0;
 
-    for (let i = 0; i < lines.length; i += 1) {
-        const line = lines[i];
-        if (replayed >= limit) {
-            keep.push(line);
-            continue;
-        }
+    while (inMemoryPendingLogs.length > 0 && replayed < limit) {
+        const entry = inMemoryPendingLogs[0];
 
         try {
-            const entry = JSON.parse(line);
             const payload = entry && entry.payload ? entry.payload : {};
-            // Support both emp_id (new) and user_id (legacy bridge field)
             const queuedEmpId = String(payload.emp_id || payload.user_id || '').trim();
             if (!queuedEmpId) {
+                inMemoryPendingLogs.shift();
                 continue;
             }
 
             const queuedLogDate = payload.timestamp ? new Date(payload.timestamp) : new Date(entry.queued_at || Date.now());
-            // No longer forcing user creation here
             await runWithSequenceFix(
-                'INSERT INTO biometric_logs (device_id, emp_id, log_time, type) VALUES ($1, $2, $3, $4)',
+                `INSERT INTO biometric_logs (device_id, emp_id, log_time, type)
+                 VALUES ($1, $2, $3, $4)
+                 ON CONFLICT (emp_id, log_time) DO NOTHING`,
                 [payload.device_id || 'PENDING_QUEUE', queuedEmpId, queuedLogDate, payload.type || (queuedLogDate.getHours() < 12 ? 'IN' : 'OUT')],
                 'biometric_logs'
             );
             const queuedDateStr = queuedLogDate.toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
             await rebuildAttendanceFromBiometricTimeline(queuedEmpId, queuedDateStr);
+
+            inMemoryPendingLogs.shift();
             replayed += 1;
+            if (DB_RECOVERY_ITEM_DELAY_MS > 0) {
+                await delay(DB_RECOVERY_ITEM_DELAY_MS);
+            }
         } catch (err) {
-            keep.push(line);
+            if (isTransientDbError(err)) {
+                markDbDisconnected(err);
+                break;
+            }
+
+            failed += 1;
+            const blocked = inMemoryPendingLogs.shift();
+            if (blocked) inMemoryPendingLogs.push(blocked);
+            console.error('Failed replaying queued biometric punch:', err.message);
         }
     }
 
-    if (keep.length > 0) {
-        fs.writeFileSync(PENDING_FILE, `${keep.join('\n')}\n`, 'utf8');
-    } else {
-        fs.unlinkSync(PENDING_FILE);
-    }
+    persistPendingQueueSnapshot();
 
-    return { replayed, remaining: keep.length };
+    return { replayed, remaining: inMemoryPendingLogs.length, failed };
 };
+
+const startPendingRecoveryWorker = () => {
+    if (recoveryWorkerStarted) return;
+    recoveryWorkerStarted = true;
+    loadPendingQueueFromFile();
+
+    setInterval(async () => {
+        if (recoveryWorkerRunning) return;
+        recoveryWorkerRunning = true;
+
+        try {
+            try {
+                await pool.query('SELECT 1');
+                markDbConnected();
+            } catch (pingErr) {
+                markDbDisconnected(pingErr);
+                return;
+            }
+
+            if (inMemoryPendingLogs.length > 0) {
+                const result = await drainPendingBiometricLogs(DB_RECOVERY_BATCH_SIZE);
+                if (result.replayed > 0 || result.failed > 0) {
+                    console.log(`[BIOMETRIC] Queue replay: replayed=${result.replayed}, failed=${result.failed}, remaining=${result.remaining}`);
+                }
+            }
+        } finally {
+            recoveryWorkerRunning = false;
+        }
+    }, Math.max(5000, DB_RETRY_INTERVAL_MS));
+};
+
+startPendingRecoveryWorker();
 
 const ensureBiometricUser = async (empId) => {
     const safeEmpId = String(empId || '').trim();
@@ -472,7 +609,17 @@ exports.receiveLog = async (req, res) => {
         return res.status(400).json({ message: 'emp_id or user_id is required' });
     }
 
+    if (dbRuntimeState.status === 'DB_DISCONNECTED') {
+        queuePendingBiometricLog(req.body, new Error('DB_DISCONNECTED'));
+        return res.status(202).json({
+            message: 'DB disconnected. Punch queued for replay.',
+            state: dbRuntimeState.status,
+            queued: true,
+        });
+    }
+
     try {
+        markDbConnected();
         const normalizedEmpId = finalEmpId;
         const deviceId = device_id || device_ip || 'ZK_ZKTECO';
         const finalTimestamp = timestamp || recordTime;
@@ -537,7 +684,7 @@ exports.receiveLog = async (req, res) => {
             `INSERT INTO biometric_logs (device_id, emp_id, log_time, type) 
              VALUES ($1, $2, $3, $4)
              ON CONFLICT (emp_id, log_time) 
-             DO UPDATE SET device_id = EXCLUDED.device_id, type = EXCLUDED.type`,
+             DO NOTHING`,
             [deviceId || 'ADMS', normalizedEmpId, istParts.timestamp, normalizedPunchType],
             'biometric_logs'
         );
@@ -608,15 +755,11 @@ exports.receiveLog = async (req, res) => {
             io.emit('biometric_punch', punchData); // Broadcast for updates
         }
 
-        // 6. Best-effort replay of previously queued logs
-        try {
-            await drainPendingBiometricLogs(5);
-        } catch (e) {}
-
         return res.status(200).json({ message: 'Log processed successfully (Attendance Synced)' });
     } catch (error) {
         console.error('🔴 Biometric processing error:', error);
         if (isTransientDbError(error)) {
+            markDbDisconnected(error);
             queuePendingBiometricLog(req.body, error);
             return res.status(202).json({ message: 'Biometric punch queued due to temporary DB issue' });
         }

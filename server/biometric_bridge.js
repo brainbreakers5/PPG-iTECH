@@ -4,25 +4,33 @@ const https = require('https');
 require('dotenv').config();
 
 /**
- * BIOMETRIC REAL-TIME BRIDGE
- * 
- * This script connects to your device (172.16.107.81) and pushes data
- * to the web application as soon as someone punches their finger.
+ * Realtime-only biometric bridge for ZKTeco/eSSL devices.
+ * - No periodic getAttendances polling
+ * - Realtime callback only enqueues punches
+ * - Background worker drains queue in batches with retry/backoff
  */
 
 const DEVICE_IP = process.env.BIOMETRIC_DEVICE_IP || '172.16.107.81';
 const DEVICE_PORT = Number(process.env.BIOMETRIC_DEVICE_PORT || 4370);
 const DEVICE_ID = process.env.BIOMETRIC_DEVICE_ID || 'MAIN_DEVICE_01';
-const POLL_INTERVAL_MS = Number(process.env.BIOMETRIC_POLL_INTERVAL_MS || 300000); // 5 minutes
-const POLL_PUSH_DELAY_MS = Number(process.env.BIOMETRIC_POLL_PUSH_DELAY_MS || 25);
-const SERVER_API_URL = process.env.SERVER_API_BIOMETRIC_URL || `http://localhost:${process.env.PORT || 5000}/api/biometric/log`; // Adjust if server is remote
+const SERVER_API_URL =
+  process.env.SERVER_API_BIOMETRIC_URL ||
+  `http://localhost:${process.env.PORT || 5000}/api/biometric/log`;
+
+const BATCH_SIZE = Math.max(1, Number(process.env.BIOMETRIC_QUEUE_BATCH_SIZE || 20));
+const BATCH_INTERVAL_MS = Math.max(200, Number(process.env.BIOMETRIC_QUEUE_INTERVAL_MS || 1000));
+const SEND_CONCURRENCY = Math.max(1, Number(process.env.BIOMETRIC_SEND_CONCURRENCY || 5));
+const KEEP_ALIVE_MS = Math.max(30000, Number(process.env.BIOMETRIC_KEEP_ALIVE_MS || 45000));
+const RETRY_BASE_MS = Math.max(250, Number(process.env.BIOMETRIC_RETRY_BASE_MS || 1000));
+const RETRY_MAX_MS = Math.max(5000, Number(process.env.BIOMETRIC_RETRY_MAX_MS || 60000));
+const RECENT_SEEN_MAX = Math.max(1000, Number(process.env.BIOMETRIC_RECENT_SEEN_MAX || 5000));
 
 const makeAxiosOptions = () => {
-  const axiosOptions = {};
+  const options = { timeout: 10000 };
   if (process.env.DISABLE_TLS_VERIFY === '1') {
-    axiosOptions.httpsAgent = new https.Agent({ rejectUnauthorized: false });
+    options.httpsAgent = new https.Agent({ rejectUnauthorized: false });
   }
-  return axiosOptions;
+  return options;
 };
 
 const safeParseDate = (value) => {
@@ -40,55 +48,10 @@ const normalizePunchType = (rawType, dateRef) => {
   return dt.getHours() < 12 ? 'IN' : 'OUT';
 };
 
-// Lightweight local de-dupe to prevent realtime + polling from re-sending the same record repeatedly.
-// Server also has DB-level conflict guard + near-duplicate debouncer.
-const RECENT_SEEN_MAX = Number(process.env.BIOMETRIC_RECENT_SEEN_MAX || 5000);
-const seenKeys = new Set();
-const seenQueue = [];
-const rememberSeen = (key) => {
-  if (!key) return;
-  if (seenKeys.has(key)) return;
-  seenKeys.add(key);
-  seenQueue.push(key);
-  while (seenQueue.length > RECENT_SEEN_MAX) {
-    const old = seenQueue.shift();
-    if (old) seenKeys.delete(old);
-  }
-};
-
-const buildPunchKey = (empId, timestampIso) => `${String(empId || '').trim()}|${String(timestampIso || '').trim()}`;
-
-const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, Math.max(0, Number(ms) || 0)));
-
-const getDateRangeForTodayAndYesterday = () => {
-  const now = new Date();
-  const startOfToday = new Date(now);
-  startOfToday.setHours(0, 0, 0, 0);
-
-  const startOfYesterday = new Date(startOfToday);
-  startOfYesterday.setDate(startOfYesterday.getDate() - 1);
-
-  const startOfTomorrow = new Date(startOfToday);
-  startOfTomorrow.setDate(startOfTomorrow.getDate() + 1);
-
-  return { startOfYesterday, startOfTomorrow };
-};
-
-const isDeviceConnectionError = (err) => {
-  const details = unwrapError(err);
-  const code = String(details?.code || '').toUpperCase();
-  const msg = String(details?.message || '').toLowerCase();
-  return (
-    ['ETIMEDOUT', 'ECONNREFUSED', 'EHOSTUNREACH', 'ENETUNREACH', 'ECONNRESET'].includes(code) ||
-    msg.includes('timeout') ||
-    msg.includes('timed out') ||
-    msg.includes('socket') ||
-    msg.includes('connect')
-  );
-};
+const buildPunchKey = (empId, timestampIso) =>
+  `${String(empId || '').trim()}|${String(timestampIso || '').trim()}`;
 
 const unwrapError = (err) => {
-  // zkteco-js sometimes wraps real Error inside nested "Errors" objects.
   const candidates = [
     err,
     err?.err,
@@ -98,7 +61,10 @@ const unwrapError = (err) => {
     err?.cause?.err,
   ].filter(Boolean);
 
-  const core = candidates.find((c) => c instanceof Error) || candidates.find((c) => typeof c?.message === 'string' || typeof c?.code === 'string') || err;
+  const core =
+    candidates.find((c) => c instanceof Error) ||
+    candidates.find((c) => typeof c?.message === 'string' || typeof c?.code === 'string') ||
+    err;
 
   return {
     message: core?.message,
@@ -111,185 +77,250 @@ const unwrapError = (err) => {
   };
 };
 
-const pushToServer = async ({ userId, timestamp, recordTime, type, deviceId, raw }) => {
-  const empId = String(userId || '').trim();
-  if (!empId) return;
-
-  const dt = safeParseDate(timestamp || recordTime);
-  const iso = (dt || new Date()).toISOString();
-  const key = buildPunchKey(empId, iso);
-  if (seenKeys.has(key)) return;
-  rememberSeen(key);
-
-  try {
-    const payload = {
-      emp_id: empId,
-      device_id: deviceId || DEVICE_ID,
-      timestamp: iso,
-      type: normalizePunchType(type, dt),
-      // Keep raw for debugging/backtracking if needed; server ignores unknown fields.
-      raw
-    };
-
-    const response = await axios.post(SERVER_API_URL, payload, makeAxiosOptions());
-    if (response.status === 200 || response.status === 202) {
-      console.log(`[${new Date().toLocaleTimeString()}] 🚀 Pushed punch emp_id=${empId} time=${iso} (status=${response.status})`);
-    }
-  } catch (postError) {
-    console.error(`[${new Date().toLocaleTimeString()}] ❌ Failed to push punch emp_id=${empId}:`, postError.message);
-  }
+const isLikelyDeviceError = (err) => {
+  const details = unwrapError(err);
+  const code = String(details?.code || '').toUpperCase();
+  const msg = String(details?.message || '').toLowerCase();
+  return (
+    ['ETIMEDOUT', 'ECONNREFUSED', 'EHOSTUNREACH', 'ENETUNREACH', 'ECONNRESET'].includes(code) ||
+    msg.includes('timeout') ||
+    msg.includes('timed out') ||
+    msg.includes('socket') ||
+    msg.includes('connect')
+  );
 };
 
-async function startBridge() {
-  let zkInstance = new ZKLib(DEVICE_IP, DEVICE_PORT, 10000, 4000);
+class BridgeRuntime {
+  constructor() {
+    this.zkInstance = null;
+    this.reconnectTimer = null;
+    this.keepAliveTimer = null;
+    this.batchTimer = null;
+    this.reconnectScheduled = false;
+    this.processing = false;
+    this.lastRealtimeAt = 0;
 
-  let pollTimer = null;
-  let lastPolledAt = null; // Date
-  let reconnectScheduled = false;
+    this.queue = [];
+    this.queuedKeys = new Set();
+    this.recentKeys = new Set();
+    this.recentOrder = [];
+  }
 
-  const clearPolling = () => {
-    if (pollTimer) {
-      clearInterval(pollTimer);
-      pollTimer = null;
+  rememberRecent(key) {
+    if (!key || this.recentKeys.has(key)) return;
+    this.recentKeys.add(key);
+    this.recentOrder.push(key);
+    while (this.recentOrder.length > RECENT_SEEN_MAX) {
+      const old = this.recentOrder.shift();
+      if (old) this.recentKeys.delete(old);
     }
-  };
+  }
 
-  const safeDisconnect = async () => {
-    try {
-      if (zkInstance && typeof zkInstance.disconnect === 'function') {
-        await zkInstance.disconnect();
-      }
-    } catch {}
-  };
+  enqueueRealtime(data) {
+    const empId = String(data?.userId ?? data?.deviceUserId ?? data?.uid ?? '').trim();
+    if (!empId) return;
 
-  const scheduleReconnect = async (reason, delayMs = 10000) => {
-    if (reconnectScheduled) return;
-    reconnectScheduled = true;
-    clearPolling();
-    await safeDisconnect();
-    console.error(`[${new Date().toLocaleTimeString()}] 🔁 Reconnecting bridge in ${Math.round(delayMs / 1000)}s. Reason: ${reason}`);
-    setTimeout(startBridge, delayMs);
-  };
+    const dt = safeParseDate(data?.recordTime ?? data?.timestamp ?? data?.time) || new Date();
+    const timestampIso = dt.toISOString();
+    const dedupeKey = buildPunchKey(empId, timestampIso);
 
-  const pollOnce = async () => {
-    console.log(`[${new Date().toLocaleTimeString()}] 📥 Polling device logs...`);
-
-    // zkteco-js has different method names across versions; prefer getAttendances.
-    const getAttendancesFn = zkInstance.getAttendances || zkInstance.getAttendancesLog || zkInstance.getAttendances;
-    if (typeof getAttendancesFn !== 'function') {
-      console.log(`[${new Date().toLocaleTimeString()}] ⚠️ Polling skipped: zkInstance.getAttendances() not available in this library version.`);
+    if (this.recentKeys.has(dedupeKey) || this.queuedKeys.has(dedupeKey)) {
       return;
     }
 
-    const logs = await getAttendancesFn.call(zkInstance);
-    const rows = Array.isArray(logs?.data) ? logs.data : Array.isArray(logs) ? logs : [];
+    this.queue.push({
+      dedupeKey,
+      payload: {
+        emp_id: empId,
+        device_id: DEVICE_ID,
+        timestamp: timestampIso,
+        type: normalizePunchType(data?.type ?? data?.state ?? data?.status ?? data?.punch, dt),
+        raw: { source: 'realtime', data },
+      },
+      attempt: 0,
+      nextAttemptAt: Date.now(),
+      enqueuedAt: Date.now(),
+    });
 
-    const { startOfYesterday, startOfTomorrow } = getDateRangeForTodayAndYesterday();
+    this.queuedKeys.add(dedupeKey);
+    this.lastRealtimeAt = Date.now();
+    console.log(
+      `[${new Date().toLocaleTimeString()}] 🔔 Enqueued realtime punch emp_id=${empId}. queue=${this.queue.length}`
+    );
+  }
 
-    // Filter incrementally to avoid re-sending huge history each poll.
-    // Keep a small overlap window to tolerate clock jitter and missed updates.
-    const overlapMs = 2 * 60 * 1000;
-    const cutoff = lastPolledAt ? new Date(lastPolledAt.getTime() - overlapMs) : null;
+  async postPunch(item) {
+    await axios.post(SERVER_API_URL, item.payload, makeAxiosOptions());
+  }
 
-    let newest = lastPolledAt;
-    let processed = 0;
+  async processBatch() {
+    if (this.processing || this.queue.length === 0) return;
+    this.processing = true;
 
-    for (const log of rows) {
-      const empId = log?.deviceUserId ?? log?.userId ?? log?.uid ?? log?.PIN ?? log?.emp_id;
-      const rt = log?.recordTime ?? log?.timestamp ?? log?.time ?? log?.logTime;
-      const dt = safeParseDate(rt);
-      if (!empId || !dt) continue;
+    try {
+      const now = Date.now();
+      const eligible = [];
 
-      // Requirement: keep only yesterday + today punches from device pull.
-      if (dt < startOfYesterday || dt >= startOfTomorrow) continue;
-
-      if (cutoff && dt <= cutoff) continue;
-
-      await pushToServer({
-        userId: empId,
-        recordTime: dt,
-        type: normalizePunchType(log?.type ?? log?.state ?? log?.status ?? log?.punch, dt),
-        deviceId: DEVICE_ID,
-        raw: { source: 'poll', log }
-      });
-
-      processed += 1;
-      if (POLL_PUSH_DELAY_MS > 0) {
-        await sleep(POLL_PUSH_DELAY_MS);
-      }
-
-      if (!newest || dt > newest) newest = dt;
-    }
-
-    if (newest) lastPolledAt = newest;
-    console.log(`[${new Date().toLocaleTimeString()}] ✅ Poll cycle complete. Total logs=${rows.length}, processed=${processed}`);
-  };
-
-  const startPolling = () => {
-    clearPolling();
-    pollTimer = setInterval(async () => {
-      try {
-        await pollOnce();
-      } catch (err) {
-        const details = unwrapError(err);
-        console.error(`[${new Date().toLocaleTimeString()}] ❌ Polling error:`, details);
-        if (isDeviceConnectionError(err)) {
-          await scheduleReconnect(details?.message || 'device connection error while polling', 10000);
+      for (let i = 0; i < this.queue.length && eligible.length < BATCH_SIZE; i += 1) {
+        if (this.queue[i].nextAttemptAt <= now) {
+          eligible.push(this.queue[i]);
         }
       }
-    }, POLL_INTERVAL_MS);
 
-    // Run once immediately so backup starts without waiting first 5-minute interval.
-    pollOnce().catch(async (err) => {
-      const details = unwrapError(err);
-      console.error(`[${new Date().toLocaleTimeString()}] ❌ Initial poll error:`, details);
-      if (isDeviceConnectionError(err)) {
-        await scheduleReconnect(details?.message || 'device connection error on initial poll', 10000);
+      if (eligible.length === 0) return;
+
+      for (let i = 0; i < eligible.length; i += SEND_CONCURRENCY) {
+        const chunk = eligible.slice(i, i + SEND_CONCURRENCY);
+        const settled = await Promise.allSettled(
+          chunk.map(async (item) => {
+            await this.postPunch(item);
+            return item;
+          })
+        );
+
+        for (let j = 0; j < settled.length; j += 1) {
+          const item = chunk[j];
+          const result = settled[j];
+
+          if (result.status === 'fulfilled') {
+            this.queue = this.queue.filter((q) => q !== item);
+            this.queuedKeys.delete(item.dedupeKey);
+            this.rememberRecent(item.dedupeKey);
+
+            console.log(
+              `[${new Date().toLocaleTimeString()}] ✅ Sent punch ${item.payload.emp_id} ${item.payload.timestamp}. queue=${this.queue.length}`
+            );
+            continue;
+          }
+
+          const err = result.reason || new Error('Unknown send error');
+          item.attempt += 1;
+          const backoff = Math.min(RETRY_BASE_MS * 2 ** (item.attempt - 1), RETRY_MAX_MS);
+          item.nextAttemptAt = Date.now() + backoff;
+
+          console.error(
+            `[${new Date().toLocaleTimeString()}] ⚠️ Send failed (attempt ${item.attempt}) emp_id=${item.payload.emp_id}. retry_in=${backoff}ms. reason=${err.message}`
+          );
+        }
       }
-    });
-  };
+    } finally {
+      this.processing = false;
+    }
+  }
 
-  try {  
-    console.log(`[${new Date().toLocaleTimeString()}] Connecting to biometric device at ${DEVICE_IP}...`);  
-    await zkInstance.createSocket();  
-    console.log(`[${new Date().toLocaleTimeString()}] ✅ Connected to device! Listening for real-time punches...`);  
+  async safeDisconnect() {
+    if (!this.zkInstance || typeof this.zkInstance.disconnect !== 'function') return;
+    try {
+      await this.zkInstance.disconnect();
+    } catch (err) {
+      console.error(`[${new Date().toLocaleTimeString()}] Disconnect warning: ${err.message}`);
+    }
+  }
 
-    // Get live notifications  
-    zkInstance.getRealTimeLogs(async (data) => {  
-        const empId = data?.userId ?? data?.deviceUserId ?? data?.uid;
-        const deviceTime = data?.recordTime ?? data?.timestamp ?? data?.time;
-        console.log(`[${new Date().toLocaleTimeString()}] 🔔 Realtime punch: ${empId}`);
+  scheduleReconnect(reason, delayMs = 10000) {
+    if (this.reconnectScheduled) return;
+    this.reconnectScheduled = true;
 
-        await pushToServer({
-          userId: empId,
-          recordTime: deviceTime,
-          type: normalizePunchType(data?.type ?? data?.state ?? data?.status ?? data?.punch, deviceTime),
-          deviceId: DEVICE_ID,
-          raw: { source: 'realtime', data }
-        });
-    });  
+    if (this.keepAliveTimer) {
+      clearInterval(this.keepAliveTimer);
+      this.keepAliveTimer = null;
+    }
 
-    // Start polling fallback (VERY IMPORTANT) – recovers missed realtime punches.
-    startPolling();
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+    }
 
-  } catch (e) {  
-    console.error(`[${new Date().toLocaleTimeString()}] ❌ Connection Error:`);
-    console.error(e);
-    console.error('Connection error details:', unwrapError(e));
-    console.log("Retrying in 10 seconds...");  
-    clearPolling();
-    await scheduleReconnect('initial connect failure', 10000);
+    console.error(
+      `[${new Date().toLocaleTimeString()}] 🔁 Reconnecting in ${Math.round(delayMs / 1000)}s. reason=${reason}`
+    );
+
+    this.reconnectTimer = setTimeout(async () => {
+      this.reconnectScheduled = false;
+      await this.start();
+    }, delayMs);
+  }
+
+  startBatchLoop() {
+    if (this.batchTimer) return;
+    this.batchTimer = setInterval(() => {
+      this.processBatch().catch((err) => {
+        console.error(`[${new Date().toLocaleTimeString()}] Queue worker error:`, unwrapError(err));
+      });
+    }, BATCH_INTERVAL_MS);
+  }
+
+  startKeepAlive() {
+    if (this.keepAliveTimer) clearInterval(this.keepAliveTimer);
+
+    this.keepAliveTimer = setInterval(async () => {
+      if (!this.zkInstance) return;
+
+      try {
+        // Prefer lightweight heartbeat methods if available in current zkteco-js build.
+        if (typeof this.zkInstance.getTime === 'function') {
+          await this.zkInstance.getTime();
+        } else if (typeof this.zkInstance.getInfo === 'function') {
+          await this.zkInstance.getInfo();
+        }
+
+        const ageMs = Date.now() - this.lastRealtimeAt;
+        if (this.lastRealtimeAt > 0 && ageMs > KEEP_ALIVE_MS * 6) {
+          throw new Error(`No realtime events for ${Math.round(ageMs / 1000)}s`);
+        }
+      } catch (err) {
+        const details = unwrapError(err);
+        console.error(`[${new Date().toLocaleTimeString()}] Keep-alive failed:`, details);
+        if (isLikelyDeviceError(err) || String(details?.message || '').includes('No realtime events')) {
+          await this.safeDisconnect();
+          this.scheduleReconnect(details?.message || 'keep-alive failure', 10000);
+        }
+      }
+    }, KEEP_ALIVE_MS);
+  }
+
+  async start() {
+    try {
+      await this.safeDisconnect();
+
+      this.zkInstance = new ZKLib(DEVICE_IP, DEVICE_PORT, 10000, 4000);
+      console.log(
+        `[${new Date().toLocaleTimeString()}] Connecting to biometric device ${DEVICE_IP}:${DEVICE_PORT}...`
+      );
+
+      await this.zkInstance.createSocket();
+      this.lastRealtimeAt = Date.now();
+      console.log(`[${new Date().toLocaleTimeString()}] ✅ Connected. Realtime listener active.`);
+
+      // Realtime callback must only enqueue. No direct API writes here.
+      this.zkInstance.getRealTimeLogs((data) => {
+        try {
+          this.enqueueRealtime(data);
+        } catch (err) {
+          console.error(`[${new Date().toLocaleTimeString()}] Realtime callback error:`, unwrapError(err));
+        }
+      });
+
+      this.startBatchLoop();
+      this.startKeepAlive();
+    } catch (err) {
+      const details = unwrapError(err);
+      console.error(`[${new Date().toLocaleTimeString()}] ❌ Bridge start error:`, details);
+      await this.safeDisconnect();
+      this.scheduleReconnect(details?.message || 'initial connect failure', 10000);
+    }
   }
 }
 
-// Keep the process alive and handle errors
+const runtime = new BridgeRuntime();
+
 process.on('uncaughtException', (err) => {
   console.error('Fatal Error:', err);
-  setTimeout(startBridge, 5000);
+  runtime.scheduleReconnect('uncaughtException', 5000);
 });
 
 process.on('unhandledRejection', (err) => {
   console.error('Unhandled Rejection:', err);
 });
 
-startBridge();
+runtime.start();

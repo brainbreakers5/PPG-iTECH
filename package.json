@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "description": "PPG Employee Management Hub",
   "scripts": {
+    "start": "cd server && node server.js",
     "install-client": "cd client && npm install",
     "install-server": "cd server && npm install",
     "install-all": "npm run install-client && npm run install-server",
