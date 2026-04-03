@@ -288,11 +288,11 @@ const normalizeSalaryRow = (row) => {
     normalized.total_days_in_period = Number(row.total_days_in_period ?? row.totalDaysInPeriod ?? row.total_days ?? row.totalDays ?? 0) || 0;
     normalized.deductions_applied = Number(row.deductions_applied ?? row.deductionsApplied ?? row.total_deductions ?? row.totalDeductions ?? 0) || 0;
     normalized.calculated_salary = Number(row.calculated_salary ?? row.calculatedSalary ?? row.net_salary ?? row.netSalary ?? 0) || 0;
-    // New granular breakdown fields
-    normalized.present_days = Number(row.present_days ?? row.total_present ?? 0) || 0;
-    normalized.with_pay_days = Number(row.with_pay_days ?? row.with_pay_count ?? row.total_present ?? 0) || 0;
-    normalized.without_pay_days = Number(row.without_pay_days ?? row.without_pay_count ?? row.total_lop ?? 0) || 0;
-    normalized.total_payable_days = Number(row.total_payable_days ?? row.with_pay_count ?? row.total_present ?? 0) || 0;
+    // New granular breakdown fields - carefully fallback to legacy values if the new fields are exactly 0 (which happens due to DB DEFAULT 0 on old records)
+    normalized.present_days = Number(row.present_days || row.total_present || 0) || 0;
+    normalized.with_pay_days = Number(row.with_pay_days || row.with_pay_count || row.total_present || 0) || 0;
+    normalized.without_pay_days = Number(row.without_pay_days || row.without_pay_count || row.total_lop || 0) || 0;
+    normalized.total_payable_days = Number(row.total_payable_days || row.with_pay_count || row.total_present || 0) || 0;
 
     normalized.status = String(row.status ?? row.salary_status ?? row.salaryStatus ?? 'Pending');
 
