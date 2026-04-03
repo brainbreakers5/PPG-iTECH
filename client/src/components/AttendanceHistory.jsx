@@ -48,11 +48,20 @@ const AttendanceHistory = ({ empId, month: propMonth, startDate, endDate, recent
         } finally {
             setLoading(false);
             if (onLoadSummary && data) {
-                 const workingDays = data.filter(r => r.status && !['Weekend', 'Holiday'].includes(r.status)).length;
+                 const isHalfDay = (r) => (r.remarks || '').toLowerCase().includes('0.5') || (r.remarks || '').toLowerCase().includes('half day');
+                 const getUnit = (r) => isHalfDay(r) ? 0.5 : 1;
+
+                 // Working days is usually the count of distinct dates that aren't weekends/holidays
+                 const workingDayRecords = data.filter(r => r.status && !['Weekend', 'Holiday'].includes(r.status));
+                 const workingDays = workingDayRecords.length; // Count of days
+
                  const holidays = data.filter(r => r.status === 'Holiday').length;
-                 const absent = data.filter(r => String(r.status).includes('Absent')).length;
-                 const lop = data.filter(r => String(r.status).includes('LOP') || String(r.remarks).includes('LOP') || String(r.remarks).includes('Loss of Pay')).length;
+                 
+                 // Summations of units
+                 const absent = data.filter(r => String(r.status).includes('Absent')).reduce((acc, r) => acc + getUnit(r), 0);
+                 const lop = data.filter(r => String(r.status).includes('LOP') || String(r.remarks).includes('LOP') || String(r.remarks).includes('Loss of Pay')).reduce((acc, r) => acc + getUnit(r), 0);
                  const lateEntry = data.filter(r => String(r.remarks).includes('Late Entry') || String(r.status).includes('Late Entry')).length;
+                 
                  onLoadSummary({ workingDays, holidays, absent, lop, lateEntry });
             }
         }

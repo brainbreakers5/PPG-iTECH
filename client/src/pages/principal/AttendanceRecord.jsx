@@ -85,13 +85,18 @@ const AttendanceRecord = () => {
             abbr = map[status] || status;
         }
         
+        const isHalfDay = (remarks || '').toLowerCase().includes('0.5') || (remarks || '').toLowerCase().includes('half day');
         if (isLate) {
-            if (abbr === 'P') return 'LE';
-            if (abbr === 'LOP') return 'LOP (LE)';
-            return `${abbr} (LE)`;
+            let label = '';
+            if (abbr === 'P') label = 'LE';
+            else if (abbr === 'LOP') label = 'LOP (LE)';
+            else label = `${abbr} (LE)`;
+            return isHalfDay ? `${label} (0.5)` : label;
         }
-        return abbr;
-    };    const getStatusCellColor = (rec) => {
+        return isHalfDay ? `${abbr} (0.5)` : abbr;
+    };
+
+    const getStatusCellColor = (rec) => {
         if (!rec) return 'text-gray-400';
         const status = rec.status || '';
         const remarks = rec.remarks || '';
@@ -132,24 +137,26 @@ const AttendanceRecord = () => {
             // Calculate totals
             const status = rec.status || '';
             const remarks = rec.remarks || '';
-            const isLate = remarks.includes('Late Entry');
+            const isLate = (remarks || '').includes('Late Entry');
+            const isHalfDay = (remarks || '').toLowerCase().includes('0.5') || (remarks || '').toLowerCase().includes('half day');
+            const unit = isHalfDay ? 0.5 : 1;
             
             if (isLate) groups[rec.emp_id].totals.LE++;
             
-            if (status.includes('Present')) groups[rec.emp_id].totals.P++;
-            else if (status.includes('Absent')) groups[rec.emp_id].totals.A++;
-            else if (status.includes('Holiday')) groups[rec.emp_id].totals.H++;
-            else if (status.includes('LOP')) groups[rec.emp_id].totals.LOP++;
+            if (status.includes('Present')) groups[rec.emp_id].totals.P += unit;
+            else if (status.includes('Absent')) groups[rec.emp_id].totals.A += unit;
+            else if (status.includes('Holiday')) groups[rec.emp_id].totals.H += unit;
+            else if (status.includes('LOP')) groups[rec.emp_id].totals.LOP += unit;
             
             // Map leave types from status or remarks
             if ((status.includes('CL') || remarks.includes('CL') || remarks.includes('Casual Leave')) && !status.includes('Comp') && !remarks.includes('Comp')) {
-                groups[rec.emp_id].totals.CL++;
+                groups[rec.emp_id].totals.CL += unit;
             } else if (status.includes('ML') || remarks.includes('ML') || remarks.includes('Medical Leave')) {
-                groups[rec.emp_id].totals.ML++;
+                groups[rec.emp_id].totals.ML += unit;
             } else if (status.includes('Comp Leave') || remarks.includes('Comp Leave')) {
-                groups[rec.emp_id].totals.COMP++;
+                groups[rec.emp_id].totals.COMP += unit;
             } else if (status.includes('OD') || remarks.includes('OD') || remarks.includes('On Duty')) {
-                groups[rec.emp_id].totals.OD++;
+                groups[rec.emp_id].totals.OD += unit;
             }
         });
         return Object.values(groups);

@@ -258,8 +258,11 @@ exports.getAttendanceSummary = async (req, res) => {
                 u.emp_id, u.name, u.role, u.department_id,
                 COALESCE(SUM(
                     CASE 
-                        WHEN au.status_text ILIKE '%LOP%' THEN 0
-                        WHEN au.status_text ILIKE '%Present%' THEN 1 
+                        WHEN au.status_text ILIKE '%+%' THEN
+                            (CASE WHEN TRIM(split_part(au.status_text, '+', 1)) ILIKE 'Present' THEN au.split_unit ELSE 0 END)
+                            +
+                            (CASE WHEN TRIM(split_part(au.status_text, '+', 2)) ILIKE 'Present' THEN au.split_unit ELSE 0 END)
+                        WHEN au.status_text ILIKE '%Present%' AND au.status_text NOT ILIKE '%Absent%' AND au.status_text NOT ILIKE '%LOP%' THEN au.unit_value
                         ELSE 0 
                     END
                 ), 0) as total_present,
@@ -321,8 +324,12 @@ exports.getAttendanceSummary = async (req, res) => {
                 ), 0) as total_od,
                 COALESCE(SUM(
                     CASE
+                        WHEN au.status_text ILIKE '%+%' THEN
+                            (CASE WHEN TRIM(split_part(au.status_text, '+', 1)) ILIKE 'LOP' THEN au.split_unit ELSE 0 END)
+                            +
+                            (CASE WHEN TRIM(split_part(au.status_text, '+', 2)) ILIKE 'LOP' THEN au.split_unit ELSE 0 END)
                         WHEN au.status_text ILIKE '%LOP%' OR au.remarks_text ILIKE '%LOP%' OR au.remarks_text ILIKE '%Loss of Pay%'
-                        THEN 1
+                        THEN au.unit_value
                         ELSE 0
                     END
                 ), 0) as total_lop,
