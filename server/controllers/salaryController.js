@@ -83,21 +83,45 @@ const classifyStatusUnits = ({ statusText, remarksText, paidSet, unpaidSet }) =>
 
     const half = isHalfDayMark({ statusText: rawStatus, remarksText });
 
+    const tokenMatchesSet = (token, set) => {
+        const norm = normalizeStatusToken(token);
+        if (!norm) return false;
+        if (set.has(norm)) return true;
+
+        // Support labels like "Morning LOP", "Evening Present", "Present (PM)", etc.
+        for (const s of set) {
+            if (!s) continue;
+            if (norm === s) return true;
+            if (norm.includes(` ${s} `) || norm.startsWith(`${s} `) || norm.endsWith(` ${s}`)) return true;
+        }
+        return false;
+    };
+
+    const splitAndClassify = (parts, splitUnit) => parts.reduce((acc, token) => {
+        if (tokenMatchesSet(token, paidSet)) acc.paid += splitUnit;
+        if (tokenMatchesSet(token, unpaidSet)) acc.unpaid += splitUnit;
+        return acc;
+    }, { paid: 0, unpaid: 0 });
+
     if (rawStatus.includes('+')) {
-        const parts = rawStatus.split('+').map((p) => normalizeStatusToken(p)).filter(Boolean);
+        const parts = rawStatus.split('+').map((p) => String(p || '').trim()).filter(Boolean);
         const splitUnit = half ? 0.25 : 0.5;
-        return parts.reduce((acc, token) => {
-            if (paidSet.has(token)) acc.paid += splitUnit;
-            if (unpaidSet.has(token)) acc.unpaid += splitUnit;
-            return acc;
-        }, { paid: 0, unpaid: 0 });
+        return splitAndClassify(parts, splitUnit);
     }
 
-    const token = normalizeStatusToken(rawStatus);
+    // Also support separators like '/', '&', ',' in mixed-day statuses.
+    if (/[\/,&]/.test(rawStatus)) {
+        const parts = rawStatus.split(/[\/,&]/).map((p) => String(p || '').trim()).filter(Boolean);
+        if (parts.length > 1) {
+            const splitUnit = half ? 0.25 : 0.5;
+            return splitAndClassify(parts, splitUnit);
+        }
+    }
+
     const unit = half ? 0.5 : 1;
     return {
-        paid: paidSet.has(token) ? unit : 0,
-        unpaid: unpaidSet.has(token) ? unit : 0
+        paid: tokenMatchesSet(rawStatus, paidSet) ? unit : 0,
+        unpaid: tokenMatchesSet(rawStatus, unpaidSet) ? unit : 0
     };
 };
 

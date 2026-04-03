@@ -285,12 +285,14 @@ const SalaryManagement = () => {
     const isAdmin = user?.role === 'admin';
     const isManagement = user?.role === 'management';
     const showStatusColumn = true;
+    const showActionsColumn = true;
+    const showInstitutionActionButtons = canInstitutionWide && !isPersonalView;
     const showSelectionBar = canInstitutionWide && !isPersonalView && !isManagement && !isHistoryPage;
 
     const tableColumnCount = (showSelectionBar ? 1 : 0)
         + 6 // Employee/Period, Pay stats, Fixed, Gross, Deductions, Net
         + (showStatusColumn ? 1 : 0)
-        + 1;
+        + (showActionsColumn ? 1 : 0);
 
     const currentCycle = useMemo(() => getCurrentPayrollCycle(), []);
     const [selectedMonth, setSelectedMonth] = useState(currentCycle.month);
@@ -1483,7 +1485,7 @@ const SalaryManagement = () => {
                                     <th className="p-3 md:p-6 text-[9px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-sky-50 text-right whitespace-nowrap">Deductions</th>
                                     <th className="p-3 md:p-6 text-[9px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-sky-50 text-right whitespace-nowrap">Net Salary</th>
                                     {showStatusColumn && <th className="p-3 md:p-6 text-[9px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-sky-50 text-center whitespace-nowrap">Status</th>}
-                                    <th className="p-3 md:p-6 text-[9px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-sky-50 text-center whitespace-nowrap">Actions</th>
+                                    {showActionsColumn && <th className="p-3 md:p-6 text-[9px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-sky-50 text-center whitespace-nowrap">Actions</th>}
                                 </tr>
                             </thead>
                         <tbody>
@@ -1554,27 +1556,16 @@ const SalaryManagement = () => {
                                             )}
                                         </td>
                                     )}
-                                    <td className="p-3 md:p-6 whitespace-nowrap">
+                                    {showActionsColumn && <td className="p-3 md:p-6 whitespace-nowrap">
                                         <div className="flex justify-center gap-2">
-                                            {!isPersonalView && (
-                                                <button
-                                                    onClick={() => printPaymentSlip(r)}
-                                                    className="h-8 w-8 md:h-10 md:w-10 bg-sky-50 text-sky-600 rounded-xl hover:bg-sky-600 hover:text-white transition-all active:scale-95 group/btn"
-                                                    title="Payslip"
-                                                >
-                                                    <FaFileAlt className="group-hover/btn:scale-125 transition-transform" />
-                                                </button>
-                                            )}
-                                            {isPersonalView && (
-                                                <button
-                                                    onClick={() => printPaymentSlip(r)}
-                                                    className="h-8 w-8 md:h-10 md:w-10 bg-sky-50 text-sky-600 rounded-xl hover:bg-sky-600 hover:text-white transition-all active:scale-95 group/btn"
-                                                    title="Payslip"
-                                                >
-                                                    <FaFileAlt className="group-hover/btn:scale-125 transition-transform" />
-                                                </button>
-                                            )}
-                                            {showSelectionBar && (
+                                            <button
+                                                onClick={() => printPaymentSlip(r)}
+                                                className="h-8 w-8 md:h-10 md:w-10 bg-sky-50 text-sky-600 rounded-xl hover:bg-sky-600 hover:text-white transition-all active:scale-95 group/btn"
+                                                title="Payslip"
+                                            >
+                                                <FaFileAlt className="group-hover/btn:scale-125 transition-transform" />
+                                            </button>
+                                            {showInstitutionActionButtons && (
                                                 <button
                                                     onClick={() => navigate(`/${user.role}/payroll/employee/${encodeURIComponent(normalizeEmpId(r.emp_id))}`)}
                                                     className="h-8 w-8 md:h-10 md:w-10 bg-sky-50 text-sky-600 rounded-xl hover:bg-sky-600 hover:text-white transition-all active:scale-95 group/btn"
@@ -1583,7 +1574,7 @@ const SalaryManagement = () => {
                                                     <FaEye className="group-hover/btn:scale-125 transition-transform" />
                                                 </button>
                                             )}
-                                            {showSelectionBar && (
+                                            {!isHistoryPage && showInstitutionActionButtons && (
                                                 <>
                                                     <button
                                                         disabled={String(r.id).startsWith('history_')}
@@ -1602,26 +1593,28 @@ const SalaryManagement = () => {
                                                     >
                                                         <FaCheckCircle className="group-hover/btn:scale-125 transition-transform" />
                                                     </button>
-                                                    <button
-                                                        onClick={async () => {
-                                                            try {
-                                                                await updateStatus(r, 'Pending');
-                                                                await handleRefreshRows();
-                                                                Swal.fire('Success', 'Marked as unpaid.', 'success');
-                                                            } catch (error) {
-                                                                console.error(error);
-                                                                Swal.fire('Error', error?.response?.data?.message || 'Failed to mark unpaid.', 'error');
-                                                            }
-                                                        }}
-                                                        className="h-8 w-8 md:h-10 md:w-10 bg-sky-50 text-sky-600 rounded-xl hover:bg-sky-600 hover:text-white transition-all active:scale-95 group/btn"
-                                                        title="Mark unpaid"
-                                                    >
-                                                        <FaTimesCircle className="group-hover/btn:scale-125 transition-transform" />
-                                                    </button>
+                                                    {isAdmin && (
+                                                        <button
+                                                            onClick={async () => {
+                                                                try {
+                                                                    await updateStatus(r, 'Pending');
+                                                                    await handleRefreshRows();
+                                                                    Swal.fire('Success', 'Marked as unpaid.', 'success');
+                                                                } catch (error) {
+                                                                    console.error(error);
+                                                                    Swal.fire('Error', error?.response?.data?.message || 'Failed to mark unpaid.', 'error');
+                                                                }
+                                                            }}
+                                                            className="h-8 w-8 md:h-10 md:w-10 bg-sky-50 text-sky-600 rounded-xl hover:bg-sky-600 hover:text-white transition-all active:scale-95 group/btn"
+                                                            title="Mark unpaid"
+                                                        >
+                                                            <FaTimesCircle className="group-hover/btn:scale-125 transition-transform" />
+                                                        </button>
+                                                    )}
                                                 </>
                                             )}
                                         </div>
-                                    </td>
+                                    </td>}
                                 </motion.tr>
                                 );
                             })}
