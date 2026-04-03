@@ -62,6 +62,45 @@ const parseDeductions = (raw) => {
     }
 };
 
+const normalizeStatusToken = (v) => String(v || '').trim().toLowerCase().replace(/\s+/g, ' ');
+
+const isHalfDayMark = ({ statusText, remarksText }) => {
+    const status = String(statusText || '').toLowerCase();
+    const remarks = String(remarksText || '').toLowerCase();
+    return (
+        status.includes('half')
+        || remarks.includes('half day')
+        || remarks.includes('half-day')
+        || remarks.includes('half')
+        || remarks.includes('0.5')
+        || remarks.includes('1/2')
+    );
+};
+
+const classifyStatusUnits = ({ statusText, remarksText, paidSet, unpaidSet }) => {
+    const rawStatus = String(statusText || '').trim();
+    if (!rawStatus) return { paid: 0, unpaid: 0 };
+
+    const half = isHalfDayMark({ statusText: rawStatus, remarksText });
+
+    if (rawStatus.includes('+')) {
+        const parts = rawStatus.split('+').map((p) => normalizeStatusToken(p)).filter(Boolean);
+        const splitUnit = half ? 0.25 : 0.5;
+        return parts.reduce((acc, token) => {
+            if (paidSet.has(token)) acc.paid += splitUnit;
+            if (unpaidSet.has(token)) acc.unpaid += splitUnit;
+            return acc;
+        }, { paid: 0, unpaid: 0 });
+    }
+
+    const token = normalizeStatusToken(rawStatus);
+    const unit = half ? 0.5 : 1;
+    return {
+        paid: paidSet.has(token) ? unit : 0,
+        unpaid: unpaidSet.has(token) ? unit : 0
+    };
+};
+
 const parseDeductionItems = (raw) => {
     if (!raw) return [];
     try {
@@ -224,57 +263,50 @@ const getAttendanceAggregateMap = async ({ fromDate, toDate, paidStatuses, unpai
                     COALESCE(h.type, CASE WHEN EXTRACT(DOW FROM dr.d) IN (0, 6) THEN 'Holiday' ELSE 'Working Day' END) AS day_type
                 FROM date_range dr
                 LEFT JOIN holidays h ON h.h_date = dr.d
-            ),
-            emp_calendar AS (
-                SELECT 
-                    u.emp_id,
-                    u.name,
-                    cd.d AS date,
-                    COALESCE(a.status::text, CASE WHEN cd.day_type IN ('Holiday') THEN 'Holiday' ELSE 'Absent' END) as status,
-                    a.remarks
-                FROM users u
-                CROSS JOIN calendar_days cd
-                LEFT JOIN attendance_records a ON TRIM(a.emp_id) = TRIM(u.emp_id) AND a.date = cd.d
-                WHERE u.role IN ('staff', 'hod', 'principal')
             )
-            SELECT 
-                TRIM(emp_id) as emp_id,
-                SUM(
-                    CASE 
-                        WHEN status = ANY($3::text[]) THEN
-                            CASE
-                                WHEN remarks ILIKE '%Half Day%' OR remarks ILIKE '%half%' OR remarks ILIKE '%0.5%' OR remarks ILIKE '%1/2%'
-                                THEN 0.5
-                                ELSE 1.0
-                            END
-                        ELSE 0
-                    END
-                ) AS payable_days,
-                SUM(
-                    CASE 
-                        WHEN status = ANY($4::text[]) THEN
-                            CASE
-                                WHEN remarks ILIKE '%Half Day%' OR remarks ILIKE '%half%' OR remarks ILIKE '%0.5%' OR remarks ILIKE '%1/2%'
-                                THEN 0.5
-                                ELSE 1.0
-                            END
-                        ELSE 0
-                    END
-                ) AS unpaid_days,
-                COUNT(*) FILTER (WHERE status != 'Absent') AS active_records
-            FROM emp_calendar
-            GROUP BY TRIM(emp_id)
+            SELECT
+                TRIM(u.emp_id) AS emp_id,
+                cd.d AS date,
+                COALESCE(a.status::text, CASE WHEN cd.day_type IN ('Holiday') THEN 'Holiday' ELSE 'Absent' END) AS status,
+                COALESCE(a.remarks, '') AS remarks
+            FROM users u
+            CROSS JOIN calendar_days cd
+            LEFT JOIN attendance_records a ON TRIM(a.emp_id) = TRIM(u.emp_id) AND a.date = cd.d
+            WHERE u.role IN ('staff', 'hod', 'principal')
+            ORDER BY TRIM(u.emp_id), cd.d
         `;
-        const { rows } = await queryWithRetry(query, [fromDate, toDate, paidStatuses, unpaidStatuses]);
+        const { rows } = await queryWithRetry(query, [fromDate, toDate]);
+
+        const paidSet = new Set((Array.isArray(paidStatuses) ? paidStatuses : []).map(normalizeStatusToken));
+        const unpaidSet = new Set((Array.isArray(unpaidStatuses) ? unpaidStatuses : []).map(normalizeStatusToken));
         
         const map = {};
         rows.forEach((r) => {
-            map[r.emp_id] = {
-                payable_days: parseFloat(r.payable_days) || 0,
-                unpaid_days: parseFloat(r.unpaid_days) || 0,
-                total_records: parseInt(r.active_records, 10) || 0
-            };
+            const key = String(r.emp_id || '').trim();
+            if (!key) return;
+            if (!map[key]) {
+                map[key] = { payable_days: 0, unpaid_days: 0, total_records: 0 };
+            }
+
+            const { paid, unpaid } = classifyStatusUnits({
+                statusText: r.status,
+                remarksText: r.remarks,
+                paidSet,
+                unpaidSet
+            });
+
+            map[key].payable_days += paid;
+            map[key].unpaid_days += unpaid;
+            if (normalizeStatusToken(r.status) !== 'absent') {
+                map[key].total_records += 1;
+            }
         });
+
+        Object.keys(map).forEach((key) => {
+            map[key].payable_days = round2(map[key].payable_days);
+            map[key].unpaid_days = round2(map[key].unpaid_days);
+        });
+
         return map;
     } catch (error) {
         console.error('getAttendanceAggregateMap ERROR:', error);
@@ -324,10 +356,6 @@ const computeSalaryMetrics = ({ monthlySalary, rawDeductions, deductions, workin
 };
 
 const resolvePayableDaysFromAttendanceStats = (stats) => {
-    const totalRecords = Number(stats?.total_records || 0);
-    // If no active records (Present, Holiday, etc.), they get 0 payable days.
-    if (!Number.isFinite(totalRecords) || totalRecords <= 0) return 0;
-
     const payable = Number(stats?.payable_days || 0);
     return Math.max(0, payable);
 };
@@ -419,9 +447,8 @@ exports.calculateSalary = async (req, res) => {
             const resolvedPayableDays = resolvePayableDaysFromAttendanceStats(stats);
             const unpaidDays = Number(stats.unpaid_days || 0);
 
-            // Add salary only for employees who have attendance records with payable days.
-            // Keep already Paid records untouched.
-            if (resolvedPayableDays <= 0) {
+            // Skip only when there are no payable and no unpaid units for this period.
+            if (resolvedPayableDays <= 0 && unpaidDays <= 0) {
                 if (existing.length > 0 && existing[0].status !== 'Paid') {
                     await queryWithRetry('DELETE FROM salary_records WHERE id = $1', [existing[0].id]);
                 }
@@ -575,51 +602,102 @@ exports.getSalaryRecords = async (req, res) => {
         if (isHistoryMode) {
             let historyQuery = `
                 SELECT
-                    h.id,
-                    h.emp_id,
-                    h.month,
-                    h.year,
-                    h.total_present,
-                    h.total_leave,
-                    h.total_lop,
-                    h.calculated_salary,
-                    h.status,
-                    h.with_pay_count,
-                    h.without_pay_count,
-                    h.deductions_applied,
-                    h.esi_gross,
-                    h.employee_esi,
-                    h.gross_salary,
-                    h.total_days_in_period,
-                    h.from_date,
-                    h.to_date,
-                    h.paid_at,
-                    h.archived_at,
+                    merged.id,
+                    merged.emp_id,
+                    merged.month,
+                    merged.year,
+                    merged.total_present,
+                    merged.total_leave,
+                    merged.total_lop,
+                    merged.calculated_salary,
+                    merged.status,
+                    merged.with_pay_count,
+                    merged.without_pay_count,
+                    merged.deductions_applied,
+                    merged.esi_gross,
+                    merged.employee_esi,
+                    merged.gross_salary,
+                    merged.total_days_in_period,
+                    merged.from_date,
+                    merged.to_date,
+                    merged.paid_at,
+                    merged.archived_at,
+                    merged.is_history,
                     u.name,
                     u.role,
                     u.profile_pic,
                     u.monthly_salary,
                     u.deductions,
                     d.name AS department_name
-                FROM salary_history h
-                LEFT JOIN users u ON TRIM(u.emp_id) = TRIM(h.emp_id)
+                FROM (
+                    SELECT
+                        CONCAT('record_', s.id) AS id,
+                        s.emp_id,
+                        s.month,
+                        s.year,
+                        s.total_present,
+                        s.total_leave,
+                        s.total_lop,
+                        s.calculated_salary,
+                        s.status,
+                        s.with_pay_count,
+                        s.without_pay_count,
+                        s.deductions_applied,
+                        s.esi_gross,
+                        s.employee_esi,
+                        s.gross_salary,
+                        s.total_days_in_period,
+                        s.from_date,
+                        s.to_date,
+                        s.paid_at,
+                        NULL::timestamp AS archived_at,
+                        FALSE AS is_history
+                    FROM salary_records s
+                    WHERE s.status = 'Paid'
+
+                    UNION ALL
+
+                    SELECT
+                        CONCAT('history_', h.id) AS id,
+                        h.emp_id,
+                        h.month,
+                        h.year,
+                        h.total_present,
+                        h.total_leave,
+                        h.total_lop,
+                        h.calculated_salary,
+                        h.status,
+                        h.with_pay_count,
+                        h.without_pay_count,
+                        h.deductions_applied,
+                        h.esi_gross,
+                        h.employee_esi,
+                        h.gross_salary,
+                        h.total_days_in_period,
+                        h.from_date,
+                        h.to_date,
+                        h.paid_at,
+                        h.archived_at,
+                        TRUE AS is_history
+                    FROM salary_history h
+                    WHERE h.status = 'Paid'
+                ) merged
+                LEFT JOIN users u ON TRIM(u.emp_id) = TRIM(merged.emp_id)
                 LEFT JOIN departments d ON u.department_id = d.id
-                WHERE h.status = 'Paid'
+                WHERE 1=1
             `;
             const historyParams = [];
 
             if (!scopeWide) {
                 historyParams.push(String(req.user.emp_id || '').trim());
-                historyQuery += ` AND TRIM(h.emp_id) = $${historyParams.length}`;
+                historyQuery += ` AND TRIM(merged.emp_id) = $${historyParams.length}`;
             }
 
-            historyQuery += ' ORDER BY COALESCE(h.paid_at, h.archived_at) DESC, h.id DESC';
+            historyQuery += ' ORDER BY COALESCE(merged.paid_at, merged.archived_at, merged.to_date, merged.from_date) DESC, merged.id DESC';
             const { rows: historyRows } = await queryWithRetry(historyQuery, historyParams);
 
             const historyMapped = historyRows.map((r) => ({
                 ...r,
-                id: `history_${r.id}`,
-                is_history: true,
                 from_date: toIsoDate(r.from_date),
                 to_date: toIsoDate(r.to_date),
                 monthly_salary: parseFloat(r.gross_salary) || parseFloat(r.monthly_salary) || 0,
@@ -694,20 +772,60 @@ exports.getSalaryRecords = async (req, res) => {
 
             // Staff/HOD/Principal should see their own salary details (Pending or Paid).
             if (!scopeWide) {
-                if (!existing) {
+                if (existing) {
+                    return {
+                        ...existing,
+                        name: u.name,
+                        role: u.role,
+                        profile_pic: u.profile_pic,
+                        monthly_salary: parseFloat(u.monthly_salary) || parseFloat(u.base_salary) || 0,
+                        department_name: u.department_name,
+                        deductions: u.deductions,
+                        from_date: toIsoDate(existing.from_date) || period.fromDate,
+                        to_date: toIsoDate(existing.to_date) || period.toDate
+                    };
+                }
+
+                const attendanceStats = attendanceMap[key] || {};
+                const payableDays = resolvePayableDaysFromAttendanceStats(attendanceStats);
+                const unpaidDays = Number(attendanceStats.unpaid_days || 0);
+                if (payableDays <= 0 && unpaidDays <= 0) {
                     return null;
                 }
 
+                const previewMetrics = computeSalaryMetrics({
+                    monthlySalary: parseFloat(u.monthly_salary) || 0,
+                    rawDeductions: u.deductions,
+                    workingDaysInPeriod: totalDaysInPeriod,
+                    payableDays,
+                    unpaidDays
+                });
+
                 return {
-                    ...existing,
+                    id: `preview_${key}_${period.fromDate}_${period.toDate}`,
+                    emp_id: key,
                     name: u.name,
                     role: u.role,
                     profile_pic: u.profile_pic,
-                    monthly_salary: parseFloat(u.monthly_salary) || parseFloat(u.base_salary) || 0,
                     department_name: u.department_name,
-                    deductions: u.deductions,
-                    from_date: toIsoDate(existing.from_date) || period.fromDate,
-                    to_date: toIsoDate(existing.to_date) || period.toDate
+                    monthly_salary: parseFloat(u.monthly_salary) || 0,
+                    gross_salary: previewMetrics.grossSalary.toFixed(2),
+                    calculated_salary: previewMetrics.netSalary.toFixed(2),
+                    total_present: previewMetrics.payableDays,
+                    total_lop: previewMetrics.lopDays,
+                    with_pay_count: previewMetrics.payableDays,
+                    without_pay_count: previewMetrics.lopDays,
+                    deductions_applied: previewMetrics.deductionsApplied.toFixed(2),
+                    esi_gross: previewMetrics.esiGross.toFixed(2),
+                    employee_esi: previewMetrics.employeeEsi.toFixed(2),
+                    total_days_in_period: totalDaysInPeriod,
+                    from_date: period.fromDate,
+                    to_date: period.toDate,
+                    status: 'Pending',
+                    month: period.month,
+                    year: period.year,
+                    is_preview: true,
+                    deductions: u.deductions
                 };
             }
 

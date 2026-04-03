@@ -6,6 +6,8 @@ import { FaArrowLeft } from 'react-icons/fa';
 import { useAuth } from '../../context/AuthContext';
 
 const toCurrency = (v) => Number(v || 0).toLocaleString('en-IN');
+const getWithPayDays = (row) => Number(row?.with_pay_count ?? row?.total_present ?? 0);
+const getWithoutPayDays = (row) => Number(row?.without_pay_count ?? row?.total_lop ?? 0);
 
 const EmployeeSalaryView = () => {
     const { empId } = useParams();
@@ -73,8 +75,8 @@ const EmployeeSalaryView = () => {
                                     </td>
                                     <td className="p-6 text-right">
                                         <div className="flex flex-col items-end gap-1">
-                                            <span className="text-sm font-black text-emerald-600">{Number(r.total_present || r.with_pay_count || 0).toFixed(1)} <span className="text-[9px] text-gray-400 uppercase">Paid</span></span>
-                                            <span className="text-sm font-black text-rose-600">{Number(r.total_lop || r.without_pay_count || 0).toFixed(1)} <span className="text-[9px] text-gray-400 uppercase">Unpaid</span></span>
+                                            <span className="text-sm font-black text-emerald-600">{getWithPayDays(r).toFixed(1)} <span className="text-[9px] text-gray-400 uppercase">Paid</span></span>
+                                            <span className="text-sm font-black text-rose-600">{getWithoutPayDays(r).toFixed(1)} <span className="text-[9px] text-gray-400 uppercase">Unpaid</span></span>
                                         </div>
                                     </td>
                                     <td className="p-6 text-right">

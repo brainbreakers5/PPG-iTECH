@@ -65,6 +65,21 @@ const normalizeDateOnly = (v) => {
     const raw = String(v);
     return raw.includes('T') ? raw.slice(0, 10) : raw;
 };
+const getWithPayDays = (row) => Number(row?.with_pay_count ?? row?.total_present ?? 0);
+const getWithoutPayDays = (row) => Number(row?.without_pay_count ?? row?.total_lop ?? 0);
+
+const isSameCycle = (row, cycle) => {
+    const rowMonth = Number(row?.month);
+    const rowYear = Number(row?.year);
+    const monthYearMatch = Number.isFinite(rowMonth) && Number.isFinite(rowYear)
+        ? (rowMonth === Number(cycle?.month) && rowYear === Number(cycle?.year))
+        : false;
+
+    const dateMatch = normalizeDateOnly(row?.from_date) === normalizeDateOnly(cycle?.fromDate)
+        && normalizeDateOnly(row?.to_date) === normalizeDateOnly(cycle?.toDate);
+
+    return monthYearMatch || dateMatch;
+};
 const getWorkingDaysFromRange = (fromDate, toDate) => {
     if (!fromDate || !toDate) return 0;
     const from = new Date(fromDate);
@@ -382,10 +397,7 @@ const SalaryManagement = () => {
     const livePersonalOverview = useMemo(() => {
         if (!isPersonalView || !rows.length) return null;
 
-        const currentCycleRecord = rows.find((r) => (
-            normalizeDateOnly(r.from_date) === normalizeDateOnly(selectedCycle.fromDate)
-            && normalizeDateOnly(r.to_date) === normalizeDateOnly(selectedCycle.toDate)
-        ));
+        const currentCycleRecord = rows.find((r) => isSameCycle(r, selectedCycle));
         const liveRow = isHistoryPage ? currentCycleRecord : (currentCycleRecord || rows[0]);
         if (!liveRow) return null;
 
@@ -394,8 +406,8 @@ const SalaryManagement = () => {
             gross: Number(liveRow.gross_salary || liveRow.monthly_salary || 0),
             deductions: Number(liveRow.deductions_applied || 0),
             net: Number(liveRow.calculated_salary || 0),
-            paidDays: Number(liveRow.total_present || liveRow.with_pay_count || 0),
-            unpaidDays: Number(liveRow.total_lop || liveRow.without_pay_count || 0),
+            paidDays: getWithPayDays(liveRow),
+            unpaidDays: getWithoutPayDays(liveRow),
             workingDays: Number(liveRow.total_days_in_period || 0) || cycleWorkingDays,
             fromDate: liveRow.from_date || selectedCycle.fromDate,
             toDate: liveRow.to_date || selectedCycle.toDate
@@ -426,8 +438,7 @@ const SalaryManagement = () => {
                 const currentRows = Array.isArray(currentCycleRows) ? currentCycleRows : [];
                 const myCurrent = currentRows.find((r) => (
                     normalizeEmpId(r.emp_id) === normalizeEmpId(user?.emp_id)
-                    && normalizeDateOnly(r.from_date) === normalizeDateOnly(currentCycle.fromDate)
-                    && normalizeDateOnly(r.to_date) === normalizeDateOnly(currentCycle.toDate)
+                    && isSameCycle(r, currentCycle)
                 ));
                 setRows(myCurrent ? [myCurrent] : []);
                 setLiveDaily(dailyRes?.data || null);
@@ -744,8 +755,8 @@ const SalaryManagement = () => {
         const earnedSalary = getEarnedSalary(row);
         const deduction = Number(row.deductions_applied || 0);
         const net = Number(row.calculated_salary || 0);
-        const withPay = Number(row.total_present || row.with_pay_count || 0).toFixed(1);
-        const withoutPay = Number(row.total_lop || row.without_pay_count || 0).toFixed(1);
+        const withPay = getWithPayDays(row).toFixed(1);
+        const withoutPay = getWithoutPayDays(row).toFixed(1);
         const generatedAt = formatGeneratedAt();
 
         const html = `
@@ -1518,7 +1529,7 @@ const SalaryManagement = () => {
                                         </td>
                                     )}
                                     <td className="p-3 md:p-6 text-right whitespace-nowrap">
-                                        <span className="text-xs md:text-sm font-black text-gray-700">{Number(r.total_present || r.with_pay_count || 0).toFixed(1)} P / {Number(r.total_lop || r.without_pay_count || 0).toFixed(1)} L</span>
+                                        <span className="text-xs md:text-sm font-black text-gray-700">{getWithPayDays(r).toFixed(1)} P / {getWithoutPayDays(r).toFixed(1)} L</span>
                                     </td>
                                     <td className="p-3 md:p-6 text-right whitespace-nowrap" title="Fixed Salary">
                                         <span className="text-xs md:text-sm font-bold text-gray-700 bg-gray-50 px-2.5 md:px-3 py-1.5 rounded-lg border border-gray-100 whitespace-nowrap">Rs {toCurrency(fixedSalary)}</span>
