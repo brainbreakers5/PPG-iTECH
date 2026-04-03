@@ -260,6 +260,37 @@ const getSalaryConceptSplit = (amount) => {
 
 const getEarnedSalaryConceptSplit = (earnedSalary) => getSalaryConceptSplit(earnedSalary);
 
+const normalizeSalaryRow = (row) => {
+    if (!row || typeof row !== 'object') return row;
+
+    const normalized = { ...row };
+    normalized.id = row.id ?? row.salary_id ?? row.record_id ?? row.salaryRecordId ?? `history_${row.emp_id || row.empId || ''}_${row.month || ''}_${row.year || ''}`;
+    normalized.emp_id = row.emp_id ?? row.empId ?? row.employee_id ?? row.employeeId ?? '';
+    normalized.name = row.name ?? row.employee_name ?? row.employeeName ?? row.full_name ?? row.fullName ?? '-';
+    normalized.department_name = row.department_name ?? row.department ?? row.dept_name ?? row.departmentName ?? '';
+    normalized.role = row.role ?? row.employee_role ?? row.employeeRole ?? '';
+    normalized.profile_pic = row.profile_pic ?? row.profile_picture_url ?? row.profilePicture ?? '';
+
+    normalized.month = Number(row.month ?? row.pay_month ?? row.payMonth ?? 0) || row.month;
+    normalized.year = Number(row.year ?? row.pay_year ?? row.payYear ?? 0) || row.year;
+    normalized.from_date = row.from_date ?? row.fromDate ?? row.period_start ?? row.periodStart ?? '';
+    normalized.to_date = row.to_date ?? row.toDate ?? row.period_end ?? row.periodEnd ?? '';
+
+    normalized.monthly_salary = Number(row.monthly_salary ?? row.monthlySalary ?? row.fixed_salary ?? row.fixedSalary ?? 0) || 0;
+    normalized.gross_salary = Number(row.gross_salary ?? row.grossSalary ?? row.earned_salary ?? row.earnedSalary ?? normalized.monthly_salary) || 0;
+    normalized.total_present = Number(row.total_present ?? row.totalPresent ?? row.with_pay_count ?? row.withPayCount ?? 0) || 0;
+    normalized.total_lop = Number(row.total_lop ?? row.totalLop ?? row.without_pay_count ?? row.withoutPayCount ?? 0) || 0;
+    normalized.with_pay_count = Number(row.with_pay_count ?? row.withPayCount ?? normalized.total_present) || 0;
+    normalized.without_pay_count = Number(row.without_pay_count ?? row.withoutPayCount ?? normalized.total_lop) || 0;
+    normalized.total_days_in_period = Number(row.total_days_in_period ?? row.totalDaysInPeriod ?? row.total_days ?? row.totalDays ?? 0) || 0;
+    normalized.deductions_applied = Number(row.deductions_applied ?? row.deductionsApplied ?? row.total_deductions ?? row.totalDeductions ?? 0) || 0;
+    normalized.calculated_salary = Number(row.calculated_salary ?? row.calculatedSalary ?? row.net_salary ?? row.netSalary ?? 0) || 0;
+
+    normalized.status = String(row.status ?? row.salary_status ?? row.salaryStatus ?? 'Pending');
+
+    return normalized;
+};
+
 const fadeUp = {
     hidden: { opacity: 0, y: 16 },
     show: { opacity: 1, y: 0 }
@@ -422,7 +453,7 @@ const SalaryManagement = () => {
             if (isPersonalView) {
                 if (isHistoryPage) {
                     const { data } = await api.get('/salary?history=true');
-                    setRows(Array.isArray(data) ? data : []);
+                    setRows(Array.isArray(data) ? data.map(normalizeSalaryRow) : []);
                     setLiveDaily(null);
                     setHasLoaded(true);
                     setLoading(false);
@@ -437,7 +468,7 @@ const SalaryManagement = () => {
                         : Promise.resolve({ data: null })
                 ]);
 
-                const currentRows = Array.isArray(currentCycleRows) ? currentCycleRows : [];
+                const currentRows = Array.isArray(currentCycleRows) ? currentCycleRows.map(normalizeSalaryRow) : [];
                 const myCurrent = currentRows.find((r) => (
                     normalizeEmpId(r.emp_id) === normalizeEmpId(user?.emp_id)
                     && isSameCycle(r, currentCycle)
@@ -458,7 +489,7 @@ const SalaryManagement = () => {
             params.set('unpaidStatuses', JSON.stringify(unpaidStatuses));
 
             const { data } = await api.get(`/salary?${params.toString()}`);
-            setRows(Array.isArray(data) ? data : []);
+            setRows(Array.isArray(data) ? data.map(normalizeSalaryRow) : []);
             setLiveDaily(null);
             setHasLoaded(true);
         } catch (error) {
