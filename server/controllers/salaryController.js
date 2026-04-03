@@ -273,7 +273,7 @@ const getAttendanceAggregateMap = async ({ fromDate, toDate, paidStatuses, unpai
     return map;
 };
 
-const computeSalaryMetrics = ({ monthlySalary, rawDeductions, deductions, workingDaysInPeriod, payableDays }) => {
+const computeSalaryMetrics = ({ monthlySalary, rawDeductions, deductions, workingDaysInPeriod, payableDays, unpaidDays }) => {
     const fixedSalary = parseFloat(String(monthlySalary || 0).replace(/,/g, '')) || 0;
     const totalDays = Number(workingDaysInPeriod || 0);
     const divisor = totalDays > 0 ? totalDays : 1;
@@ -294,8 +294,8 @@ const computeSalaryMetrics = ({ monthlySalary, rawDeductions, deductions, workin
         ? computeDeductions({ rawDeductions, grossSalary, conveyance })
         : { total: Math.max(0, Number(deductions || 0)), esiGross: 0, employeeEsi: 0 };
     const deductionsApplied = Math.max(0, Number(computed.total || 0));
+    const lopDays = Math.max(0, Number(unpaidDays || 0));
     const netSalary = Math.max(0, grossSalary - deductionsApplied);
-    const lopDays = Math.max(0, divisor - normalizedPayable);
 
     return {
         fixedSalary,
@@ -314,12 +314,13 @@ const computeSalaryMetrics = ({ monthlySalary, rawDeductions, deductions, workin
     };
 };
 
-const resolvePayableDaysFromAttendanceStats = (stats) => {
+const resolvePayableDaysFromAttendanceStats = (stats, daysUntilNow) => {
     const totalRecords = Number(stats?.total_records || 0);
     if (!Number.isFinite(totalRecords) || totalRecords <= 0) return 0;
 
-    const payable = Number(stats?.payable_days || 0);
-    return Number.isFinite(payable) && payable > 0 ? payable : 0;
+    const unpaid = Number(stats?.unpaid_days || 0);
+    // pay days so far = days so far - unpaid so far
+    return Math.max(0, Number(daysUntilNow || 0) - unpaid);
 };
 
 // @desc    Calculate Salary (supports exact date range)
@@ -406,7 +407,8 @@ exports.calculateSalary = async (req, res) => {
             }
 
             const stats = statsMap[userEmpId] || { payable_days: 0, unpaid_days: 0, total_records: 0 };
-            const resolvedPayableDays = resolvePayableDaysFromAttendanceStats(stats);
+            const resolvedPayableDays = resolvePayableDaysFromAttendanceStats(stats, daysUntilNow);
+            const unpaidDays = Number(stats.unpaid_days || 0);
 
             // Add salary only for employees who have attendance records with payable days.
             // Keep already Paid records untouched.
@@ -422,7 +424,8 @@ exports.calculateSalary = async (req, res) => {
                 monthlySalary: grossSource,
                 rawDeductions: user.deductions,
                 workingDaysInPeriod: totalDaysInPeriod,
-                payableDays: resolvedPayableDays
+                payableDays: resolvedPayableDays,
+                unpaidDays
             });
 
             if (existing.length > 0) {
@@ -675,13 +678,14 @@ exports.getSalaryRecords = async (req, res) => {
             unpaidStatuses
         });
         const totalDaysInPeriod = getTotalDays(period.fromDate, period.toDate);
+        const daysUntilNow = getTotalDays(period.fromDate, effectiveCalcTo);
         const merged = users.map((u) => {
             const key = String(u.emp_id || '').trim();
             const existing = recMap[key];
 
-            // Staff/HOD/Principal should only see their own published salary details.
+            // Staff/HOD/Principal should see their own salary details (Pending or Paid).
             if (!scopeWide) {
-                if (!existing || existing.status !== 'Paid') {
+                if (!existing) {
                     return null;
                 }
 
@@ -701,14 +705,16 @@ exports.getSalaryRecords = async (req, res) => {
             if (existing) {
                 if (existing.status !== 'Paid') {
                     const attendanceStats = attendanceMap[key] || {};
-                    const payableDays = resolvePayableDaysFromAttendanceStats(attendanceStats);
-                    if (payableDays <= 0) return null;
+                    const payableDays = resolvePayableDaysFromAttendanceStats(attendanceStats, daysUntilNow);
+                    const unpaidDays = Number(attendanceStats.unpaid_days || 0);
+                    if (payableDays <= 0 && unpaidDays <= 0) return null;
 
                     const metrics = computeSalaryMetrics({
                         monthlySalary: parseFloat(u.monthly_salary) || 0,
                         rawDeductions: u.deductions,
                         workingDaysInPeriod: totalDaysInPeriod,
-                        payableDays
+                        payableDays,
+                        unpaidDays
                     });
 
                     return {
@@ -749,14 +755,16 @@ exports.getSalaryRecords = async (req, res) => {
 
             const gross = parseFloat(u.monthly_salary) || 0;
             const attendanceStats = attendanceMap[key] || {};
-            const payableDays = resolvePayableDaysFromAttendanceStats(attendanceStats);
-            if (payableDays <= 0) return null;
+            const payableDays = resolvePayableDaysFromAttendanceStats(attendanceStats, daysUntilNow);
+            const unpaidDays = Number(attendanceStats.unpaid_days || 0);
+            if (payableDays <= 0 && unpaidDays <= 0) return null;
 
             const metrics = computeSalaryMetrics({
                 monthlySalary: gross,
                 rawDeductions: u.deductions,
                 workingDaysInPeriod: totalDaysInPeriod,
-                payableDays
+                payableDays,
+                unpaidDays
             });
 
             return {
