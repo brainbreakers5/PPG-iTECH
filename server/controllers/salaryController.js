@@ -210,67 +210,76 @@ const ensureSalarySchema = async () => {
 };
 
 const getAttendanceAggregateMap = async ({ fromDate, toDate, paidStatuses, unpaidStatuses }) => {
-    const { rows } = await queryWithRetry(`
-        SELECT
-            TRIM(emp_id) AS emp_id,
-            SUM(
-                CASE
-                    WHEN status::text LIKE '%+%' THEN
-                        (CASE WHEN split_part(status::text, ' + ', 1) = ANY($3::text[]) THEN 0.5 ELSE 0 END +
-                         CASE WHEN split_part(status::text, ' + ', 2) = ANY($3::text[]) THEN 0.5 ELSE 0 END)
-                    WHEN status::text = ANY($3::text[]) THEN
-                        CASE
-                            WHEN remarks ILIKE '%Half Day%' OR remarks ILIKE '%half%' OR remarks ILIKE '%0.5%' OR remarks ILIKE '%1/2%'
-                            THEN 0.5
-                            ELSE 1.0
-                        END
-                    ELSE 0
-                END
-            ) AS payable_days,
-            SUM(
-                CASE
-                    WHEN status::text LIKE '%+%' THEN
-                        (CASE WHEN split_part(status::text, ' + ', 1) = ANY($4::text[]) THEN 0.5 ELSE 0 END +
-                         CASE WHEN split_part(status::text, ' + ', 2) = ANY($4::text[]) THEN 0.5 ELSE 0 END)
-                    WHEN status::text = ANY($4::text[]) THEN
-                        CASE
-                            WHEN remarks ILIKE '%Half Day%' OR remarks ILIKE '%half%' OR remarks ILIKE '%0.5%' OR remarks ILIKE '%1/2%'
-                            THEN 0.5
-                            ELSE 1.0
-                        END
-                    ELSE 0
-                END
-            ) AS unpaid_days,
-            SUM(
-                CASE
-                    WHEN status::text LIKE '%+%' THEN
-                        (CASE WHEN split_part(status::text, ' + ', 1) = ANY($4::text[]) THEN 0 ELSE 0.5 END +
-                         CASE WHEN split_part(status::text, ' + ', 2) = ANY($4::text[]) THEN 0 ELSE 0.5 END)
-                    WHEN status::text = ANY($4::text[]) THEN 0
-                    ELSE
-                        CASE
-                            WHEN remarks ILIKE '%Half Day%' OR remarks ILIKE '%half%' OR remarks ILIKE '%0.5%' OR remarks ILIKE '%1/2%'
-                            THEN 0.5
-                            ELSE 1.0
-                        END
-                END
-            ) AS inferred_payable_days,
-            COUNT(*) AS total_records
-        FROM attendance_records
-        WHERE date::date >= $1::date AND date::date <= $2::date
-        GROUP BY TRIM(emp_id)
-    `, [fromDate, toDate, paidStatuses, unpaidStatuses]);
-
-    const map = {};
-    rows.forEach((r) => {
-        map[r.emp_id] = {
-            payable_days: parseFloat(r.payable_days) || 0,
-            unpaid_days: parseFloat(r.unpaid_days) || 0,
-            inferred_payable_days: parseFloat(r.inferred_payable_days) || 0,
-            total_records: parseInt(r.total_records, 10) || 0
-        };
-    });
-    return map;
+    try {
+        const query = `
+            WITH RECURSIVE date_range AS (
+                SELECT $1::date as d
+                UNION ALL
+                SELECT (d + 1)::date FROM date_range 
+                WHERE d < $2::date
+            ),
+            calendar_days AS (
+                SELECT 
+                    dr.d,
+                    COALESCE(h.type, CASE WHEN EXTRACT(DOW FROM dr.d) IN (0, 6) THEN 'Holiday' ELSE 'Working Day' END) AS day_type
+                FROM date_range dr
+                LEFT JOIN holidays h ON h.h_date = dr.d
+            ),
+            emp_calendar AS (
+                SELECT 
+                    u.emp_id,
+                    u.name,
+                    cd.d AS date,
+                    COALESCE(a.status::text, CASE WHEN cd.day_type IN ('Holiday') THEN 'Holiday' ELSE 'Absent' END) as status,
+                    a.remarks
+                FROM users u
+                CROSS JOIN calendar_days cd
+                LEFT JOIN attendance_records a ON TRIM(a.emp_id) = TRIM(u.emp_id) AND a.date = cd.d
+                WHERE u.role IN ('staff', 'hod', 'principal')
+            )
+            SELECT 
+                TRIM(emp_id) as emp_id,
+                SUM(
+                    CASE 
+                        WHEN status = ANY($3::text[]) THEN
+                            CASE
+                                WHEN remarks ILIKE '%Half Day%' OR remarks ILIKE '%half%' OR remarks ILIKE '%0.5%' OR remarks ILIKE '%1/2%'
+                                THEN 0.5
+                                ELSE 1.0
+                            END
+                        ELSE 0
+                    END
+                ) AS payable_days,
+                SUM(
+                    CASE 
+                        WHEN status = ANY($4::text[]) THEN
+                            CASE
+                                WHEN remarks ILIKE '%Half Day%' OR remarks ILIKE '%half%' OR remarks ILIKE '%0.5%' OR remarks ILIKE '%1/2%'
+                                THEN 0.5
+                                ELSE 1.0
+                            END
+                        ELSE 0
+                    END
+                ) AS unpaid_days,
+                COUNT(*) FILTER (WHERE status != 'Absent') AS active_records
+            FROM emp_calendar
+            GROUP BY TRIM(emp_id)
+        `;
+        const { rows } = await queryWithRetry(query, [fromDate, toDate, paidStatuses, unpaidStatuses]);
+        
+        const map = {};
+        rows.forEach((r) => {
+            map[r.emp_id] = {
+                payable_days: parseFloat(r.payable_days) || 0,
+                unpaid_days: parseFloat(r.unpaid_days) || 0,
+                total_records: parseInt(r.active_records, 10) || 0
+            };
+        });
+        return map;
+    } catch (error) {
+        console.error('getAttendanceAggregateMap ERROR:', error);
+        return {};
+    }
 };
 
 const computeSalaryMetrics = ({ monthlySalary, rawDeductions, deductions, workingDaysInPeriod, payableDays, unpaidDays }) => {
@@ -314,13 +323,13 @@ const computeSalaryMetrics = ({ monthlySalary, rawDeductions, deductions, workin
     };
 };
 
-const resolvePayableDaysFromAttendanceStats = (stats, daysUntilNow) => {
+const resolvePayableDaysFromAttendanceStats = (stats) => {
     const totalRecords = Number(stats?.total_records || 0);
+    // If no active records (Present, Holiday, etc.), they get 0 payable days.
     if (!Number.isFinite(totalRecords) || totalRecords <= 0) return 0;
 
-    const unpaid = Number(stats?.unpaid_days || 0);
-    // pay days so far = days so far - unpaid so far
-    return Math.max(0, Number(daysUntilNow || 0) - unpaid);
+    const payable = Number(stats?.payable_days || 0);
+    return Math.max(0, payable);
 };
 
 // @desc    Calculate Salary (supports exact date range)
@@ -407,7 +416,7 @@ exports.calculateSalary = async (req, res) => {
             }
 
             const stats = statsMap[userEmpId] || { payable_days: 0, unpaid_days: 0, total_records: 0 };
-            const resolvedPayableDays = resolvePayableDaysFromAttendanceStats(stats, daysUntilNow);
+            const resolvedPayableDays = resolvePayableDaysFromAttendanceStats(stats);
             const unpaidDays = Number(stats.unpaid_days || 0);
 
             // Add salary only for employees who have attendance records with payable days.
@@ -705,7 +714,7 @@ exports.getSalaryRecords = async (req, res) => {
             if (existing) {
                 if (existing.status !== 'Paid') {
                     const attendanceStats = attendanceMap[key] || {};
-                    const payableDays = resolvePayableDaysFromAttendanceStats(attendanceStats, daysUntilNow);
+                    const payableDays = resolvePayableDaysFromAttendanceStats(attendanceStats);
                     const unpaidDays = Number(attendanceStats.unpaid_days || 0);
                     if (payableDays <= 0 && unpaidDays <= 0) return null;
 
@@ -755,7 +764,7 @@ exports.getSalaryRecords = async (req, res) => {
 
             const gross = parseFloat(u.monthly_salary) || 0;
             const attendanceStats = attendanceMap[key] || {};
-            const payableDays = resolvePayableDaysFromAttendanceStats(attendanceStats, daysUntilNow);
+            const payableDays = resolvePayableDaysFromAttendanceStats(attendanceStats);
             const unpaidDays = Number(attendanceStats.unpaid_days || 0);
             if (payableDays <= 0 && unpaidDays <= 0) return null;
 
