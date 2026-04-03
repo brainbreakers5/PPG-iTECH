@@ -1,5 +1,19 @@
 const { pool, queryWithRetry } = require('../config/db');
 
+const apiCache = new Map();
+const CACHE_TTL = 30000; // 30 seconds
+
+const getCachedResult = (cacheKey) => {
+    const cached = apiCache.get(cacheKey);
+    if (cached && Date.now() - cached.time < CACHE_TTL) return cached.data;
+    if (cached) apiCache.delete(cacheKey);
+    return null;
+};
+
+const setCachedResult = (cacheKey, data) => {
+    apiCache.set(cacheKey, { data, time: Date.now() });
+};
+
 // @desc    Get attendance records (with filters)
 // @route   GET /api/attendance
 // @access  Private
@@ -179,6 +193,10 @@ exports.getAttendance = async (req, res) => {
 exports.getAttendanceSummary = async (req, res) => {
     try {
         const { date, month, startDate, endDate, role, department_id } = req.query;
+        
+        const cacheKey = "sum_" + JSON.stringify(req.query);
+        const cached = getCachedResult(cacheKey);
+        if (cached) return res.json(cached);
 
         let start;
         let end;
@@ -256,6 +274,8 @@ exports.getAttendanceSummary = async (req, res) => {
             )
             SELECT 
                 u.emp_id, u.name, u.role, u.department_id,
+                MAX(COALESCE(au.status_text, '')) as status,
+                MAX(COALESCE(au.remarks_text, '')) as remarks,
                 COALESCE(SUM(
                     CASE 
                         WHEN au.status_text ILIKE '%+%' THEN
@@ -395,6 +415,7 @@ exports.getAttendanceSummary = async (req, res) => {
         `;
 
         const { rows } = await queryWithRetry(query, params);
+        setCachedResult(cacheKey, rows);
         res.json(rows);
     } catch (error) {
         console.error('getAttendanceSummary ERROR:', error);

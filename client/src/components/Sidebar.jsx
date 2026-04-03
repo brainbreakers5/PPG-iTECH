@@ -29,7 +29,7 @@ const Sidebar = ({ userRole = 'staff', isOpen, onClose }) => {
   const [now, setNow] = useState(new Date());
 
   useEffect(() => {
-    const timer = setInterval(() => setNow(new Date()), 1000);
+    const timer = setInterval(() => setNow(new Date()), 60000);
     return () => clearInterval(timer);
   }, []);
 
@@ -174,3 +174,4 @@ const Sidebar = ({ userRole = 'staff', isOpen, onClose }) => {
 };
 
 export default Sidebar;
+

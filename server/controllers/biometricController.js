@@ -23,6 +23,20 @@ let pendingLogsLoaded = false;
 let recoveryWorkerStarted = false;
 let recoveryWorkerRunning = false;
 
+const apiCache = new Map();
+const CACHE_TTL = 30000; // 30 seconds
+
+const getCachedResult = (cacheKey) => {
+    const cached = apiCache.get(cacheKey);
+    if (cached && Date.now() - cached.time < CACHE_TTL) return cached.data;
+    if (cached) apiCache.delete(cacheKey);
+    return null;
+};
+
+const setCachedResult = (cacheKey, data) => {
+    apiCache.set(cacheKey, { data, time: Date.now() });
+};
+
 const normalizePunchType = (rawType, dateRef) => {
     const val = String(rawType ?? '').trim().toUpperCase();
     if (val === 'IN' || val === '0') return 'IN';
@@ -788,8 +802,13 @@ exports.receiveLog = async (req, res) => {
 exports.getRawBiometricLogs = async (req, res) => {
     try {
         const { emp_id, date, limit = 50, offset = 0 } = req.query;
+        
+        const cacheKey = `raw_logs_${JSON.stringify(req.query)}`;
+        const cached = getCachedResult(cacheKey);
+        if (cached) return res.json(cached);
+
         let query = `
-            SELECT l.*, u.name 
+            SELECT l.id, l.emp_id, l.log_time, l.device_id, l.type, u.name 
             FROM biometric_logs l
             LEFT JOIN users u ON TRIM(l.emp_id) = u.emp_id
             WHERE 1=1
@@ -807,6 +826,7 @@ exports.getRawBiometricLogs = async (req, res) => {
         params.push(limit, offset);
 
         const { rows } = await queryWithRetry(query, params);
+        setCachedResult(cacheKey, rows);
         res.json(rows);
     } catch (error) {
         console.error('Error fetching raw biometric logs:', error);
@@ -817,9 +837,14 @@ exports.getRawBiometricLogs = async (req, res) => {
 // @desc    Get biometric attendance data
 exports.getBiometricData = async (req, res) => {
     try {
-        const { emp_id, date, month, startDate, endDate } = req.query;
+        const { emp_id, date, month, startDate, endDate, limit = 100, offset = 0 } = req.query;
+        
+        const cacheKey = `bio_data_${JSON.stringify(req.query)}`;
+        const cached = getCachedResult(cacheKey);
+        if (cached) return res.json(cached);
+
         let query = `
-            SELECT b.*, u.name, u.role, d.name as department_name, 
+            SELECT b.id, b.user_id, b.date, b.intime, b.outtime, u.name, u.role, d.name as department_name, 
                    ar.status as att_status, ar.remarks as att_remarks
             FROM biometric_attendance b
             JOIN users u ON b.user_id = u.emp_id
@@ -844,9 +869,11 @@ exports.getBiometricData = async (req, res) => {
             query += ` AND b.date::text LIKE $${params.length}`;
         }
 
-        query += ` ORDER BY b.date DESC, b.intime DESC`;
+        query += ` ORDER BY b.date DESC, b.intime DESC LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
+        params.push(limit, offset);
 
         const { rows } = await queryWithRetry(query, params);
+        setCachedResult(cacheKey, rows);
         res.json(rows);
     } catch (error) {
         console.error('Error fetching biometric data:', error);
@@ -878,6 +905,10 @@ exports.getRegisteredEmpIds = async (req, res) => {
 // @desc    Get biometric statistics
 exports.getBiometricStats = async (req, res) => {
     try {
+        const cacheKey = 'bio_stats_today';
+        const cached = getCachedResult(cacheKey);
+        if (cached) return res.json(cached);
+
         const { rows: stats } = await queryWithRetry(`
             SELECT 
                 COUNT(DISTINCT b.user_id) as total_users,
@@ -887,6 +918,7 @@ exports.getBiometricStats = async (req, res) => {
             JOIN users u ON b.user_id = u.emp_id
             WHERE b.date = CURRENT_DATE AND u.role NOT IN ('admin', 'management')
         `);
+        setCachedResult(cacheKey, stats[0]);
         res.json(stats[0]);
     } catch (error) {
         console.error('Error fetching biometric stats:', error);

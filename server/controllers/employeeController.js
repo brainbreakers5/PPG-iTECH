@@ -5,6 +5,20 @@ const sendEmail = require('../utils/sendEmail');
 const logActivity = require('../utils/activityLogger');
 const { createNotification } = require('./notificationController');
 
+const apiCache = new Map();
+const CACHE_TTL = 30000; // 30 seconds for lists, 10s for individual lookups
+
+const getCachedResult = (cacheKey) => {
+    const cached = apiCache.get(cacheKey);
+    if (cached && Date.now() - cached.time < (cached.ttl || CACHE_TTL)) return cached.data;
+    if (cached) apiCache.delete(cacheKey);
+    return null;
+};
+
+const setCachedResult = (cacheKey, data, ttl) => {
+    apiCache.set(cacheKey, { data, time: Date.now(), ttl });
+};
+
 const IMPORT_REQUIRED_COLUMNS = [
     'emp_id',
     'employee_name',
@@ -251,13 +265,41 @@ exports.getEmployees = async (req, res) => {
     try {
         await ensureEmployeeImportSchema(pool);
 
-        let query = `
-            SELECT u.id, u.emp_id, u.emp_code, u.name, u.role, u.email, u.mobile,
+        const { all, page, limit, fields } = req.query;
+
+        // Caching
+        const cacheKey = `emps_${JSON.stringify({ 
+            role: req.user.role, 
+            dept: req.user.department_id, 
+            query: req.query 
+        })}`;
+        const cached = getCachedResult(cacheKey);
+        if (cached) return res.json(cached);
+
+        // Column selection to reduce egress
+        let selectCols = `u.id, u.emp_id, u.emp_code, u.name, u.role, u.email, u.mobile,
                    u.department_id, u.designation, u.profile_pic,
                    u.monthly_salary, COALESCE(u.employment_status, 'active') AS employment_status,
                    TO_CHAR(u.dob, 'YYYY-MM-DD') as dob,
                    TO_CHAR(u.doj, 'YYYY-MM-DD') as doj,
-                   d.name as department_name 
+                   d.name as department_name`;
+
+        if (fields) {
+            const allowed = ['id', 'emp_id', 'emp_code', 'name', 'role', 'email', 'mobile', 'department_id', 'designation', 'profile_pic', 'monthly_salary', 'employment_status', 'dob', 'doj', 'department_name'];
+            const requested = fields.split(',').map(f => f.trim()).filter(f => allowed.includes(f));
+            if (requested.length > 0) {
+                selectCols = requested.map(f => {
+                    if (f === 'department_name') return 'd.name as department_name';
+                    if (f === 'employment_status') return "COALESCE(u.employment_status, 'active') AS employment_status";
+                    if (f === 'dob') return "TO_CHAR(u.dob, 'YYYY-MM-DD') as dob";
+                    if (f === 'doj') return "TO_CHAR(u.doj, 'YYYY-MM-DD') as doj";
+                    return `u.${f}`;
+                }).join(', ');
+            }
+        }
+
+        let query = `
+            SELECT ${selectCols}
             FROM users u
             LEFT JOIN departments d ON u.department_id = d.id
         `;
@@ -265,27 +307,31 @@ exports.getEmployees = async (req, res) => {
 
         // Role-based filtering
         if (req.user.role === 'hod' || req.user.role === 'staff') {
-            // If ?all=true is passed, HOD/Staff can see all staff/hod/principal profiles (e.g. for conversation participant selection)
-            if (req.query.all === 'true') {
+            if (all === 'true') {
                 query += ` WHERE u.role NOT IN ('admin')`;
             } else if (req.user.role === 'hod') {
-                // HOD can only see their own department's personnel
                 query += ` WHERE u.department_id = $1 AND u.role NOT IN ('admin', 'principal')`;
                 params.push(req.user.department_id);
             } else if (req.user.department_id) {
-                // Staff can only see their own department
                 query += ` WHERE u.department_id = $1 AND u.role NOT IN ('admin', 'principal')`;
                 params.push(req.user.department_id);
             } else {
-                // Return an empty list if not assigned a department (for security)
                 return res.status(200).json([]);
             }
         }
-        // Admin and Principal still see everyone
 
         query += ` ORDER BY u.name ASC`;
 
+        // Pagination
+        if (page && limit) {
+            const p = Math.max(1, parseInt(page));
+            const l = Math.min(100, Math.max(1, parseInt(limit)));
+            query += ` LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
+            params.push(l, (p - 1) * l);
+        }
+
         const { rows } = await pool.query(query, params);
+        setCachedResult(cacheKey, rows, 30000);
         res.json(rows);
     } catch (error) {
         console.error(error);
@@ -301,79 +347,54 @@ exports.getEmployeeById = async (req, res) => {
         const paramId = req.params.id;
         const lookupMode = String(req.query.lookup || '').trim().toLowerCase();
 
-        // Build a safe query: only compare to u.id if the param looks like a number
-        // to avoid a PostgreSQL integer cast error on string emp_ids like '@PPG ZORVIAN'
+        const cacheKey = `emp_id_${paramId}_${lookupMode}`;
+        const cached = getCachedResult(cacheKey);
+        if (cached) return res.json(cached);
+
         const isNumeric = /^\d+$/.test(paramId);
+
+        // Explicit columns instead of * to reduce egress
+        const fullUserCols = `
+            u.id, u.emp_id, u.emp_code, u.name, u.role, u.email, u.mobile, u.department_id, u.designation,
+            u.dob, u.doj, u.gender, u.profile_pic, u.blood_group, u.religion, u.nationality, u.caste,
+            u.community, u.whatsapp, u.aadhar, u.pan, u.account_no, u.bank_name, u.branch, u.ifsc,
+            u.pin_code, u.pf_number, u.uan_number, u.permanent_address, u.communication_address,
+            u.father_name, u.mother_name, u.marital_status, u.monthly_salary, u.experience, u.deductions,
+            COALESCE(u.employment_status, 'active') as employment_status,
+            TO_CHAR(u.dob, 'YYYY-MM-DD') as dob_formatted,
+            TO_CHAR(u.doj, 'YYYY-MM-DD') as doj_formatted,
+            d.name as department_name
+        `;
 
         let query, values;
         if (lookupMode === 'id') {
-            if (!isNumeric) {
-                return res.status(400).json({ message: 'Invalid numeric id for lookup=id' });
-            }
-            query = `
-                SELECT u.*, 
-                       TO_CHAR(u.dob, 'YYYY-MM-DD') as dob,
-                       TO_CHAR(u.doj, 'YYYY-MM-DD') as doj,
-                       d.name as department_name
-                FROM users u
-                LEFT JOIN departments d ON u.department_id = d.id
-                WHERE u.id = $1
-                LIMIT 1
-            `;
+            if (!isNumeric) return res.status(400).json({ message: 'Invalid numeric id for lookup=id' });
+            query = `SELECT ${fullUserCols} FROM users u LEFT JOIN departments d ON u.department_id = d.id WHERE u.id = $1 LIMIT 1`;
             values = [parseInt(paramId, 10)];
         } else if (lookupMode === 'emp_id') {
-            query = `
-                SELECT u.*, 
-                       TO_CHAR(u.dob, 'YYYY-MM-DD') as dob,
-                       TO_CHAR(u.doj, 'YYYY-MM-DD') as doj,
-                       d.name as department_name
-                FROM users u
-                LEFT JOIN departments d ON u.department_id = d.id
-                WHERE TRIM(u.emp_id) = $1
-                LIMIT 1
-            `;
+            query = `SELECT ${fullUserCols} FROM users u LEFT JOIN departments d ON u.department_id = d.id WHERE TRIM(u.emp_id) = $1 LIMIT 1`;
             values = [paramId.trim()];
         } else if (isNumeric) {
-            // Priority 1: Exact emp_id match (trimmed)
-            // Priority 2: Database ID match (numeric)
-            query = `
-                SELECT u.*, 
-                       TO_CHAR(u.dob, 'YYYY-MM-DD') as dob,
-                       TO_CHAR(u.doj, 'YYYY-MM-DD') as doj,
-                       d.name as department_name
-                FROM users u
-                LEFT JOIN departments d ON u.department_id = d.id
-                WHERE TRIM(u.emp_id) = $1 OR u.id = $2
-                ORDER BY CASE WHEN TRIM(u.emp_id) = $1 THEN 0 ELSE 1 END ASC
-                LIMIT 1
-            `;
+            query = `SELECT ${fullUserCols} FROM users u LEFT JOIN departments d ON u.department_id = d.id WHERE TRIM(u.emp_id) = $1 OR u.id = $2 ORDER BY CASE WHEN TRIM(u.emp_id) = $1 THEN 0 ELSE 1 END ASC LIMIT 1`;
             values = [paramId.trim(), parseInt(paramId)];
         } else {
-            query = `
-                SELECT u.*, 
-                       TO_CHAR(u.dob, 'YYYY-MM-DD') as dob,
-                       TO_CHAR(u.doj, 'YYYY-MM-DD') as doj,
-                       d.name as department_name
-                FROM users u
-                LEFT JOIN departments d ON u.department_id = d.id
-                WHERE TRIM(u.emp_id) = $1
-            `;
+            query = `SELECT ${fullUserCols} FROM users u LEFT JOIN departments d ON u.department_id = d.id WHERE TRIM(u.emp_id) = $1 LIMIT 1`;
             values = [paramId.trim()];
         }
 
         const { rows } = await pool.query(query, values);
-
-        if (rows.length === 0) {
-            return res.status(404).json({ message: 'Employee not found' });
-        }
+        if (rows.length === 0) return res.status(404).json({ message: 'Employee not found' });
 
         const targetUser = rows[0];
-        // Allow users to see their own profile, or allow higher roles to see any
         if (req.user.role === 'staff' && req.user.id !== targetUser.id) {
             return res.status(403).json({ message: 'Not authorized to view this profile' });
         }
 
-        delete targetUser.password;
+        // Rename back formatted dates if needed
+        targetUser.dob = targetUser.dob_formatted || targetUser.dob;
+        targetUser.doj = targetUser.doj_formatted || targetUser.doj;
+
+        setCachedResult(cacheKey, targetUser, 10000);
         res.json(targetUser);
     } catch (error) {
         console.error('getEmployeeById ERROR:', error);

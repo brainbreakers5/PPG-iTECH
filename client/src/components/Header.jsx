@@ -94,7 +94,7 @@ const Header = () => {
         const fetchSearchData = async () => {
             try {
                 const [empRes, deptRes] = await Promise.all([
-                    api.get('/employees'),
+                    api.get('/employees?fields=id,emp_id,name,role,designation'),
                     api.get('/departments')
                 ]);
                 setEmployees(empRes.data || []);
@@ -116,7 +116,7 @@ const Header = () => {
         }
 
         fetchNotifications();
-        const interval = setInterval(fetchNotifications, 10000);
+        const interval = setInterval(fetchNotifications, 60000);
         return () => clearInterval(interval);
     }, [user]);
 

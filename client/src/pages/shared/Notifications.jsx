@@ -50,7 +50,7 @@ const Notifications = () => {
     useEffect(() => {
         fetchNotifications();
         // Auto-refresh every 15 seconds like dashboard
-        const interval = setInterval(fetchNotifications, 15000);
+        const interval = setInterval(fetchNotifications, 60000);
         return () => clearInterval(interval);
     }, [fetchNotifications]);
 

@@ -110,7 +110,7 @@ const ManagementDashboard = () => {
 
     useEffect(() => {
         fetchDashboardData();
-        const interval = setInterval(fetchDashboardData, 10000);
+        const interval = setInterval(fetchDashboardData, 60000);
         return () => clearInterval(interval);
     }, [fetchDashboardData]);
 

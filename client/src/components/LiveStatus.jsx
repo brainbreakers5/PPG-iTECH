@@ -14,7 +14,7 @@ const LiveStatus = ({ className = "" }) => {
             }
         };
         checkStatus();
-        const interval = setInterval(checkStatus, 30000); // Check every 30s
+        const interval = setInterval(checkStatus, 60000); // Check every 30s
         return () => clearInterval(interval);
     }, []);
 

@@ -74,26 +74,31 @@ const AdminDashboard = () => {
     const fetchDashboardData = useCallback(async () => {
         try {
             const date = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
-            const { data: summary } = await api.get(`/attendance/summary?date=${date}`);
-            const { data: bdays } = await api.get('/employees/birthdays/today');
-            setBirthdays(bdays);
-            const { data: emps } = await api.get('/employees');
-            setAllEmployees(emps);
+            
+            // Replaced 4 calls with 2 essential ones. Summary now includes everything needed for counts/map.
+            const [summaryRes, bdaysRes] = await Promise.all([
+                api.get(`/attendance/summary?date=${date}`),
+                api.get('/employees/birthdays/today')
+            ]);
+            
+            const summary = summaryRes.data || [];
+            setBirthdays(bdaysRes.data || []);
+            setAllEmployees(summary.map(s => ({ ...s, status: s.status, remarks: s.remarks })));
 
-            // Build attendance map: emp_id -> status for today
-            const { data: todayAtt } = await api.get(`/attendance?date=${date}`);
             const map = {};
-            (todayAtt || []).forEach(r => { map[r.emp_id] = r; });
+            summary.forEach(r => { map[r.emp_id] = { status: r.status, remarks: r.remarks }; });
             setAttendanceMap(map);
-            // Fetch holiday/calendar data for month summary
+
             const now = new Date();
             const curMonth = now.getMonth() + 1;
             const curYear = now.getFullYear();
+            
+            // We can fetch holiday data less once or on demand, but for now we keep it filtered.
             const { data: holidayData } = await api.get(`holidays?month=${curMonth}&year=${curYear}`);
             setCurrentDayStatus(getCurrentDayStatus({ today: date, holidayData }));
             
             const holidayDateSet = new Set();
-            (holidayData || []).forEach(h => { holidayDateSet.add(h.h_date); });
+            (holidayData || []).forEach(h => { if (h.h_date) holidayDateSet.add(h.h_date); });
             
             const isTodayHoliday = holidayDateSet.has(date);
             const todayDayOfWeek = new Date().getDay();
@@ -116,30 +121,27 @@ const AdminDashboard = () => {
                 const lp = Number(r.total_lop) || 0;
                 const late = Number(r.total_late) || 0;
                 const abs = Number(r.total_actual_absent || (r.total_absent > 0 ? r.total_absent : 0)) || 0;
+                const cl = Number(r.total_cl) || 0;
+                const ml = Number(r.total_ml) || 0;
+                const comp = Number(r.total_comp) || 0;
                 
                 bucket.present += p;
                 bucket.od += o;
                 bucket.lop += lp;
                 bucket.late_entry += late;
                 bucket.absent += abs;
+                bucket.cl += cl;
+                bucket.ml += ml;
+                bucket.comp_leave += comp;
                 
                 agg.present += p;
                 agg.od += o;
                 agg.lop += lp;
                 agg.late_entry += late;
                 agg.absent += abs;
-            });
-
-            // Count individual leave types from attendance map
-            (emps || []).forEach(emp => {
-                const r = attendanceMap[emp.emp_id] || {};
-                const s = (r.status || '').toUpperCase();
-                const rem = (r.remarks || '').toUpperCase();
-                const role = (emp.role || '').toLowerCase();
-                const bucket = agg[role] || agg.staff;
-                if ((s.includes('CL') || rem.includes('CL') || rem.includes('CASUAL')) && !s.includes('COMP') && !rem.includes('COMP')) { bucket.cl++; agg.cl++; }
-                else if (s.includes('ML') || rem.includes('ML') || rem.includes('MEDICAL')) { bucket.ml++; agg.ml++; }
-                else if (s.includes('COMP LEAVE') || rem.includes('COMP LEAVE') || rem.includes('COMPENSATORY')) { bucket.comp_leave++; agg.comp_leave++; }
+                agg.cl += cl;
+                agg.ml += ml;
+                agg.comp_leave += comp;
             });
             setStats(agg);
 
@@ -164,7 +166,7 @@ const AdminDashboard = () => {
     // Auto-refresh every 10 seconds
     useEffect(() => {
         fetchDashboardData();
-        const interval = setInterval(fetchDashboardData, 10000);
+        const interval = setInterval(fetchDashboardData, 60000);
         return () => clearInterval(interval);
     }, [fetchDashboardData]);
 
