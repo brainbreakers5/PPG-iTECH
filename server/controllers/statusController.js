@@ -22,11 +22,14 @@ exports.getSystemStatus = async (req, res) => {
         }
 
         // 2. Check Biometric Sync
-        // We consider it "functioning" if we can query the biometric logs table.
-        // A more advanced check would verify if a punch was received within a threshold (e.g. 24h).
+        // We avoid heavy ORDER BY / LIMIT queries on large tables for a 30s polling heartbeat.
+        // If the DB is up, we consider biometric tables "available".
         try {
-            await queryWithRetry('SELECT id FROM biometric_logs ORDER BY log_time DESC LIMIT 1');
-            status.biometric = true;
+            if (status.database) {
+                status.biometric = true;
+            } else {
+                status.biometric = false;
+            }
         } catch (bioErr) {
             console.error('Status Check - Biometric Error:', bioErr.message);
             status.biometric = false;
