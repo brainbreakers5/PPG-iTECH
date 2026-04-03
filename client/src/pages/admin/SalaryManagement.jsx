@@ -65,8 +65,11 @@ const normalizeDateOnly = (v) => {
     const raw = String(v);
     return raw.includes('T') ? raw.slice(0, 10) : raw;
 };
-const getWithPayDays = (row) => Number(row?.with_pay_count ?? row?.total_present ?? 0);
-const getWithoutPayDays = (row) => Number(row?.without_pay_count ?? row?.total_lop ?? 0);
+// Prefer new granular fields; fall back to legacy aggregated fields
+const getPresentDays = (row) => Number(row?.present_days ?? 0);
+const getWithPayDays = (row) => Number(row?.with_pay_days ?? row?.with_pay_count ?? row?.total_present ?? 0);
+const getWithoutPayDays = (row) => Number(row?.without_pay_days ?? row?.without_pay_count ?? row?.total_lop ?? 0);
+const getTotalPayableDays = (row) => Number(row?.total_payable_days ?? row?.with_pay_count ?? row?.total_present ?? 0);
 
 const isSameCycle = (row, cycle) => {
     const rowMonth = Number(row?.month);
@@ -285,6 +288,11 @@ const normalizeSalaryRow = (row) => {
     normalized.total_days_in_period = Number(row.total_days_in_period ?? row.totalDaysInPeriod ?? row.total_days ?? row.totalDays ?? 0) || 0;
     normalized.deductions_applied = Number(row.deductions_applied ?? row.deductionsApplied ?? row.total_deductions ?? row.totalDeductions ?? 0) || 0;
     normalized.calculated_salary = Number(row.calculated_salary ?? row.calculatedSalary ?? row.net_salary ?? row.netSalary ?? 0) || 0;
+    // New granular breakdown fields
+    normalized.present_days = Number(row.present_days ?? row.total_present ?? 0) || 0;
+    normalized.with_pay_days = Number(row.with_pay_days ?? row.with_pay_count ?? row.total_present ?? 0) || 0;
+    normalized.without_pay_days = Number(row.without_pay_days ?? row.without_pay_count ?? row.total_lop ?? 0) || 0;
+    normalized.total_payable_days = Number(row.total_payable_days ?? row.with_pay_count ?? row.total_present ?? 0) || 0;
 
     normalized.status = String(row.status ?? row.salary_status ?? row.salaryStatus ?? 'Pending');
 
@@ -315,8 +323,9 @@ const SalaryManagement = () => {
     const isPersonalView = !canInstitutionWide;
     const isAdmin = user?.role === 'admin';
     const isManagement = user?.role === 'management';
-    const showStatusColumn = true;
-    const showActionsColumn = true;
+    // Live salary page (admin): hide Status & Actions. History page: show both. Personal views: always show.
+    const showStatusColumn = isHistoryPage || isPersonalView;
+    const showActionsColumn = isHistoryPage || isPersonalView;
     const showInstitutionActionButtons = canInstitutionWide && !isPersonalView;
     const showSelectionBar = canInstitutionWide && !isPersonalView && !isManagement && !isHistoryPage;
 
@@ -886,7 +895,10 @@ const SalaryManagement = () => {
                             </thead>
                             <tbody>
                                 <tr><td>Fixed Salary</td><td class="right">${toCurrency(fixedSalary)}</td></tr>
-                                <tr><td>With Pay / Without Pay Days</td><td class="right">${withPay} / ${withoutPay}</td></tr>
+                                <tr><td>Present Days</td><td class="right">${Number(row?.present_days ?? 0).toFixed(1)}</td></tr>
+                                <tr><td>With Pay Days (Leave)</td><td class="right">${withPay}</td></tr>
+                                <tr><td>Total Payable Days</td><td class="right">${(Number(row?.total_payable_days ?? 0) || (Number(row?.present_days ?? 0) + Number(row?.with_pay_days ?? 0))).toFixed(1)}</td></tr>
+                                <tr><td>Without Pay (Deducted)</td><td class="right" style="color:#dc2626">${withoutPay}</td></tr>
                                 <tr><td>Earned Salary</td><td class="right">${toCurrency(earnedSalary)}</td></tr>
                                 <tr><td>Total Deductions</td><td class="right">${toCurrency(deduction)}</td></tr>
                                 <tr><td>Net Salary</td><td class="right">${toCurrency(net)}</td></tr>
@@ -1028,8 +1040,10 @@ const SalaryManagement = () => {
                 const earnedSplit = getEarnedSalaryConceptSplit(earnedSalary);
                 const totalDays = Number(r.total_days_in_period || totalCycleDays || 0);
                 const workingDays = Number(cycleWorkingDays || 0);
-                const paidDays = Number(r.with_pay_count ?? r.total_present ?? 0);
-                const unpaidDays = Number(r.without_pay_count ?? r.total_lop ?? 0);
+                const presentDays = getPresentDays(r);
+                const withPayDays = getWithPayDays(r);
+                const paidDays = getTotalPayableDays(r); // present + with_pay
+                const unpaidDays = getWithoutPayDays(r);
                 return `
             <tr>
                 <td>${index + 1}</td>
@@ -1040,6 +1054,8 @@ const SalaryManagement = () => {
                 <td class="right">${workingDays.toFixed(1)}</td>
                 <td class="right">${toCurrency(fixedSalary)}</td>
                 <td class="right">${toCurrency(grossSalary)}</td>
+                <td class="right excel-only">${presentDays.toFixed(1)}</td>
+                <td class="right excel-only">${withPayDays.toFixed(1)}</td>
                 <td class="right excel-only">${paidDays.toFixed(1)}</td>
                 <td class="right excel-only">${unpaidDays.toFixed(1)}</td>
                 <td class="right excel-only">${toCurrency(earnedSalary)}</td>
@@ -1106,8 +1122,10 @@ const SalaryManagement = () => {
                                     <th class="right">Total Working Days</th>
                                     <th class="right">Fixed Salary</th>
                                     <th class="right">Gross Salary</th>
-                                    <th class="right excel-only">Total Paid Days</th>
-                                    <th class="right excel-only">Total Unpaid Days</th>
+                                    <th class="right excel-only">Present Days</th>
+                                    <th class="right excel-only">With Pay Days</th>
+                                    <th class="right excel-only">Total Payable Days</th>
+                                    <th class="right excel-only">Without Pay Days</th>
                                     <th class="right excel-only">Earned Salary</th>
                                     <th class="right excel-only">Basic Salary</th>
                                     <th class="right excel-only">Performance</th>
@@ -1510,7 +1528,7 @@ const SalaryManagement = () => {
                                         </th>
                                     )}
                                     <th className="p-3 md:p-6 text-[9px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-sky-50 whitespace-nowrap">{isPersonalView ? 'Period' : 'Employee'}</th>
-                                    <th className="p-3 md:p-6 text-[9px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-sky-50 text-right whitespace-nowrap">Pay Days</th>
+                                    <th className="p-3 md:p-6 text-[9px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-sky-50 text-right whitespace-nowrap">Attendance</th>
                                     <th className="p-3 md:p-6 text-[9px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-sky-50 text-right whitespace-nowrap">Fixed Salary</th>
                                     <th className="p-3 md:p-6 text-[9px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-sky-50 text-right whitespace-nowrap">Gross Salary</th>
                                     <th className="p-3 md:p-6 text-[9px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-sky-50 text-right whitespace-nowrap">Deductions</th>
@@ -1562,7 +1580,11 @@ const SalaryManagement = () => {
                                         </td>
                                     )}
                                     <td className="p-3 md:p-6 text-right whitespace-nowrap">
-                                        <span className="text-xs md:text-sm font-black text-gray-700">{getWithPayDays(r).toFixed(1)} P / {getWithoutPayDays(r).toFixed(1)} L</span>
+                                        <div className="inline-flex flex-col items-end gap-0.5">
+                                            <span className="text-[10px] font-black text-emerald-700" title="Present Days">P: {getPresentDays(r).toFixed(1)}</span>
+                                            <span className="text-[10px] font-black text-sky-600" title="With Pay Days (Leave/Holiday)">W: {getWithPayDays(r).toFixed(1)}</span>
+                                            <span className="text-[10px] font-black text-rose-500" title="Without Pay (LOP)">L: {getWithoutPayDays(r).toFixed(1)}</span>
+                                        </div>
                                     </td>
                                     <td className="p-3 md:p-6 text-right whitespace-nowrap" title="Fixed Salary">
                                         <span className="text-xs md:text-sm font-bold text-gray-700 bg-gray-50 px-2.5 md:px-3 py-1.5 rounded-lg border border-gray-100 whitespace-nowrap">Rs {toCurrency(fixedSalary)}</span>

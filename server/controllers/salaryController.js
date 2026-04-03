@@ -222,7 +222,11 @@ const ensureSalarySchema = async () => {
         ADD COLUMN IF NOT EXISTS total_days_in_period INTEGER DEFAULT 0,
         ADD COLUMN IF NOT EXISTS from_date DATE,
         ADD COLUMN IF NOT EXISTS to_date DATE,
-        ADD COLUMN IF NOT EXISTS paid_at TIMESTAMP
+        ADD COLUMN IF NOT EXISTS paid_at TIMESTAMP,
+        ADD COLUMN IF NOT EXISTS present_days NUMERIC(10, 2) DEFAULT 0,
+        ADD COLUMN IF NOT EXISTS with_pay_days NUMERIC(10, 2) DEFAULT 0,
+        ADD COLUMN IF NOT EXISTS without_pay_days NUMERIC(10, 2) DEFAULT 0,
+        ADD COLUMN IF NOT EXISTS total_payable_days NUMERIC(10, 2) DEFAULT 0
     `);
 
     await queryWithRetry(`
@@ -247,14 +251,22 @@ const ensureSalarySchema = async () => {
             from_date DATE,
             to_date DATE,
             paid_at TIMESTAMP,
-            archived_at TIMESTAMP DEFAULT NOW()
+            archived_at TIMESTAMP DEFAULT NOW(),
+            present_days NUMERIC(10, 2) DEFAULT 0,
+            with_pay_days NUMERIC(10, 2) DEFAULT 0,
+            without_pay_days NUMERIC(10, 2) DEFAULT 0,
+            total_payable_days NUMERIC(10, 2) DEFAULT 0
         )
     `);
 
     await queryWithRetry(`
         ALTER TABLE salary_history
         ADD COLUMN IF NOT EXISTS esi_gross NUMERIC(12, 2) DEFAULT 0,
-        ADD COLUMN IF NOT EXISTS employee_esi NUMERIC(12, 2) DEFAULT 0
+        ADD COLUMN IF NOT EXISTS employee_esi NUMERIC(12, 2) DEFAULT 0,
+        ADD COLUMN IF NOT EXISTS present_days NUMERIC(10, 2) DEFAULT 0,
+        ADD COLUMN IF NOT EXISTS with_pay_days NUMERIC(10, 2) DEFAULT 0,
+        ADD COLUMN IF NOT EXISTS without_pay_days NUMERIC(10, 2) DEFAULT 0,
+        ADD COLUMN IF NOT EXISTS total_payable_days NUMERIC(10, 2) DEFAULT 0
     `);
 
     await queryWithRetry(`
@@ -270,6 +282,19 @@ const ensureSalarySchema = async () => {
             created_at TIMESTAMP DEFAULT NOW()
         )
     `);
+};
+
+// Categorise a single status token as: 'present', 'withpay', 'withoutpay', or 'other'
+const classifyStatusCategory = (statusText, remarksText, paidSet, unpaidSet) => {
+    const norm = normalizeStatusToken(statusText);
+    // Present markers
+    const presentMarkers = new Set(['present', 'p']);
+    if (presentMarkers.has(norm)) return 'present';
+    // Unpaid / LOP markers
+    if (unpaidSet.has(norm)) return 'withoutpay';
+    // Everything else in paid set = With Pay (CL, ML, OD, Holiday, Leave, etc.)
+    if (paidSet.has(norm)) return 'withpay';
+    return 'other';
 };
 
 const getAttendanceAggregateMap = async ({ fromDate, toDate, paidStatuses, unpaidStatuses }) => {
@@ -309,7 +334,15 @@ const getAttendanceAggregateMap = async ({ fromDate, toDate, paidStatuses, unpai
             const key = String(r.emp_id || '').trim();
             if (!key) return;
             if (!map[key]) {
-                map[key] = { payable_days: 0, unpaid_days: 0, total_records: 0 };
+                map[key] = {
+                    present_days: 0,
+                    with_pay_days: 0,
+                    without_pay_days: 0,
+                    // kept for backward compat
+                    payable_days: 0,
+                    unpaid_days: 0,
+                    total_records: 0
+                };
             }
 
             const { paid, unpaid } = classifyStatusUnits({
@@ -319,6 +352,29 @@ const getAttendanceAggregateMap = async ({ fromDate, toDate, paidStatuses, unpai
                 unpaidSet
             });
 
+            // Fine-grained category (handles half-day splits via classifyStatusUnits units)
+            const rawStatus = String(r.status || '').trim();
+            const half = isHalfDayMark({ statusText: rawStatus, remarksText: r.remarks });
+            const unit = half ? 0.5 : 1;
+
+            if (rawStatus.includes('+') || /[\/,&]/.test(rawStatus)) {
+                // Mixed statuses: split and categorise each part
+                const sep = rawStatus.includes('+') ? '+' : /[/,&]/;
+                const parts = rawStatus.split(sep).map((p) => String(p || '').trim()).filter(Boolean);
+                const splitUnit = half ? 0.25 : 0.5;
+                parts.forEach((part) => {
+                    const cat = classifyStatusCategory(part, r.remarks, paidSet, unpaidSet);
+                    if (cat === 'present') map[key].present_days += splitUnit;
+                    else if (cat === 'withpay') map[key].with_pay_days += splitUnit;
+                    else if (cat === 'withoutpay') map[key].without_pay_days += splitUnit;
+                });
+            } else {
+                const cat = classifyStatusCategory(rawStatus, r.remarks, paidSet, unpaidSet);
+                if (cat === 'present') map[key].present_days += unit;
+                else if (cat === 'withpay') map[key].with_pay_days += unit;
+                else if (cat === 'withoutpay') map[key].without_pay_days += unit;
+            }
+
             map[key].payable_days += paid;
             map[key].unpaid_days += unpaid;
             if (normalizeStatusToken(r.status) !== 'absent') {
@@ -327,8 +383,11 @@ const getAttendanceAggregateMap = async ({ fromDate, toDate, paidStatuses, unpai
         });
 
         Object.keys(map).forEach((key) => {
-            map[key].payable_days = round2(map[key].payable_days);
-            map[key].unpaid_days = round2(map[key].unpaid_days);
+            map[key].present_days = round2(map[key].present_days);
+            map[key].with_pay_days = round2(map[key].with_pay_days);
+            map[key].without_pay_days = round2(map[key].without_pay_days);
+            map[key].payable_days = round2(map[key].present_days + map[key].with_pay_days);
+            map[key].unpaid_days = round2(map[key].without_pay_days);
         });
 
         return map;
@@ -380,9 +439,17 @@ const computeSalaryMetrics = ({ monthlySalary, rawDeductions, deductions, workin
 };
 
 const resolvePayableDaysFromAttendanceStats = (stats) => {
+    // payable = present + with_pay (calculated in aggregator)
     const payable = Number(stats?.payable_days || 0);
     return Math.max(0, payable);
 };
+
+const resolveBreakdownFromStats = (stats) => ({
+    present_days: round2(Number(stats?.present_days || 0)),
+    with_pay_days: round2(Number(stats?.with_pay_days || 0)),
+    without_pay_days: round2(Number(stats?.without_pay_days || stats?.unpaid_days || 0)),
+    total_payable_days: round2(Number(stats?.payable_days || 0))
+});
 
 // @desc    Calculate Salary (supports exact date range)
 // @route   POST /api/salary/calculate
@@ -467,17 +534,19 @@ exports.calculateSalary = async (req, res) => {
                 continue;
             }
 
-            const stats = statsMap[userEmpId] || { payable_days: 0, unpaid_days: 0, total_records: 0 };
-            const resolvedPayableDays = resolvePayableDaysFromAttendanceStats(stats);
-            const unpaidDays = Number(stats.unpaid_days || 0);
+            const stats = statsMap[userEmpId] || {
+                present_days: 0, with_pay_days: 0, without_pay_days: 0,
+                payable_days: 0, unpaid_days: 0, total_records: 0
+            };
+            const breakdown = resolveBreakdownFromStats(stats);
+            const resolvedPayableDays = breakdown.total_payable_days; // present + with_pay
+            const unpaidDays = breakdown.without_pay_days;
 
-            // Skip only when there are no payable and no unpaid units for this period.
-            if (resolvedPayableDays <= 0 && unpaidDays <= 0) {
-                if (existing.length > 0 && existing[0].status !== 'Paid') {
-                    await queryWithRetry('DELETE FROM salary_records WHERE id = $1', [existing[0].id]);
-                }
-                continue;
-            }
+            // If zero attendance data AND no existing record → skip silently.
+            // If an existing Pending record exists but attendance is now zero → still update it
+            // so it reflects the latest (cleared) attendance rather than stale data.
+            const hasAnyData = resolvedPayableDays > 0 || unpaidDays > 0;
+            if (!hasAnyData && existing.length === 0) continue;
             
             const grossSource = parseFloat(user.monthly_salary) || 0;
             const metrics = computeSalaryMetrics({
@@ -488,25 +557,9 @@ exports.calculateSalary = async (req, res) => {
                 unpaidDays
             });
 
-            if (existing.length > 0) {
-                if (existing[0].status === 'Paid') {
-                    await queryWithRetry(`
-                        INSERT INTO salary_history (
-                            source_salary_id, emp_id, month, year, total_present, total_leave, total_lop,
-                            calculated_salary, status, with_pay_count, without_pay_count,
-                            deductions_applied, gross_salary, total_days_in_period,
-                            from_date, to_date, paid_at, archived_at
-                        )
-                        SELECT
-                            id, emp_id, month, year, total_present, total_leave, total_lop,
-                            calculated_salary, status, with_pay_count, without_pay_count,
-                            deductions_applied, gross_salary, total_days_in_period,
-                            from_date, to_date, paid_at, NOW()
-                        FROM salary_records
-                        WHERE id = $1
-                    `, [existing[0].id]);
-                }
 
+            if (existing.length > 0) {
+                // UPDATE existing Pending record with full breakdown values
                 await queryWithRetry(`
                     UPDATE salary_records
                     SET month = $2,
@@ -525,54 +578,71 @@ exports.calculateSalary = async (req, res) => {
                         from_date = $15::date,
                         to_date = $16::date,
                         status = 'Pending',
-                        paid_at = NULL
+                        paid_at = NULL,
+                        present_days = $17,
+                        with_pay_days = $18,
+                        without_pay_days = $19,
+                        total_payable_days = $20
                     WHERE id = $1
                 `, [
                     existing[0].id,
                     period.month,
                     period.year,
-                    metrics.payableDays,
-                    0,
-                    metrics.lopDays,
+                    breakdown.present_days,       // total_present
+                    breakdown.with_pay_days,      // total_leave
+                    breakdown.without_pay_days,   // total_lop
                     metrics.netSalary.toFixed(2),
-                    metrics.payableDays,
-                    metrics.lopDays,
+                    breakdown.total_payable_days, // with_pay_count
+                    breakdown.without_pay_days,   // without_pay_count
                     metrics.deductionsApplied.toFixed(2),
                     metrics.esiGross.toFixed(2),
                     metrics.employeeEsi.toFixed(2),
                     metrics.grossSalary.toFixed(2),
                     totalDaysInPeriod,
                     rangeFrom,
-                    rangeTo
+                    rangeTo,
+                    breakdown.present_days,
+                    breakdown.with_pay_days,
+                    breakdown.without_pay_days,
+                    breakdown.total_payable_days
                 ]);
             } else {
+                // INSERT a brand-new salary record
                 await queryWithRetry(`
                     INSERT INTO salary_records (
                         emp_id, month, year, total_present, total_leave, total_lop,
                         calculated_salary, status, with_pay_count, without_pay_count,
-                        deductions_applied, esi_gross, employee_esi, gross_salary, total_days_in_period, from_date, to_date
+                        deductions_applied, esi_gross, employee_esi, gross_salary,
+                        total_days_in_period, from_date, to_date,
+                        present_days, with_pay_days, without_pay_days, total_payable_days
                     ) VALUES (
                         $1, $2, $3, $4, $5, $6,
                         $7, 'Pending', $8, $9,
-                        $10, $11, $12, $13, $14, $15::date, $16::date
+                        $10, $11, $12, $13,
+                        $14, $15::date, $16::date,
+                        $17, $18, $19, $20
                     )
                 `, [
                     userEmpId,
                     period.month,
                     period.year,
-                    metrics.payableDays,
-                    0,
-                    metrics.lopDays,
+                    breakdown.present_days,
+                    breakdown.with_pay_days,
+                    breakdown.without_pay_days,
                     metrics.netSalary.toFixed(2),
-                    metrics.payableDays,
-                    metrics.lopDays,
+                    breakdown.total_payable_days,
+                    breakdown.without_pay_days,
                     metrics.deductionsApplied.toFixed(2),
                     metrics.esiGross.toFixed(2),
                     metrics.employeeEsi.toFixed(2),
                     metrics.grossSalary.toFixed(2),
                     totalDaysInPeriod,
                     rangeFrom,
-                    rangeTo
+                    rangeTo,
+                    breakdown.present_days,
+                    breakdown.with_pay_days,
+                    breakdown.without_pay_days,
+                    breakdown.total_payable_days
                 ]);
             }
 
@@ -582,8 +652,12 @@ exports.calculateSalary = async (req, res) => {
                 role: user.role,
                 monthly_salary: metrics.fixedSalary,
                 calculated_salary: metrics.netSalary.toFixed(2),
-                payable_days: metrics.payableDays,
-                total_lop: metrics.lopDays,
+                present_days: breakdown.present_days,
+                with_pay_days: breakdown.with_pay_days,
+                without_pay_days: breakdown.without_pay_days,
+                total_payable_days: breakdown.total_payable_days,
+                payable_days: breakdown.total_payable_days,
+                total_lop: breakdown.without_pay_days,
                 range_days: totalDaysInPeriod,
                 gross_salary: metrics.grossSalary.toFixed(2),
                 deductions_applied: metrics.deductionsApplied.toFixed(2),
@@ -811,8 +885,9 @@ exports.getSalaryRecords = async (req, res) => {
                 }
 
                 const attendanceStats = attendanceMap[key] || {};
-                const payableDays = resolvePayableDaysFromAttendanceStats(attendanceStats);
-                const unpaidDays = Number(attendanceStats.unpaid_days || 0);
+                const breakdown = resolveBreakdownFromStats(attendanceStats);
+                const payableDays = breakdown.total_payable_days;
+                const unpaidDays = breakdown.without_pay_days;
                 if (payableDays <= 0 && unpaidDays <= 0) {
                     return null;
                 }
@@ -835,10 +910,15 @@ exports.getSalaryRecords = async (req, res) => {
                     monthly_salary: parseFloat(u.monthly_salary) || 0,
                     gross_salary: previewMetrics.grossSalary.toFixed(2),
                     calculated_salary: previewMetrics.netSalary.toFixed(2),
-                    total_present: previewMetrics.payableDays,
-                    total_lop: previewMetrics.lopDays,
-                    with_pay_count: previewMetrics.payableDays,
-                    without_pay_count: previewMetrics.lopDays,
+                    total_present: breakdown.present_days,
+                    total_leave: breakdown.with_pay_days,
+                    total_lop: breakdown.without_pay_days,
+                    present_days: breakdown.present_days,
+                    with_pay_days: breakdown.with_pay_days,
+                    without_pay_days: breakdown.without_pay_days,
+                    total_payable_days: breakdown.total_payable_days,
+                    with_pay_count: breakdown.total_payable_days,
+                    without_pay_count: breakdown.without_pay_days,
                     deductions_applied: previewMetrics.deductionsApplied.toFixed(2),
                     esi_gross: previewMetrics.esiGross.toFixed(2),
                     employee_esi: previewMetrics.employeeEsi.toFixed(2),
@@ -856,8 +936,9 @@ exports.getSalaryRecords = async (req, res) => {
             if (existing) {
                 if (existing.status !== 'Paid') {
                     const attendanceStats = attendanceMap[key] || {};
-                    const payableDays = resolvePayableDaysFromAttendanceStats(attendanceStats);
-                    const unpaidDays = Number(attendanceStats.unpaid_days || 0);
+                    const breakdown = resolveBreakdownFromStats(attendanceStats);
+                    const payableDays = breakdown.total_payable_days;
+                    const unpaidDays = breakdown.without_pay_days;
                     if (payableDays <= 0 && unpaidDays <= 0) return null;
 
                     const metrics = computeSalaryMetrics({
@@ -876,10 +957,15 @@ exports.getSalaryRecords = async (req, res) => {
                         monthly_salary: parseFloat(u.monthly_salary) || 0,
                         department_name: u.department_name,
                         deductions: u.deductions,
-                        total_present: metrics.payableDays,
-                        total_lop: metrics.lopDays,
-                        with_pay_count: metrics.payableDays,
-                        without_pay_count: metrics.lopDays,
+                        total_present: breakdown.present_days,
+                        total_leave: breakdown.with_pay_days,
+                        total_lop: breakdown.without_pay_days,
+                        present_days: breakdown.present_days,
+                        with_pay_days: breakdown.with_pay_days,
+                        without_pay_days: breakdown.without_pay_days,
+                        total_payable_days: breakdown.total_payable_days,
+                        with_pay_count: breakdown.total_payable_days,
+                        without_pay_count: breakdown.without_pay_days,
                         deductions_applied: metrics.deductionsApplied.toFixed(2),
                         calculated_salary: metrics.netSalary.toFixed(2),
                         gross_salary: metrics.grossSalary.toFixed(2),
@@ -906,8 +992,9 @@ exports.getSalaryRecords = async (req, res) => {
 
             const gross = parseFloat(u.monthly_salary) || 0;
             const attendanceStats = attendanceMap[key] || {};
-            const payableDays = resolvePayableDaysFromAttendanceStats(attendanceStats);
-            const unpaidDays = Number(attendanceStats.unpaid_days || 0);
+            const breakdown = resolveBreakdownFromStats(attendanceStats);
+            const payableDays = breakdown.total_payable_days;
+            const unpaidDays = breakdown.without_pay_days;
             if (payableDays <= 0 && unpaidDays <= 0) return null;
 
             const metrics = computeSalaryMetrics({
@@ -928,10 +1015,15 @@ exports.getSalaryRecords = async (req, res) => {
                 monthly_salary: gross,
                 gross_salary: metrics.grossSalary.toFixed(2),
                 calculated_salary: metrics.netSalary.toFixed(2),
-                total_present: metrics.payableDays,
-                total_lop: metrics.lopDays,
-                with_pay_count: metrics.payableDays,
-                without_pay_count: metrics.lopDays,
+                total_present: breakdown.present_days,
+                total_leave: breakdown.with_pay_days,
+                total_lop: breakdown.without_pay_days,
+                present_days: breakdown.present_days,
+                with_pay_days: breakdown.with_pay_days,
+                without_pay_days: breakdown.without_pay_days,
+                total_payable_days: breakdown.total_payable_days,
+                with_pay_count: breakdown.total_payable_days,
+                without_pay_count: breakdown.without_pay_days,
                 deductions_applied: metrics.deductionsApplied.toFixed(2),
                 esi_gross: metrics.esiGross.toFixed(2),
                 employee_esi: metrics.employeeEsi.toFixed(2),
