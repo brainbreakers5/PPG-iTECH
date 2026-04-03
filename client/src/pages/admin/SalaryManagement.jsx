@@ -65,11 +65,11 @@ const normalizeDateOnly = (v) => {
     const raw = String(v);
     return raw.includes('T') ? raw.slice(0, 10) : raw;
 };
-// Prefer new granular fields; fall back to legacy aggregated fields
-const getPresentDays = (row) => Number(row?.present_days ?? 0);
-const getWithPayDays = (row) => Number(row?.with_pay_days ?? row?.with_pay_count ?? row?.total_present ?? 0);
-const getWithoutPayDays = (row) => Number(row?.without_pay_days ?? row?.without_pay_count ?? row?.total_lop ?? 0);
-const getTotalPayableDays = (row) => Number(row?.total_payable_days ?? row?.with_pay_count ?? row?.total_present ?? 0);
+// Prefer new granular fields; fall back to legacy aggregated fields using logical OR so exactly 0 doesn't hide legacy values
+const getPresentDays = (row) => Number(row?.present_days || row?.total_present || 0) || 0;
+const getWithPayDays = (row) => Number(row?.with_pay_days || row?.with_pay_count || row?.total_present || 0) || 0;
+const getWithoutPayDays = (row) => Number(row?.without_pay_days || row?.without_pay_count || row?.total_lop || 0) || 0;
+const getTotalPayableDays = (row) => Number(row?.total_payable_days || row?.with_pay_count || row?.total_present || 0) || 0;
 
 const isSameCycle = (row, cycle) => {
     const rowMonth = Number(row?.month);
