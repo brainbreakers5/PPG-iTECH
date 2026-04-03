@@ -29,15 +29,15 @@ const sslEnabledByHost = resolvedHost.includes('supabase.co') || resolvedHost.in
 const useSsl = !sslDisabled && (sslEnabledByFlag || (!sslFlag && sslEnabledByHost));
 
 // STRICT POOL LIMITS: Supabase/Render free/session mode have very low limits (often 10 total).
-// We set max: 5 to ensure we don't hit "Max clients reached" easily.
-const poolMax = 5;
+// We set max: 3 to ensure we don't hit "Max clients reached" easily as requested.
+const poolMax = 3;
 
 const poolConfig = {
     connectionString,
     ssl: useSsl ? { rejectUnauthorized: false } : false,
     max: poolMax,
-    idleTimeoutMillis: 10000, // Close idle clients after 10s to free up slots
-    connectionTimeoutMillis: 5000,  // Fast fail if no connection available
+    idleTimeoutMillis: 30000,     // Close idle clients after 30s to free up slots
+    connectionTimeoutMillis: 2000, // Fast fail if no connection available (prevent hanging)
     keepAlive: true,
 };
 
@@ -52,6 +52,19 @@ if (!connectionString) {
 
 // Create a single shared pool instance
 const pool = new Pool(poolConfig);
+
+// SIMPLE LOGGING TO TRACK CONNECTION USAGE
+pool.on('connect', (client) => {
+    // console.log(`[DB] New client connected to pool. Total clients: ${pool.totalCount}, Idle: ${pool.idleCount}`);
+});
+
+pool.on('acquire', (client) => {
+    // console.log(`[DB] Client acquired from pool. Total clients: ${pool.totalCount}, Idle: ${pool.idleCount}`);
+});
+
+pool.on('remove', (client) => {
+    console.log(`[DB] Client removed from pool. Total clients: ${pool.totalCount}`);
+});
 
 /**
  * Checks if a DB error is "retryable" (transient network or load issue).
@@ -70,8 +83,8 @@ const isRetryableDbError = (error) => {
             '57P01', // admin_shutdown
             '57P03', // cannot_connect_now
             '53300', // too_many_connections
-            '53400', // configuration_limit_exceeded (custom for some pg hosts)
-            'XX000', // internal_error (sometimes thrown by Supabase/Render on load)
+            '53400', // configuration_limit_exceeded
+            'XX000', // internal_error
         ].includes(code) ||
         msg.includes('connection terminated') ||
         msg.includes('connection timeout') ||
@@ -102,7 +115,7 @@ const queryWithRetry = async (text, params = [], options = {}) => {
             lastError = error;
             if (attempt < maxRetries && isRetryableDbError(error)) {
                 console.warn(`[DB RETRY] Query failed (attempt ${attempt + 1}/${maxRetries + 1}): ${error.message}`);
-                await sleep(delayMs * (attempt + 1)); // Exponential backoffish
+                await sleep(delayMs * (attempt + 1));
                 continue;
             }
             throw error;
@@ -118,7 +131,7 @@ const queryWithRetry = async (text, params = [], options = {}) => {
 const withDbClient = async (handler) => {
     let client;
     let attempt = 0;
-    const maxRetries = 2; // Low retries for acquiring a client
+    const maxRetries = 2;
 
     while (attempt <= maxRetries) {
         try {
@@ -147,7 +160,6 @@ const connectDB = async () => {
         console.log('PostgreSQL Database Connected Successfully (Max Pool: ' + poolMax + ')');
     } catch (error) {
         console.error('CRITICAL: Database Connection Failed:', error.message);
-        // Do not crash the process, allow for potential recovery via retries later
     }
 };
 
@@ -164,4 +176,5 @@ module.exports = {
     withDbClient, 
     isRetryableDbError 
 };
+
 

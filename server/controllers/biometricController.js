@@ -1,4 +1,4 @@
-const { pool } = require('../config/db');
+const { pool, queryWithRetry, withDbClient } = require('../config/db');
 const { createNotification } = require('./notificationController');
 const bcrypt = require('bcryptjs');
 const fs = require('fs');
@@ -87,17 +87,17 @@ const toIstParts = (date) => {
     return { dateStr, timeStr, timestamp: `${dateStr} ${timeStr}` };
 };
 
-const upsertBiometricAttendanceFromLogs = async (empId, dateStr) => {
+const upsertBiometricAttendanceFromLogs = async (empId, dateStr, client = pool) => {
     // We treat log_time as already being in IST local time (timestamp without time zone)
     // to avoid triple-conversion bugs that shift dashboard data by 5.5 hours.
-    await pool.query(
+    await client.query(
         `WITH agg AS (
             SELECT
                 MIN(log_time::time) AS first_punch,
                 MAX(log_time::time) AS last_punch
             FROM biometric_logs
             WHERE emp_id = $1
-              AND log_time::date = $2::date
+            AND log_time::date = $2::date
         )
         INSERT INTO biometric_attendance (user_id, date, intime, outtime)
         SELECT $1, $2::date, first_punch, last_punch
@@ -346,7 +346,9 @@ const startPendingRecoveryWorker = () => {
 
         try {
             try {
-                await pool.query('SELECT 1');
+                // Using pool.query directly here is fine as it's a heartbeat/ping,
+                // but let's use a very short timeout or just queryWithRetry
+                await queryWithRetry('SELECT 1', [], { retries: 0 });
                 markDbConnected();
             } catch (pingErr) {
                 markDbDisconnected(pingErr);
@@ -374,7 +376,7 @@ const ensureBiometricUser = async (empId) => {
     const placeholderPassword = `AUTO_BIOMETRIC_${safeEmpId}_${Date.now()}`;
     const passwordHash = await bcrypt.hash(placeholderPassword, 10);
 
-    await pool.query(
+    await queryWithRetry(
         `INSERT INTO users (emp_id, password, role, name, designation)
          VALUES ($1, $2, 'staff', $3, 'Biometric Imported')
          ON CONFLICT (emp_id) DO NOTHING`,
@@ -384,28 +386,28 @@ const ensureBiometricUser = async (empId) => {
 
 // Defined as a local const so internal callers (receiveLog, drainPendingBiometricLogs,
 // rebuildTodayPunches) can all call it without going through exports.*
-const rebuildAttendanceFromBiometricTimeline = async (normalizedEmpId, dateStr) => {
+const rebuildAttendanceFromBiometricTimeline = async (normalizedEmpId, dateStr, client = pool) => {
     const toMins = (t) => {
         if (!t) return 0;
         const [h, m] = t.split(':').map(Number);
         return (h || 0) * 60 + (m || 0);
     };
 
-    const { rows: allPunches } = await pool.query(
+    const { rows: allPunches } = await client.query(
         `SELECT log_time FROM biometric_logs
          WHERE TRIM(emp_id) = $1 AND log_time::date = $2::date
          ORDER BY log_time ASC`,
         [normalizedEmpId, dateStr]
     );
 
-    const { rows: approvedLeaves } = await pool.query(
+    const { rows: approvedLeaves } = await client.query(
         `SELECT leave_type, is_half_day, dates_detail FROM leave_requests
          WHERE emp_id = $1 AND status = 'Approved'
          AND from_date <= $2 AND to_date >= $2`,
         [normalizedEmpId, dateStr]
     );
 
-    const { rows: approvedPerms } = await pool.query(
+    const { rows: approvedPerms } = await client.query(
         `SELECT from_time, to_time FROM permission_requests
          WHERE emp_id = $1 AND status = 'Approved' AND date = $2`,
         [normalizedEmpId, dateStr]
@@ -575,7 +577,8 @@ const rebuildAttendanceFromBiometricTimeline = async (normalizedEmpId, dateStr) 
             intime = EXCLUDED.intime,
             outtime = EXCLUDED.outtime`,
         [normalizedEmpId, dateStr, physIn || null, physOut || null],
-        'biometric_attendance'
+        'biometric_attendance',
+        client
     );
 
     await runWithSequenceFix(
@@ -588,7 +591,8 @@ const rebuildAttendanceFromBiometricTimeline = async (normalizedEmpId, dateStr) 
             status = EXCLUDED.status,
             remarks = EXCLUDED.remarks`,
         [normalizedEmpId, dateStr, physIn || null, physOut || null, enumStatus, finalRemarks || null],
-        'attendance_records'
+        'attendance_records',
+        client
     );
 
     return { dbStatus, enumStatus, remarks: finalRemarks || null, physIn, physOut };
@@ -598,20 +602,20 @@ const rebuildAttendanceFromBiometricTimeline = async (normalizedEmpId, dateStr) 
 exports.rebuildAttendanceFromBiometricTimeline = rebuildAttendanceFromBiometricTimeline;
 
 // Helper: run a query, and on unique-violation (23505) attempt to reset sequence for given table and retry once
-async function runWithSequenceFix(queryText, params = [], tableName = null) {
+async function runWithSequenceFix(queryText, params = [], tableName = null, client = pool) {
     try {
-        return await pool.query(queryText, params);
+        return await client.query(queryText, params);
     } catch (err) {
         if (err && err.code === '23505' && tableName) {
             try {
-                const seqRes = await pool.query("SELECT pg_get_serial_sequence($1, 'id') as seqname", [tableName]);
+                const seqRes = await client.query("SELECT pg_get_serial_sequence($1, 'id') as seqname", [tableName]);
                 const seqName = seqRes.rows[0] && seqRes.rows[0].seqname;
                 if (seqName) {
-                    const maxRes = await pool.query(`SELECT COALESCE(MAX(id), 0) as maxid FROM ${tableName}`);
+                    const maxRes = await client.query(`SELECT COALESCE(MAX(id), 0) as maxid FROM ${tableName}`);
                     const next = parseInt(maxRes.rows[0].maxid, 10) + 1;
-                    await pool.query('SELECT setval($1, $2, false)', [seqName, next]);
+                    await client.query('SELECT setval($1, $2, false)', [seqName, next]);
                     console.warn(`Sequence ${seqName} for ${tableName} was out of sync. Reset to ${next} and retrying query.`);
-                    return await pool.query(queryText, params);
+                    return await client.query(queryText, params);
                 }
             } catch (fixErr) {
                 console.error('Error fixing sequence for', tableName, fixErr);
@@ -641,153 +645,140 @@ exports.receiveLog = async (req, res) => {
         });
     }
 
-    try {
-        markDbConnected();
-        const normalizedEmpId = finalEmpId;
-        const deviceId = device_id || device_ip || 'ZK_ZKTECO';
-        const finalTimestamp = timestamp || recordTime;
-        console.log(`Processing punch for User: ${normalizedEmpId}, Device: ${deviceId}`);
+    // Optimization: Use withDbClient to run all related queries on a SINGLE connection.
+    // This prevents opening many connections per request.
+    return await withDbClient(async (client) => {
+        try {
+            markDbConnected();
+            const normalizedEmpId = finalEmpId;
+            const deviceId = device_id || device_ip || 'ZK_ZKTECO';
+            const finalTimestamp = timestamp || recordTime;
+            
+            // Use provided timestamp or current server time
+            const logDate = finalTimestamp ? new Date(finalTimestamp) : new Date();
+            if (Number.isNaN(logDate.getTime())) {
+                return res.status(400).json({ message: 'Invalid timestamp format' });
+            }
+            const normalizedPunchType = normalizePunchType(type, logDate);
+            const istParts = toIstParts(logDate);
+            const dateStr = istParts.dateStr;
+            const timeStr = new Intl.DateTimeFormat('en-US', {
+                timeZone: 'Asia/Kolkata',
+                hour: '2-digit',
+                minute: '2-digit',
+                hour12: true,
+            }).format(logDate);
 
-        // Use provided timestamp or current server time
-        const logDate = finalTimestamp ? new Date(finalTimestamp) : new Date();
-        if (Number.isNaN(logDate.getTime())) {
-            return res.status(400).json({ message: 'Invalid timestamp format' });
-        }
-        const normalizedPunchType = normalizePunchType(type, logDate);
-        const istParts = toIstParts(logDate);
-        const dateStr = istParts.dateStr;
-        const timeStr = new Intl.DateTimeFormat('en-US', {
-            timeZone: 'Asia/Kolkata',
-            hour: '2-digit',
-            minute: '2-digit',
-            hour12: true,
-        }).format(logDate);
-
-        // 1. Process only known employees from users table
-        const { rows: userRows } = await pool.query(
-            'SELECT 1 FROM users WHERE emp_id = $1 LIMIT 1',
-            [normalizedEmpId]
-        );
-
-        if (userRows.length === 0) {
-            console.log(`[BIOMETRIC] Employee ${normalizedEmpId} not found in users table. Skipping biometric punch.`);
-            return res.status(202).json({
-                message: `Employee ${normalizedEmpId} is not registered. Punch skipped.`,
-                skipped: true,
-                reason: 'UNKNOWN_EMPLOYEE'
-            });
-        }
-
-        // 2. Block rapid duplicate punches for the same employee within 2 minutes (debouncer).
-        if (!skipDuplicateGuard) {
-            const { rows: nearPunchRows } = await pool.query(
-                `SELECT id, log_time
-                 FROM biometric_logs
-                 WHERE TRIM(emp_id) = $1
-                 AND log_time >= ($2::timestamp - interval '2 minutes')
-                 AND log_time <= ($2::timestamp + interval '2 minutes')
-                 LIMIT 1`,
-                [normalizedEmpId, istParts.timestamp]
+            // 1. Process only known employees
+            const { rows: userRows } = await client.query(
+                'SELECT 1 FROM users WHERE emp_id = $1 LIMIT 1',
+                [normalizedEmpId]
             );
 
-            if (nearPunchRows.length > 0) {
-                console.log(`[BIOMETRIC] Duplicate punch ignored for ${normalizedEmpId} at ${logDate.toISOString()} (Found existing at ${nearPunchRows[0].log_time})`);
-                return res.status(200).json({
-                    message: `Duplicate punch ignored. Punch already exists within 2 minutes.`,
+            if (userRows.length === 0) {
+                return res.status(202).json({
+                    message: `Employee ${normalizedEmpId} is not registered. Punch skipped.`,
                     skipped: true,
-                    reason: 'DUPLICATE_OR_TOO_SOON'
+                    reason: 'UNKNOWN_EMPLOYEE'
                 });
             }
-        }
 
-        // 3. Store raw log in biometric_logs (Audit Trail)
-        // This log table stores EVERYTHING (minutely/hourly records for full history)
-        // Uses ON CONFLICT to swallow exact duplicates sent by device/sync scripts
-        await runWithSequenceFix(
-            `INSERT INTO biometric_logs (device_id, emp_id, log_time, type) 
-             VALUES ($1, $2, $3, $4)
-             ON CONFLICT (emp_id, log_time) 
-             DO NOTHING`,
-            [deviceId || 'ADMS', normalizedEmpId, istParts.timestamp, normalizedPunchType],
-            'biometric_logs'
-        );
+            // 2. Debouncer
+            if (!skipDuplicateGuard) {
+                const { rows: nearPunchRows } = await client.query(
+                    `SELECT id, log_time
+                     FROM biometric_logs
+                     WHERE TRIM(emp_id) = $1
+                     AND log_time >= ($2::timestamp - interval '2 minutes')
+                     AND log_time <= ($2::timestamp + interval '2 minutes')
+                     LIMIT 1`,
+                    [normalizedEmpId, istParts.timestamp]
+                );
 
-        // 4. Sync summaries (biometric_attendance and attendance_records)
-        await upsertBiometricAttendanceFromLogs(normalizedEmpId, dateStr);
-        // We use the unified rebuild function to ensure consistency and handle past-date updates properly.
-        // This function automatically picks min(time) as in, max(time) as out, and replaces existing values.
-        let syncResult = { dbStatus: 'Present', physIn: null, physOut: null };
-        if (!req.body.skipRebuild) {
-            syncResult = await rebuildAttendanceFromBiometricTimeline(normalizedEmpId, dateStr);
-        }
-
-        // 5. Real-time notifications and socket updates
-        let userName = normalizedEmpId;
-        try {
-            const { rows: userRows } = await pool.query("SELECT name FROM users WHERE TRIM(emp_id) = TRIM($1)", [normalizedEmpId]);
-            if (userRows.length > 0) userName = userRows[0].name;
-        } catch (e) {
-            console.error('Failed to lookup user name for notification:', e);
-        }
-
-        const punchType = normalizedPunchType;
-        const statusLabel = syncResult.enumStatus || syncResult.dbStatus || 'Present';
-        const punchEventTime = timeStr;
-        const inTimeLabel = syncResult.physIn || '--:--';
-        const outTimeLabel = syncResult.physOut || 'Pending';
-        const workingHours = (syncResult.physIn && syncResult.physOut)
-            ? calculateWorkingHours(syncResult.physIn, syncResult.physOut)
-            : '0h 0m';
-
-        const message = punchType === 'OUT'
-            ? `🔔 Attendance Notification\n\nEmployee Name   : ${userName}\nEmployee ID     : ${normalizedEmpId}\nPunch-In Time   : ${inTimeLabel}\nPunch-Out Time  : ${outTimeLabel}\nTotal Work Time : ${workingHours}\nStatus          : ${statusLabel}\n\nRemark : Attendance completed successfully.`
-            : `🔔 Attendance Notification\n\nEmployee Name : ${userName}\nEmployee ID   : ${normalizedEmpId}\nPunch-In Time : ${punchEventTime}\nStatus        : ${statusLabel}\n\nRemark : Punch-in recorded successfully.`;
-
-        // Notifications (best-effort)
-        try {
-            // 1. Notify the individual employee
-            await createNotification(normalizedEmpId, message, 'attendance', null, null, true);
-            
-            // 2. NEW: Notify all high-level authorities (Admin & Management)
-            const { rows: admins } = await pool.query("SELECT emp_id FROM users WHERE role IN ('admin', 'management')");
-            for (const admin of admins) {
-                // Skip if the employee is also the admin (already notified)
-                if ((admin.emp_id || '').trim() !== (normalizedEmpId || '').trim()) {
-                    await createNotification(admin.emp_id, message, 'attendance', null, null, true);
+                if (nearPunchRows.length > 0) {
+                    return res.status(200).json({
+                        message: `Duplicate punch ignored. Already exists within 2 minutes.`,
+                        skipped: true,
+                        reason: 'DUPLICATE_OR_TOO_SOON'
+                    });
                 }
             }
-        } catch (e) {
-            console.error('Failed to send punch notifications:', e);
-        }
 
-        // Socket emitter
-        const io = req.app.get('io');
-        if (io) {
-            const punchData = {
-                emp_id: normalizedEmpId,
-                type: punchType,
-                time: timeStr,
-                date: dateStr,
-                in_time: syncResult.physIn || null,
-                out_time: syncResult.physOut || null,
-                status: syncResult.enumStatus || syncResult.dbStatus || null,
-                remarks: syncResult.remarks || null,
-            };
-            io.emit('biometric_punch', punchData); // Broadcast for updates
-        }
+            // 3. Store raw log
+            await runWithSequenceFix(
+                `INSERT INTO biometric_logs (device_id, emp_id, log_time, type) 
+                 VALUES ($1, $2, $3, $4)
+                 ON CONFLICT (emp_id, log_time) 
+                 DO NOTHING`,
+                [deviceId || 'ADMS', normalizedEmpId, istParts.timestamp, normalizedPunchType],
+                'biometric_logs',
+                client
+            );
 
-        return res.status(200).json({ message: 'Log processed successfully (Attendance Synced)' });
-    } catch (error) {
-        console.error('🔴 Biometric processing error:', error);
-        if (isTransientDbError(error)) {
-            markDbDisconnected(error);
-            queuePendingBiometricLog(req.body, error);
-            return res.status(202).json({ message: 'Biometric punch queued due to temporary DB issue' });
+            // 4. Sync summaries & Rebuild
+            await upsertBiometricAttendanceFromLogs(normalizedEmpId, dateStr, client);
+            
+            let syncResult = { dbStatus: 'Present', physIn: null, physOut: null };
+            if (!req.body.skipRebuild) {
+                syncResult = await rebuildAttendanceFromBiometricTimeline(normalizedEmpId, dateStr, client);
+            }
+
+            // 5. Notifications
+            let userName = normalizedEmpId;
+            try {
+                const { rows: nameRows } = await client.query("SELECT name FROM users WHERE TRIM(emp_id) = TRIM($1)", [normalizedEmpId]);
+                if (nameRows.length > 0) userName = nameRows[0].name;
+            } catch (e) {
+                console.error('Name lookup failed:', e);
+            }
+
+            const statusLabel = syncResult.enumStatus || syncResult.dbStatus || 'Present';
+            const inTimeLabel = syncResult.physIn || '--:--';
+            const outTimeLabel = syncResult.physOut || 'Pending';
+            
+            const message = normalizedPunchType === 'OUT'
+                ? `🔔 Attendance Notification\n\nEmployee Name   : ${userName}\nEmployee ID     : ${normalizedEmpId}\nPunch-In Time   : ${inTimeLabel}\nPunch-Out Time  : ${outTimeLabel}\nStatus          : ${statusLabel}\n\nRemark : Attendance completed successfully.`
+                : `🔔 Attendance Notification\n\nEmployee Name : ${userName}\nEmployee ID   : ${normalizedEmpId}\nPunch-In Time : ${timeStr}\nStatus        : ${statusLabel}\n\nRemark : Punch-in recorded successfully.`;
+
+            // Asynchronous notifications (don't block the response)
+            (async () => {
+                try {
+                    await createNotification(normalizedEmpId, message, 'attendance', null, null, true);
+                    const { rows: admins } = await pool.query("SELECT emp_id FROM users WHERE role IN ('admin', 'management')");
+                    for (const admin of admins) {
+                        if ((admin.emp_id || '').trim() !== normalizedEmpId) {
+                            await createNotification(admin.emp_id, message, 'attendance', null, null, true);
+                        }
+                    }
+                } catch (e) { console.error('Notify error:', e); }
+            })();
+
+            // Socket emit
+            const io = req.app.get('io');
+            if (io) {
+                io.emit('biometric_punch', {
+                    emp_id: normalizedEmpId,
+                    type: normalizedPunchType,
+                    time: timeStr,
+                    date: dateStr,
+                    in_time: syncResult.physIn || null,
+                    out_time: syncResult.physOut || null,
+                    status: statusLabel,
+                    remarks: syncResult.remarks || null,
+                });
+            }
+
+            return res.status(200).json({ message: 'Log processed successfully' });
+        } catch (error) {
+            console.error('🔴 Biometric processing error:', error);
+            if (isTransientDbError(error)) {
+                markDbDisconnected(error);
+                queuePendingBiometricLog(req.body, error);
+                return res.status(202).json({ message: 'Biometric punch queued' });
+            }
+            return res.status(500).json({ message: 'Biometric processing failed', error: error.message });
         }
-        // Non-transient errors (code bugs, schema errors) should NOT be queued for retry
-        // as they will never succeed until the underlying code is fixed.
-        return res.status(500).json({ message: 'Biometric processing failed', error: error.message });
-    }
+    }); // End withDbClient
 };
 
 // @desc    Get biometric attendance data
@@ -815,7 +806,7 @@ exports.getRawBiometricLogs = async (req, res) => {
         query += ` ORDER BY l.log_time DESC LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
         params.push(limit, offset);
 
-        const { rows } = await pool.query(query, params);
+        const { rows } = await queryWithRetry(query, params);
         res.json(rows);
     } catch (error) {
         console.error('Error fetching raw biometric logs:', error);
@@ -855,7 +846,7 @@ exports.getBiometricData = async (req, res) => {
 
         query += ` ORDER BY b.date DESC, b.intime DESC`;
 
-        const { rows } = await pool.query(query, params);
+        const { rows } = await queryWithRetry(query, params);
         res.json(rows);
     } catch (error) {
         console.error('Error fetching biometric data:', error);
@@ -867,7 +858,7 @@ exports.getBiometricData = async (req, res) => {
 exports.getRegisteredEmpIds = async (req, res) => {
     try {
         console.log('📡 Bridge is fetching Employee IDs...');
-        const result = await pool.query('SELECT emp_id FROM users');
+        const result = await queryWithRetry('SELECT emp_id FROM users');
         const ids = result.rows
             .filter(r => r.emp_id) // Skip users with no ID
             .map(r => String(r.emp_id).trim());
@@ -887,7 +878,7 @@ exports.getRegisteredEmpIds = async (req, res) => {
 // @desc    Get biometric statistics
 exports.getBiometricStats = async (req, res) => {
     try {
-        const { rows: stats } = await pool.query(`
+        const { rows: stats } = await queryWithRetry(`
             SELECT 
                 COUNT(DISTINCT b.user_id) as total_users,
                 COUNT(*) as total_punches_today,
@@ -917,7 +908,7 @@ exports.rebuildTodayPunches = async (req, res) => {
         console.log(`[BIOMETRIC] Rebuilding attendance from ${start} to ${end}`);
 
         // Get all employees who have biometric logs in the range
-        const { rows: affectedEmployees } = await pool.query(
+        const { rows: affectedEmployees } = await queryWithRetry(
             `SELECT DISTINCT TRIM(emp_id) as emp_id, log_time::date as log_date
              FROM biometric_logs
              WHERE log_time::date >= $1::date
