@@ -328,7 +328,10 @@ const getAttendanceAggregateMap = async ({ fromDate, toDate, paidStatuses, unpai
 
         const paidSet = new Set((Array.isArray(paidStatuses) ? paidStatuses : []).map(normalizeStatusToken));
         const unpaidSet = new Set((Array.isArray(unpaidStatuses) ? unpaidStatuses : []).map(normalizeStatusToken));
-        
+
+        // Tokens that unambiguously mean physically present (not leave / holiday)
+        const presentMarkers = new Set(['present', 'p']);
+
         const map = {};
         rows.forEach((r) => {
             const key = String(r.emp_id || '').trim();
@@ -338,13 +341,14 @@ const getAttendanceAggregateMap = async ({ fromDate, toDate, paidStatuses, unpai
                     present_days: 0,
                     with_pay_days: 0,
                     without_pay_days: 0,
-                    // kept for backward compat
                     payable_days: 0,
                     unpaid_days: 0,
                     total_records: 0
                 };
             }
 
+            // classifyStatusUnits is the battle-tested fuzzy-matching source of truth.
+            // It correctly handles OD, Comp Leave, half-days, separators, prefix/suffix labels, etc.
             const { paid, unpaid } = classifyStatusUnits({
                 statusText: r.status,
                 remarksText: r.remarks,
@@ -352,42 +356,52 @@ const getAttendanceAggregateMap = async ({ fromDate, toDate, paidStatuses, unpai
                 unpaidSet
             });
 
-            // Fine-grained category (handles half-day splits via classifyStatusUnits units)
-            const rawStatus = String(r.status || '').trim();
-            const half = isHalfDayMark({ statusText: rawStatus, remarksText: r.remarks });
-            const unit = half ? 0.5 : 1;
+            // ── Granular breakdown: distribute paid units into present vs with_pay ──
+            // We use the SAME paid amount from classifyStatusUnits so totals always match.
+            if (paid > 0) {
+                const rawStatus = String(r.status || '').trim();
+                let presentPortion = 0;
 
-            if (rawStatus.includes('+') || /[\/,&]/.test(rawStatus)) {
-                // Mixed statuses: split and categorise each part
-                const sep = rawStatus.includes('+') ? '+' : /[/,&]/;
-                const parts = rawStatus.split(sep).map((p) => String(p || '').trim()).filter(Boolean);
-                const splitUnit = half ? 0.25 : 0.5;
-                parts.forEach((part) => {
-                    const cat = classifyStatusCategory(part, r.remarks, paidSet, unpaidSet);
-                    if (cat === 'present') map[key].present_days += splitUnit;
-                    else if (cat === 'withpay') map[key].with_pay_days += splitUnit;
-                    else if (cat === 'withoutpay') map[key].without_pay_days += splitUnit;
-                });
-            } else {
-                const cat = classifyStatusCategory(rawStatus, r.remarks, paidSet, unpaidSet);
-                if (cat === 'present') map[key].present_days += unit;
-                else if (cat === 'withpay') map[key].with_pay_days += unit;
-                else if (cat === 'withoutpay') map[key].without_pay_days += unit;
+                if (rawStatus.includes('+') || /[\/,&]/.test(rawStatus)) {
+                    // Compound status e.g. "Present+LOP", "CL/Present"
+                    const sep = rawStatus.includes('+') ? '+' : /[\/,&]/;
+                    const parts = rawStatus.split(sep).map((p) => String(p || '').trim()).filter(Boolean);
+                    const perPart = paid / Math.max(parts.length, 1);
+                    parts.forEach((part) => {
+                        if (presentMarkers.has(normalizeStatusToken(part))) {
+                            presentPortion += perPart;
+                        }
+                    });
+                } else {
+                    if (presentMarkers.has(normalizeStatusToken(rawStatus))) {
+                        presentPortion = paid;
+                    }
+                }
+
+                map[key].present_days  += presentPortion;
+                map[key].with_pay_days += round2(paid - presentPortion);
             }
 
+            // ── Unpaid days (LOP / Absent) ──
+            if (unpaid > 0) {
+                map[key].without_pay_days += unpaid;
+            }
+
+            // ── Running totals straight from classifyStatusUnits (never overwritten) ──
             map[key].payable_days += paid;
-            map[key].unpaid_days += unpaid;
+            map[key].unpaid_days  += unpaid;
+
             if (normalizeStatusToken(r.status) !== 'absent') {
                 map[key].total_records += 1;
             }
         });
 
         Object.keys(map).forEach((key) => {
-            map[key].present_days = round2(map[key].present_days);
-            map[key].with_pay_days = round2(map[key].with_pay_days);
+            map[key].present_days     = round2(map[key].present_days);
+            map[key].with_pay_days    = round2(map[key].with_pay_days);
             map[key].without_pay_days = round2(map[key].without_pay_days);
-            map[key].payable_days = round2(map[key].present_days + map[key].with_pay_days);
-            map[key].unpaid_days = round2(map[key].without_pay_days);
+            map[key].payable_days     = round2(map[key].payable_days);  // === present + with_pay
+            map[key].unpaid_days      = round2(map[key].unpaid_days);   // === without_pay
         });
 
         return map;
