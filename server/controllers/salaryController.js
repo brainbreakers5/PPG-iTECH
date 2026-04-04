@@ -316,11 +316,11 @@ const getAttendanceAggregateMap = async ({ fromDate, toDate, paidStatuses, unpai
             SELECT
                 TRIM(u.emp_id) AS emp_id,
                 cd.d AS date,
-                COALESCE(a.status::text, CASE WHEN cd.day_type IN ('Holiday') THEN 'Holiday' ELSE 'Absent' END) AS status,
-                COALESCE(a.remarks, '') AS remarks
+                COALESCE(ar.status::text, CASE WHEN cd.day_type IN ('Holiday') THEN 'Holiday' ELSE 'Absent' END) AS status,
+                COALESCE(ar.remarks, '') AS remarks
             FROM users u
             CROSS JOIN calendar_days cd
-            LEFT JOIN attendance_records a ON TRIM(a.emp_id) = TRIM(u.emp_id) AND a.date = cd.d
+            LEFT JOIN attendance_records ar ON TRIM(ar.emp_id) = TRIM(u.emp_id) AND ar.date = cd.d
             WHERE u.role IN ('staff', 'hod', 'principal')
             ORDER BY TRIM(u.emp_id), cd.d
         `;

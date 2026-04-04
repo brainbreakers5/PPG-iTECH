@@ -289,11 +289,75 @@ async function injectPermissionApprovals(client, data) {
     console.log(`✓ permission_approvals: ${inserted} inserted, ${skipped} skipped`);
 }
 
+async function createAttendanceRecordsTable(client) {
+    console.log('Ensuring attendance_records table exists...');
+    try {
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS attendance_records (
+                id SERIAL PRIMARY KEY,
+                emp_id VARCHAR(20) NOT NULL,
+                date DATE NOT NULL,
+                in_time TIME,
+                out_time TIME,
+                status VARCHAR(50) DEFAULT 'Absent',
+                remarks TEXT,
+                FOREIGN KEY (emp_id) REFERENCES users(emp_id) ON DELETE CASCADE,
+                UNIQUE (emp_id, date)
+            )
+        `);
+        console.log('✓ attendance_records table ready');
+    } catch (err) {
+        console.error('Error creating attendance_records table:', err.message);
+    }
+}
+
+async function injectAttendanceRecords(client, data) {
+    console.log('Injecting attendance_records...');
+    let inserted = 0;
+    let skipped = 0;
+
+    for (const row of data) {
+        try {
+            const query = `
+                INSERT INTO attendance_records (
+                    id, emp_id, date, in_time, out_time, status, remarks
+                ) VALUES ($1, $2, $3, $4, $5, $6, $7)
+                ON CONFLICT (emp_id, date) DO UPDATE SET
+                    in_time = EXCLUDED.in_time,
+                    out_time = EXCLUDED.out_time,
+                    status = EXCLUDED.status,
+                    remarks = EXCLUDED.remarks
+            `;
+            
+            const values = [
+                parseInt(row.id),
+                row.emp_id,
+                row.date ? new Date(row.date) : null,
+                row.in_time ? row.in_time : null,
+                row.out_time ? row.out_time : null,
+                row.status || 'Absent',
+                prepareValue(row.remarks)
+            ];
+            
+            await client.query(query, values);
+            inserted++;
+        } catch (err) {
+            console.log(`Skipped row ID ${row.id}: ${err.message}`);
+            skipped++;
+        }
+    }
+    
+    console.log(`✓ attendance_records: ${inserted} inserted, ${skipped} skipped`);
+}
+
 async function main() {
     const client = await pool.connect();
     try {
         console.log('Connected to database');
         console.log('Starting data injection...\n');
+
+        // Ensure attendance_records table exists
+        await createAttendanceRecordsTable(client);
 
         // Read and inject leave_requests
         const leaveRequestsPath = path.join(__dirname, 'datas', 'leave_requests_rows.csv');
@@ -333,6 +397,14 @@ async function main() {
             const content = fs.readFileSync(permissionApprovalsPath, 'utf8');
             const data = parseCSV(content);
             await injectPermissionApprovals(client, data);
+        }
+
+        // Read and inject attendance_records
+        const attendancePath = path.join(__dirname, 'datas', 'attendance_records_rows.csv');
+        if (fs.existsSync(attendancePath)) {
+            const content = fs.readFileSync(attendancePath, 'utf8');
+            const data = parseCSV(content);
+            await injectAttendanceRecords(client, data);
         }
 
         console.log('\n✓ Data injection completed successfully!');
