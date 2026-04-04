@@ -5,7 +5,7 @@ const path = require('path');
 dotenv.config({ path: path.join(__dirname, '.env') });
 
 const testDirect = async () => {
-    const directHost = 'db.zolybloevqjxtfishmcg.supabase.co';
+    const directHost = 'db.emorgztggtmrvqtilkfj.supabase.co';
     console.log(`--- Testing Direct Connection to ${directHost} ---`);
     const pool = new Pool({
         host: directHost,
