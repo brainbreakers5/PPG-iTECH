@@ -45,6 +45,18 @@ async function run() {
     try {
         await client.query("SET session_replication_role = 'replica'");
 
+        // Load emp_id to user_id mapping
+        console.log('Loading user mapping...');
+        const userMap = {};
+        try {
+            const { rows: userRows } = await client.query('SELECT id, emp_id FROM users');
+            userRows.forEach(u => {
+                if (u.emp_id) userMap[String(u.emp_id).trim()] = u.id;
+            });
+        } catch (e) {
+            console.error('Failed to load user mapping:', e.message);
+        }
+
         const files = fs.readdirSync(DATA_DIR).filter(f => f.endsWith('.csv'));
         files.sort((a, b) => {
             if (a.includes('departments')) return -1;
@@ -62,55 +74,63 @@ async function run() {
             const lines = content.split('\n').filter(l => l.trim().length > 0);
             if (lines.length < 1) continue;
 
-            const headers = parseCsvLine(lines[0]);
+            let csvHeaders = parseCsvLine(lines[0]);
             
-            // Ensure table exists
+            // Check table existence/columns
             await client.query(`CREATE TABLE IF NOT EXISTS "${tableName}" (id SERIAL PRIMARY KEY)`);
-
-            // Relax ALL columns that are user-defined types (enums)
             const { rows: columns } = await client.query(`
                 SELECT column_name, udt_name, data_type 
                 FROM information_schema.columns 
                 WHERE table_name = $1
             `, [tableName]);
             
-            for (const col of columns) {
-                if (col.data_type === 'USER-DEFINED') {
-                    console.log(`   Changing enum column ${col.column_name} to TEXT`);
-                    try {
-                        await client.query(`ALTER TABLE "${tableName}" ALTER COLUMN "${col.column_name}" TYPE TEXT`);
-                    } catch (e) {
-                         console.error(`   Failed to relax column ${col.column_name}: ${e.message}`);
-                    }
-                }
+            const tableColSet = new Set(columns.map(c => c.column_name));
+            
+            // Map CSV headers to target columns
+            let targetHeaders = [...csvHeaders];
+            let empIdIdx = csvHeaders.indexOf('emp_id');
+            let hasUserId = tableColSet.has('user_id');
+
+            // If CSV has 'emp_id' and table has 'user_id' but CSV doesn't have 'user_id'
+            // We will add 'user_id' to targetHeaders to be filled from mapping.
+            let autoMapUserId = false;
+            if (empIdIdx !== -1 && hasUserId && csvHeaders.indexOf('user_id') === -1) {
+                targetHeaders.push('user_id');
+                autoMapUserId = true;
+                console.log(`   Mapping 'emp_id' to 'user_id' automatically.`);
             }
 
-            // Check missing columns from CSV
-            const colSet = new Set(columns.map(c => c.column_name));
-            for (const col of headers) {
-                if (!colSet.has(col)) {
-                    console.log(`   Creating missing column ${col}`);
+            // Ensure all target columns exist in DB
+            for (const col of targetHeaders) {
+                if (!tableColSet.has(col)) {
+                    console.log(`   Adding missing column ${col}`);
                     await client.query(`ALTER TABLE "${tableName}" ADD COLUMN "${col}" TEXT`);
-                    colSet.add(col);
+                    tableColSet.add(col);
                 }
             }
 
-            // TRUNCATE
+            // Truncate
             await client.query(`TRUNCATE TABLE "${tableName}" RESTART IDENTITY CASCADE`);
 
-            // INSERT
+            // Insert
             let insertCount = 0;
             let skipCount = 0;
-            const hasId = colSet.has('id');
+            const hasId = tableColSet.has('id');
 
             for (let i = 1; i < lines.length; i++) {
                 const rawValues = parseCsvLine(lines[i]);
-                if (rawValues.join(',') === headers.join(',')) { skipCount++; continue; }
-                if (rawValues.length !== headers.length) { continue; }
+                if (rawValues.join(',') === csvHeaders.join(',')) { skipCount++; continue; }
+                if (rawValues.length !== csvHeaders.length) continue;
 
-                const values = rawValues.map(v => (v === '' || v === 'NULL' || v === 'null') ? null : v);
-                const placeholders = headers.map((_, idx) => `$${idx + 1}`).join(', ');
-                const colsStr = headers.map(h => `"${h}"`).join(', ');
+                let values = rawValues.map(v => (v === '' || v === 'NULL' || v === 'null') ? null : v);
+                
+                if (autoMapUserId) {
+                    const empCode = String(values[empIdIdx] || '').trim();
+                    values.push(userMap[empCode] || null);
+                }
+
+                const placeholders = targetHeaders.map((_, idx) => `$${idx + 1}`).join(', ');
+                const colsStr = targetHeaders.map(h => `"${h}"`).join(', ');
 
                 let sql = `INSERT INTO "${tableName}" (${colsStr}) VALUES (${placeholders})`;
                 if (hasId) sql += ` ON CONFLICT (id) DO NOTHING`;
@@ -120,7 +140,7 @@ async function run() {
                     if (r.rowCount > 0) insertCount++;
                     else skipCount++;
                 } catch (e) {
-                    if (i < 5) console.error(`   Row ${i} error: ${e.message}`);
+                    if (i < 5 || i % 100 === 0) console.error(`   Row ${i} error: ${e.message}`);
                 }
             }
             console.log(`   Result: ${insertCount} inserted, ${skipCount} skipped.`);

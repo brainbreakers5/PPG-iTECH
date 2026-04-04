@@ -18,5 +18,9 @@
     "concurrently": "^8.2.0"
   },
   "author": "",
-  "license": "ISC"
+  "license": "ISC",
+  "dependencies": {
+    "dotenv": "^17.4.0",
+    "pg": "^8.20.0"
+  }
 }
