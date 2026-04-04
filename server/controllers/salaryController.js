@@ -606,7 +606,7 @@ exports.calculateSalary = async (req, res) => {
                     breakdown.with_pay_days,      // total_leave
                     breakdown.without_pay_days,   // total_lop
                     metrics.netSalary.toFixed(2),
-                    breakdown.total_payable_days, // with_pay_count
+                    breakdown.with_pay_days,      // with_pay_count (fixed: was total_payable_days)
                     breakdown.without_pay_days,   // without_pay_count
                     metrics.deductionsApplied.toFixed(2),
                     metrics.esiGross.toFixed(2),
@@ -644,7 +644,7 @@ exports.calculateSalary = async (req, res) => {
                     breakdown.with_pay_days,
                     breakdown.without_pay_days,
                     metrics.netSalary.toFixed(2),
-                    breakdown.total_payable_days,
+                    breakdown.with_pay_days,      // with_pay_count (fixed: was total_payable_days)
                     breakdown.without_pay_days,
                     metrics.deductionsApplied.toFixed(2),
                     metrics.esiGross.toFixed(2),
@@ -931,7 +931,7 @@ exports.getSalaryRecords = async (req, res) => {
                     with_pay_days: breakdown.with_pay_days,
                     without_pay_days: breakdown.without_pay_days,
                     total_payable_days: breakdown.total_payable_days,
-                    with_pay_count: breakdown.total_payable_days,
+                    with_pay_count: breakdown.with_pay_days,      // Fixed: was total_payable_days
                     without_pay_count: breakdown.without_pay_days,
                     deductions_applied: previewMetrics.deductionsApplied.toFixed(2),
                     esi_gross: previewMetrics.esiGross.toFixed(2),
@@ -978,7 +978,7 @@ exports.getSalaryRecords = async (req, res) => {
                         with_pay_days: breakdown.with_pay_days,
                         without_pay_days: breakdown.without_pay_days,
                         total_payable_days: breakdown.total_payable_days,
-                        with_pay_count: breakdown.total_payable_days,
+                        with_pay_count: breakdown.with_pay_days,    // Fixed: was total_payable_days
                         without_pay_count: breakdown.without_pay_days,
                         deductions_applied: metrics.deductionsApplied.toFixed(2),
                         calculated_salary: metrics.netSalary.toFixed(2),
@@ -1036,7 +1036,7 @@ exports.getSalaryRecords = async (req, res) => {
                 with_pay_days: breakdown.with_pay_days,
                 without_pay_days: breakdown.without_pay_days,
                 total_payable_days: breakdown.total_payable_days,
-                with_pay_count: breakdown.total_payable_days,
+                with_pay_count: breakdown.with_pay_days,    // Fixed: was total_payable_days
                 without_pay_count: breakdown.without_pay_days,
                 deductions_applied: metrics.deductionsApplied.toFixed(2),
                 esi_gross: metrics.esiGross.toFixed(2),
@@ -1055,10 +1055,14 @@ exports.getSalaryRecords = async (req, res) => {
         if (!scopeWide) {
             const { rows: historyRecords } = await queryWithRetry(`
                 SELECT h.*, u.name, u.role, u.profile_pic, d.name AS department_name, u.monthly_salary, u.deductions
-                FROM salary_history h
+                FROM (
+                    SELECT s.*, FALSE AS is_history FROM salary_records s WHERE s.status = 'Paid'
+                    UNION ALL
+                    SELECT h.*, TRUE AS is_history FROM salary_history h WHERE h.status = 'Paid'
+                ) h
                 LEFT JOIN users u ON TRIM(u.emp_id) = TRIM(h.emp_id)
                 LEFT JOIN departments d ON u.department_id = d.id
-                WHERE TRIM(h.emp_id) = $1 AND h.status = 'Paid'
+                WHERE TRIM(h.emp_id) = $1
                 ORDER BY h.year DESC, h.month DESC
             `, [req.user.emp_id]);
 
