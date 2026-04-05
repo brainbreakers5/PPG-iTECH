@@ -354,8 +354,8 @@ const getAttendanceAggregateMap = async ({ fromDate, toDate, paidStatuses, unpai
                 if (r.status) return r.status;
 
                 const dayType = normalizeStatusToken(r.day_type);
+                if (dayType.includes('holiday')) return 'Holiday';
                 if (dayType === 'weekend' && paidSet.has('weekend')) return 'Weekend';
-                if (dayType.includes('holiday') && paidSet.has('holiday')) return 'Holiday';
                 return 'Absent';
             })();
 
@@ -512,9 +512,8 @@ exports.calculateSalary = async (req, res) => {
         const rangeTo = period.toDate;
         const effectiveCalcTo = getEffectiveCalcTo(rangeTo);
         
-        // Use total calendar days for the divisor as requested.
-        const totalDaysInPeriod = getTotalDays(rangeFrom, rangeTo);
-        const daysUntilNow = getTotalDays(rangeFrom, effectiveCalcTo);
+        // Use live calendar days for ongoing periods (from cycle start to today).
+        const totalDaysInPeriod = getTotalDays(rangeFrom, effectiveCalcTo);
 
         // 1. Fetch all eligible employees
         let usersQuery = `
@@ -909,8 +908,7 @@ exports.getSalaryRecords = async (req, res) => {
             paidStatuses: effectivePaidStatuses,
             unpaidStatuses
         });
-        const totalDaysInPeriod = getTotalDays(period.fromDate, period.toDate);
-        const daysUntilNow = getTotalDays(period.fromDate, effectiveCalcTo);
+        const totalDaysInPeriod = getTotalDays(period.fromDate, effectiveCalcTo);
         const merged = users.map((u) => {
             const key = String(u.emp_id || '').trim();
             const existing = recMap[key];

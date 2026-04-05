@@ -208,8 +208,8 @@ async function aggregateForPeriod({ empId, fromDate, toDate, paidSet, unpaidSet 
     const resolvedStatus = (() => {
       if (r.status) return r.status;
       const dayType = normalizeStatusToken(r.day_type);
+      if (dayType.includes('holiday')) return 'Holiday';
       if (dayType === 'weekend' && paidSet.has('weekend')) return 'Weekend';
-      if (dayType.includes('holiday') && paidSet.has('holiday')) return 'Holiday';
       return 'Absent';
     })();
 
