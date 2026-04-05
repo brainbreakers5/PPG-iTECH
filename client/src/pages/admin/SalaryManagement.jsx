@@ -352,6 +352,7 @@ const SalaryManagement = () => {
     const [activeDepartment, setActiveDepartment] = useState('all');
     const [departments, setDepartments] = useState([]);
     const [calendarTotals, setCalendarTotals] = useState({ workingDays: null, holidays: null });
+    const [attendanceStatusOptions, setAttendanceStatusOptions] = useState([]);
 
     const [paidStatuses, setPaidStatuses] = useState(() => {
         const saved = localStorage.getItem('salary_paid_statuses');
@@ -416,9 +417,7 @@ const SalaryManagement = () => {
     const summary = useMemo(() => {
         const gross = filteredRows.reduce((acc, row) => acc + Number(row.gross_salary || row.monthly_salary || 0), 0);
         const net = filteredRows.reduce((acc, row) => acc + Number(row.calculated_salary || 0), 0);
-        const withPay = filteredRows.reduce((acc, row) => acc + getWithPayDays(row), 0);
-        const withoutPay = filteredRows.reduce((acc, row) => acc + getWithoutPayDays(row), 0);
-        return { gross, net, withPay, withoutPay };
+        return { gross, net };
     }, [filteredRows]);
 
     const totalCycleDays = useMemo(() => {
@@ -662,28 +661,84 @@ const SalaryManagement = () => {
         fetchDepartments();
     }, [canInstitutionWide]);
 
+    useEffect(() => {
+        const fetchStatusOptions = async () => {
+            if (!canInstitutionWide || isHistoryPage || isPersonalView) return;
+            try {
+                const params = new URLSearchParams({
+                    startDate: selectedCycle.fromDate,
+                    endDate: selectedCycle.toDate
+                });
+                const { data } = await api.get(`/attendance/status-options?${params.toString()}`);
+                setAttendanceStatusOptions(Array.isArray(data) ? data : []);
+            } catch (error) {
+                console.error('Failed to fetch attendance status options:', error);
+                setAttendanceStatusOptions([]);
+            }
+        };
+
+        fetchStatusOptions();
+    }, [canInstitutionWide, isHistoryPage, isPersonalView, selectedCycle.fromDate, selectedCycle.toDate]);
+
     const openAttendanceConfig = () => {
+        const allStatuses = Array.from(new Set([
+            ...attendanceStatusOptions,
+            ...paidStatuses,
+            ...unpaidStatuses
+        ])).filter(Boolean);
+
+        const renderStatusCheckboxes = (statuses, group) => statuses.map((status) => {
+            const escaped = escapeHtml(status);
+            const safeId = `swal-${group}-${String(status).replace(/[^a-zA-Z0-9_-]/g, '_')}`;
+            const checked = group === 'paid'
+                ? paidStatuses.includes(status)
+                : unpaidStatuses.includes(status);
+
+            return `
+                <label for="${safeId}" class="flex items-center gap-2 py-1 text-xs">
+                    <input id="${safeId}" data-group="${group}" data-status="${escaped}" type="checkbox" ${checked ? 'checked' : ''}>
+                    <span>${escaped}</span>
+                </label>
+            `;
+        }).join('');
+
         Swal.fire({
             title: 'Attendance Status Calculations',
             html: `
                 <div class="text-left text-sm">
                     <div class="mb-4">
                         <label class="block font-bold text-gray-600 mb-2">Statuses with Pay</label>
-                        <input id="swal-paid" class="swal2-input" value="${paidStatuses.join(', ')}">
+                        <div id="swal-paid-list" class="max-h-52 overflow-y-auto border border-gray-200 rounded-lg px-3 py-2 bg-gray-50">
+                            ${renderStatusCheckboxes(allStatuses, 'paid')}
+                        </div>
                     </div>
                     <div>
                         <label class="block font-bold text-gray-600 mb-2">Statuses without Pay (LOP)</label>
-                        <input id="swal-unpaid" class="swal2-input" value="${unpaidStatuses.join(', ')}">
+                        <div id="swal-unpaid-list" class="max-h-52 overflow-y-auto border border-gray-200 rounded-lg px-3 py-2 bg-gray-50">
+                            ${renderStatusCheckboxes(allStatuses, 'unpaid')}
+                        </div>
                     </div>
-                    <p class="text-xs text-gray-500 mt-4">Enter comma-separated values. Changes will trigger a salary recalculation for the current period.</p>
+                    <p class="text-xs text-gray-500 mt-4">Select available attendance statuses. Changes will trigger salary recalculation for the current period.</p>
                 </div>
             `,
             focusConfirm: false,
             showCancelButton: true,
             confirmButtonText: 'Save & Recalculate',
             preConfirm: () => {
-                const paid = document.getElementById('swal-paid').value.split(',').map(s => s.trim()).filter(Boolean);
-                const unpaid = document.getElementById('swal-unpaid').value.split(',').map(s => s.trim()).filter(Boolean);
+                const paid = Array.from(document.querySelectorAll('#swal-paid-list input[type="checkbox"]:checked'))
+                    .map((el) => el.getAttribute('data-status') || '')
+                    .map((s) => s.trim())
+                    .filter(Boolean);
+                const unpaid = Array.from(document.querySelectorAll('#swal-unpaid-list input[type="checkbox"]:checked'))
+                    .map((el) => el.getAttribute('data-status') || '')
+                    .map((s) => s.trim())
+                    .filter(Boolean);
+
+                if (!paid.length && !unpaid.length) {
+                    Swal.showValidationMessage('Select at least one status in with-pay or without-pay.');
+                    return null;
+                }
+
                 return { paid, unpaid };
             }
         }).then(async (result) => {
@@ -1421,7 +1476,7 @@ const SalaryManagement = () => {
                 </div>
 
                 {!isPersonalView && (
-                    <motion.div variants={staggerWrap} className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6 mb-6">
+                    <motion.div variants={staggerWrap} className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
                         <motion.div variants={fadeUp} transition={{ duration: 0.35 }} className="modern-card p-6 border-sky-50 shadow-xl shadow-sky-50/50 flex items-center gap-4 transition-all duration-300 hover:-translate-y-1 group">
                             <div className="h-12 w-12 rounded-xl bg-sky-500 flex items-center justify-center text-white shadow-lg shadow-sky-100 group-hover:scale-110 group-hover:-translate-y-1 transition-transform"><FaMoneyBillWave size={20} /></div>
                             <div>
@@ -1434,20 +1489,6 @@ const SalaryManagement = () => {
                             <div>
                                 <p className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">Net Total</p>
                                 <p className="text-xl font-black text-emerald-700 tracking-tighter">Rs {toCurrency(summary.net)}</p>
-                            </div>
-                        </motion.div>
-                        <motion.div variants={fadeUp} transition={{ duration: 0.35 }} className="modern-card p-6 border-sky-50 shadow-xl shadow-sky-50/50 flex items-center gap-4 transition-all duration-300 hover:-translate-y-1 group">
-                            <div className="h-12 w-12 rounded-xl bg-sky-600 flex items-center justify-center text-white shadow-lg shadow-sky-100 group-hover:scale-110 group-hover:-translate-y-1 transition-transform"><FaCheckCircle size={20} /></div>
-                            <div>
-                                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">With Pay Total Days</p>
-                                <p className="text-xl font-black text-sky-700 tracking-tighter">{Number(summary.withPay || 0).toFixed(1)}</p>
-                            </div>
-                        </motion.div>
-                        <motion.div variants={fadeUp} transition={{ duration: 0.35 }} className="modern-card p-6 border-rose-50 shadow-xl shadow-rose-50/50 flex items-center gap-4 transition-all duration-300 hover:-translate-y-1 group">
-                            <div className="h-12 w-12 rounded-xl bg-rose-500 flex items-center justify-center text-white shadow-lg shadow-rose-100 group-hover:scale-110 group-hover:-translate-y-1 transition-transform"><FaTimesCircle size={20} /></div>
-                            <div>
-                                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">Without Pay Total Days</p>
-                                <p className="text-xl font-black text-rose-700 tracking-tighter">{Number(summary.withoutPay || 0).toFixed(1)}</p>
                             </div>
                         </motion.div>
                     </motion.div>

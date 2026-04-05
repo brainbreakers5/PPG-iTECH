@@ -447,4 +447,43 @@ exports.getAttendanceTrend = async (req, res) => {
     }
 };
 
+// @desc    Get distinct attendance status options
+// @route   GET /api/attendance/status-options
+// @access  Private
+exports.getAttendanceStatusOptions = async (req, res) => {
+    try {
+        const { startDate, endDate } = req.query;
+        const params = [];
+        const where = [`status IS NOT NULL`, `TRIM(status::text) <> ''`];
+
+        if (startDate) {
+            params.push(startDate);
+            where.push(`date >= $${params.length}::date`);
+        }
+        if (endDate) {
+            params.push(endDate);
+            where.push(`date <= $${params.length}::date`);
+        }
+
+        const query = `
+            SELECT DISTINCT TRIM(status::text) AS status
+            FROM attendance_records
+            WHERE ${where.join(' AND ')}
+            ORDER BY status ASC
+        `;
+
+        const { rows } = await queryWithRetry(query, params);
+        const defaults = ['Present', 'CL', 'ML', 'Comp Leave', 'OD', 'Leave', 'Holiday', 'Absent', 'LOP'];
+        const merged = Array.from(new Set([
+            ...defaults,
+            ...rows.map((r) => String(r.status || '').trim()).filter(Boolean)
+        ]));
+
+        res.json(merged);
+    } catch (error) {
+        console.error('getAttendanceStatusOptions ERROR:', error);
+        res.status(500).json({ message: 'Server Error' });
+    }
+};
+
 
