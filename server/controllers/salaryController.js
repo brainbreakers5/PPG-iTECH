@@ -483,7 +483,8 @@ const resolveBreakdownFromStats = (stats, totalDaysInPeriod = 0) => {
 
     return {
         present_days: presentDays,
-        with_pay_days: round2(Math.max(0, payable - presentDays)),
+        // With pay should represent total payable days in live period (present + payable leave/holiday)
+        with_pay_days: payable,
         without_pay_days: withoutPay,
         total_payable_days: payable
     };

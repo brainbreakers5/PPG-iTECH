@@ -247,11 +247,11 @@ async function aggregateForPeriod({ empId, fromDate, toDate, paidSet, unpaidSet 
 
   const normalizedPayable = round2(Math.max(0, Math.min(effectiveTotalDays, totalPayableDays)));
   const normalizedWithoutPay = round2(Math.max(0, effectiveTotalDays - normalizedPayable));
-  const normalizedWithPay = round2(Math.max(0, normalizedPayable - presentDays));
 
   return {
     present_days: round2(presentDays),
-    with_pay_days: normalizedWithPay,
+    // With pay should represent total payable days (present + payable leave/holiday)
+    with_pay_days: normalizedPayable,
     without_pay_days: normalizedWithoutPay,
     total_payable_days: normalizedPayable
   };
@@ -307,7 +307,8 @@ async function run() {
         }
 
         const { fromDate, toDate } = normalizePeriod(row);
-        const totalDaysInPeriod = getTotalDays(fromDate, toDate);
+        const effectiveToDate = toIsoDate(toDate) > getTodayIso() ? getTodayIso() : toIsoDate(toDate);
+        const totalDaysInPeriod = getTotalDays(fromDate, effectiveToDate);
         const breakdown = await aggregateForPeriod({
           empId: String(row.emp_id).trim(),
           fromDate,
@@ -393,9 +394,10 @@ async function run() {
   const consistencyCheck = await queryWithRetry(`
     SELECT COUNT(*)::int AS inconsistent
     FROM salary_records s
-    WHERE abs(coalesce(s.total_payable_days,0) - (coalesce(s.present_days,0) + coalesce(s.with_pay_days,0))) > 0.01
+    WHERE abs(coalesce(s.with_pay_days,0) - coalesce(s.total_payable_days,0)) > 0.01
        OR abs(coalesce(s.with_pay_count,0) - coalesce(s.with_pay_days,0)) > 0.01
        OR abs(coalesce(s.without_pay_count,0) - coalesce(s.without_pay_days,0)) > 0.01
+       OR abs((coalesce(s.with_pay_days,0) + coalesce(s.without_pay_days,0)) - coalesce(s.total_days_in_period,0)) > 0.01
   `);
 
   console.log('Post-backfill internal consistency issues (salary_records):', consistencyCheck.rows[0]?.inconsistent ?? 0);
