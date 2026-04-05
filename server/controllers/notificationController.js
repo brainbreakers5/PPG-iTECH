@@ -142,11 +142,19 @@ exports.subscribePush = async (req, res) => {
 // @access  Private
 exports.getNotifications = async (req, res) => {
     try {
+        // Remove legacy login/security notification messages from the DB for this user.
+        await pool.query(
+            `DELETE FROM notifications
+             WHERE user_id = $1 AND LOWER(type::text) = 'login'`,
+            [req.user.emp_id]
+        );
+
         const { rows } = await pool.query(
             `SELECT id, user_id, message, is_read, type, metadata,
                     to_char(created_at, 'YYYY-MM-DD"T"HH24:MI:SS') as created_at
               FROM notifications 
-              WHERE user_id = $1 
+              WHERE user_id = $1
+                AND LOWER(type::text) <> 'login'
               ORDER BY created_at DESC 
               LIMIT 20`,
             [req.user.emp_id]

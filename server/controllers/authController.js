@@ -2,7 +2,6 @@ const { pool, queryWithRetry, isRetryableDbError } = require('../config/db');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const logActivity = require('../utils/activityLogger');
-const { createNotification } = require('./notificationController');
 
 // Generate JWT
 const generateToken = (id) => {
@@ -56,19 +55,6 @@ exports.loginUser = async (req, res) => {
 
             if (isMatch) {
                 await logActivity(user.id, 'LOGIN', { emp_id: user.emp_id, email_id: user.email }, req.ip);
-                
-                // Notify all admins about the login
-                const { rows: admins } = await queryWithRetry("SELECT emp_id FROM users WHERE role = 'admin'");
-                const loginMsg = `Employee Login: ${user.name} (${user.emp_id}) logged into the hub`;
-                for (const admin of admins) {
-                    if (admin.emp_id !== user.emp_id) {
-                        try {
-                            await createNotification(admin.emp_id, loginMsg, 'login', { emp_id: user.emp_id }, null, false);
-                        } catch (notifErr) {
-                            console.error('Notification Error during login:', notifErr.message);
-                        }
-                    }
-                }
 
                 res.json({
                     id: user.id,

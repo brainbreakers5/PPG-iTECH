@@ -473,6 +473,7 @@ exports.calculateSalary = async (req, res) => {
         month,
         year,
         emp_id,
+        forceRecalculateAll = false,
         paidStatuses = ['Present', 'CL', 'ML', 'Comp Leave', 'OD', 'Leave', 'Holiday'],
         unpaidStatuses = ['Absent', 'LOP'],
         fromDate,
@@ -522,7 +523,7 @@ exports.calculateSalary = async (req, res) => {
 
             // Fetch latest salary record for this period (exact date first, then month/year fallback)
             const { rows: existing } = await pool.query(
-                                `SELECT id, status
+                                `SELECT id, status, paid_at
                                  FROM salary_records
                                  WHERE TRIM(emp_id) = $1
                                      AND (
@@ -538,7 +539,7 @@ exports.calculateSalary = async (req, res) => {
 
             // Skip recalculation if the record is already Paid (Published)
             // As per user request: "salry publish after admin page not change the published salary"
-            if (existing.length > 0 && existing[0].status === 'Paid') {
+            if (existing.length > 0 && existing[0].status === 'Paid' && !forceRecalculateAll) {
                 results.push({
                     emp_id: userEmpId,
                     name: user.name,
@@ -573,6 +574,10 @@ exports.calculateSalary = async (req, res) => {
 
 
             if (existing.length > 0) {
+                const preserveAsPaid = forceRecalculateAll && existing[0].status === 'Paid';
+                const nextStatus = preserveAsPaid ? 'Paid' : 'Pending';
+                const nextPaidAt = preserveAsPaid ? existing[0].paid_at : null;
+
                 // UPDATE existing Pending record with full breakdown values
                 await queryWithRetry(`
                     UPDATE salary_records
@@ -591,12 +596,12 @@ exports.calculateSalary = async (req, res) => {
                         total_days_in_period = $14,
                         from_date = $15::date,
                         to_date = $16::date,
-                        status = 'Pending',
-                        paid_at = NULL,
-                        present_days = $17,
-                        with_pay_days = $18,
-                        without_pay_days = $19,
-                        total_payable_days = $20
+                        status = $17,
+                        paid_at = $18,
+                        present_days = $19,
+                        with_pay_days = $20,
+                        without_pay_days = $21,
+                        total_payable_days = $22
                     WHERE id = $1
                 `, [
                     existing[0].id,
@@ -615,6 +620,8 @@ exports.calculateSalary = async (req, res) => {
                     totalDaysInPeriod,
                     rangeFrom,
                     rangeTo,
+                    nextStatus,
+                    nextPaidAt,
                     breakdown.present_days,
                     breakdown.with_pay_days,
                     breakdown.without_pay_days,

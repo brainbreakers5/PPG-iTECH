@@ -553,6 +553,41 @@ const SalaryManagement = () => {
         await refreshRows();
     };
 
+    const handleForceRecalculateAll = async () => {
+        if (!canInstitutionWide || isPersonalView || isHistoryPage) return;
+
+        const confirm = await Swal.fire({
+            title: 'Recalculate All Employee Salaries?',
+            text: `${selectedCycle.fromDate} to ${selectedCycle.toDate} for all employees. Paid records will stay Paid but values will be recalculated from attendance.`,
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonText: 'Yes, Recalculate All',
+            confirmButtonColor: '#0284c7'
+        });
+        if (!confirm.isConfirmed) return;
+
+        setLoading(true);
+        try {
+            const { data } = await api.post('/salary/calculate', {
+                month: selectedCycle.month,
+                year: selectedCycle.year,
+                fromDate: selectedCycle.fromDate,
+                toDate: selectedCycle.toDate,
+                paidStatuses,
+                unpaidStatuses,
+                forceRecalculateAll: true
+            });
+
+            await refreshRows();
+            Swal.fire('Recalculated', data?.message || 'All salary records were recalculated successfully.', 'success');
+        } catch (error) {
+            console.error('Force recalculation failed:', error?.response?.data || error.message);
+            Swal.fire('Error', 'Failed to recalculate all salary records.', 'error');
+        } finally {
+            setLoading(false);
+        }
+    };
+
     useEffect(() => {
         let mounted = true;
 
@@ -1460,6 +1495,15 @@ const SalaryManagement = () => {
                                 <FaRedoAlt className={`mr-2 transition-transform ${loading ? 'animate-spin' : ''}`} /> Refresh
                             </button>
                             {!isPersonalView && !isHistoryPage && (
+                                <button
+                                    onClick={handleForceRecalculateAll}
+                                    className="bg-sky-600 text-white px-4 py-2 rounded-xl shadow-lg shadow-sky-100 hover:bg-sky-700 transition-all active:scale-95 flex items-center font-black uppercase tracking-[0.2em] text-[10px]"
+                                    title="Recalculate all employee salary records from attendance"
+                                >
+                                    <FaRedoAlt className={`mr-2 transition-transform ${loading ? 'animate-spin' : ''}`} /> Recalculate All Employees
+                                </button>
+                            )}
+                            {!isPersonalView && !isHistoryPage && (
                                 <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">
                                     <span>Payroll Period</span>
                                     <span className="px-3 py-2 rounded-xl bg-sky-50 text-sky-700 border border-sky-100 normal-case tracking-normal text-xs font-bold">{selectedCycle.fromDate} to {selectedCycle.toDate}</span>
@@ -1528,7 +1572,7 @@ const SalaryManagement = () => {
                                         </th>
                                     )}
                                     <th className="p-3 md:p-6 text-[9px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-sky-50 whitespace-nowrap">{isPersonalView ? 'Period' : 'Employee'}</th>
-                                    <th className="p-3 md:p-6 text-[9px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-sky-50 text-right whitespace-nowrap">Attendance</th>
+                                    <th className="p-3 md:p-6 text-[9px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-sky-50 text-right whitespace-nowrap">With Pay / Without Pay</th>
                                     <th className="p-3 md:p-6 text-[9px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-sky-50 text-right whitespace-nowrap">Fixed Salary</th>
                                     <th className="p-3 md:p-6 text-[9px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-sky-50 text-right whitespace-nowrap">Gross Salary</th>
                                     <th className="p-3 md:p-6 text-[9px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-sky-50 text-right whitespace-nowrap">Deductions</th>
@@ -1579,12 +1623,10 @@ const SalaryManagement = () => {
                                             </div>
                                         </td>
                                     )}
-                                    <td className="p-3 md:p-6 text-right whitespace-nowrap">
-                                        <div className="inline-flex flex-col items-end gap-0.5">
-                                            <span className="text-[10px] font-black text-emerald-700" title="Present Days">P: {getPresentDays(r).toFixed(1)}</span>
-                                            <span className="text-[10px] font-black text-sky-600" title="With Pay Days (Leave/Holiday)">W: {getWithPayDays(r).toFixed(1)}</span>
-                                            <span className="text-[10px] font-black text-rose-500" title="Without Pay (LOP)">L: {getWithoutPayDays(r).toFixed(1)}</span>
-                                        </div>
+                                    <td className="p-3 md:p-6 text-right whitespace-nowrap" title="With Pay / Without Pay">
+                                        <span className="text-xs md:text-sm font-black text-sky-700 bg-sky-50 px-2.5 md:px-3 py-1.5 rounded-lg border border-sky-100 whitespace-nowrap">
+                                            {getWithPayDays(r).toFixed(1)}/{getWithoutPayDays(r).toFixed(1)}
+                                        </span>
                                     </td>
                                     <td className="p-3 md:p-6 text-right whitespace-nowrap" title="Fixed Salary">
                                         <span className="text-xs md:text-sm font-bold text-gray-700 bg-gray-50 px-2.5 md:px-3 py-1.5 rounded-lg border border-gray-100 whitespace-nowrap">Rs {toCurrency(fixedSalary)}</span>
