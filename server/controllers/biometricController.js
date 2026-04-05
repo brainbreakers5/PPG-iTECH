@@ -463,7 +463,7 @@ const rebuildAttendanceFromBiometricTimeline = async (normalizedEmpId, dateStr, 
     });
 
     const STD_IN_MINS = 540;
-    const LATE_GRACE_IN_MINS = 541; // 09:01 grace window for Present
+    const LATE_GRACE_IN_MINS = 540; // 09:00 or earlier is Present
     const STD_OUT_MINS = 1005;
     const MORNING_HALF_DAY_END_MINS = 755;
     const EVENING_HALF_DAY_START_MINS = 810;
@@ -482,8 +482,9 @@ const rebuildAttendanceFromBiometricTimeline = async (normalizedEmpId, dateStr, 
         const leaveInfo = leaveSegments.length > 0 ? leaveSegments.map((s) => `${s.type} (${s.from}-${s.to})`).join(' + ') : null;
 
         if (!physOut) {
-            flags.push('Missing Out Punch');
-            dbStatus = leaveInfo ? `LOP (Missing Out) + ${leaveInfo}` : 'LOP (Missing Out)';
+            // Do not mark LOP or add missing-out alerts when only IN punch exists.
+            // Keep provisional status as Present and wait for possible later OUT punch.
+            dbStatus = leaveInfo ? `Present + ${leaveInfo}` : 'Present';
         } else {
             let isLateEntry = false;
             let isEarlyExit = false;

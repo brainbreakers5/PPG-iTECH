@@ -305,24 +305,17 @@ const getAttendanceAggregateMap = async ({ fromDate, toDate, paidStatuses, unpai
                 UNION ALL
                 SELECT (d + 1)::date FROM date_range 
                 WHERE d < $2::date
-            ),
-            calendar_days AS (
-                SELECT 
-                    dr.d,
-                    COALESCE(h.type, CASE WHEN EXTRACT(DOW FROM dr.d) IN (0, 6) THEN 'Holiday' ELSE 'Working Day' END) AS day_type
-                FROM date_range dr
-                LEFT JOIN holidays h ON h.h_date = dr.d
             )
             SELECT
                 TRIM(u.emp_id) AS emp_id,
-                cd.d AS date,
-                COALESCE(ar.status::text, CASE WHEN cd.day_type IN ('Holiday') THEN 'Holiday' ELSE 'Absent' END) AS status,
+                dr.d AS date,
+                COALESCE(ar.status::text, 'Absent') AS status,
                 COALESCE(ar.remarks, '') AS remarks
             FROM users u
-            CROSS JOIN calendar_days cd
-            LEFT JOIN attendance_records ar ON TRIM(ar.emp_id) = TRIM(u.emp_id) AND ar.date = cd.d
+            CROSS JOIN date_range dr
+            LEFT JOIN attendance_records ar ON TRIM(ar.emp_id) = TRIM(u.emp_id) AND ar.date = dr.d
             WHERE u.role IN ('staff', 'hod', 'principal')
-            ORDER BY TRIM(u.emp_id), cd.d
+            ORDER BY TRIM(u.emp_id), dr.d
         `;
         const { rows } = await queryWithRetry(query, [fromDate, toDate]);
 
