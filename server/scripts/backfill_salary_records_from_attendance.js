@@ -171,22 +171,30 @@ const computeSalaryMetrics = ({ monthlySalary, rawDeductions, totalDaysInPeriod,
 
 async function aggregateForPeriod({ empId, fromDate, toDate, paidSet, unpaidSet }) {
   const effectiveTo = toIsoDate(toDate) > getTodayIso() ? getTodayIso() : toIsoDate(toDate);
+  const effectiveTotalDays = getTotalDays(fromDate, effectiveTo);
 
   const { rows } = await queryWithRetry(
     `WITH RECURSIVE date_range AS (
        SELECT $2::date AS d
        UNION ALL
        SELECT (d + 1)::date FROM date_range WHERE d < $3::date
+     ),
+     calendar_days AS (
+       SELECT
+         dr.d,
+         CASE WHEN EXTRACT(DOW FROM dr.d) IN (0, 6) THEN 'Weekend' ELSE 'Working Day' END AS day_type
+       FROM date_range dr
      )
      SELECT
-       dr.d AS date,
-       COALESCE(ar.status::text, 'Absent') AS status,
+       cd.d AS date,
+       cd.day_type,
+       ar.status::text AS status,
        COALESCE(ar.remarks, '') AS remarks
-     FROM date_range dr
+     FROM calendar_days cd
      LEFT JOIN attendance_records ar
        ON TRIM(ar.emp_id) = TRIM($1)
-      AND ar.date = dr.d
-     ORDER BY dr.d`,
+      AND ar.date = cd.d
+     ORDER BY cd.d`,
     [empId, fromDate, effectiveTo]
   );
 
@@ -197,15 +205,23 @@ async function aggregateForPeriod({ empId, fromDate, toDate, paidSet, unpaidSet 
   let totalPayableDays = 0;
 
   for (const r of rows) {
+    const resolvedStatus = (() => {
+      if (r.status) return r.status;
+      const dayType = normalizeStatusToken(r.day_type);
+      if (dayType === 'weekend' && paidSet.has('weekend')) return 'Weekend';
+      if (dayType.includes('holiday') && paidSet.has('holiday')) return 'Holiday';
+      return 'Absent';
+    })();
+
     const { paid, unpaid } = classifyStatusUnits({
-      statusText: r.status,
+      statusText: resolvedStatus,
       remarksText: r.remarks,
       paidSet,
       unpaidSet
     });
 
     if (paid > 0) {
-      const rawStatus = String(r.status || '').trim();
+      const rawStatus = String(resolvedStatus || '').trim();
       let presentPortion = 0;
 
       if (rawStatus.includes('+') || /[\/,&]/.test(rawStatus)) {
@@ -229,11 +245,15 @@ async function aggregateForPeriod({ empId, fromDate, toDate, paidSet, unpaidSet 
     }
   }
 
+  const normalizedPayable = round2(Math.max(0, Math.min(effectiveTotalDays, totalPayableDays)));
+  const normalizedWithoutPay = round2(Math.max(0, effectiveTotalDays - normalizedPayable));
+  const normalizedWithPay = round2(Math.max(0, normalizedPayable - presentDays));
+
   return {
     present_days: round2(presentDays),
-    with_pay_days: round2(withPayDays),
-    without_pay_days: round2(withoutPayDays),
-    total_payable_days: round2(totalPayableDays)
+    with_pay_days: normalizedWithPay,
+    without_pay_days: normalizedWithoutPay,
+    total_payable_days: normalizedPayable
   };
 }
 
@@ -257,7 +277,7 @@ async function run() {
 
   const paidStatuses = ['Present', 'CL', 'ML', 'Comp Leave', 'OD', 'Leave', 'Holiday', 'Weekend'];
   const unpaidStatuses = ['Absent', 'LOP'];
-  const paidSet = new Set(paidStatuses.map(normalizeStatusToken));
+  const paidSet = new Set([...paidStatuses, 'Holiday', 'Weekend'].map(normalizeStatusToken));
   const unpaidSet = new Set(unpaidStatuses.map(normalizeStatusToken));
 
   console.log(`Starting salary_records backfill from attendance... startId=${startId}`);
@@ -276,10 +296,12 @@ async function run() {
     let updated = 0;
     let skipped = 0;
     let failed = 0;
+    let lastProcessedId = startId;
 
     for (const row of records) {
       try {
         if (!row.emp_id) {
+          lastProcessedId = row.id;
           skipped += 1;
           continue;
         }
@@ -353,14 +375,16 @@ async function run() {
           ]
         );
 
+        lastProcessedId = row.id;
         updated += 1;
       } catch (err) {
+        console.error(`[${tableName}] Resume from id=${row.id} with: node scripts/backfill_salary_records_from_attendance.js ${row.id}`);
         failed += 1;
         console.error(`Failed ${tableName} row id=${row.id} emp_id=${row.emp_id}:`, err.message);
       }
     }
 
-    console.log(`${tableName} backfill completed. updated=${updated}, skipped=${skipped}, failed=${failed}`);
+    console.log(`${tableName} backfill completed. updated=${updated}, skipped=${skipped}, failed=${failed}, lastProcessedId=${lastProcessedId}`);
   };
 
   await processTable('salary_records');

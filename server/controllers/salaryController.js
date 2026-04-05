@@ -468,12 +468,26 @@ const resolvePayableDaysFromAttendanceStats = (stats) => {
     return Math.max(0, payable);
 };
 
-const resolveBreakdownFromStats = (stats) => ({
-    present_days: round2(Number(stats?.present_days || 0)),
-    with_pay_days: round2(Number(stats?.with_pay_days || 0)),
-    without_pay_days: round2(Number(stats?.without_pay_days || stats?.unpaid_days || 0)),
-    total_payable_days: round2(Number(stats?.payable_days || 0))
-});
+const resolveBreakdownFromStats = (stats, totalDaysInPeriod = 0) => {
+    const totalDays = Math.max(0, Number(totalDaysInPeriod || 0));
+    const presentDays = Math.max(0, round2(Number(stats?.present_days || 0)));
+    const rawWithPayDays = Math.max(0, round2(Number(stats?.with_pay_days || 0)));
+
+    // Keep present + with_pay as payable signal, but hard-normalize to period bounds.
+    const payable = round2(Math.max(0, Math.min(totalDays || Number.MAX_SAFE_INTEGER, presentDays + rawWithPayDays)));
+
+    // Critical invariant: with pay + without pay must equal total days in period.
+    const withoutPay = totalDays > 0
+        ? round2(Math.max(0, totalDays - payable))
+        : Math.max(0, round2(Number(stats?.without_pay_days || stats?.unpaid_days || 0)));
+
+    return {
+        present_days: presentDays,
+        with_pay_days: round2(Math.max(0, payable - presentDays)),
+        without_pay_days: withoutPay,
+        total_payable_days: payable
+    };
+};
 
 // @desc    Calculate Salary (supports exact date range)
 // @route   POST /api/salary/calculate
@@ -491,6 +505,7 @@ exports.calculateSalary = async (req, res) => {
     } = req.body;
 
     try {
+        const effectivePaidStatuses = Array.from(new Set([...(Array.isArray(paidStatuses) ? paidStatuses : []), 'Holiday']));
         await ensureSalarySchema();
         const period = buildPeriod({ month, year, fromDate, toDate });
         const rangeFrom = period.fromDate;
@@ -521,7 +536,7 @@ exports.calculateSalary = async (req, res) => {
         const statsMap = await getAttendanceAggregateMap({
             fromDate: rangeFrom,
             toDate: effectiveCalcTo,
-            paidStatuses,
+            paidStatuses: effectivePaidStatuses,
             unpaidStatuses
         });
 
@@ -563,7 +578,7 @@ exports.calculateSalary = async (req, res) => {
                 present_days: 0, with_pay_days: 0, without_pay_days: 0,
                 payable_days: 0, unpaid_days: 0, total_records: 0
             };
-            const breakdown = resolveBreakdownFromStats(stats);
+            const breakdown = resolveBreakdownFromStats(stats, totalDaysInPeriod);
             const resolvedPayableDays = breakdown.total_payable_days; // present + with_pay
             const unpaidDays = breakdown.without_pay_days;
 
@@ -721,6 +736,7 @@ exports.getSalaryRecords = async (req, res) => {
         const paidStatuses = req.query.paidStatuses
             ? JSON.parse(req.query.paidStatuses)
             : ['Present', 'CL', 'ML', 'Comp Leave', 'OD', 'Leave', 'Holiday'];
+        const effectivePaidStatuses = Array.from(new Set([...(Array.isArray(paidStatuses) ? paidStatuses : []), 'Holiday']));
         const unpaidStatuses = req.query.unpaidStatuses
             ? JSON.parse(req.query.unpaidStatuses)
             : ['Absent', 'LOP'];
@@ -890,7 +906,7 @@ exports.getSalaryRecords = async (req, res) => {
         const attendanceMap = await getAttendanceAggregateMap({
             fromDate: period.fromDate,
             toDate: effectiveCalcTo,
-            paidStatuses,
+            paidStatuses: effectivePaidStatuses,
             unpaidStatuses
         });
         const totalDaysInPeriod = getTotalDays(period.fromDate, period.toDate);
@@ -916,7 +932,7 @@ exports.getSalaryRecords = async (req, res) => {
                 }
 
                 const attendanceStats = attendanceMap[key] || {};
-                const breakdown = resolveBreakdownFromStats(attendanceStats);
+                const breakdown = resolveBreakdownFromStats(attendanceStats, totalDaysInPeriod);
                 const payableDays = breakdown.total_payable_days;
                 const unpaidDays = breakdown.without_pay_days;
                 if (payableDays <= 0 && unpaidDays <= 0) {
@@ -967,7 +983,7 @@ exports.getSalaryRecords = async (req, res) => {
             if (existing) {
                 if (existing.status !== 'Paid') {
                     const attendanceStats = attendanceMap[key] || {};
-                    const breakdown = resolveBreakdownFromStats(attendanceStats);
+                    const breakdown = resolveBreakdownFromStats(attendanceStats, totalDaysInPeriod);
                     const payableDays = breakdown.total_payable_days;
                     const unpaidDays = breakdown.without_pay_days;
                     if (payableDays <= 0 && unpaidDays <= 0) return null;
@@ -1023,7 +1039,7 @@ exports.getSalaryRecords = async (req, res) => {
 
             const gross = parseFloat(u.monthly_salary) || 0;
             const attendanceStats = attendanceMap[key] || {};
-            const breakdown = resolveBreakdownFromStats(attendanceStats);
+            const breakdown = resolveBreakdownFromStats(attendanceStats, totalDaysInPeriod);
             const payableDays = breakdown.total_payable_days;
             const unpaidDays = breakdown.without_pay_days;
             if (payableDays <= 0 && unpaidDays <= 0) return null;
