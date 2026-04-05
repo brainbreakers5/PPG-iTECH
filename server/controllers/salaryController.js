@@ -351,11 +351,16 @@ const getAttendanceAggregateMap = async ({ fromDate, toDate, paidStatuses, unpai
             // classifyStatusUnits is the battle-tested fuzzy-matching source of truth.
             // It correctly handles OD, Comp Leave, half-days, separators, prefix/suffix labels, etc.
             const resolvedStatus = (() => {
-                if (r.status) return r.status;
-
                 const dayType = normalizeStatusToken(r.day_type);
-                if (dayType.includes('holiday')) return 'Holiday';
-                if (dayType === 'weekend' && paidSet.has('weekend')) return 'Weekend';
+                const rawStatus = String(r.status || '').trim();
+                const normStatus = normalizeStatusToken(rawStatus);
+
+                // Calendar holidays/weekends are always payable for salary counts.
+                // If an auto-generated/default row marked Absent/LOP exists, override it.
+                if (dayType.includes('holiday') && (!normStatus || normStatus === 'absent' || normStatus === 'lop')) return 'Holiday';
+                if (dayType === 'weekend' && (!normStatus || normStatus === 'absent' || normStatus === 'lop')) return 'Weekend';
+
+                if (rawStatus) return rawStatus;
                 return 'Absent';
             })();
 
@@ -506,7 +511,7 @@ exports.calculateSalary = async (req, res) => {
     } = req.body;
 
     try {
-        const effectivePaidStatuses = Array.from(new Set([...(Array.isArray(paidStatuses) ? paidStatuses : []), 'Holiday']));
+        const effectivePaidStatuses = Array.from(new Set([...(Array.isArray(paidStatuses) ? paidStatuses : []), 'Holiday', 'Weekend']));
         await ensureSalarySchema();
         const period = buildPeriod({ month, year, fromDate, toDate });
         const rangeFrom = period.fromDate;
@@ -735,8 +740,8 @@ exports.getSalaryRecords = async (req, res) => {
         const { month, year, fromDate, toDate } = req.query;
         const paidStatuses = req.query.paidStatuses
             ? JSON.parse(req.query.paidStatuses)
-            : ['Present', 'CL', 'ML', 'Comp Leave', 'OD', 'Leave', 'Holiday'];
-        const effectivePaidStatuses = Array.from(new Set([...(Array.isArray(paidStatuses) ? paidStatuses : []), 'Holiday']));
+            : ['Present', 'CL', 'ML', 'Comp Leave', 'OD', 'Leave', 'Holiday', 'Weekend'];
+        const effectivePaidStatuses = Array.from(new Set([...(Array.isArray(paidStatuses) ? paidStatuses : []), 'Holiday', 'Weekend']));
         const unpaidStatuses = req.query.unpaidStatuses
             ? JSON.parse(req.query.unpaidStatuses)
             : ['Absent', 'LOP'];
@@ -1125,7 +1130,7 @@ exports.getDailyBreakdown = async (req, res) => {
         const { emp_id, fromDate, toDate } = req.query;
         const paidStatuses = req.query.paidStatuses
             ? JSON.parse(req.query.paidStatuses)
-            : ['Present', 'CL', 'ML', 'Comp Leave', 'OD', 'Leave', 'Holiday'];
+            : ['Present', 'CL', 'ML', 'Comp Leave', 'OD', 'Leave', 'Holiday', 'Weekend'];
 
         if (!emp_id || !fromDate || !toDate) {
             return res.status(400).json({ message: 'emp_id, fromDate, toDate are required' });
