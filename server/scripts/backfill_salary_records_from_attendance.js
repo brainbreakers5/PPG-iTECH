@@ -182,8 +182,9 @@ async function aggregateForPeriod({ empId, fromDate, toDate, paidSet, unpaidSet 
      calendar_days AS (
        SELECT
          dr.d,
-         CASE WHEN EXTRACT(DOW FROM dr.d) IN (0, 6) THEN 'Weekend' ELSE 'Working Day' END AS day_type
+         COALESCE(h.type, CASE WHEN EXTRACT(DOW FROM dr.d) IN (0, 6) THEN 'Weekend' ELSE 'Working Day' END) AS day_type
        FROM date_range dr
+       LEFT JOIN holidays h ON h.h_date = dr.d
      )
      SELECT
        cd.d AS date,
