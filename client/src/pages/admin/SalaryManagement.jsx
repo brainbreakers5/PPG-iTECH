@@ -416,7 +416,9 @@ const SalaryManagement = () => {
     const summary = useMemo(() => {
         const gross = filteredRows.reduce((acc, row) => acc + Number(row.gross_salary || row.monthly_salary || 0), 0);
         const net = filteredRows.reduce((acc, row) => acc + Number(row.calculated_salary || 0), 0);
-        return { gross, net };
+        const withPay = filteredRows.reduce((acc, row) => acc + getWithPayDays(row), 0);
+        const withoutPay = filteredRows.reduce((acc, row) => acc + getWithoutPayDays(row), 0);
+        return { gross, net, withPay, withoutPay };
     }, [filteredRows]);
 
     const totalCycleDays = useMemo(() => {
@@ -544,7 +546,8 @@ const SalaryManagement = () => {
                     fromDate: currentCycle.fromDate,
                     toDate: currentCycle.toDate,
                     paidStatuses,
-                    unpaidStatuses
+                    unpaidStatuses,
+                    forceRecalculateAll: true
                 });
             } catch (error) {
                 console.error('Manual calculate failed:', error?.response?.data || error.message);
@@ -699,7 +702,8 @@ const SalaryManagement = () => {
                             fromDate: currentCycle.fromDate,
                             toDate: currentCycle.toDate,
                             paidStatuses: paid,
-                            unpaidStatuses: unpaid
+                            unpaidStatuses: unpaid,
+                            forceRecalculateAll: true
                         });
                     }
                     await handleRefreshRows();
@@ -1417,7 +1421,7 @@ const SalaryManagement = () => {
                 </div>
 
                 {!isPersonalView && (
-                    <motion.div variants={staggerWrap} className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                    <motion.div variants={staggerWrap} className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6 mb-6">
                         <motion.div variants={fadeUp} transition={{ duration: 0.35 }} className="modern-card p-6 border-sky-50 shadow-xl shadow-sky-50/50 flex items-center gap-4 transition-all duration-300 hover:-translate-y-1 group">
                             <div className="h-12 w-12 rounded-xl bg-sky-500 flex items-center justify-center text-white shadow-lg shadow-sky-100 group-hover:scale-110 group-hover:-translate-y-1 transition-transform"><FaMoneyBillWave size={20} /></div>
                             <div>
@@ -1430,6 +1434,20 @@ const SalaryManagement = () => {
                             <div>
                                 <p className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">Net Total</p>
                                 <p className="text-xl font-black text-emerald-700 tracking-tighter">Rs {toCurrency(summary.net)}</p>
+                            </div>
+                        </motion.div>
+                        <motion.div variants={fadeUp} transition={{ duration: 0.35 }} className="modern-card p-6 border-sky-50 shadow-xl shadow-sky-50/50 flex items-center gap-4 transition-all duration-300 hover:-translate-y-1 group">
+                            <div className="h-12 w-12 rounded-xl bg-sky-600 flex items-center justify-center text-white shadow-lg shadow-sky-100 group-hover:scale-110 group-hover:-translate-y-1 transition-transform"><FaCheckCircle size={20} /></div>
+                            <div>
+                                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">With Pay Total Days</p>
+                                <p className="text-xl font-black text-sky-700 tracking-tighter">{Number(summary.withPay || 0).toFixed(1)}</p>
+                            </div>
+                        </motion.div>
+                        <motion.div variants={fadeUp} transition={{ duration: 0.35 }} className="modern-card p-6 border-rose-50 shadow-xl shadow-rose-50/50 flex items-center gap-4 transition-all duration-300 hover:-translate-y-1 group">
+                            <div className="h-12 w-12 rounded-xl bg-rose-500 flex items-center justify-center text-white shadow-lg shadow-rose-100 group-hover:scale-110 group-hover:-translate-y-1 transition-transform"><FaTimesCircle size={20} /></div>
+                            <div>
+                                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">Without Pay Total Days</p>
+                                <p className="text-xl font-black text-rose-700 tracking-tighter">{Number(summary.withoutPay || 0).toFixed(1)}</p>
                             </div>
                         </motion.div>
                     </motion.div>
