@@ -255,7 +255,7 @@ async function run() {
   const envStartArg = Number(process.env.START_ID || 0) || 0;
   const startId = Math.max(cliStartArg, envStartArg, 0);
 
-  const paidStatuses = ['Present', 'CL', 'ML', 'Comp Leave', 'OD', 'Leave', 'Holiday'];
+  const paidStatuses = ['Present', 'CL', 'ML', 'Comp Leave', 'OD', 'Leave', 'Holiday', 'Weekend'];
   const unpaidStatuses = ['Absent', 'LOP'];
   const paidSet = new Set(paidStatuses.map(normalizeStatusToken));
   const unpaidSet = new Set(unpaidStatuses.map(normalizeStatusToken));

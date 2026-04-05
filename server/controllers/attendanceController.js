@@ -473,7 +473,7 @@ exports.getAttendanceStatusOptions = async (req, res) => {
         `;
 
         const { rows } = await queryWithRetry(query, params);
-        const defaults = ['Present', 'CL', 'ML', 'Comp Leave', 'OD', 'Leave', 'Holiday', 'Absent', 'LOP'];
+        const defaults = ['Present', 'CL', 'ML', 'Comp Leave', 'OD', 'Leave', 'Holiday', 'Weekend', 'Absent', 'LOP'];
         const merged = Array.from(new Set([
             ...defaults,
             ...rows.map((r) => String(r.status || '').trim()).filter(Boolean)

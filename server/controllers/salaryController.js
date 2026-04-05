@@ -305,17 +305,25 @@ const getAttendanceAggregateMap = async ({ fromDate, toDate, paidStatuses, unpai
                 UNION ALL
                 SELECT (d + 1)::date FROM date_range 
                 WHERE d < $2::date
+            ),
+            calendar_days AS (
+                SELECT
+                    dr.d,
+                    COALESCE(h.type, CASE WHEN EXTRACT(DOW FROM dr.d) IN (0, 6) THEN 'Weekend' ELSE 'Working Day' END) AS day_type
+                FROM date_range dr
+                LEFT JOIN holidays h ON h.h_date = dr.d
             )
             SELECT
                 TRIM(u.emp_id) AS emp_id,
-                dr.d AS date,
-                COALESCE(ar.status::text, 'Absent') AS status,
+                cd.d AS date,
+                cd.day_type,
+                ar.status::text AS status,
                 COALESCE(ar.remarks, '') AS remarks
             FROM users u
-            CROSS JOIN date_range dr
-            LEFT JOIN attendance_records ar ON TRIM(ar.emp_id) = TRIM(u.emp_id) AND ar.date = dr.d
+            CROSS JOIN calendar_days cd
+            LEFT JOIN attendance_records ar ON TRIM(ar.emp_id) = TRIM(u.emp_id) AND ar.date = cd.d
             WHERE u.role IN ('staff', 'hod', 'principal')
-            ORDER BY TRIM(u.emp_id), dr.d
+            ORDER BY TRIM(u.emp_id), cd.d
         `;
         const { rows } = await queryWithRetry(query, [fromDate, toDate]);
 
@@ -342,8 +350,17 @@ const getAttendanceAggregateMap = async ({ fromDate, toDate, paidStatuses, unpai
 
             // classifyStatusUnits is the battle-tested fuzzy-matching source of truth.
             // It correctly handles OD, Comp Leave, half-days, separators, prefix/suffix labels, etc.
+            const resolvedStatus = (() => {
+                if (r.status) return r.status;
+
+                const dayType = normalizeStatusToken(r.day_type);
+                if (dayType === 'weekend' && paidSet.has('weekend')) return 'Weekend';
+                if (dayType.includes('holiday') && paidSet.has('holiday')) return 'Holiday';
+                return 'Absent';
+            })();
+
             const { paid, unpaid } = classifyStatusUnits({
-                statusText: r.status,
+                statusText: resolvedStatus,
                 remarksText: r.remarks,
                 paidSet,
                 unpaidSet
@@ -352,7 +369,7 @@ const getAttendanceAggregateMap = async ({ fromDate, toDate, paidStatuses, unpai
             // ── Granular breakdown: distribute paid units into present vs with_pay ──
             // We use the SAME paid amount from classifyStatusUnits so totals always match.
             if (paid > 0) {
-                const rawStatus = String(r.status || '').trim();
+                const rawStatus = String(resolvedStatus || '').trim();
                 let presentPortion = 0;
 
                 if (rawStatus.includes('+') || /[\/,&]/.test(rawStatus)) {
@@ -384,7 +401,7 @@ const getAttendanceAggregateMap = async ({ fromDate, toDate, paidStatuses, unpai
             map[key].payable_days += paid;
             map[key].unpaid_days  += unpaid;
 
-            if (normalizeStatusToken(r.status) !== 'absent') {
+            if (normalizeStatusToken(resolvedStatus) !== 'absent') {
                 map[key].total_records += 1;
             }
         });
