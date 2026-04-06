@@ -73,13 +73,14 @@ const Notifications = () => {
             console.log('Real-time punch received:', data);
             const now = new Date();
             const localTimestamp = now.toISOString().replace('Z', '');
+            const liveMessage = data?.message || `${data?.name || data?.emp_id || 'Employee'} punched ${data?.type || 'IN/OUT'} at ${formatTo12Hr(data?.time || '')}`;
             const newNotif = {
                 id: Date.now(),
-                message: `${data.name} punched ${data.type} at ${formatTo12Hr(data.time)}`,
+                message: liveMessage,
                 type: 'system',
                 created_at: localTimestamp,
                 is_read: false,
-                metadata: null
+                metadata: data?.remarks ? { remarks: data.remarks } : null
             };
             setNotifications(prev => [newNotif, ...prev]);
             setLoading(false);

@@ -750,10 +750,13 @@ exports.receiveLog = async (req, res) => {
             const statusLabel = syncResult.enumStatus || syncResult.dbStatus || 'Present';
             const inTimeLabel = syncResult.physIn || '--:--';
             const outTimeLabel = syncResult.physOut || 'Pending';
+            const remarksLabel = removeStatusFromRemarks(syncResult.remarks || '') || (normalizedPunchType === 'OUT'
+                ? 'Attendance completed successfully.'
+                : 'Punch-in recorded successfully.');
             
             const message = normalizedPunchType === 'OUT'
-                ? `🔔 Attendance Notification\n\nEmployee Name   : ${userName}\nEmployee ID     : ${normalizedEmpId}\nPunch-In Time   : ${inTimeLabel}\nPunch-Out Time  : ${outTimeLabel}\nStatus          : ${statusLabel}\n\nRemark : Attendance completed successfully.`
-                : `🔔 Attendance Notification\n\nEmployee Name : ${userName}\nEmployee ID   : ${normalizedEmpId}\nPunch-In Time : ${timeStr}\nStatus        : ${statusLabel}\n\nRemark : Punch-in recorded successfully.`;
+                ? `🔔 Attendance Notification\n\nEmployee Name   : ${userName}\nEmployee ID     : ${normalizedEmpId}\nPunch-In Time   : ${inTimeLabel}\nPunch-Out Time  : ${outTimeLabel}\nStatus          : ${statusLabel}\n\nRemark : ${remarksLabel}`
+                : `🔔 Attendance Notification\n\nEmployee Name : ${userName}\nEmployee ID   : ${normalizedEmpId}\nPunch-In Time : ${timeStr}\nStatus        : ${statusLabel}\n\nRemark : ${remarksLabel}`;
 
             // Asynchronous notifications (don't block the response)
             (async () => {
@@ -773,7 +776,9 @@ exports.receiveLog = async (req, res) => {
             if (io) {
                 io.emit('biometric_punch', {
                     emp_id: normalizedEmpId,
+                    name: userName,
                     type: normalizedPunchType,
+                    message,
                     time: timeStr,
                     date: dateStr,
                     in_time: syncResult.physIn || null,
